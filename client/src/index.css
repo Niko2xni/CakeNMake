@@ -1,0 +1,227 @@
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&family=Baloo+2:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Cake / bakery palette */
+    --cake-bg:        #1a0f00;
+    --cake-gold:      #E3A14D;
+    --cake-cream:     #F8E9B9;
+    --cake-brown:     #C07828;
+    --cake-text:      #FFF5E0;
+    --cake-muted:     rgba(255,245,224,0.5);
+
+    --background: 30 50% 97%;
+    --foreground: 340 30% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 340 30% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 340 30% 15%;
+    --primary: 340 82% 62%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 45 100% 85%;
+    --secondary-foreground: 35 60% 30%;
+    --muted: 30 30% 93%;
+    --muted-foreground: 340 10% 45%;
+    --accent: 170 60% 75%;
+    --accent-foreground: 170 60% 15%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 340 20% 88%;
+    --input: 340 20% 88%;
+    --ring: 340 82% 62%;
+    --chart-1: 340 82% 62%;
+    --chart-2: 170 60% 55%;
+    --chart-3: 45 100% 65%;
+    --chart-4: 280 60% 65%;
+    --chart-5: 200 80% 60%;
+    --radius: 1rem;
+    --font-heading: 'Baloo 2', cursive, ui-sans-serif, system-ui, sans-serif;
+    --font-body: 'Fredoka', ui-sans-serif, system-ui, sans-serif;
+    --font-display: 'Baloo 2', cursive, ui-sans-serif, system-ui, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 340 82% 62%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 340 20% 95%;
+    --sidebar-accent-foreground: 340 30% 15%;
+    --sidebar-border: 340 20% 90%;
+    --sidebar-ring: 340 82% 62%;
+  }
+
+  .dark {
+    --background: 340 20% 8%;
+    --foreground: 30 50% 95%;
+    --card: 340 20% 12%;
+    --card-foreground: 30 50% 95%;
+    --popover: 340 20% 12%;
+    --popover-foreground: 30 50% 95%;
+    --primary: 340 82% 62%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 45 40% 25%;
+    --secondary-foreground: 45 100% 85%;
+    --muted: 340 15% 18%;
+    --muted-foreground: 340 10% 60%;
+    --accent: 170 40% 30%;
+    --accent-foreground: 170 60% 85%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 340 15% 20%;
+    --input: 340 15% 20%;
+    --ring: 340 82% 62%;
+    --chart-1: 340 82% 62%;
+    --chart-2: 170 60% 55%;
+    --chart-3: 45 100% 65%;
+    --chart-4: 280 60% 65%;
+    --chart-5: 200 80% 60%;
+    --sidebar-background: 340 20% 10%;
+    --sidebar-foreground: 30 50% 95%;
+    --sidebar-primary: 340 82% 62%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 340 15% 18%;
+    --sidebar-accent-foreground: 30 50% 95%;
+    --sidebar-border: 340 15% 20%;
+    --sidebar-ring: 340 82% 62%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-body;
+  }
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Sponge Cake page ── */
+.cake-page {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: var(--cake-bg);
+  overflow: hidden;
+}
+
+.cake-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.cake-header {
+  position: absolute;
+  top: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  pointer-events: none;
+  user-select: none;
+}
+
+.cake-title {
+  font-size: clamp(1.6rem, 4vw, 2.6rem);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--cake-gold);
+  text-shadow: 0 2px 16px rgba(0,0,0,0.6);
+  margin: 0;
+  line-height: 1.1;
+}
+
+.cake-subtitle {
+  font-size: clamp(0.7rem, 1.8vw, 0.95rem);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  transition: color 0.4s ease;
+  margin: 6px 0 0;
+}
+
+.cake-hint {
+  position: absolute;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  color: var(--cake-muted);
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+}
+
+/* ── Flavor selector ── */
+.flavor-bar {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  padding: 10px 16px;
+  background: rgba(255,255,255,0.06);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 999px;
+  align-items: center;
+}
+
+.flavor-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 12px;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.flavor-btn:hover {
+  transform: translateY(-3px);
+  background: rgba(255,255,255,0.08);
+}
+
+.flavor-btn.active {
+  transform: translateY(-3px);
+}
+
+.flavor-swatch {
+  display: block;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.flavor-btn.active .flavor-swatch {
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.85), 0 2px 12px rgba(0,0,0,0.5);
+  transform: scale(1.15);
+}
+
+.flavor-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cake-muted);
+  transition: color 0.25s ease;
+  white-space: nowrap;
+}
+
+.flavor-btn.active .flavor-label {
+  color: var(--cake-text);
+}

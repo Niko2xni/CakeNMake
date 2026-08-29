@@ -1,0 +1,63 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build & Production Outputs
+dist/
+**/dist/
+dist-ssr/
+**/dist-slr/
+build/
+**/build/
+
+# Temporary Vite & Tooling Files
+*.timestamp-*.mjs
+**/vite.config.js.timestamp*
+.vite/
+
+# Environment Variables & Secret Files
+.env
+.env.*
+*.env
+server/.env
+connect to cloudinary
+cloudinary credentials
+
+# Debug & Execution Logs
+*.log
+**/*.log
+logs/
+**/logs/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Scratch Notes & Temporary Specs
+*.tmp
+(.temp
+implementation_plan.md
+problem with white screen bug.md
+victorial-style-lambeth-piping.html
+DRAG_AND_DROP_DECORATIONS_RESEARCH.md
+EXTERIOR_FINISH_*.md
+SPONGE_*.md
+SUGAR_COLOR_FILES.md 
+REDESIGN_SUMMARY.md
+github_cleanup_plan.md
+fix_text_not_appearing_plan.md
+ball_overlap_fix_plan.md
+.kiro/
+AI_HANDOFF_NOTE.md
+ARCHITECTURE_ALIGNMENT.md
+CHANGES_BY_NIKOLAI.md
+Changes.txt
+CLEANUP_COMPLETED.md
+
+# IDE & System Files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+PROJECT_OVERVIEW.md
