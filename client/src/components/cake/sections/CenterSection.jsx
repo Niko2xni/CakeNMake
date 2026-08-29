@@ -4,7 +4,7 @@ import { CENTER_DECORATION_SETS, CENTER_DECORATION_VARIATIONS } from '@/lib/cake
 import SetPicker from '../SetPicker';
 import SugarColorSection from './SugarColorSection';
 import { PREMADE_DOODLES } from '../sets/premadeDoodles';
-import { Grid, Circle, Dot, Moon, Sparkles, SlidersHorizontal } from 'lucide-react';
+import { Grid, Circle, Dot, Moon, Sparkles, SlidersHorizontal, Crown, Layers } from 'lucide-react';
 
 const SPACING_PRESETS = [
   { id: 'tight', label: 'Tight', value: 0.18 },

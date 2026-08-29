@@ -499,6 +499,8 @@ export const SINGLE_ITEM_DECORATION_SETS = CENTER_DECORATION_SETS;
 export const CENTER_DECORATION_VARIATIONS = [
   { id: 'fullFill', label: 'Full Surface Fill' },
   { id: 'outerRing', label: 'Outer Ring' },
+  { id: 'topBottomCrown', label: 'Top & Bottom Crown' },
+  { id: 'cornerFlanks', label: 'Dual Corner Flanks' },
   { id: 'single', label: 'Single Centerpiece' },
   { id: 'crescent', label: 'Crescent Arc' },
   { id: 'cluster', label: 'Offset Cluster' },
