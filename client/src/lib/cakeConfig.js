@@ -8,7 +8,7 @@
 //   Center   — top surface: Decorations OR Text (mutually exclusive)
 //   Edge     — top/bottom edge trim: Top+Bottom-separate OR Both (mutually exclusive)
 //   Side     — vertical wall treatments: exactly one of Checkered Pattern,
-//              Triangle Pattern, Stripes, Scatter Pearls, Tuxedo, Whipped
+//              Triangle Pattern, Scatter Pearls, Sunshine Play, Whipped
 //              Skirt, or Drip is active at a time (`mode`), plus
 //              independent Piping
 //   Place    — empty bucket for now, future manual-placement experiments
@@ -28,7 +28,7 @@
 // in DEFAULT_CONFIG). `surfaceTreatment` still exists for Glaze, which
 // genuinely is the latter — an overlay that can combine with any of the
 // three Exterior Finish styles rather than being an alternative to them.
-// Checkered Pattern and the old "No Name" (Tuxedo/Whipped Skirt/Drip)
+// Checkered Pattern and the old "No Name" (Whipped Skirt/Drip)
 // never actually lived in the Surface UI — they've always been Side, and
 // stay there, now each its own field under `side.mode` instead of nested
 // "sets" lists.
@@ -153,7 +153,7 @@ export const DEFAULT_CONFIG = {
   center: {
     mode: null, // 'decorations' | 'text' | null
     decorations: { setId: null, variation: 'outerRing', colorId: 'vanilla' },
-    text: { top: '', middle: '', bottom: '', font: 'script', spacing: 0.28 },
+    text: { top: '', middle: '', bottom: '', font: 'script' },
   },
 
   // 6. Edge — top edge / bottom edge trim. Top+Bottom-separate and Both are
@@ -174,19 +174,20 @@ export const DEFAULT_CONFIG = {
   // active at a time (`mode`, same exclusive-choice pattern as `center.mode`
   // and `edge.mode`). Each treatment keeps its own dedicated field so
   // switching between them never loses a person's settings — picking
-  // Tuxedo after Stripes was active doesn't erase the Stripes color, it's
-  // just not the active one anymore.
+  // Victorian Lambeth after Piping Scrolls was active doesn't erase the
+  // Piping Scrolls color, it's just not the active one anymore.
+  // Fondant Swag, Stripes, and Tuxedo were retired and replaced by Sunshine
+  // Play (see SUNSHINE_PLAY_SETS) — a single accent piece stuck to the side
+  // rather than a treatment that wraps the whole wall.
   side: {
-    mode: null, // 'checkeredPattern' | 'trianglePattern' | 'stripes' | 'scatterPearls' | 'tuxedo' | 'whippedSkirt' | 'drip' | null
+    mode: null, // 'checkeredPattern' | 'trianglePattern' | 'scatterPearls' | 'whippedSkirt' | 'drip' | null
     checkeredPattern: { setId: null, colorId: 'vanilla' }, // setId from CHECKERED_PATTERN_SETS (4 variants)
     trianglePattern: { setId: null, colorId: 'vanilla' }, // setId from TRIANGLE_PATTERN_SETS — duplicate of checkeredPattern's shape, triangles instead of boxes
-    stripes: { colorId: 'vanilla' },
     scatterPearls: { setId: 'randomScatter', colorId: 'vanilla' },
-    tuxedo: { colorId: 'vanilla' },
     whippedSkirt: { colorId: 'vanilla' },
     drip: { colorId: 'vanilla' },
     pipingScrolls: { setId: 'waveRope', colorId: 'vanilla' },
-    fondantSwag: { setId: 'classic', colorId: 'vanilla' },
+    sunshinePlay: { setId: 'rainbowArc', colorId: 'vanilla', flavorId: 'vanilla' }, // setId from SUNSHINE_PLAY_SETS, flavorId for rainbow arc customization
     victorianLambeth: { setId: 'classic', colorId: 'vanilla' }, // setId from VICTORIAN_LAMBETH_SETS (4 variants)
     chevronPattern: { setId: 'multiColor', colorId: 'vanilla' },
   },
@@ -499,8 +500,6 @@ export const SINGLE_ITEM_DECORATION_SETS = CENTER_DECORATION_SETS;
 export const CENTER_DECORATION_VARIATIONS = [
   { id: 'fullFill', label: 'Full Surface Fill' },
   { id: 'outerRing', label: 'Outer Ring' },
-  { id: 'topBottomCrown', label: 'Top & Bottom Crown' },
-  { id: 'cornerFlanks', label: 'Dual Corner Flanks' },
   { id: 'single', label: 'Single Centerpiece' },
   { id: 'crescent', label: 'Crescent Arc' },
   { id: 'cluster', label: 'Offset Cluster' },
@@ -510,6 +509,17 @@ export const CENTER_DECORATION_VARIATIONS = [
 export const EDGE_DECORATION_SETS = [
   { id: 'curtain', label: 'Curtain' },
   { id: 'beadedTrim', label: 'Beaded Trim' },
+  // Same underlying geometry as Beaded Trim (buildBeadedTrimRing in
+  // DecorationSets.jsx), just a different bead-size rhythm per design —
+  // see BEADED_TRIM_PATTERNS in CakeScene.jsx for how each id maps to a
+  // pattern. Trio cycles Small → Big → Medium around the ring rather than
+  // a straight Small → Medium → Big ramp — a repeating ascending-size
+  // sequence reads as a lopsided gradient once it wraps all the way
+  // around a circle, not a balanced pattern; breaking the order keeps
+  // the eye from settling into "biggest bead is always three spots after
+  // the smallest."
+  { id: 'beadedTrimTrio', label: 'Trio Beaded Trim' },
+  { id: 'beadedTrimPetite', label: 'Petite Beaded Trim' },
 ];
 
 export const EDGE_PIPING_OPTIONS = [...EDGE_DECORATION_SETS, ...PIPING_TIPS]
@@ -552,10 +562,18 @@ export const PIPING_SCROLLS_SETS = [
   { id: 'loopChain', label: 'Interlocking Loop Chain', price: 115 },
 ];
 
-export const FONDANT_SWAG_SETS = [
-  { id: 'classic', label: 'Classic Drape', price: 130 },
-  { id: 'deepScallop', label: 'Deep Scallop', price: 140 },
-  { id: 'shallowRuffle', label: 'Shallow Ruffle', price: 125 },
+// Sunshine Play — replaces Fondant Swag, Stripes, and Tuxedo. Unlike those
+// (and unlike every other Side treatment, which wraps the whole wall or
+// tiles around it), each Sunshine Play design is an accent piece
+// stuck to the side — see buildSunshinePlay in
+// sets/sunshinePlayHelpers.js. Star Burst and Cloudy Chump respect Color
+// Override for buttercream coloring; Rainbow Arc has its own fixed rainbow
+// palette and ignores it — see SideSection.jsx's colorOverrideDisabled,
+// which is keyed off exactly that.
+export const SUNSHINE_PLAY_SETS = [
+  { id: 'rainbowArc', label: 'Rainbow Arc', price: 140 }, // hardened buttercream rainbow with cloud puffs at its feet
+  { id: 'starBurst', label: 'Star Burst', price: 125 }, // scattered buttercream stars hugging the cake side
+  { id: 'cloudyChump', label: 'Cloudy Chump', price: 130 }, // randomized clouds only
 ];
 
 export const VICTORIAN_LAMBETH_SETS = [
@@ -573,9 +591,7 @@ export const SIDE_TREATMENTS = [
   { id: 'chevronPattern', label: 'Chevron Pattern' }, // priced per-variant, see CHEVRON_PATTERN_SETS
   { id: 'scatterPearls', label: 'Scatter Pearls' }, // priced per-variant, see SCATTER_PEARLS_SETS
   { id: 'pipingScrolls', label: 'Piping Scrolls' }, // priced per-variant, see PIPING_SCROLLS_SETS
-  { id: 'fondantSwag', label: 'Fondant Swag' }, // priced per-variant, see FONDANT_SWAG_SETS
-  { id: 'stripes', label: 'Stripes', price: 80 },
-  { id: 'tuxedo', label: 'Tuxedo', price: 120 },
+  { id: 'sunshinePlay', label: 'Sunshine Play' }, // priced per-variant, see SUNSHINE_PLAY_SETS — replaces Fondant Swag/Stripes/Tuxedo
   { id: 'victorianLambeth', label: 'Victorian Lambeth' }, // priced per-variant, see VICTORIAN_LAMBETH_SETS
 ];
 

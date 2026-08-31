@@ -1,16 +1,9 @@
 import React from 'react';
-import { Slider } from '@/components/ui/slider';
 import { CENTER_DECORATION_SETS, CENTER_DECORATION_VARIATIONS } from '@/lib/cakeConfig';
 import SetPicker from '../SetPicker';
 import SugarColorSection from './SugarColorSection';
 import { PREMADE_DOODLES } from '../sets/premadeDoodles';
-import { Grid, Circle, Dot, Moon, Sparkles, SlidersHorizontal, Crown, Layers } from 'lucide-react';
-
-const SPACING_PRESETS = [
-  { id: 'tight', label: 'Tight', value: 0.18 },
-  { id: 'normal', label: 'Normal', value: 0.28 },
-  { id: 'wide', label: 'Wide', value: 0.42 },
-];
+import { Grid, Circle, Dot, Moon, Sparkles, SlidersHorizontal } from 'lucide-react';
 
 const FONTS = [
   { id: 'script', label: 'Script' },
@@ -101,10 +94,6 @@ export default function CenterSection({ center, onChange, activeTool, onSelectTo
 
   const updateText = (value) => {
     updateTextSlot("middle", value);
-  };
-
-  const updateSpacing = (spacing) => {
-    onChange({ ...center, text: { ...center.text, spacing } });
   };
 
   const updateFont = (font) => {
@@ -236,44 +225,6 @@ export default function CenterSection({ center, onChange, activeTool, onSelectTo
                   {f.label}
                 </button>
               ))}
-            </div>
-          </div>
-
-          <div className="pt-1">
-            <div className="flex justify-between items-center mb-1.5">
-              <span className="text-xs text-muted-foreground">Line Spacing</span>
-              <span className="text-[10px] font-medium text-muted-foreground">
-                {Math.round(((center.text?.spacing ?? 0.28) / 0.28) * 100)}%
-              </span>
-            </div>
-            <div className="flex gap-1 mb-2">
-              {SPACING_PRESETS.map((p) => {
-                const currentSpacing = center.text?.spacing ?? 0.28;
-                const isSelected = Math.abs(currentSpacing - p.value) < 0.03;
-                return (
-                  <button
-                    key={p.id}
-                    onClick={() => updateSpacing(p.value)}
-                    className={`flex-1 py-1 rounded-lg text-xs font-semibold transition-all duration-150 ${
-                      isSelected
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                    }`}
-                  >
-                    {p.label}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="px-1 py-1">
-              <Slider
-                value={[center.text?.spacing ?? 0.28]}
-                onValueChange={([val]) => updateSpacing(val)}
-                min={0.15}
-                max={0.50}
-                step={0.01}
-                className="w-full cursor-pointer"
-              />
             </div>
           </div>
           <p className="text-[10px] text-muted-foreground">

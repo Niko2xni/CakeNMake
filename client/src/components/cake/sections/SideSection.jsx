@@ -6,9 +6,10 @@ import {
   CHEVRON_PATTERN_SETS,
   SCATTER_PEARLS_SETS,
   PIPING_SCROLLS_SETS,
-  FONDANT_SWAG_SETS,
+  SUNSHINE_PLAY_SETS,
   VICTORIAN_LAMBETH_SETS,
 } from '@/lib/cakeConfig';
+import { FLAVORS, FLAVOR_ORDER } from '@/lib/cakeFlavors';
 import SugarColorSection from './SugarColorSection';
 
 export default function SideSection({ side, onChange, sugarColor, onSugarColorChange }) {
@@ -32,8 +33,11 @@ export default function SideSection({ side, onChange, sugarColor, onSugarColorCh
   const selectPipingScrollsVariant = (setId) =>
     onChange({ ...side, mode: 'pipingScrolls', pipingScrolls: { ...side.pipingScrolls, setId } });
 
-  const selectFondantSwagVariant = (setId) =>
-    onChange({ ...side, mode: 'fondantSwag', fondantSwag: { ...side.fondantSwag, setId } });
+  const selectSunshinePlayVariant = (setId) =>
+    onChange({ ...side, mode: 'sunshinePlay', sunshinePlay: { ...side.sunshinePlay, setId } });
+
+  const selectSunshinePlayFlavor = (flavorId) =>
+    onChange({ ...side, mode: 'sunshinePlay', sunshinePlay: { ...side.sunshinePlay, flavorId } });
 
   const selectVictorianLambethVariant = (setId) =>
     onChange({ ...side, mode: 'victorianLambeth', victorianLambeth: { ...side.victorianLambeth, setId } });
@@ -44,7 +48,7 @@ export default function SideSection({ side, onChange, sugarColor, onSugarColorCh
     chevronPattern: { sets: CHEVRON_PATTERN_SETS, select: selectChevronVariant, stateKey: 'chevronPattern' },
     scatterPearls: { sets: SCATTER_PEARLS_SETS, select: selectScatterPearlsVariant, stateKey: 'scatterPearls' },
     pipingScrolls: { sets: PIPING_SCROLLS_SETS, select: selectPipingScrollsVariant, stateKey: 'pipingScrolls' },
-    fondantSwag: { sets: FONDANT_SWAG_SETS, select: selectFondantSwagVariant, stateKey: 'fondantSwag' },
+    sunshinePlay: { sets: SUNSHINE_PLAY_SETS, select: selectSunshinePlayVariant, stateKey: 'sunshinePlay' },
     victorianLambeth: { sets: VICTORIAN_LAMBETH_SETS, select: selectVictorianLambethVariant, stateKey: 'victorianLambeth' },
   };
 
@@ -84,8 +88,17 @@ export default function SideSection({ side, onChange, sugarColor, onSugarColorCh
                       sugarColor={sugarColor}
                       onChange={onSugarColorChange}
                       showDefaultColorPicker
-                      colorOverrideDisabled={t.id === 'chevronPattern' && currentSetId === 'multiColor'}
-                      colorOverrideDisabledReason="Multi-Color uses its own fixed palette per row — Color Override has no effect on it."
+                      colorOverrideDisabled={
+                        (t.id === 'chevronPattern' && currentSetId === 'multiColor') ||
+                        (t.id === 'sunshinePlay' && currentSetId === 'rainbowArc')
+                      }
+                      colorOverrideDisabledReason={
+                        (t.id === 'sunshinePlay' && currentSetId === 'rainbowArc')
+                          ? 'Rainbow Arc uses its own fixed rainbow palette — Color Override has no effect on it.'
+                          : (t.id === 'chevronPattern' && currentSetId === 'multiColor')
+                          ? 'Multi-Color uses its own fixed palette per row — Color Override has no effect on it.'
+                          : ''
+                      }
                     />
                   )}
                 </React.Fragment>

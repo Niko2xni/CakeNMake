@@ -42,6 +42,7 @@ export default function SetPicker({
   colorLabel = 'Color',
   showColorPicker = true,
   numberFromNone = false,
+  showNoneButton = true,
 }) {
   const showColors = !!activeSetId && showColorPicker;
 
@@ -52,21 +53,23 @@ export default function SetPicker({
       )}
 
       <div className={`flex flex-wrap gap-2 ${disabled ? 'opacity-40' : ''}`}>
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => onSelectSet(null)}
-          title="None"
-          className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
-            disabled ? 'cursor-not-allowed' : ''
-          } ${
-            !activeSetId
-              ? 'bg-primary text-primary-foreground border-primary'
-              : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
-          }`}
-        >
-          {numberFromNone ? 1 : '—'}
-        </button>
+        {showNoneButton && (
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => onSelectSet(null)}
+            title="None"
+            className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
+              disabled ? 'cursor-not-allowed' : ''
+            } ${
+              !activeSetId
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
+            }`}
+          >
+            {numberFromNone ? 1 : '—'}
+          </button>
+        )}
         {sets.map((set, i) => {
           const active = activeSetId === set.id;
           return (

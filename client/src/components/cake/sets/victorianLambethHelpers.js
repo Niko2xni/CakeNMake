@@ -163,11 +163,10 @@ export function buildVictorianLambeth(radius, height, icingColorHex, pearlColorH
   const R_anchor = R_cake + 0.025; // Standoff so rosette & leaves sit in front of cake wall
 
   // 3.5 Variant shorthand flags — computed early because segment spacing
-  // below is now variant-conditional (tripleBand/classic), not global.
+  // below is now variant-conditional (tripleBand), not global.
   const isDoubleBand = variant === 'doubleBand';
   const isTripleBand = variant === 'tripleBand';
-  const isClassic = variant === 'classic';
-  const isRopesOnly = variant === 'ropesOnly';
+  const isNoRosette = variant === 'noRosette';
 
   // Anchor pearl's own radius (see buildAnchorNode below, which now
   // references this same constant instead of a separate hardcoded 0.16) —
@@ -177,21 +176,23 @@ export function buildVictorianLambeth(radius, height, icingColorHex, pearlColorH
   // pearl's own size or position is ever retuned.
   const ANCHOR_PEARL_RADIUS = 0.16;
 
+  // How far below their default position rope1/rope2 (and the ball they
+  // meet) are nudged, for variants with showTopRopes true — currently
+  // 'classic' and 'ropesOnly'. Kept as one shared constant so both stay
+  // in sync automatically, rather than drifting apart if tuned separately.
+  const ROPES_ONLY_EXTRA_DROP = 0.05; // × H — tune here for more/less than the current nudge
+
   // 4. Compact Segment & Angular Math
   const circumference = 2 * Math.PI * radius;
   // Wider spacing (tripleBand only) — classic no longer uses a density
   // target at all (see segmentCount below), so this ternary only branches
   // for tripleBand now; every other design keeps the original 2.3.
   const targetSegmentWidth = isTripleBand ? 3.4 : 2.3;
-  // classic (design 1): an exact segment count instead of a
-  // circumference-derived approximation. The rosette, its anchor pearl,
-  // and the low swag-intersection pearl are all built once per segment
-  // (see the per-segment loop below), so fixing this one number to 11
-  // pins the rosette count AND the low-pearl count ("the balls below")
-  // to exactly 11 together, regardless of tier radius — not an
-  // approximation via circumference / width the way every other design
-  // still works.
-  const segmentCount = isClassic ? 11 : Math.max(6, Math.round(circumference / targetSegmentWidth));
+  // classic no longer overrides segment count — it uses the same
+  // circumference-based count as every other non-tripleBand design,
+  // since it's now noRosette's design with the rosette added, not its
+  // own separately-tuned layout.
+  const segmentCount = Math.max(6, Math.round(circumference / targetSegmentWidth));
   const anglePerSegment = (Math.PI * 2) / segmentCount;
 
   const H = height;
@@ -213,11 +214,24 @@ export function buildVictorianLambeth(radius, height, icingColorHex, pearlColorH
     // circle connected to the ropes"). anchorPearl=the anchor's own
     // accent pearl (NOT positioned at any rope's endpoint, unlike lowPearl).
     // topFleur=an extra, upward-pointing fleur-de-lis at the angular
-    // stagger between anchors, up near the top gap above the curtain —
-    // 'noRosette' only, since without the rosette or top ropes that gap
-    // is otherwise empty. See "2b. Top Fleur-de-lis" below.
+    // stagger between anchors, up near the top gap above the curtain.
+    // Currently unused by every variant (VARIANT_FLAGS all set it
+    // false) — noRosette was the last one using it, until it became an
+    // exact copy of ropesOnly below. Left in place, not deleted, in
+    // case a future variant wants that top-gap treatment again. See
+    // "2b. Top Fleur-de-lis" below.
+    // classic is ropesOnly's design with the rosette added, plus two
+    // more additions on top: curtain (the wide sag connected to the
+    // rosettes) and fleur (hanging in the gaps between the lower ropes,
+    // i.e. at currentAngle — the angular midpoint between two consecutive
+    // low pearls, since midAngle/nextMidAngle straddle it symmetrically).
+    // ropesOnly itself is untouched by either addition.
     classic:    { rosette: true,  topRopes: true,  lowerRope: true,  offsetRope: true,  lowPearl: true,  fleur: true,  curtain: true,  anchorPearl: true, topFleur: false },
-    noRosette:  { rosette: false, topRopes: false, lowerRope: true,  offsetRope: true,  lowPearl: true,  fleur: true,  curtain: true,  anchorPearl: true, topFleur: true  },
+    // noRosette is now an exact copy of ropesOnly — every flag matches
+    // (rosette was already false on both, so this makes the two
+    // structurally identical designs). curtain/fleur/topFleur, which
+    // noRosette previously had, are now off to match.
+    noRosette:  { rosette: false, topRopes: true,  lowerRope: true,  offsetRope: true,  lowPearl: true,  fleur: false, curtain: false, anchorPearl: true, topFleur: false },
     ropesOnly:  { rosette: false, topRopes: true,  lowerRope: true,  offsetRope: true,  lowPearl: true,  fleur: false, curtain: false, anchorPearl: true, topFleur: false },
     noRopes:    { rosette: true,  topRopes: false, lowerRope: false, offsetRope: false, lowPearl: false, fleur: true,  curtain: true,  anchorPearl: true, topFleur: false },
     doubleBand: { rosette: true,  topRopes: false, lowerRope: false, offsetRope: false, lowPearl: false, fleur: false, curtain: true,  anchorPearl: true, topFleur: false },
@@ -267,6 +281,14 @@ export function buildVictorianLambeth(radius, height, icingColorHex, pearlColorH
   // match the reference sketch's small drips hanging below its bottom row
   // only, not every row.
   //
+  // 'noRosette' now uses this same 2-band mechanism too (see the ternary
+  // below) — its own visible elements (rope1/rope2, the pulled-in ball,
+  // rope3, the offset rope, the low pearl) all repeat automatically for
+  // each band, since the whole per-segment loop already runs once per
+  // band regardless of which variant it is. Neither band carries
+  // topFleur/bottomFleur, since noRosette's own fleur/topFleur flags are
+  // both false anyway.
+  //
   // BAND_SPACING controls how far down each subsequent band sits. The
   // fleur's teardrops reach lower than anything else in a band, so
   // removing fleur shrinks a single band's own vertical footprint a lot —
@@ -278,6 +300,14 @@ export function buildVictorianLambeth(radius, height, icingColorHex, pearlColorH
   // beyond two bands, so worth checking it still lands on the cake body
   // once rendered.
   const BAND_SPACING = 0.36; // × H — how far down each subsequent band sits; tune here if bands land too close/far apart or run off the cake body
+  // noRosette's own band reaches much lower than doubleBand/tripleBand's
+  // noRopes-style bands do — rope3 and the offset rope both stretch all
+  // the way down to the low pearl (see their sections further below), not
+  // just a compact rosette+curtain. Stacking a second full band that deep
+  // at the same 0.36×H spacing pushed its lowest points past the tier and
+  // onto the plate. A smaller, dedicated spacing keeps the second band's
+  // reach within the tier instead.
+  const NOROSETTE_BAND_SPACING = 0.20; // × H — tune here if the second band still overflows, or sits too close to the first
   // tripleBand now renders only 2 bands (its 3rd/bottommost band was
   // removed) — top band and middle band, same half-segment phase stagger
   // between them as before. The top band previously had neither topFleur
@@ -293,6 +323,11 @@ export function buildVictorianLambeth(radius, height, icingColorHex, pearlColorH
     ? [
         { yOffset: 0, angleOffset: 0, topFleur: false, bottomFleur: false },
         { yOffset: -H * BAND_SPACING, angleOffset: anglePerSegment / 2, topFleur: false, bottomFleur: false },
+      ]
+    : isNoRosette
+    ? [
+        { yOffset: 0, angleOffset: 0, topFleur: false, bottomFleur: false },
+        { yOffset: -H * NOROSETTE_BAND_SPACING, angleOffset: anglePerSegment / 2, topFleur: false, bottomFleur: false },
       ]
     : [{ yOffset: 0, angleOffset: 0, topFleur: showTopFleur, bottomFleur: showFleur }];
 
@@ -578,8 +613,8 @@ export function buildVictorianLambeth(radius, height, icingColorHex, pearlColorH
   const curtainGeoSingle = showCurtain
     ? createSinglePieceVolumetricCurtainGeometry(
         anglePerSegment,
-        isTripleBand ? 0.14 * H : isClassic ? 0.10 * H : 0.12 * H,
-        isTripleBand ? 0.32 * H : isClassic ? 0.13 * H : 0.22 * H,
+        isTripleBand ? 0.14 * H : 0.12 * H,
+        isTripleBand ? 0.32 * H : 0.22 * H,
         0.09
       )
     : null;
@@ -588,8 +623,18 @@ export function buildVictorianLambeth(radius, height, icingColorHex, pearlColorH
   // entry for every existing variant (so their output is identical to
   // before this existed), two entries only for 'doubleBand' (see `bands`
   // above).
+  //
+  // TOP_LIFT nudges a design up a little as a whole — applied here, at
+  // bandYOffset, because every Y position throughout this file (anchor,
+  // curtain, every rope tier, every pearl, every fleur) is built as some
+  // fraction of H plus bandYOffset, so this one hook raises all of them
+  // together. Scoped to 'noRosette' and 'ropesOnly' only — those are the
+  // two that needed it; 'classic', 'noRopes', 'doubleBand', and
+  // 'tripleBand' are back to their original, unlifted positions.
+  const applyTopLift = isNoRosette || variant === 'ropesOnly';
+  const TOP_LIFT = 0.05; // × H — "a little"; raise/lower this if it needs more or less
   for (const band of bands) {
-  const bandYOffset = band.yOffset;
+  const bandYOffset = band.yOffset + (applyTopLift ? TOP_LIFT * H : 0);
   const angleOffset = band.angleOffset;
   const bandTopFleur = band.topFleur;
   const bandBottomFleur = band.bottomFleur;
@@ -598,12 +643,22 @@ export function buildVictorianLambeth(radius, height, icingColorHex, pearlColorH
     const nextAngle = (i + 1) * anglePerSegment + angleOffset;
     const midAngle = currentAngle + anglePerSegment / 2;
 
-    // 1. Anchor Node at currentAngle — skipped entirely for 'ropesOnly'
-    // (buildAnchorNode would otherwise just return an empty group, since
-    // both the rosette and the anchor pearl are gated inside it already).
+    // 1. Anchor Node at currentAngle (rosette and/or anchor pearl,
+    // depending on flags — buildAnchorNode gates each internally).
     if (showRosette || showAnchorPearl) {
       const anchor = buildAnchorNode();
-      anchor.position.set(R_anchor * Math.sin(currentAngle), 0.42 * H + bandYOffset, R_anchor * Math.cos(currentAngle));
+      // Variants with top ropes (classic, ropesOnly — the only two with
+      // showTopRopes true) pull the ball in toward the cake wall (reduced
+      // standoff) instead of the default R_anchor, and drop it by
+      // ROPES_ONLY_EXTRA_DROP so it stays vertically centered on
+      // rope1/rope2's endpoints below instead of sitting at its default
+      // height while the ropes sit lower. Gated on showTopRopes rather
+      // than a variant name so classic and ropesOnly — copies of each
+      // other structurally — automatically get the identical treatment.
+      // Every other variant keeps the original R_anchor and Y untouched.
+      const anchorR = showTopRopes ? R_anchor - 0.08 : R_anchor;
+      const anchorYOffset = showTopRopes ? -ROPES_ONLY_EXTRA_DROP * H : 0;
+      anchor.position.set(anchorR * Math.sin(currentAngle), 0.42 * H + bandYOffset + anchorYOffset, anchorR * Math.cos(currentAngle));
       anchor.rotation.y = currentAngle;
       masterGroup.add(anchor);
     }
@@ -681,24 +736,30 @@ export function buildVictorianLambeth(radius, height, icingColorHex, pearlColorH
     // sitting at 0.40*H and rope1 at 0.46*H: both well above the pearl,
     // reading as floating on top of it rather than connected to it
     // (most visible in 'ropesOnly', where the pearl has no rosette above
-    // it to visually bridge that gap). rope1 keeps the same 0.06*H gap
-    // above rope2 it always had, for the same two-tier layered look.
+    // it to visually bridge that gap).
     if (showTopRopes) {
-      // 'ropesOnly' (design 3): pull rope1 down until it sits exactly on
-      // the anchor pearl's own top surface — pearl center is 0.34*H (see
-      // comment above), so its top is 0.34*H + ANCHOR_PEARL_RADIUS — then
-      // nudge both ropes a bit lower still, past that pearl-aligned point.
-      // rope2 keeps the same 0.06*H gap below rope1 it always had. Every
-      // other variant using this block ('classic') keeps the original
-      // 0.40*H / 0.34*H positions untouched.
-      const ROPES_ONLY_EXTRA_DROP = 0.05; // × H — tune here for more/less than the current nudge
-      const rope1Y = (isRopesOnly ? (0.34 * H + ANCHOR_PEARL_RADIUS - ROPES_ONLY_EXTRA_DROP * H) : 0.40 * H) + bandYOffset;
-      const rope2Y = (isRopesOnly ? (0.34 * H + ANCHOR_PEARL_RADIUS - ROPES_ONLY_EXTRA_DROP * H - 0.06 * H) : 0.34 * H) + bandYOffset;
-      // 'classic' (design 1): shorter sag on both tiers, paired with the
-      // denser rosette spacing set above. 'ropesOnly' keeps the original
-      // sag amounts — only its Y position changed, not its dip depth.
-      const rope1Sag = isClassic ? 0.15 * H * 0.6 : 0.15 * H;
-      const rope2Sag = isClassic ? 0.22 * H * 0.6 : 0.22 * H;
+      // This block runs for whichever variants have showTopRopes true —
+      // currently 'classic' and 'ropesOnly', which are now the same
+      // design structurally (classic = ropesOnly + rosette; see
+      // VARIANT_FLAGS above), so both get identical rope treatment here.
+      // Root cause of the "adjust up, adjust down, one rope always pokes
+      // out" problem: the gap between rope1 and rope2 was 0.06*H — scaled
+      // with tier height — while the ball's own radius (ANCHOR_PEARL_RADIUS,
+      // 0.16) is a FIXED real-world size that never scales with H. Once
+      // 0.06*H exceeds what fits inside a 0.16-radius ball, no vertical
+      // shift of the pair as a whole can contain both ropes at once —
+      // moving them up always eventually pushes rope1 out the top, moving
+      // them down always eventually pushes rope1 (or rope2) out the
+      // bottom, exactly as described. The actual fix has to shrink the
+      // gap itself, not reposition it: ROPE_GAP is now a fraction of the
+      // ball's own fixed radius, so both ropes stay inside the ball by
+      // construction regardless of what H turns out to be.
+      const ROPE_GAP = ANCHOR_PEARL_RADIUS * 0.4; // fixed units, not × H — tune the 0.4 fraction here if still too tight/loose
+      const ropesOnlyBallCenterY = 0.34 * H - ROPES_ONLY_EXTRA_DROP * H;
+      const rope2Y = ropesOnlyBallCenterY + bandYOffset;
+      const rope1Y = ropesOnlyBallCenterY + ROPE_GAP + bandYOffset;
+      const rope1Sag = 0.15 * H;
+      const rope2Sag = 0.22 * H;
 
       // Top Rope Tier (rope1 - Top Border Piping Line framing top curtain rim)
       const rope1 = new PolarRopeCurve(R_rope1, currentAngle, nextAngle, rope1Y, rope1Y, rope1Sag, 0.018);
@@ -711,12 +772,38 @@ export function buildVictorianLambeth(radius, height, icingColorHex, pearlColorH
       masterGroup.add(ropeMesh2);
     }
 
+    // lowPearlY is needed by both rope3 (below) and the offset rope
+    // (step 6), so it's computed once here regardless of whether the
+    // pearl mesh itself gets built.
+    const lowPearlY = -0.16 * H + bandYOffset;
+    const lowPearlR = R_pearl + 0.04;
+
     // Lower Rope Tier (rope3 - Deep loop below curtain) — removed for
     // 'noRopes' and 'doubleBand' along with every other rope tier and the
     // low pearl.
     if (showLowerRope) {
-      const rope3Sag = isClassic ? 0.42 * H * 0.6 : 0.42 * H;
-      const rope3 = new PolarRopeCurve(R_rope3, currentAngle, nextAngle, 0.28 * H + bandYOffset, 0.28 * H + bandYOffset, rope3Sag, 0.015);
+      // classic/noRosette (the only two variants where lowerRope AND
+      // curtain are both active — ropesOnly has curtain:false) sat rope3
+      // at the same Y as the curtain's own base, which buried it inside
+      // the curtain's volume instead of reading as a visible piped rope.
+      // Raised closer to the anchor pearl's height so it clears the
+      // curtain and is actually visible. Scoped to showCurtain (the
+      // actual cause), not a variant name — 'classic' is the only
+      // variant this still applies to now that noRosette's curtain is
+      // off (see VARIANT_FLAGS above).
+      const rope3Y = (showCurtain ? 0.38 * H : 0.28 * H) + bandYOffset;
+      // Stretched to reach the low pearl below, the same "touching, not
+      // just overlapping" treatment used for ropesOnly's top ropes and
+      // the ball. Derived directly from the actual gap to lowPearlY
+      // rather than a fixed guessed sag, so it stays correct regardless
+      // of H, bandYOffset, or whether the curtain raise applies. The
+      // earlier noRosette-only 60% dial-back is gone — that exception
+      // existed only because noRosette had a curtain for the rope to
+      // over-extend past; now that noRosette is an exact copy of
+      // ropesOnly (no curtain), it gets the same full reach ropesOnly
+      // always used.
+      const rope3Sag = rope3Y - lowPearlY;
+      const rope3 = new PolarRopeCurve(R_rope3, currentAngle, nextAngle, rope3Y, rope3Y, rope3Sag, 0.015);
       const ropeMesh3 = buildStarTipRopeMesh(rope3, 64, ropeRadius, 12, icingMat);
       masterGroup.add(ropeMesh3);
     }
@@ -726,11 +813,6 @@ export function buildVictorianLambeth(radius, height, icingColorHex, pearlColorH
     // its lowest point, so it reads as "a circle connected to the ropes"
     // rather than a standalone decorative accent like the anchor's pearl
     // above. Kept for 'ropesOnly', removed for 'noRopes'/'doubleBand'.
-    // lowPearlY/lowPearlR stay computed either way since the offset
-    // rope's own position depends on lowPearlY regardless of whether the
-    // pearl mesh is built.
-    const lowPearlY = -0.16 * H + bandYOffset;
-    const lowPearlR = R_pearl + 0.04;
     if (showLowPearl) {
       const lowPearl = new THREE.Mesh(new THREE.SphereGeometry(0.10, 16, 16), pearlMat);
       lowPearl.position.set(lowPearlR * Math.sin(midAngle), lowPearlY, lowPearlR * Math.cos(midAngle));
@@ -741,8 +823,7 @@ export function buildVictorianLambeth(radius, height, icingColorHex, pearlColorH
     // 'noRopes'/'doubleBand'.
     if (showOffsetRope) {
       const nextMidAngle = midAngle + anglePerSegment;
-      const offsetRopeSag = isClassic ? 0.22 * H * 0.6 : 0.22 * H;
-      const offsetRope = new PolarRopeCurve(R_rope3, midAngle, nextMidAngle, lowPearlY, lowPearlY, offsetRopeSag, 0.015);
+      const offsetRope = new PolarRopeCurve(R_rope3, midAngle, nextMidAngle, lowPearlY, lowPearlY, 0.22 * H, 0.015);
       const offsetRopeMesh = buildStarTipRopeMesh(offsetRope, 64, ropeRadius, 12, icingMat);
       masterGroup.add(offsetRopeMesh);
     }

@@ -1,11 +1,16 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { User, Settings, LogOut, ChevronDown, Plus, LayoutTemplate, Bot, Trash2, MessageSquare, Clock } from 'lucide-react';
+import { useAuth } from '@/lib/AuthContext';
 
 export default function ClientNavbar() {
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
+
+  const displayName = user?.displayName || user?.email?.split('@')[0]?.replace(/[._-]/g, ' ') || 'Cake Lover';
+  const userEmail = user?.email || 'user@example.com';
 
   const handleLogout = () => {
     // Add logout logic here
@@ -107,8 +112,8 @@ export default function ClientNavbar() {
           {userDropdownOpen && (
             <div className="absolute left-0 bottom-full mb-2 w-56 bg-white rounded-xl shadow-xl border border-pink-100 py-2 z-50">
               <div className="px-4 py-2 border-b border-pink-100">
-                <p className="font-semibold text-gray-800">Welcome!</p>
-                <p className="text-sm text-gray-600">user@example.com</p>
+                <p className="font-semibold text-gray-800">{displayName}</p>
+                <p className="text-sm text-gray-600">{userEmail}</p>
               </div>
               <Link
                 to="/profile"

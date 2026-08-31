@@ -2,19 +2,19 @@ import React, { useRef, useEffect, useCallback, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { addWhippedCreamSkirt } from './sets/skirtHelpers';
-import { addTuxedo } from './sets/tuxedoHelpers';
 import { buildPipingScrolls } from './sets/pipingScrollsHelpers';
-import { buildFondantSwag } from './sets/fondantSwagHelpers';
+import { buildSunshinePlay } from './sets/sunshinePlayHelpers';
 import { buildVictorianLambeth } from './sets/victorianLambethHelpers';
 import { buildPipingRing } from './pipingTips';
 import {
   buildDripRing,
   buildBeadedTrimRing,
-  buildStripesRing,
   buildCheckerSideSquares,
   buildTriangleSideShapes,
   buildScatterPearlsRing,
   buildChevronSideStripes,
+  computeEdgeTrimY,
+  computeEdgeTrimRadius,
 } from './DecorationSets';
 import { getFrostingMaterial } from './frostingMaterial';
 import { SUGAR_COLORS, TOP_SURFACE_SLOTS, computeSlotPosition, getSlotById } from '../../lib/cakeConfig';
@@ -299,12 +299,12 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       sideChevronPatternSetId = 'multiColor',
       sideScatterPearlsSetId = 'randomScatter',
       sidePipingScrollsSetId = 'waveRope',
-      sideFondantSwagSetId = 'classic',
+      sideSunshinePlaySetId = 'rainbowArc',
       sideVictorianLambethSetId = 'classic',
       sideNoNameSetId = null,
       centerDecorationSetId = null,
       centerDecorationVariation = 'outerRing',
-      centerText = '', centerTextTop = '', centerTextMiddle = '', centerTextBottom = '', centerTextSpacing = 0.28, centerTextFont = 'default',
+      centerText = '', centerTextTop = '', centerTextMiddle = '', centerTextBottom = '', centerTextFont = 'default',
       edgeMode = 'both', edgeTop = null, edgeBottom = null, edgeBoth = null,
       edgeMiddle = null,
       sideDecorationColor = '#F6DEAB', sideCheckeredColor = '#F6DEAB',
@@ -593,12 +593,6 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         addWhippedCreamSkirt(group, radius, currentY, height, sideNoNameColor);
         registerNewChildrenForClipping(group, startIdx, coveringMaterialsRef, interiorPreview);
       }
-      if (sideNoNameSetId === 'tuxedo') {
-        const lTopY = currentY + height + 0.05;
-        const startIdx = group.children.length;
-        addTuxedo(group, radius, lTopY, sideNoNameColor);
-        registerNewChildrenForClipping(group, startIdx, coveringMaterialsRef, interiorPreview);
-      }
 
       // Checkered/Triangle Pattern's standoff above the tier radius has to
       // clear whichever Exterior Finish shell they're sitting on. A flat
@@ -741,7 +735,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         group.add(triangleSide);
       }
 
-      // Side > Decorations (Stripes, Scatter Pearls, Piping Scrolls, Fondant Swag, Victorian Lambeth, Chevron)
+      // Side > Decorations (Scatter Pearls, Piping Scrolls, Sunshine Play, Victorian Lambeth, Chevron)
       // Colored by Sugar Color's frostColor now (Side's per-treatment
       // color pickers were removed) — see the "Sugar Color applies
       // everywhere outside Fundamentals" pass. The old '#F6DEAB' fallback
@@ -752,33 +746,26 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       const hasFrostingForDeco = frostColor && exteriorFinishStyle !== 'naked';
       const sideDecorationRadius = hasFrostingForDeco ? radius + 0.06 : radius - 0.02;
 
-      // Chevron Pattern, Piping Scrolls, Fondant Swag, and Victorian
+      // Chevron Pattern, Piping Scrolls, Sunshine Play, and Victorian
       // Lambeth all need the same Textured Buttercream ridge-clearance fix
       // Checkered/Triangle Pattern got (see sideDecorStandoff above) —
       // sideDecorationRadius's shared flat 0.06 clearance is even tighter
       // than Checkered/Triangle's old 0.08 was, so ridge peaks poke
       // through these the same way they did through those before that
       // fix. All four build genuine flat/relief-faced shapes (squares,
-      // triangles, chevron teeth, scroll/swag/lace relief), so a ridge
+      // triangles, chevron teeth, scroll/rainbow/lace relief), so a ridge
       // peak breaking the surface reads as a visible cut line the same
       // way. Reuses sideDecorStandoff's already-texture-aware value
       // (falls back to sideDecorationRadius untouched for Naked/Fully
-      // Frosted, so nothing changes there for these either). Stripes and
-      // Scatter Pearls are left on sideDecorationRadius, unchanged —
-      // both build round-rod/bead instanced geometry (see
-      // buildStripesRing above), which doesn't get visibly cut into by a
-      // ridge poking through it the way a flat face does; Scatter Pearls
-      // in particular already blends fine with the ridges as-is per
-      // visual review.
+      // Frosted, so nothing changes there for these either). Scatter
+      // Pearls is left on sideDecorationRadius, unchanged — it builds
+      // round-rod/bead instanced geometry, which doesn't get visibly cut
+      // into by a ridge poking through it the way a flat face does;
+      // Scatter Pearls in particular already blends fine with the ridges
+      // as-is per visual review.
       const ridgedTextureRadius = (exteriorFinishStyle === 'texturedButtercream' && hasFrostingForDeco)
         ? radius + sideDecorStandoff
         : sideDecorationRadius;
-
-      if (sideDecorationSetId === 'stripes') {
-        const stripes = buildStripesRing(sideDecorationRadius - 0.03, height * 0.92, sideDecorationColor);
-        stripes.position.y = currentY + height / 2;
-        group.add(stripes);
-      }
 
       if (sideDecorationSetId === 'scatterPearls') {
         const pearlRand = makePRNG(hashStr(`pearls-${cakeSize}-${sideDecorationVariant}-tier${i}`));
@@ -795,10 +782,15 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         group.add(scrolls);
       }
 
-      if (sideDecorationSetId === 'fondantSwag') {
-        const swag = buildFondantSwag(ridgedTextureRadius, height * 0.85, sideDecorationColor, sideFondantSwagSetId || 'classic');
-        swag.position.y = currentY + height / 2;
-        group.add(swag);
+      if (sideDecorationSetId === 'sunshinePlay') {
+        // A single accent piece stuck to one spot on the wall (see
+        // buildSunshinePlay's own doc comment) rather than a treatment
+        // that wraps/tiles around it like the others here — it positions
+        // itself against ridgedTextureRadius internally, same standoff
+        // logic as Piping Scrolls above.
+        const sunshine = buildSunshinePlay(ridgedTextureRadius, height * 0.85, sideDecorationColor, sideSunshinePlaySetId || 'rainbowArc');
+        sunshine.position.y = currentY + height / 2;
+        group.add(sunshine);
       }
 
       if (sideDecorationSetId === 'victorianLambeth') {
@@ -1112,147 +1104,34 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         soccerball: 1.28,
       };
 
-      // ── Text-Aware Collision Bounds Calculation ─────────────────────────
-      const isHandwritten = centerTextFont === 'handwritten';
-      const activeFont = isHandwritten ? getHandwrittenFont() : getPacificoFont();
-
-      const topStr = (centerTextTop || '').trim();
-      const middleStr = (centerTextMiddle || '').trim();
-      const bottomStr = (centerTextBottom || '').trim();
-      const hasExplicitSlots = Boolean(
-        centerTextTop !== undefined || centerTextMiddle !== undefined || centerTextBottom !== undefined
-      );
-
-      let activeTextSlots = [];
-      const spacingRatio = typeof centerTextSpacing === 'number' ? centerTextSpacing : 0.28;
-
-      if (hasExplicitSlots) {
-        if (topStr) activeTextSlots.push({ line: topStr, zRatio: -spacingRatio });
-        if (middleStr) activeTextSlots.push({ line: middleStr, zRatio: 0.00 });
-        if (bottomStr) activeTextSlots.push({ line: bottomStr, zRatio: spacingRatio });
-      } else if (centerText && centerText.trim()) {
-        const lines = centerText.split('\n').map((l) => l.trim()).filter(Boolean);
-        if (lines.length === 1) {
-          activeTextSlots.push({ line: lines[0], zRatio: 0.00 });
-        } else if (lines.length === 2) {
-          activeTextSlots.push({ line: lines[0], zRatio: -spacingRatio * 0.65 });
-          activeTextSlots.push({ line: lines[1], zRatio: spacingRatio * 0.65 });
-        } else if (lines.length >= 3) {
-          activeTextSlots.push({ line: lines[0], zRatio: -spacingRatio });
-          activeTextSlots.push({ line: lines[1], zRatio: 0.00 });
-          activeTextSlots.push({ line: lines[2], zRatio: spacingRatio });
-        }
-      }
-
-      // Compute 2D collision bounding boxes for active text lines
-      const computeActiveTextBounds = (slots, isScriptOrHand, rTop, decorPadding) => {
-        const charW = isScriptOrHand ? 0.22 : 0.20;
-        const lineH = isScriptOrHand ? 0.45 : 0.40;
-        return slots.map((slot) => {
-          const w = Math.max(0.8, slot.line.length * charW);
-          const zAnchor = slot.zRatio * rTop;
-          return {
-            minX: -w / 2 - decorPadding,
-            maxX: +w / 2 + decorPadding,
-            minZ: zAnchor - lineH / 2 - decorPadding,
-            maxZ: zAnchor + lineH / 2 + decorPadding,
-          };
-        });
-      };
-
-      const isCollidingWithText = (x, z, textBounds) => {
-        if (!textBounds || textBounds.length === 0) return false;
-        for (let i = 0; i < textBounds.length; i++) {
-          const b = textBounds[i];
-          if (x >= b.minX && x <= b.maxX && z >= b.minZ && z <= b.maxZ) {
-            return true;
-          }
-        }
-        return false;
-      };
-
-      const computeVariantPositions = (setId, variation, rTop, prng, textBounds) => {
+      const computeVariantPositions = (setId, variation, rTop, prng) => {
         const spacing = (DECORATION_SPACING[setId] || 1.0) * centerDecorScale;
         const positions = [];
 
         if (variation === 'single') {
-          if (isCollidingWithText(0, 0, textBounds)) {
-            // Shift to upper crown if center is occupied by text
-            positions.push({ x: 0, z: -rTop * 0.65 });
-          } else {
-            positions.push({ x: 0, z: 0 });
-          }
+          positions.push({ x: 0, z: 0 });
         } else if (variation === 'outerRing') {
           const ringRadius = rTop * 0.72;
           const count = Math.max(4, Math.round((2 * Math.PI * ringRadius) / spacing));
           for (let i = 0; i < count; i++) {
             const angle = (i / count) * Math.PI * 2;
-            const x = Math.cos(angle) * ringRadius;
-            const z = Math.sin(angle) * ringRadius;
-            if (!isCollidingWithText(x, z, textBounds)) {
-              positions.push({ x, z });
-            }
-          }
-        } else if (variation === 'topBottomCrown') {
-          // Arched upper crown
-          const topArcR = rTop * 0.72;
-          const count = Math.max(3, Math.round((Math.PI * 0.65 * topArcR) / spacing));
-          for (let i = 0; i < count; i++) {
-            const frac = count > 1 ? i / (count - 1) : 0.5;
-            const angle = -Math.PI * 0.82 + frac * Math.PI * 0.64;
-            const x = Math.cos(angle) * topArcR;
-            const z = Math.sin(angle) * topArcR;
-            if (!isCollidingWithText(x, z, textBounds)) {
-              positions.push({ x, z });
-            }
-          }
-          // Arched lower crown
-          for (let i = 0; i < count; i++) {
-            const frac = count > 1 ? i / (count - 1) : 0.5;
-            const angle = Math.PI * 0.18 + frac * Math.PI * 0.64;
-            const x = Math.cos(angle) * topArcR;
-            const z = Math.sin(angle) * topArcR;
-            if (!isCollidingWithText(x, z, textBounds)) {
-              positions.push({ x, z });
-            }
-          }
-        } else if (variation === 'cornerFlanks') {
-          const flankOffsets = [
-            { x: 0, z: 0 },
-            { x: 0.30 * spacing, z: 0.20 * spacing },
-            { x: -0.30 * spacing, z: -0.20 * spacing },
-          ];
-          // Top-Left Flank
-          const tlX = -rTop * 0.44, tlZ = -rTop * 0.44;
-          for (const off of flankOffsets) {
-            const x = tlX + off.x, z = tlZ + off.z;
-            if (x * x + z * z <= (rTop * 0.80) ** 2 && !isCollidingWithText(x, z, textBounds)) {
-              positions.push({ x, z });
-            }
-          }
-          // Bottom-Right Flank
-          const brX = rTop * 0.44, brZ = rTop * 0.44;
-          for (const off of flankOffsets) {
-            const x = brX + off.x, z = brZ + off.z;
-            if (x * x + z * z <= (rTop * 0.80) ** 2 && !isCollidingWithText(x, z, textBounds)) {
-              positions.push({ x, z });
-            }
+            positions.push({
+              x: Math.cos(angle) * ringRadius,
+              z: Math.sin(angle) * ringRadius,
+            });
           }
         } else if (variation === 'fullFill') {
-          if (!isCollidingWithText(0, 0, textBounds)) {
-            positions.push({ x: 0, z: 0 });
-          }
+          positions.push({ x: 0, z: 0 });
           const maxR = rTop * 0.78;
           let currentR = spacing * 0.9;
           while (currentR <= maxR) {
             const count = Math.max(3, Math.round((2 * Math.PI * currentR) / spacing));
             for (let i = 0; i < count; i++) {
               const angle = (i / count) * Math.PI * 2;
-              const x = Math.cos(angle) * currentR;
-              const z = Math.sin(angle) * currentR;
-              if (!isCollidingWithText(x, z, textBounds)) {
-                positions.push({ x, z });
-              }
+              positions.push({
+                x: Math.cos(angle) * currentR,
+                z: Math.sin(angle) * currentR,
+              });
             }
             currentR += spacing * 0.9;
           }
@@ -1262,11 +1141,10 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           for (let i = 0; i < count; i++) {
             const frac = count > 1 ? i / (count - 1) : 0.5;
             const angle = -Math.PI * 0.55 + frac * Math.PI * 1.1;
-            const x = Math.cos(angle) * arcRadius;
-            const z = Math.sin(angle) * arcRadius;
-            if (!isCollidingWithText(x, z, textBounds)) {
-              positions.push({ x, z });
-            }
+            positions.push({
+              x: Math.cos(angle) * arcRadius,
+              z: Math.sin(angle) * arcRadius,
+            });
           }
         } else if (variation === 'cluster') {
           const clusterOffsets = [
@@ -1276,27 +1154,26 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
             { x: 0.12 * spacing, z: -0.42 * spacing },
             { x: -0.38 * spacing, z: -0.26 * spacing },
           ];
-          const offsetX = rTop * 0.32;
-          const offsetZ = -rTop * 0.32;
+          const offsetX = rTop * 0.28;
+          const offsetZ = -rTop * 0.24;
           for (const off of clusterOffsets) {
-            const x = offsetX + off.x;
-            const z = offsetZ + off.z;
-            if (!isCollidingWithText(x, z, textBounds)) {
-              positions.push({ x, z });
-            }
+            positions.push({
+              x: offsetX + off.x,
+              z: offsetZ + off.z,
+            });
           }
         } else if (variation === 'diagonal') {
           const maxDiag = rTop * 0.68;
-          const count = Math.max(3, Math.round((2 * maxDiag) / spacing));
+          const count = Math.max(3, Math.round((2 * maxDiag * 1.414) / spacing));
           for (let i = 0; i < count; i++) {
-            const frac = count > 1 ? i / (count - 1) : 0.5;
-            const t = -maxDiag + frac * 2 * maxDiag;
-            const x = t * 0.707;
-            const z = t * 0.707;
-            if (!isCollidingWithText(x, z, textBounds)) {
-              positions.push({ x, z });
-            }
+            const frac = count > 1 ? (i / (count - 1)) * 2 - 1 : 0;
+            positions.push({
+              x: frac * maxDiag * 0.707,
+              z: frac * maxDiag * 0.707,
+            });
           }
+        } else {
+          positions.push({ x: 0, z: 0 });
         }
 
         return positions;
@@ -1359,14 +1236,11 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       ];
 
       if (centerDecorationSetId && ALL_DECORATION_ASSET_IDS.includes(centerDecorationSetId)) {
-        const itemPadding = (DECORATION_SPACING[centerDecorationSetId] || 1.0) * centerDecorScale * 0.38 + 0.12;
-        const textBounds = computeActiveTextBounds(activeTextSlots, isHandwritten, topRadius, itemPadding);
         const positions = computeVariantPositions(
           centerDecorationSetId,
           centerDecorationVariation || 'outerRing',
           topRadius,
-          rand,
-          textBounds
+          rand
         );
         for (const { x, z } of positions) {
           const y = centerSurfaceY(x, z);
@@ -1383,15 +1257,27 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         }
       }
 
-      const textSlots = activeTextSlots;
-      if (textSlots.length > 0 && activeFont) {
+      const isHandwritten = centerTextFont === 'handwritten';
+      const activeFont = isHandwritten ? getHandwrittenFont() : getPacificoFont();
+
+      if (centerText && activeFont) {
+        const lines = centerText.split('\n');
+        const lineHeight = isHandwritten ? 0.60 : 0.65;
+        // Same lastFrostColor reasoning as Floral Cluster above.
         const textMat = getFrostingMaterial(centerTextColor);
         const textGroup = new THREE.Group();
 
-        textSlots.forEach((slot) => {
-          const textGeo = new TextGeometry(slot.line, {
+        let actualLines = 0;
+        lines.forEach((line) => {
+          if (line.trim()) actualLines++;
+        });
+
+        let currentLine = 0;
+        lines.forEach((line) => {
+          if (!line.trim()) return;
+          const textGeo = new TextGeometry(line, {
             font: activeFont,
-            size: isHandwritten ? 0.38 : 0.33,
+            size: isHandwritten ? 0.40 : 0.35,
             depth: 0.015,
             curveSegments: 8,
             bevelEnabled: true,
@@ -1403,8 +1289,9 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           const bbox = textGeo.boundingBox;
           const xOffset = -0.5 * (bbox.max.x - bbox.min.x);
 
-          const targetWorldZ = slot.zRatio * topRadius;
-          const yOffset = -targetWorldZ;
+          const totalHeight = actualLines * lineHeight;
+          const startY = totalHeight / 2 - lineHeight / 2;
+          const yOffset = startY - currentLine * lineHeight;
 
           // Conform the text to the cake's domed surface
           const R = topRadius - 0.15; // Bevel size is 0.15
@@ -1432,6 +1319,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           textMesh.castShadow = true;
           textMesh.receiveShadow = true;
           textGroup.add(textMesh);
+          currentLine++;
         });
 
         textGroup.rotation.x = -Math.PI / 2;
@@ -1445,21 +1333,31 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       // pass. Uses lastFrostColor (see Floral Cluster's comment above)
       // since this runs after the per-layer loop where frostColor itself
       // is declared.
+      //
+      // Trio and Petite Beaded Trim are the same geometry as the
+      // original (buildBeadedTrimRing), just a different bead-size
+      // pattern — see that function's own doc comment in
+      // DecorationSets.jsx for what each pattern name means.
+      const BEADED_TRIM_PATTERNS = { beadedTrim: 'classic', beadedTrimTrio: 'trio', beadedTrimPetite: 'petite' };
       const edgeSlotsToRender =
-        edgeMode === 'both' ? [{ slot: edgeBoth, y: topY, radius: topRadius }, { slot: edgeBoth, y: 0, radius: BASE_RADIUS }]
-          : [{ slot: edgeTop, y: topY, radius: topRadius }, { slot: edgeBottom, y: 0, radius: BASE_RADIUS }];
-      for (const { slot, y, radius: edgeRadius } of edgeSlotsToRender) {
-        const edgeTrimId = slot?.pipingTip === 'beadedTrim' ? 'beadedTrim' : slot?.decorationSetId;
-        if (edgeTrimId === 'beadedTrim') {
-          const trim = buildBeadedTrimRing(edgeRadius + 0.05, slot?.decorationColor || lastFrostColor, rand);
-          trim.position.y = y;
+        edgeMode === 'both' ? [{ slot: edgeBoth, y: topY, radius: topRadius, isBottom: false }, { slot: edgeBoth, y: 0, radius: BASE_RADIUS, isBottom: true }]
+          : [{ slot: edgeTop, y: topY, radius: topRadius, isBottom: false }, { slot: edgeBottom, y: 0, radius: BASE_RADIUS, isBottom: true }];
+      for (const { slot, y, radius: edgeRadius, isBottom } of edgeSlotsToRender) {
+        const beadedTrimPattern = BEADED_TRIM_PATTERNS[slot?.pipingTip];
+        const decorationKind = beadedTrimPattern ? 'beadedTrim' : 'piping';
+        const edgeTrimId = beadedTrimPattern ? slot.pipingTip : slot?.decorationSetId;
+        const edgeTrimY = computeEdgeTrimY(y, edgeRadius, decorationKind, exteriorFinishStyle);
+        const edgeTrimRadius = computeEdgeTrimRadius(edgeRadius, decorationKind, exteriorFinishStyle, isBottom);
+        if (beadedTrimPattern) {
+          const trim = buildBeadedTrimRing(edgeTrimRadius, slot?.decorationColor || lastFrostColor, rand, { pattern: beadedTrimPattern });
+          trim.position.y = edgeTrimY;
           group.add(trim);
         }
         if (slot?.pipingTip) {
           const pipingMat = getFillingMaterial(slot?.pipingColor || lastFrostColor);
           const edgePiping = buildPipingRing(slot.pipingTip, pipingMat, {
-            radius: edgeRadius - 0.25,
-            y,
+            radius: edgeTrimRadius,
+            y: edgeTrimY,
             rand,
             scale: 3,
           });
@@ -1475,8 +1373,8 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       if (layerCount >= 2 && edgeMiddle?.pipingTip) {
         const middlePipingMat = getFillingMaterial(edgeMiddle.pipingColor || lastFrostColor);
         const middlePiping = buildPipingRing(edgeMiddle.pipingTip, middlePipingMat, {
-          radius: layer1OuterRadius - 0.25,
-          y: ledgeY,
+          radius: Math.max(0.2, layer1OuterRadius - 0.12),
+          y: ledgeY + 0.045,
           rand,
           scale: 3,
         });

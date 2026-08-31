@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import ClientNavbar from '@/components/client/ClientNavbar';
+import { useAuth } from '@/lib/AuthContext';
 import { User, Bell, Palette, Shield, ChevronRight, Save } from 'lucide-react';
 
 export default function Settings() {
+  const { user } = useAuth();
   const [settings, setSettings] = useState({
-    username: 'Cake Lover',
-    email: 'user@example.com',
+    username: '',
+    email: '',
     notifications: {
       email: true,
       push: true,
@@ -16,6 +18,17 @@ export default function Settings() {
     theme: 'light',
     language: 'en'
   });
+
+  useEffect(() => {
+    const derivedUsername = user?.displayName || user?.email?.split('@')[0]?.replace(/[._-]/g, ' ') || 'Cake Lover';
+    const derivedEmail = user?.email || 'user@example.com';
+
+    setSettings((prev) => ({
+      ...prev,
+      username: derivedUsername,
+      email: derivedEmail,
+    }));
+  }, [user]);
 
   const handleSave = () => {
     // Save settings logic here

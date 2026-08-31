@@ -208,13 +208,9 @@ export function adaptConfigToLegacy(newConfig) {
   const centerDecorationVariation = center.decorations?.variation || 'outerRing';
   const centerSugarColorHex = resolveContextSugarColor('center', null, true);
   const centerDecorationColor = centerSugarColorHex || resolveColor(center.decorations?.colorId);
-    const centerTextTop = center.text?.top ?? '';
-  const centerTextMiddle = center.text?.middle ?? (center.text?.value ?? '');
-  const centerTextBottom = center.text?.bottom ?? '';
-  const centerText = center.text?.value ?? [centerTextTop, centerTextMiddle, centerTextBottom].filter(Boolean).join('\n');
+  const centerText = center.text?.value || '';
   const centerTextFont = center.text?.font || 'script';
   const centerTextColor = centerSugarColorHex || resolveColor(center.text?.colorId);
-  const centerTextSpacing = typeof center.text?.spacing === 'number' ? center.text.spacing : 0.28;
 
   // ── Edge — Top+Bottom-separate XOR Both (genuine delete, spec §4b).
   // Resolve all three slots regardless of mode; CakeScene only needs to
@@ -246,8 +242,8 @@ export function adaptConfigToLegacy(newConfig) {
   // renderer changes since the values it reads are shaped identically to
   // before, just computed differently here.
   const sideMode = side.mode || null;
-  const DECORATION_MODES = ['stripes', 'scatterPearls', 'pipingScrolls', 'fondantSwag', 'chevronPattern', 'victorianLambeth'];
-  const NO_NAME_MODES = ['tuxedo', 'whippedSkirt', 'drip'];
+  const DECORATION_MODES = ['scatterPearls', 'pipingScrolls', 'sunshinePlay', 'chevronPattern', 'victorianLambeth'];
+  const NO_NAME_MODES = ['whippedSkirt', 'drip'];
 
   const sideDecorationSetId = DECORATION_MODES.includes(sideMode) ? sideMode : null;
   const sideSugarColorHex = resolveContextSugarColor('side', null, true);
@@ -296,8 +292,8 @@ export function adaptConfigToLegacy(newConfig) {
     ? (side.pipingScrolls?.setId || 'waveRope')
     : null;
 
-  const sideFondantSwagSetId = sideMode === 'fondantSwag'
-    ? (side.fondantSwag?.setId || 'classic')
+  const sideSunshinePlaySetId = sideMode === 'sunshinePlay'
+    ? (side.sunshinePlay?.setId || 'rainbowArc')
     : null;
 
   const sideVictorianLambethSetId = sideMode === 'victorianLambeth'
@@ -380,10 +376,6 @@ export function adaptConfigToLegacy(newConfig) {
     centerDecorationVariation,
     centerDecorationColor,
     centerText,
-    centerTextTop,
-    centerTextMiddle,
-    centerTextBottom,
-    centerTextSpacing,
     centerTextFont,
     centerTextColor,
 
@@ -412,7 +404,7 @@ export function adaptConfigToLegacy(newConfig) {
     sideChevronColor,
     sideScatterPearlsSetId,
     sidePipingScrollsSetId,
-    sideFondantSwagSetId,
+    sideSunshinePlaySetId, // Sunshine Play's setId (Rainbow Arc is the only design today)
     sideVictorianLambethSetId,
     sideNoNameSetId,
     sideNoNameColor,
@@ -428,8 +420,8 @@ export function adaptConfigToLegacy(newConfig) {
     plateVisible: newConfig.plateVisible !== undefined ? newConfig.plateVisible : true,
     
     // Legacy sets (old tuxedo/skirt mechanism — superseded by
-    // side.mode + side.tuxedo/side.whippedSkirt, kept only for any code
-    // path not yet migrated)
+    // side.mode + side.whippedSkirt (Tuxedo itself was retired, see
+    // Sunshine Play), kept only for any code path not yet migrated)
     activeSet: null,
     activeSetLayers: [],
     
@@ -514,9 +506,7 @@ export function adaptConfigFromLegacy(legacyConfig) {
       mode: null,
       checkeredPattern: { setId: null, colorId: 'vanilla' },
       trianglePattern: { setId: null, colorId: 'vanilla' },
-      stripes: { colorId: 'vanilla' },
       scatterPearls: { colorId: 'vanilla' },
-      tuxedo: { colorId: 'vanilla' },
       whippedSkirt: { colorId: 'vanilla' },
       drip: { colorId: 'vanilla' },
       piping: { tip: null, colorId: 'vanilla' },

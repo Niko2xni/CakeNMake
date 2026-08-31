@@ -19,11 +19,13 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "firebase-admin": "^14.3.0",
     "ioredis": "^5.11.1",
     "jsonwebtoken": "^9.0.3",
     "jspdf": "^4.2.1",
     "mongoose": "^9.7.0",
     "multer": "^2.2.0",
+    "nodemailer": "^9.0.6",
     "paymongo-node": "^10.17.0",
     "puppeteer": "^25.1.0"
   },

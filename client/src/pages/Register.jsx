@@ -7,7 +7,8 @@ import { UserPlus, Mail, Lock, Loader2 } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
-import { toast } from "@/components/ui/use-toast";
+import { auth, firebaseConfigured, googleProvider, missingFirebaseConfigMessage } from "@/lib/firebase";
+import { createUserWithEmailAndPassword, signInWithPopup } from "firebase/auth";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -28,10 +29,9 @@ export default function Register() {
     }
     setLoading(true);
     try {
-      // Simplified registration - in production, this would call your backend API
-      // For now, we'll simulate successful registration
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setShowOtp(true);
+      if (!firebaseConfigured) throw new Error(missingFirebaseConfigMessage);
+      await createUserWithEmailAndPassword(auth, email, password);
+      navigate("/login-success");
     } catch (err) {
       setError(err.message || "Registration failed");
     } finally {
@@ -43,14 +43,9 @@ export default function Register() {
     setError("");
     setLoading(true);
     try {
-      // Simplified OTP verification - in production, this would call your backend API
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Store user info in localStorage (simplified auth)
-      localStorage.setItem('user', JSON.stringify({ email }));
-      localStorage.setItem('isAuthenticated', 'true');
-      
-      navigate("/client");
+      if (!firebaseConfigured) throw new Error(missingFirebaseConfigMessage);
+      await createUserWithEmailAndPassword(auth, email, password);
+      navigate("/login-success");
     } catch (err) {
       setError(err.message || "Invalid verification code");
     } finally {
@@ -61,22 +56,24 @@ export default function Register() {
   const handleResend = async () => {
     setError("");
     try {
-      // Simplified resend - in production, this would call your backend API
-      await new Promise(resolve => setTimeout(resolve, 500));
-      toast({
-        title: "Code sent",
-        description: "Check your email for the new code.",
-      });
+      setError("Email verification is handled by Firebase after account creation.");
     } catch (err) {
       setError(err.message || "Failed to resend code");
     }
   };
 
-  const handleGoogle = () => {
-    // Simplified Google auth - in production, this would integrate with OAuth
-    localStorage.setItem('user', JSON.stringify({ email: 'google-user@example.com', provider: 'google' }));
-    localStorage.setItem('isAuthenticated', 'true');
-    navigate("/client");
+  const handleGoogle = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      if (!firebaseConfigured) throw new Error(missingFirebaseConfigMessage);
+      await signInWithPopup(auth, googleProvider);
+      navigate("/login-success");
+    } catch (err) {
+      setError(err.message || "Google sign-in failed");
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (showOtp) {

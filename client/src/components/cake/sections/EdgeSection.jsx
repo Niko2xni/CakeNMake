@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { EDGE_PIPING_OPTIONS, PIPING_TIPS } from '@/lib/cakeConfig';
-import SetPicker from '../SetPicker';
 import SugarColorSection from './SugarColorSection';
 
 const EMPTY_SLOT = () => ({
@@ -98,16 +97,41 @@ export default function EdgeSection({ edge, onChange, layerCount = 1, onActiveSl
         </div>
       )}
 
-      <SetPicker
-        label="Piping"
-        sets={EDGE_PIPING_OPTIONS}
-        activeSetId={currentSlot.piping?.tip || currentSlot.decorations?.setId}
-        onSelectSet={(tip) => updateSlot({
-          decorations: { ...currentSlot.decorations, setId: null },
-          piping: { ...currentSlot.piping, tip },
-        })}
-        showColorPicker={false}
-      />
+      <div className="space-y-4">
+        <div className="text-center mb-2">
+          <span className="text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">
+            Edge Design
+          </span>
+        </div>
+
+        <div className="space-y-3">
+          {EDGE_PIPING_OPTIONS.map((option) => {
+            const active = (currentSlot.piping?.tip || currentSlot.decorations?.setId) === option.id;
+            return (
+              <div key={option.id}>
+                <span className="text-xs font-semibold text-foreground/80 mb-1.5 block">{option.label}</span>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => updateSlot({
+                      decorations: { ...currentSlot.decorations, setId: null },
+                      piping: { ...currentSlot.piping, tip: option.id },
+                    })}
+                    title={option.label}
+                    className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
+                      active
+                        ? 'bg-primary text-primary-foreground border-primary shadow-md'
+                        : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
+                    }`}
+                  >
+                    {option.label.slice(0, 1).toUpperCase()}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       {layerCount >= 2 && (
         <div className="pt-2 space-y-3 border-t border-border/50">
@@ -120,13 +144,30 @@ export default function EdgeSection({ edge, onChange, layerCount = 1, onActiveSl
             </span>
           </div>
 
-          <SetPicker
-            label="Piping"
-            sets={PIPING_TIPS}
-            activeSetId={edge.middle?.piping?.tip}
-            onSelectSet={(tip) => updateMiddle({ tip })}
-            showColorPicker={false}
-          />
+          <div className="space-y-3">
+            {PIPING_TIPS.map((tip) => {
+              const active = edge.middle?.piping?.tip === tip.id;
+              return (
+                <div key={tip.id}>
+                  <span className="text-xs font-semibold text-foreground/80 mb-1.5 block">{tip.label}</span>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => updateMiddle({ tip: tip.id })}
+                      title={tip.label}
+                      className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
+                        active
+                          ? 'bg-primary text-primary-foreground border-primary shadow-md'
+                          : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
+                      }`}
+                    >
+                      {tip.label.slice(0, 1).toUpperCase()}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

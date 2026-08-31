@@ -6,12 +6,14 @@ import * as THREE from 'three';
 // right now, so the whole Surface/Center/Edge/Side data pipeline can
 // actually be tested end-to-end before investing in every named design.
 //
-// Reused instead of rebuilt: Surface > Full Coverage (tuxedo/whippedSkirt)
-// already has working geometry in sets/tuxedoHelpers.jsx and
-// sets/skirtHelpers.jsx from the old Sets system — wired directly in
-// CakeScene.jsx, nothing new needed here. Center > Floral Cluster reuses
+// Reused instead of rebuilt: Surface > Full Coverage (whippedSkirt)
+// already has working geometry in sets/skirtHelpers.jsx from the old Sets
+// system — wired directly in CakeScene.jsx, nothing new needed here.
+// (Tuxedo used to be reused the same way from sets/tuxedoHelpers.jsx, but
+// was retired along with Fondant Swag and Stripes in favor of Sunshine
+// Play — see sets/sunshinePlayHelpers.js.) Center > Floral Cluster reuses
 // CakeScene.jsx's existing addRosette() the same way. This module only
-// covers the genuinely new geometry: Drip, Beaded Trim, Stripes.
+// covers the genuinely new geometry: Drip, Beaded Trim.
 
 /**
  * Drip — a ring of teardrop blobs hanging from the top edge, each a
@@ -58,7 +60,82 @@ export function buildDripRing(radius, colorHex, rand, opts = {}) {
  * the "Round" piping tip in pipingTips.js — this is meant to read as a
  * strung decoration, not a piped border).
  */
+export function computeEdgeTrimY(topSurfaceY, radius, decorationType = 'piping', exteriorFinishStyle = 'fullyFrosted') {
+  if (exteriorFinishStyle === 'naked') {
+    // compactDepth + extraInset below (0.10–0.16 depending on cake size
+    // and decoration type — see the numbers this replaced) were tuned
+    // assuming there's a frosting cap to recess the trim into. Naked's
+    // top is bare flat sponge meeting the side wall at a hard, unbeveled
+    // 90° corner — there's no material there to sink into, and no bevel
+    // to visually absorb it either. Any real dip below the true top
+    // surface doesn't nestle in, it punches straight through that corner
+    // into the side wall's own geometry, which is exactly the
+    // dripping/smearing artifact in the screenshots. topSurfaceY already
+    // carries a small +0.05 buffer above the true flat surface (see
+    // topY's own definition in CakeScene.jsx), which compactDepth alone
+    // already exceeds on every realistic cake size — so this isn't a
+    // constant that needs re-tuning, Naked genuinely needs a different
+    // formula, not a different number in the same one. A small fixed
+    // recess keeps it visually flush without ever going negative.
+    return topSurfaceY - 0.02;
+  }
+  const compactDepth = Math.min(0.12, Math.max(0.06, radius * 0.08));
+  const finishDepth = 0.06;
+  const extraInset = decorationType === 'beadedTrim' ? 0.02 : 0.04;
+  return topSurfaceY - (compactDepth + extraInset + finishDepth);
+}
+
+export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', exteriorFinishStyle = 'fullyFrosted', isBottom = false) {
+  // `edgeRadius` (topRadius/BASE_RADIUS in CakeScene.jsx) is the raw
+  // sponge radius, identical for every finish — unlike topSurfaceY above,
+  // nothing upstream adjusts it for frosting bulge. So the flat
+  // per-finish "finishInset" constants this used to use (applied
+  // directly to that same raw number for every finish alike) never
+  // actually accounted for Fully Frosted's real surface sitting further
+  // out than Naked's does — only for however different those constants
+  // happened to be tuned. Deriving an actual surfaceRadius first — the
+  // same frosting-bulge convention the Side decorations already use (see
+  // sideDecorationRadius/hasFrostingForDeco above: frosted finishes add
+  // ~0.06 outward, Naked sits ~0.02 in from the bare sponge) — then
+  // applying ONE consistent radialInset on top of that for every finish,
+  // is what actually keeps the trim sitting an equivalent distance from
+  // each finish's own real edge instead of from a shared number that
+  // doesn't represent any of their real edges.
+  const surfaceRadius = exteriorFinishStyle === 'naked'
+    ? edgeRadius - 0.02
+    : edgeRadius + (exteriorFinishStyle === 'texturedButtercream' ? 0.08 : 0.06);
+  // The top rim's radialInset (0.22–0.26) is tuned to nestle the trim
+  // back into the top surface, inset from the very edge — appropriate
+  // there since the whole top disc is visible from above and the trim
+  // needs room to sit "on" it. The bottom trim isn't sitting on any
+  // visible surface the same way — it reads as a border/skirt piped
+  // right at the base perimeter, resting against the cake board. A
+  // small POSITIVE inset there (the first attempt at this) still tucked
+  // it just inside the wall's own radius, which was enough for the wall
+  // to keep occluding most of it from a normal viewing angle. Going
+  // negative instead pushes it genuinely proud of the wall — actually in
+  // front of the surface, the way a piped border resting against the
+  // board would really sit — rather than just closer to flush with it.
+  const radialInset = isBottom
+    ? (decorationType === 'beadedTrim' ? -0.10 : -0.14)
+    : (decorationType === 'beadedTrim' ? 0.22 : 0.26);
+  return Math.max(0.15, surfaceRadius - radialInset);
+}
+
+/**
+ * Beaded Trim — three designs sharing this one geometry function, only
+ * the per-bead size rhythm around the ring differs (`opts.pattern`):
+ *
+ * - 'classic' (default, the original Beaded Trim): alternates Big/Small.
+ * - 'trio' (Trio Beaded Trim): cycles Small → Big → Medium. Deliberately
+ *   not a Small → Medium → Big ramp — see EDGE_DECORATION_SETS' comment
+ *   in cakeConfig.js for why that reads as lopsided once it wraps around
+ *   a full circle instead of balanced.
+ * - 'petite' (Petite Beaded Trim): every bead the same small size — a
+ *   finer, more delicate trim than either of the other two.
+ */
 export function buildBeadedTrimRing(radius, colorHex, rand, opts = {}) {
+  const pattern = opts.pattern || 'classic';
   const count = opts.count ?? Math.max(18, Math.round((radius * Math.PI * 2) / 0.28));
   const mat = new THREE.MeshPhysicalMaterial({ color: colorHex, roughness: 0.25, clearcoat: 0.6 });
   const geo = new THREE.SphereGeometry(0.13, 14, 10);
@@ -66,8 +143,17 @@ export function buildBeadedTrimRing(radius, colorHex, rand, opts = {}) {
   const dummy = new THREE.Object3D();
   for (let i = 0; i < count; i++) {
     const angle = (i / count) * Math.PI * 2;
-    const big = i % 2 === 0;
-    const scale = (big ? 1 : 0.62) * (0.92 + rand() * 0.16);
+    let baseScale;
+    if (pattern === 'trio') {
+      const cyclePos = i % 3;
+      baseScale = cyclePos === 0 ? 0.58 : cyclePos === 1 ? 1.05 : 0.82; // Small, Big, Medium
+    } else if (pattern === 'petite') {
+      baseScale = 0.62;
+    } else {
+      const big = i % 2 === 0;
+      baseScale = big ? 1 : 0.62;
+    }
+    const scale = baseScale * (0.92 + rand() * 0.16);
     dummy.position.set(Math.sin(angle) * radius, 0, Math.cos(angle) * radius);
     dummy.scale.setScalar(scale);
     dummy.updateMatrix();
@@ -79,44 +165,17 @@ export function buildBeadedTrimRing(radius, colorHex, rand, opts = {}) {
 }
 
 /**
- * Stripes — vertical fluted ridges around the side wall (the "comb
- * technique" look), rather than two-tone color stripes — the current data
- * model gives each Set a single color, so alternating-hue stripes aren't
- * representable yet; ridges achieve a visually distinct "stripes" read
- * using only one color.
- */
-export function buildStripesRing(radius, height, colorHex, opts = {}) {
-  const count = opts.count ?? Math.max(24, Math.round((radius * Math.PI * 2) / 0.35));
-  const thickness = opts.thickness ?? 0.09;
-  const mat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.4 });
-  const geo = new THREE.CylinderGeometry(thickness, thickness, height, 8);
-  const mesh = new THREE.InstancedMesh(geo, mat, count);
-  const dummy = new THREE.Object3D();
-  for (let i = 0; i < count; i++) {
-    const angle = (i / count) * Math.PI * 2;
-    dummy.position.set(Math.sin(angle) * (radius + thickness * 0.4), 0, Math.cos(angle) * (radius + thickness * 0.4));
-    dummy.updateMatrix();
-    mesh.setMatrixAt(i, dummy.matrix);
-  }
-  mesh.instanceMatrix.needsUpdate = true;
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  return mesh;
-}
-
-
-/**
  * Checkered Pattern (Buttercream Stenciling) — real 3D raised squares,
  * NOT a flat printed texture. Every other decoration in this file (Drip,
- * Beaded Trim, Stripes) is actual instanced geometry — the earlier
- * texture-based version was the inconsistent exception, which is part of
- * why it read as a printed edible sheet instead of a stenciled
- * decoration. Only the "black" squares get real geometry at all — the
- * "white" squares are simply absent, so the base frosting shows through
- * naturally, exactly like a real stencil where color is only pushed
- * through the cutouts. One fixed real-world square size is used for both
- * the side wrap and the top disc, so squares read as the same physical
- * size everywhere instead of the side ones looking shrunken.
+ * Beaded Trim) is actual instanced geometry — the earlier texture-based
+ * version was the inconsistent exception, which is part of why it read as
+ * a printed edible sheet instead of a stenciled decoration. Only the
+ * "black" squares get real geometry at all — the "white" squares are
+ * simply absent, so the base frosting shows through naturally, exactly
+ * like a real stencil where color is only pushed through the cutouts. One
+ * fixed real-world square size is used for both the side wrap and the top
+ * disc, so squares read as the same physical size everywhere instead of
+ * the side ones looking shrunken.
  */
 const CHECKER_SQUARE_SIZE = 1.22; // same physical size on sides AND top
 const CHECKER_STANDOFF = -0.06;   // negative standoff embeds the back face into the cake to hide gaps
@@ -510,43 +569,103 @@ export function buildTriangleSideShapes(radius, height, opts = {}) {
 }
 
 /**
- * Deterministic, evenly-covering pearl layout — shared by every "scatter"
- * Scatter Pearls variant (Random Scatter, Big Pearls Scatter, Small Pearls
- * Scatter) so all three read as the same organic family, just at different
- * sizes, and none of them depend on Math.random() or the seeded `rand`
- * PRNG passed into this file: the same cake config always renders the
- * exact same pearl placement, never reshuffling between builds.
+ * Deterministic pearl layout — shared by every "scatter" Scatter Pearls
+ * variant (Random Scatter, Big Pearls Scatter, Small Pearls Scatter) so all
+ * three read as the same organic family, just at different sizes.
  *
- * Uses three classic low-discrepancy (Kronecker) sequences instead of any
- * randomness — golden-angle steps around the circumference, and the
- * fractional parts of two different irrational multiples for height and
- * size. The three multipliers must not sum to an integer with each other
- * (checked below) — two irrational multipliers that are simple complements
- * (e.g. summing to 1) aren't actually independent: as one sequence advances
- * one way around its range, the other advances the complementary amount in
- * lockstep, so every point still lands on a single line instead of filling
- * the surface. That's what the golden-angle fraction (≈0.381966) paired
- * with 1/φ (≈0.618034, its exact complement) did originally — it looked
- * like two different numbers but produced one diagonal strand of pearls,
- * not a scattered field. √2−1 and √3−1 don't share that relationship with
- * the angle fraction or with each other, so height and size both vary
- * genuinely independently of angle and of each other, filling the whole
- * side wall with no visible repeating grid and no clustering — the "looks
- * organically scattered" quality true randomness is normally reached for,
- * but fully reproducible and needing no collision-retry loop to avoid
- * overlap the way the old rand()-based version did.
+ * Uses the same seeded linear-congruential generator as Sunshine Play's
+ * Star Burst (scatterStarPositions in sets/sunshinePlayHelpers.js) —
+ * genuinely random-looking placement, with the natural clumps and gaps
+ * true randomness has, rather than the golden-angle Kronecker sequence
+ * this used previously. That sequence was deliberately even/gapless
+ * ("sunflower-seed" coverage with no clustering by construction), which
+ * reads as a visibly different, too-uniform pattern next to Star Burst's
+ * actual scatter — the mismatch this fixes. Still fully deterministic (a
+ * fixed seed, not Math.random() or the `rand` PRNG passed into this file):
+ * the same cake config always renders the exact same placement, it just
+ * looks organically scattered instead of evenly gridded now. Uses its own
+ * seed (distinct from Star Burst's 54321) so the two decorations don't
+ * echo each other's exact layout despite sharing a method.
  */
 function scatterPearlPositions(count) {
-  const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // ≈ 137.5°, the classic even-coverage step
+  const seed = 13579;
   const points = [];
+  let current = seed;
+  const seededRandom = () => {
+    current = (current * 1103515245 + 12345) & 0x7fffffff;
+    return current / 0x7fffffff;
+  };
   for (let i = 0; i < count; i++) {
     points.push({
-      angle:      i * GOLDEN_ANGLE,
-      heightFrac: (i * 0.4142135624) % 1, // fractional multiples of √2 − 1
-      sizeFrac:   (i * 0.7320508076) % 1, // fractional multiples of √3 − 1
+      angle:      seededRandom() * Math.PI * 2,
+      heightFrac: seededRandom(),
+      sizeFrac:   seededRandom(),
     });
   }
   return points;
+}
+
+/**
+ * Same seeded-LCG scatter as scatterPearlPositions, but with a rejection
+ * step: draws candidates one at a time and only keeps ones that clear a
+ * minimum distance from every pearl already placed, so large pearls this
+ * sparse never visually overlap or clip into each other. Only Big Pearls
+ * Scatter uses this — it's the one variant sparse and large enough for
+ * collisions between individually-readable pearls to actually show; the
+ * denser/smaller pearl variants above are fine with the plain sequence.
+ *
+ * The distance check uses the true 3D straight-line distance between two
+ * pearl centers on the cylinder (2·radius·sin(Δangle/2) for the
+ * around-the-circumference component, combined with the height
+ * difference) rather than arc length — arc length is always ≥ the actual
+ * straight-line distance between two points on a circle, so using it here
+ * would let some genuinely-overlapping pairs slip through as "far enough
+ * apart".
+ *
+ * Deterministic like every other scatter in this file (fixed seed, no
+ * Math.random()), and bounded: if the surface is packed tight enough that
+ * a valid spot can't be found within a generous attempt budget, it simply
+ * returns fewer pearls than asked for rather than looping forever or
+ * letting a pearl through that collides.
+ */
+function scatterNonCollidingBigPearls(radius, height, targetCount, getScale) {
+  const seed = 24680;
+  let current = seed;
+  const seededRandom = () => {
+    current = (current * 1103515245 + 12345) & 0x7fffffff;
+    return current / 0x7fffffff;
+  };
+
+  const GAP = 0.05; // minimum clear space left between two pearls' surfaces, not just "not touching"
+  const MAX_ATTEMPTS = targetCount * 60;
+
+  const accepted = [];
+  let attempts = 0;
+  while (accepted.length < targetCount && attempts < MAX_ATTEMPTS) {
+    attempts++;
+    const angle = seededRandom() * Math.PI * 2;
+    const heightFrac = seededRandom();
+    const sizeFrac = seededRandom();
+    const y = -height / 2 + height * 0.05 + heightFrac * height * 0.9;
+    const scale = getScale(sizeFrac);
+
+    let collides = false;
+    for (const p of accepted) {
+      let dAngle = Math.abs(angle - p.angle) % (Math.PI * 2);
+      if (dAngle > Math.PI) dAngle = Math.PI * 2 - dAngle;
+      const chordXZ = 2 * radius * Math.sin(dAngle / 2); // true center-to-center distance around the circumference
+      const dy = y - p.y;
+      const dist = Math.sqrt(chordXZ * chordXZ + dy * dy);
+      if (dist < scale + p.scale + GAP) {
+        collides = true;
+        break;
+      }
+    }
+
+    if (!collides) accepted.push({ angle, y, scale });
+  }
+
+  return accepted;
 }
 
 export function buildScatterPearlsRing(radius, height, colorHex, rand, opts = {}) {
@@ -651,21 +770,33 @@ export function buildScatterPearlsRing(radius, height, colorHex, rand, opts = {}
 
   if (variant === 'bigPearlsScatter') {
     // Design 5 — same organic scatter family as Random Scatter below (same
-    // placement helper), fixed to a big-pearl-only size range. Bigger
+    // seeded-LCG approach), fixed to a big-pearl-only size range. Bigger
     // pearls need more clearance from each other to read as individual
-    // pearls rather than a fused blob, so this uses a lower density
-    // (bigger areaPerPearl budget) than Random Scatter or Small Pearls.
-    const areaPerPearl = 0.85;
-    const pearlCount = Math.max(55, Math.round((2 * Math.PI * radius * height) / areaPerPearl));
-    const mesh = new THREE.InstancedMesh(geo, mat, pearlCount);
+    // pearls rather than a fused blob, so this uses a much lower density
+    // (bigger areaPerPearl budget) than Random Scatter or Small Pearls —
+    // a deliberately sparse scatter of a few large pearls, not a dense
+    // field of them. Placement itself also actively checks for and
+    // rejects collisions (see scatterNonCollidingBigPearls) — at this
+    // size and sparseness, two pearls landing close enough to visually
+    // overlap is common enough with a plain unchecked sequence to be
+    // worth guarding against directly, unlike the denser/smaller pearl
+    // variants above.
+    const areaPerPearl = 2.6;
+    const targetCount = Math.max(15, Math.round((2 * Math.PI * radius * height) / areaPerPearl));
+    const getScale = (sizeFrac) => 0.22 + sizeFrac * 0.06; // big pearls only: 0.22–0.28
+
+    const placed = scatterNonCollidingBigPearls(radius, height, targetCount, getScale);
+    const mesh = new THREE.InstancedMesh(geo, mat, placed.length);
     const dummy = new THREE.Object3D();
 
-    const points = scatterPearlPositions(pearlCount);
-    for (let i = 0; i < pearlCount; i++) {
-      const { angle, heightFrac, sizeFrac } = points[i];
-      const y = -height / 2 + height * 0.05 + heightFrac * height * 0.9;
-      const scale = 0.22 + sizeFrac * 0.06; // big pearls only: 0.22–0.28
-      const standoffRadius = radius + scale * 0.3;
+    for (let i = 0; i < placed.length; i++) {
+      const { angle, y, scale } = placed[i];
+      // Centered exactly on the wall surface (no outward offset) so the
+      // cut is right through the sphere's middle — half the pearl sits
+      // buried in the frosting, half pokes out, instead of the small
+      // 0.3×-scale outward nudge every other pearl variant uses (which
+      // only buries a little over a third of it).
+      const standoffRadius = radius;
       dummy.position.set(Math.sin(angle) * standoffRadius, y, Math.cos(angle) * standoffRadius);
       dummy.scale.setScalar(scale);
       dummy.updateMatrix();
@@ -707,12 +838,12 @@ export function buildScatterPearlsRing(radius, height, colorHex, rand, opts = {}
 
   // Default: 'randomScatter'. Fixed, not randomized — see
   // scatterPearlPositions' docstring above. Every render of the same cake
-  // shows the identical layout instead of reshuffling. Mixed pearl sizes
-  // (unlike designs 5/6) and a denser, area-scaled count so every side of
-  // the cake reads as populated regardless of tier size, not just a flat
-  // 50 pearls that could leave a big cake looking sparse.
-  const areaPerPearl = 0.5;
-  const pearlCount = Math.max(90, Math.round((2 * Math.PI * radius * height) / areaPerPearl));
+  // shows the identical layout instead of reshuffling. This variant is tuned
+  // intentionally lighter than the other scatter families: the pearls are
+  // smaller and spread further apart so the pattern reads as "scattered"
+  // instead of a dense cluster.
+  const areaPerPearl = 0.75;
+  const pearlCount = Math.max(70, Math.round((2 * Math.PI * radius * height) / areaPerPearl));
   const mesh = new THREE.InstancedMesh(geo, mat, pearlCount);
   const dummy = new THREE.Object3D();
 
@@ -720,7 +851,7 @@ export function buildScatterPearlsRing(radius, height, colorHex, rand, opts = {}
   for (let i = 0; i < pearlCount; i++) {
     const { angle, heightFrac, sizeFrac } = points[i];
     const y = -height / 2 + height * 0.05 + heightFrac * height * 0.9;
-    const scale = 0.12 + sizeFrac * 0.15; // same mixed range the old version used
+    const scale = 0.06 + sizeFrac * 0.10; // light scatter: small-to-medium pearls only
     const standoffRadius = radius + scale * 0.3;
     dummy.position.set(Math.sin(angle) * standoffRadius, y, Math.cos(angle) * standoffRadius);
     dummy.scale.setScalar(scale);

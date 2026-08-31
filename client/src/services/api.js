@@ -1,5 +1,30 @@
 const API_BASE_URL = 'http://localhost:5000/api';
 
+const requestJson = async (url, options) => {
+  const response = await fetch(url, options);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.message || 'Authentication request failed');
+  return data;
+};
+
+export const authApi = {
+  requestEmailOtp: (email) => requestJson(`${API_BASE_URL}/auth/email/request-otp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  }),
+  cancelEmailOtp: (email) => requestJson(`${API_BASE_URL}/auth/email/cancel-otp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  }),
+  verifyEmailOtp: (email, code) => requestJson(`${API_BASE_URL}/auth/email/verify-otp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, code }),
+  }),
+};
+
 // Get user ID from localStorage (simplified auth)
 const getUserId = () => {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
