@@ -19,7 +19,7 @@ import {
 import { getFrostingMaterial } from './frostingMaterial';
 import { SUGAR_COLORS, TOP_SURFACE_SLOTS, computeSlotPosition, getSlotById } from '../../lib/cakeConfig';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
-import { getPacificoFont, getHandwrittenFont } from './cakeFonts';
+import { getPacificoFont, getHandwrittenFont, areFontsReady, onFontsReady } from './cakeFonts';
 import { makePRNG, hashStr } from './cakeMath';
 import {
   FROSTING_COLORS,
@@ -87,6 +87,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
   const cakeConfigRef = useRef(cakeConfig);
   const [error, setError] = useState(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [fontsReady, setFontsReady] = useState(() => areFontsReady());
   const isCapturingThumbnailRef = useRef(false);
   const baselineYRef = useRef(0);
   const coveringMaterialsRef = useRef([]);
@@ -257,6 +258,12 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
     updateSlotVisuals();
   }, [activeTool, updateSlotVisuals]);
   useEffect(() => { onPlaceRef.current = onPlace; }, [onPlace]);
+
+  // Trigger a scene rebuild when fonts finish loading asynchronously
+  useEffect(() => {
+    if (fontsReady) return;
+    onFontsReady(() => setFontsReady(true));
+  }, [fontsReady]);
   useEffect(() => { cakeConfigRef.current = cakeConfig; }, [cakeConfig]);
 
   const buildCake = useCallback(() => {
@@ -308,7 +315,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       sideNoNameSetId = null,
       centerDecorationSetId = null,
       centerDecorationVariation = 'outerRing',
-      centerText = '', centerTextTop = '', centerTextMiddle = '', centerTextBottom = '', centerTextFont = 'default',
+      centerText = '', centerTextTop = '', centerTextMiddle = '', centerTextBottom = '', centerTextSpacing = 0.28, centerTextFont = 'default',
       edgeMode = 'both', edgeTop = null, edgeBottom = null, edgeBoth = null,
       edgeMiddle = null,
       sideDecorationColor = '#F6DEAB', sideCheckeredColor = '#F6DEAB',
@@ -1108,34 +1115,147 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         soccerball: 1.28,
       };
 
-      const computeVariantPositions = (setId, variation, rTop, prng) => {
+      // ── Text-Aware Collision Bounds Calculation ─────────────────────────
+      const isHandwritten = centerTextFont === 'handwritten';
+      const activeFont = isHandwritten ? getHandwrittenFont() : getPacificoFont();
+
+      const topStr = (centerTextTop || '').trim();
+      const middleStr = (centerTextMiddle || '').trim();
+      const bottomStr = (centerTextBottom || '').trim();
+      const hasExplicitSlots = Boolean(
+        centerTextTop !== undefined || centerTextMiddle !== undefined || centerTextBottom !== undefined
+      );
+
+      let activeTextSlots = [];
+      const spacingRatio = typeof centerTextSpacing === 'number' ? centerTextSpacing : 0.28;
+
+      if (hasExplicitSlots) {
+        if (topStr) activeTextSlots.push({ line: topStr, zRatio: -spacingRatio });
+        if (middleStr) activeTextSlots.push({ line: middleStr, zRatio: 0.00 });
+        if (bottomStr) activeTextSlots.push({ line: bottomStr, zRatio: spacingRatio });
+      } else if (centerText && centerText.trim()) {
+        const lines = centerText.split('\n').map((l) => l.trim()).filter(Boolean);
+        if (lines.length === 1) {
+          activeTextSlots.push({ line: lines[0], zRatio: 0.00 });
+        } else if (lines.length === 2) {
+          activeTextSlots.push({ line: lines[0], zRatio: -spacingRatio * 0.65 });
+          activeTextSlots.push({ line: lines[1], zRatio: spacingRatio * 0.65 });
+        } else if (lines.length >= 3) {
+          activeTextSlots.push({ line: lines[0], zRatio: -spacingRatio });
+          activeTextSlots.push({ line: lines[1], zRatio: 0.00 });
+          activeTextSlots.push({ line: lines[2], zRatio: spacingRatio });
+        }
+      }
+
+      // Compute 2D collision bounding boxes for active text lines
+      const computeActiveTextBounds = (slots, isScriptOrHand, rTop, decorPadding) => {
+        const charW = isScriptOrHand ? 0.22 : 0.20;
+        const lineH = isScriptOrHand ? 0.45 : 0.40;
+        return slots.map((slot) => {
+          const w = Math.max(0.8, slot.line.length * charW);
+          const zAnchor = slot.zRatio * rTop;
+          return {
+            minX: -w / 2 - decorPadding,
+            maxX: +w / 2 + decorPadding,
+            minZ: zAnchor - lineH / 2 - decorPadding,
+            maxZ: zAnchor + lineH / 2 + decorPadding,
+          };
+        });
+      };
+
+      const isCollidingWithText = (x, z, textBounds) => {
+        if (!textBounds || textBounds.length === 0) return false;
+        for (let i = 0; i < textBounds.length; i++) {
+          const b = textBounds[i];
+          if (x >= b.minX && x <= b.maxX && z >= b.minZ && z <= b.maxZ) {
+            return true;
+          }
+        }
+        return false;
+      };
+
+      const computeVariantPositions = (setId, variation, rTop, prng, textBounds) => {
         const spacing = (DECORATION_SPACING[setId] || 1.0) * centerDecorScale;
         const positions = [];
 
         if (variation === 'single') {
-          positions.push({ x: 0, z: 0 });
+          if (isCollidingWithText(0, 0, textBounds)) {
+            // Shift to upper crown if center is occupied by text
+            positions.push({ x: 0, z: -rTop * 0.65 });
+          } else {
+            positions.push({ x: 0, z: 0 });
+          }
         } else if (variation === 'outerRing') {
           const ringRadius = rTop * 0.72;
           const count = Math.max(4, Math.round((2 * Math.PI * ringRadius) / spacing));
           for (let i = 0; i < count; i++) {
             const angle = (i / count) * Math.PI * 2;
-            positions.push({
-              x: Math.cos(angle) * ringRadius,
-              z: Math.sin(angle) * ringRadius,
-            });
+            const x = Math.cos(angle) * ringRadius;
+            const z = Math.sin(angle) * ringRadius;
+            if (!isCollidingWithText(x, z, textBounds)) {
+              positions.push({ x, z });
+            }
+          }
+        } else if (variation === 'topBottomCrown') {
+          // Arched upper crown
+          const topArcR = rTop * 0.72;
+          const count = Math.max(3, Math.round((Math.PI * 0.65 * topArcR) / spacing));
+          for (let i = 0; i < count; i++) {
+            const frac = count > 1 ? i / (count - 1) : 0.5;
+            const angle = -Math.PI * 0.82 + frac * Math.PI * 0.64;
+            const x = Math.cos(angle) * topArcR;
+            const z = Math.sin(angle) * topArcR;
+            if (!isCollidingWithText(x, z, textBounds)) {
+              positions.push({ x, z });
+            }
+          }
+          // Arched lower crown
+          for (let i = 0; i < count; i++) {
+            const frac = count > 1 ? i / (count - 1) : 0.5;
+            const angle = Math.PI * 0.18 + frac * Math.PI * 0.64;
+            const x = Math.cos(angle) * topArcR;
+            const z = Math.sin(angle) * topArcR;
+            if (!isCollidingWithText(x, z, textBounds)) {
+              positions.push({ x, z });
+            }
+          }
+        } else if (variation === 'cornerFlanks') {
+          const flankOffsets = [
+            { x: 0, z: 0 },
+            { x: 0.30 * spacing, z: 0.20 * spacing },
+            { x: -0.30 * spacing, z: -0.20 * spacing },
+          ];
+          // Top-Left Flank
+          const tlX = -rTop * 0.44, tlZ = -rTop * 0.44;
+          for (const off of flankOffsets) {
+            const x = tlX + off.x, z = tlZ + off.z;
+            if (x * x + z * z <= (rTop * 0.80) ** 2 && !isCollidingWithText(x, z, textBounds)) {
+              positions.push({ x, z });
+            }
+          }
+          // Bottom-Right Flank
+          const brX = rTop * 0.44, brZ = rTop * 0.44;
+          for (const off of flankOffsets) {
+            const x = brX + off.x, z = brZ + off.z;
+            if (x * x + z * z <= (rTop * 0.80) ** 2 && !isCollidingWithText(x, z, textBounds)) {
+              positions.push({ x, z });
+            }
           }
         } else if (variation === 'fullFill') {
-          positions.push({ x: 0, z: 0 });
+          if (!isCollidingWithText(0, 0, textBounds)) {
+            positions.push({ x: 0, z: 0 });
+          }
           const maxR = rTop * 0.78;
           let currentR = spacing * 0.9;
           while (currentR <= maxR) {
             const count = Math.max(3, Math.round((2 * Math.PI * currentR) / spacing));
             for (let i = 0; i < count; i++) {
               const angle = (i / count) * Math.PI * 2;
-              positions.push({
-                x: Math.cos(angle) * currentR,
-                z: Math.sin(angle) * currentR,
-              });
+              const x = Math.cos(angle) * currentR;
+              const z = Math.sin(angle) * currentR;
+              if (!isCollidingWithText(x, z, textBounds)) {
+                positions.push({ x, z });
+              }
             }
             currentR += spacing * 0.9;
           }
@@ -1145,10 +1265,11 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           for (let i = 0; i < count; i++) {
             const frac = count > 1 ? i / (count - 1) : 0.5;
             const angle = -Math.PI * 0.55 + frac * Math.PI * 1.1;
-            positions.push({
-              x: Math.cos(angle) * arcRadius,
-              z: Math.sin(angle) * arcRadius,
-            });
+            const x = Math.cos(angle) * arcRadius;
+            const z = Math.sin(angle) * arcRadius;
+            if (!isCollidingWithText(x, z, textBounds)) {
+              positions.push({ x, z });
+            }
           }
         } else if (variation === 'cluster') {
           const clusterOffsets = [
@@ -1158,26 +1279,27 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
             { x: 0.12 * spacing, z: -0.42 * spacing },
             { x: -0.38 * spacing, z: -0.26 * spacing },
           ];
-          const offsetX = rTop * 0.28;
-          const offsetZ = -rTop * 0.24;
+          const offsetX = rTop * 0.32;
+          const offsetZ = -rTop * 0.32;
           for (const off of clusterOffsets) {
-            positions.push({
-              x: offsetX + off.x,
-              z: offsetZ + off.z,
-            });
+            const x = offsetX + off.x;
+            const z = offsetZ + off.z;
+            if (!isCollidingWithText(x, z, textBounds)) {
+              positions.push({ x, z });
+            }
           }
         } else if (variation === 'diagonal') {
           const maxDiag = rTop * 0.68;
-          const count = Math.max(3, Math.round((2 * maxDiag * 1.414) / spacing));
+          const count = Math.max(3, Math.round((2 * maxDiag) / spacing));
           for (let i = 0; i < count; i++) {
-            const frac = count > 1 ? (i / (count - 1)) * 2 - 1 : 0;
-            positions.push({
-              x: frac * maxDiag * 0.707,
-              z: frac * maxDiag * 0.707,
-            });
+            const frac = count > 1 ? i / (count - 1) : 0.5;
+            const t = -maxDiag + frac * 2 * maxDiag;
+            const x = t * 0.707;
+            const z = t * 0.707;
+            if (!isCollidingWithText(x, z, textBounds)) {
+              positions.push({ x, z });
+            }
           }
-        } else {
-          positions.push({ x: 0, z: 0 });
         }
 
         return positions;
@@ -1185,23 +1307,28 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
 
       const buildAndAddDecoration = (targetGroup, setId, x, y, z, scaleFactor, decorColor, prng) => {
         if (setId === 'floralCluster') {
-          const rosetteScale = 0.85 * scaleFactor;
-          const rosetteMesh = buildFloralRosetteMesh(x, y, z, rosetteScale, decorColor);
-          targetGroup.add(rosetteMesh);
+          const unitGroup = new THREE.Group();
+          addRosette(unitGroup, 0, 0, 0, decorColor);
+          unitGroup.scale.setScalar(0.75 * scaleFactor);
+          unitGroup.position.set(x, y, z);
+          targetGroup.add(unitGroup);
         } else if (setId === 'strawberry') {
-          const strawScale = 0.80 * scaleFactor;
-          const strawMesh = buildStrawberryMesh(x, y, z, strawScale, prng || rand);
-          targetGroup.add(strawMesh);
+          const unitGroup = new THREE.Group();
+          addStrawberry(unitGroup, 0, 0, 0);
+          unitGroup.scale.setScalar(0.85 * scaleFactor);
+          unitGroup.position.set(x, y, z);
+          targetGroup.add(unitGroup);
         } else if (setId === 'cherry') {
-          const cherryScale = 0.85 * scaleFactor;
-          const cherryMesh = buildCherryMesh(x, y, z, cherryScale, prng || rand);
-          targetGroup.add(cherryMesh);
+          const unitGroup = new THREE.Group();
+          addCherry(unitGroup, 0, 0, 0, prng || rand);
+          unitGroup.scale.setScalar(0.85 * scaleFactor);
+          unitGroup.position.set(x, y, z);
+          targetGroup.add(unitGroup);
         } else if (setId === 'fruitRing') {
           const unitGroup = new THREE.Group();
-          const strawMesh = buildStrawberryMesh(-0.16 * scaleFactor, 0, 0, 0.65 * scaleFactor, prng || rand);
-          const cherryMesh = buildCherryMesh(0.20 * scaleFactor, 0, 0.08 * scaleFactor, 0.65 * scaleFactor, prng || rand);
-          unitGroup.add(strawMesh);
-          unitGroup.add(cherryMesh);
+          addStrawberry(unitGroup, -0.15 * scaleFactor, 0, 0);
+          addCherry(unitGroup, 0.22 * scaleFactor, 0, 0.1 * scaleFactor, prng || rand);
+          unitGroup.scale.setScalar(0.65 * scaleFactor);
           unitGroup.position.set(x, y, z);
           targetGroup.add(unitGroup);
         } else if (setId === 'ferreroRocher') {
@@ -1235,11 +1362,14 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       ];
 
       if (centerDecorationSetId && ALL_DECORATION_ASSET_IDS.includes(centerDecorationSetId)) {
+        const itemPadding = (DECORATION_SPACING[centerDecorationSetId] || 1.0) * centerDecorScale * 0.38 + 0.12;
+        const textBounds = computeActiveTextBounds(activeTextSlots, isHandwritten, topRadius, itemPadding);
         const positions = computeVariantPositions(
           centerDecorationSetId,
           centerDecorationVariation || 'outerRing',
           topRadius,
-          rand
+          rand,
+          textBounds
         );
         for (const { x, z } of positions) {
           const y = centerSurfaceY(x, z);
@@ -1256,25 +1386,13 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         }
       }
 
-      const isHandwritten = centerTextFont === 'handwritten';
-      const activeFont = isHandwritten ? getHandwrittenFont() : getPacificoFont();
-
-      if (centerText && activeFont) {
-        const lines = centerText.split('\n');
-        const lineHeight = isHandwritten ? 0.60 : 0.65;
-        // Same lastFrostColor reasoning as Floral Cluster above.
+      const textSlots = activeTextSlots;
+      if (textSlots.length > 0 && activeFont) {
         const textMat = getFrostingMaterial(centerTextColor);
         const textGroup = new THREE.Group();
 
-        let actualLines = 0;
-        lines.forEach((line) => {
-          if (line.trim()) actualLines++;
-        });
-
-        let currentLine = 0;
-        lines.forEach((line) => {
-          if (!line.trim()) return;
-          const textGeo = new TextGeometry(line, {
+        textSlots.forEach((slot) => {
+          const textGeo = new TextGeometry(slot.line, {
             font: activeFont,
             size: isHandwritten ? 0.40 : 0.35,
             depth: 0.015,
@@ -1282,15 +1400,12 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
             bevelEnabled: true,
             bevelThickness: isHandwritten ? 0.03 : 0.025,
             bevelSize: isHandwritten ? 0.015 : 0.01,
-            bevelSegments: 4
+            bevelSegments: 4,
           });
           textGeo.computeBoundingBox();
           const bbox = textGeo.boundingBox;
           const xOffset = -0.5 * (bbox.max.x - bbox.min.x);
-
-          const totalHeight = actualLines * lineHeight;
-          const startY = totalHeight / 2 - lineHeight / 2;
-          const yOffset = startY - currentLine * lineHeight;
+          const yOffset = -slot.zRatio * topRadius;
 
           // Conform the text to the cake's domed surface
           const R = topRadius - 0.15; // Bevel size is 0.15
@@ -1318,7 +1433,6 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           textMesh.castShadow = true;
           textMesh.receiveShadow = true;
           textGroup.add(textMesh);
-          currentLine++;
         });
 
         textGroup.rotation.x = -Math.PI / 2;
@@ -1446,7 +1560,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
     // Interior Preview's cutaway is now real geometric clipping, applied
     // directly to covering materials (currently just frostMat) at the point
     // they're created above — nothing left to do here.
-  }, [cakeConfig]);
+  }, [cakeConfig, fontsReady]);
 
   useEffect(() => {
     const mount = mountRef.current;

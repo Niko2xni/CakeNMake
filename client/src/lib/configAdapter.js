@@ -208,7 +208,14 @@ export function adaptConfigToLegacy(newConfig) {
   const centerDecorationVariation = center.decorations?.variation || 'outerRing';
   const centerSugarColorHex = resolveContextSugarColor('center', null, true);
   const centerDecorationColor = centerSugarColorHex || resolveColor(center.decorations?.colorId);
-  const centerText = center.text?.value || '';
+  const rawTop = center.text?.top ?? '';
+  const rawMiddle = center.text?.middle ?? '';
+  const rawBottom = center.text?.bottom ?? '';
+  const centerTextTop = rawTop;
+  const centerTextMiddle = rawMiddle;
+  const centerTextBottom = rawBottom;
+  const centerTextSpacing = typeof center.text?.spacing === 'number' ? center.text.spacing : 0.28;
+  const centerText = [rawTop, rawMiddle, rawBottom].filter(Boolean).join('\n');
   const centerTextFont = center.text?.font || 'script';
   const centerTextColor = centerSugarColorHex || resolveColor(center.text?.colorId);
 
@@ -376,6 +383,10 @@ export function adaptConfigToLegacy(newConfig) {
     centerDecorationVariation,
     centerDecorationColor,
     centerText,
+    centerTextTop,
+    centerTextMiddle,
+    centerTextBottom,
+    centerTextSpacing,
     centerTextFont,
     centerTextColor,
 
