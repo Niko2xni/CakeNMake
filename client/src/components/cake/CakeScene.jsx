@@ -55,6 +55,9 @@ import {
   addCandle,
   addChocolateChip,
   addRosette,
+  buildCherryMesh,
+  buildStrawberryMesh,
+  buildFloralRosetteMesh,
   buildFerreroRocherMesh,
   buildHersheysKissMesh,
   buildOreoMesh,
@@ -63,6 +66,7 @@ import {
   buildSoccerBallMesh,
   addPipingPattern,
 } from './toppings';
+
 
 
 
@@ -1181,28 +1185,23 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
 
       const buildAndAddDecoration = (targetGroup, setId, x, y, z, scaleFactor, decorColor, prng) => {
         if (setId === 'floralCluster') {
-          const unitGroup = new THREE.Group();
-          addRosette(unitGroup, 0, 0, 0, decorColor);
-          unitGroup.scale.setScalar(0.75 * scaleFactor);
-          unitGroup.position.set(x, y, z);
-          targetGroup.add(unitGroup);
+          const rosetteScale = 0.85 * scaleFactor;
+          const rosetteMesh = buildFloralRosetteMesh(x, y, z, rosetteScale, decorColor);
+          targetGroup.add(rosetteMesh);
         } else if (setId === 'strawberry') {
-          const unitGroup = new THREE.Group();
-          addStrawberry(unitGroup, 0, 0, 0);
-          unitGroup.scale.setScalar(0.85 * scaleFactor);
-          unitGroup.position.set(x, y, z);
-          targetGroup.add(unitGroup);
+          const strawScale = 0.80 * scaleFactor;
+          const strawMesh = buildStrawberryMesh(x, y, z, strawScale, prng || rand);
+          targetGroup.add(strawMesh);
         } else if (setId === 'cherry') {
-          const unitGroup = new THREE.Group();
-          addCherry(unitGroup, 0, 0, 0, prng || rand);
-          unitGroup.scale.setScalar(0.85 * scaleFactor);
-          unitGroup.position.set(x, y, z);
-          targetGroup.add(unitGroup);
+          const cherryScale = 0.85 * scaleFactor;
+          const cherryMesh = buildCherryMesh(x, y, z, cherryScale, prng || rand);
+          targetGroup.add(cherryMesh);
         } else if (setId === 'fruitRing') {
           const unitGroup = new THREE.Group();
-          addStrawberry(unitGroup, -0.15 * scaleFactor, 0, 0);
-          addCherry(unitGroup, 0.22 * scaleFactor, 0, 0.1 * scaleFactor, prng || rand);
-          unitGroup.scale.setScalar(0.65 * scaleFactor);
+          const strawMesh = buildStrawberryMesh(-0.16 * scaleFactor, 0, 0, 0.65 * scaleFactor, prng || rand);
+          const cherryMesh = buildCherryMesh(0.20 * scaleFactor, 0, 0.08 * scaleFactor, 0.65 * scaleFactor, prng || rand);
+          unitGroup.add(strawMesh);
+          unitGroup.add(cherryMesh);
           unitGroup.position.set(x, y, z);
           targetGroup.add(unitGroup);
         } else if (setId === 'ferreroRocher') {
