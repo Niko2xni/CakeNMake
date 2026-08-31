@@ -168,6 +168,8 @@ export function getSharedStrawberryBodyGeometry() {
   ];
 
   const geo = new THREE.LatheGeometry(points, 48);
+  // Shift geometry so the bottom tip is embedded into the frosting
+  geo.translate(0, -0.22, 0);
   geo.computeVertexNormals();
   geo.userData.sharedCache = true;
   _sharedStrawberryBodyGeo = geo;
@@ -277,6 +279,7 @@ export function getSharedPedicelMaterial() {
  * - 3D tactile normal/bump depth
  * - Lush 6-leaf calyx crown curling naturally over the shoulders
  * - Trimmed center pedicel stem stub
+ * - Embedded base sitting naturally nestled in cake frosting
  */
 export function buildStrawberryMesh(x = 0, y = 0, z = 0, scale = 1.0, rand = Math.random) {
   const root = new THREE.Group();
@@ -294,9 +297,9 @@ export function buildStrawberryMesh(x = 0, y = 0, z = 0, scale = 1.0, rand = Mat
   bodyMesh.receiveShadow = true;
   root.add(bodyMesh);
 
-  // Calyx Crown (6 organic curling sepals)
+  // Calyx Crown (6 organic curling sepals) sitting on top of embedded berry
   const calyxGroup = new THREE.Group();
-  calyxGroup.position.set(0, 1.02, 0);
+  calyxGroup.position.set(0, 0.80, 0);
 
   const numLeaves = 6;
   const baseRotationOffset = rand() * Math.PI * 2;

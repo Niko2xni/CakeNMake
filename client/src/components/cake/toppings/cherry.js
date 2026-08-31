@@ -65,10 +65,10 @@ export function getSharedCherryBodyGeometry() {
     );
   }
 
-  // Shift geometry so the bottom-most point rests at y = 0
+  // Shift geometry so the bottom of the cherry is embedded into the frosting
   geo.computeBoundingBox();
   const minY = geo.boundingBox.min.y;
-  geo.translate(0, -minY, 0);
+  geo.translate(0, -minY - 0.10, 0);
 
   geo.computeVertexNormals();
   geo.userData.sharedCache = true;
@@ -138,6 +138,7 @@ export function getSharedCherryBasalCollarGeometry() {
  * - Naturally curved organic stem with randomized bend & orientation
  * - Basal collar node and woody tip bud
  * - High-gloss maraschino / fresh dark cherry glaze
+ * - Embedded base sitting naturally nestled in cake frosting
  */
 export function buildCherryMesh(x = 0, y = 0, z = 0, scale = 1.0, rand = Math.random) {
   const root = new THREE.Group();
@@ -153,10 +154,10 @@ export function buildCherryMesh(x = 0, y = 0, z = 0, scale = 1.0, rand = Math.ra
   bodyMesh.receiveShadow = true;
   root.add(bodyMesh);
 
-  // Basal Collar inside the top depression (approx y = 0.60 above bottom)
+  // Basal Collar inside the top depression (approx y = 0.52 above embedded baseline)
   const collarGeo = getSharedCherryBasalCollarGeometry();
   const collarMesh = new THREE.Mesh(collarGeo, stemMat);
-  collarMesh.position.set(0, 0.62, 0);
+  collarMesh.position.set(0, 0.52, 0);
   collarMesh.castShadow = true;
   root.add(collarMesh);
 
@@ -164,11 +165,11 @@ export function buildCherryMesh(x = 0, y = 0, z = 0, scale = 1.0, rand = Math.ra
   const tiltAngle = (rand() * Math.PI * 2);
   const bendAmount = 0.12 + rand() * 0.10;
   const curvePoints = [
-    new THREE.Vector3(0, 0.62, 0),
-    new THREE.Vector3(Math.cos(tiltAngle) * 0.03, 0.78, Math.sin(tiltAngle) * 0.03),
-    new THREE.Vector3(Math.cos(tiltAngle) * (bendAmount * 0.6), 0.98, Math.sin(tiltAngle) * (bendAmount * 0.6)),
-    new THREE.Vector3(Math.cos(tiltAngle) * bendAmount, 1.18, Math.sin(tiltAngle) * bendAmount),
-    new THREE.Vector3(Math.cos(tiltAngle) * (bendAmount * 1.12), 1.25, Math.sin(tiltAngle) * (bendAmount * 1.12)),
+    new THREE.Vector3(0, 0.52, 0),
+    new THREE.Vector3(Math.cos(tiltAngle) * 0.03, 0.68, Math.sin(tiltAngle) * 0.03),
+    new THREE.Vector3(Math.cos(tiltAngle) * (bendAmount * 0.6), 0.88, Math.sin(tiltAngle) * (bendAmount * 0.6)),
+    new THREE.Vector3(Math.cos(tiltAngle) * bendAmount, 1.08, Math.sin(tiltAngle) * bendAmount),
+    new THREE.Vector3(Math.cos(tiltAngle) * (bendAmount * 1.12), 1.15, Math.sin(tiltAngle) * (bendAmount * 1.12)),
   ];
 
   const stemCurve = new THREE.CatmullRomCurve3(curvePoints);
