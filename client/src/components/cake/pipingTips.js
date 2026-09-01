@@ -299,95 +299,135 @@ function buildStarDollopUnitGeometry({ radius = 0.28, height = 0.5, points = 12 
   return geometry;
 }
 
-function triangleWave(value) {
-  return (2 / Math.PI) * Math.asin(Math.sin(value));
+class StarScallopRimCurve extends THREE.Curve {
+  constructor(R = 4.0, A = 0.18, N = 10, cuspSharpness = 0.8) {
+    super();
+    this.R = R;
+    this.A = A;
+    this.N = N;
+    this.cuspSharpness = cuspSharpness;
+  }
+  getPoint(t, target = new THREE.Vector3()) {
+    const theta = t * Math.PI * 2;
+    const lobeT = (t * this.N) % 1;
+    const arch = Math.pow(Math.sin(lobeT * Math.PI), this.cuspSharpness);
+    const r = this.R + this.A * (arch - 0.5);
+    const x = Math.cos(theta) * r;
+    const z = Math.sin(theta) * r;
+    const y = arch * 0.035;
+    return target.set(x, y, z);
+  }
 }
 
-function buildScallopedRingGeometry(ringRadius, {
-  lobes = 10,
-  depth = 0.18,
-  valleyDepthFactor = 0,
-  tubeRadius = 0.34,
-  points = 10,
-  segments = 480,
-  size = 1,
-} = {}) {
-  const peakRadius = ringRadius + depth * size;
-  const valleyRadius = ringRadius - depth * valleyDepthFactor * size;
-  const pathPoints = [];
-
-  for (let i = 0; i < lobes; i++) {
-    const peakAngle = (i / lobes) * Math.PI * 2;
-    const valleyAngle = ((i + 0.5) / lobes) * Math.PI * 2;
-    pathPoints.push(new THREE.Vector3(Math.cos(peakAngle) * peakRadius, 0, Math.sin(peakAngle) * peakRadius));
-    pathPoints.push(new THREE.Vector3(Math.cos(valleyAngle) * valleyRadius, 0, Math.sin(valleyAngle) * valleyRadius));
-  }
-
-  const curve = new THREE.CatmullRomCurve3(pathPoints, true, 'centripetal');
-  const frames = curve.computeFrenetFrames(segments, true);
-  const curvePoints = curve.getPoints(segments);
-  const radialSegments = points * 4;
+function sweepFlutedProfileAlongCurve(profilePoints, curve, { segments = 240, taper = () => 1, twist = () => 0 } = {}) {
   const positions = [];
   const indices = [];
+  const profileCount = profilePoints.length;
+  const worldUp = new THREE.Vector3(0, 1, 0);
+  const fallbackRef = new THREE.Vector3(1, 0, 0);
 
   for (let i = 0; i <= segments; i++) {
-    const center = curvePoints[i];
-    const normal = frames.normals[i];
-    const binormal = frames.binormals[i];
-    const angle = Math.atan2(center.z, center.x);
-    const phase = (Math.cos(lobes * angle) + 1) / 2;
-    const swell = 0.95 + 0.19 * phase;
+    const t = i / segments;
+    const center = curve.getPointAt(Math.min(t, 1));
+    const tangent = curve.getTangentAt(Math.min(t, 1)).normalize();
 
-    for (let j = 0; j < radialSegments; j++) {
-      const crossAngle = (j / radialSegments) * Math.PI * 2;
-      const ridge = triangleWave(points * crossAngle);
-      const radius = tubeRadius * size * swell * (1 + ridge * 0.46);
-      const cos = Math.cos(crossAngle) * radius;
-      const sin = Math.sin(crossAngle) * radius;
-      positions.push(
-        center.x + normal.x * cos + binormal.x * sin,
-        center.y + normal.y * cos + binormal.y * sin,
-        center.z + normal.z * cos + binormal.z * sin,
-      );
+    const ref = Math.abs(tangent.dot(worldUp)) > 0.98 ? fallbackRef : worldUp;
+    const normal = new THREE.Vector3().crossVectors(ref, tangent).normalize();
+    const binormal = new THREE.Vector3().crossVectors(tangent, normal).normalize();
+
+    const scale = Math.max(taper(t), 0.001);
+    const rot = twist(t);
+    const cosRot = Math.cos(rot);
+    const sinRot = Math.sin(rot);
+
+    for (let j = 0; j < profileCount; j++) {
+      const p = profilePoints[j];
+      const px = (p.x * cosRot - p.y * sinRot) * scale;
+      const py = (p.x * sinRot + p.y * cosRot) * scale;
+
+      const x = normal.x * px + binormal.x * py;
+      const y = normal.y * px + binormal.y * py;
+      const z = normal.z * px + binormal.z * py;
+      positions.push(center.x + x, center.y + y, center.z + z);
     }
   }
 
   for (let i = 0; i < segments; i++) {
-    for (let j = 0; j < radialSegments; j++) {
-      const next = (j + 1) % radialSegments;
-      const current = i * radialSegments + j;
-      const currentNext = i * radialSegments + next;
-      const nextRow = (i + 1) * radialSegments + j;
-      const nextRowNext = (i + 1) * radialSegments + next;
-      indices.push(current, nextRow, currentNext, currentNext, nextRow, nextRowNext);
+    for (let j = 0; j < profileCount; j++) {
+      const jNext = (j + 1) % profileCount;
+      const a = i * profileCount + j;
+      const b = i * profileCount + jNext;
+      const c = (i + 1) * profileCount + j;
+      const d = (i + 1) * profileCount + jNext;
+      indices.push(a, b, c, b, d, c);
     }
   }
 
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  return geometry;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return geo;
 }
 
-function buildScallopedPiping(material, radius, y, options) {
+function buildScallopedRingGeometry(ringRadius, {
+  lobes = Math.max(6, Math.round((ringRadius * Math.PI * 2) / 2.6)),
+  radialDepth = 0.18,
+  starPoints = 8,
+  outerR = 0.16,
+  innerR = 0.075,
+  taperAmp = 0.20,
+  twistAmp = 0.35,
+  cuspSharpness = 0.8,
+} = {}) {
+  const curve = new StarScallopRimCurve(ringRadius, radialDepth, lobes, cuspSharpness);
+  const segments = Math.max(96, lobes * 30);
+  return sweepFlutedProfileAlongCurve(starProfilePoints(starPoints, outerR, innerR), curve, {
+    segments,
+    taper: (t) => 0.88 + taperAmp * Math.sin(((t * lobes) % 1) * Math.PI),
+    twist: (t) => Math.sin(((t * lobes) % 1) * Math.PI * 2) * twistAmp,
+  });
+}
+
+function buildScallopedPiping(material, radius, y, options = {}) {
+  const surfaceLift = options.surfaceLift ?? 0.18;
   const mesh = new THREE.Mesh(buildScallopedRingGeometry(radius, options), material);
-  mesh.position.y = y;
+  mesh.position.y = y + surfaceLift;
   mesh.castShadow = true;
   return mesh;
 }
 
-function buildScallopedDollopPiping(material, radius, y, options, rand) {
-  const { lobes = 10, depth = 0.34, tubeRadius = 0.28, dollopScale = 1, size = 1 } = options;
+function buildScallopedDollopPiping(material, radius, y, options = {}, rand) {
+  const lobes = options.lobes || Math.max(6, Math.round((radius * Math.PI * 2) / 2.6));
+  const surfaceLift = options.surfaceLift ?? 0.18;
   const group = new THREE.Group();
-  group.add(buildScallopedPiping(material, radius, y, options));
+  group.add(buildScallopedPiping(material, radius, y, { ...options, lobes, surfaceLift }));
+
+  if (options.layered) {
+    const lowerGeo = buildScallopedRingGeometry(radius, {
+      lobes,
+      radialDepth: (options.radialDepth || 0.18) * 1.35,
+      starPoints: 6,
+      outerR: (options.outerR || 0.16) * 0.75,
+      innerR: (options.innerR || 0.075) * 0.75,
+      taperAmp: 0.15,
+      twistAmp: 0.25,
+      cuspSharpness: 0.75,
+    });
+    const lowerMesh = new THREE.Mesh(lowerGeo, material);
+    lowerMesh.position.y = y + surfaceLift - 0.06;
+    lowerMesh.castShadow = true;
+    group.add(lowerMesh);
+  }
+
+  const dollopScale = options.dollopScale || 0.60;
   group.add(instanceAroundRing(getUnitGeometry('starDollop'), material, {
-    ringRadius: radius + depth * 1.7 * size,
-    y: -tubeRadius * 0.75 * size,
+    ringRadius: radius - (options.radialDepth || 0.18) * 0.45,
+    y: y + surfaceLift + (options.outerR || 0.16) * 0.4,
     count: lobes,
-    angleOffset: Math.PI / lobes,
+    angleOffset: 0,
     rand,
-    scale: dollopScale * size,
+    scale: dollopScale,
   }));
   return group;
 }
@@ -695,14 +735,22 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
       const count = Math.max(8, Math.round((radius * Math.PI * 2) / (1.35 * scale)));
       return instanceAroundRing(getUnitGeometry('starDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.55 });
     }
-    case 'starScallop':
-      return buildScallopedPiping(material, radius, y, { lobes: 14, depth: 0.3, tubeRadius: 0.34, points: 10, segments: 480, size: 0.55 });
-    case 'starScallopSoft':
-      return buildScallopedPiping(material, radius, y, { lobes: 10, depth: 0.18, tubeRadius: 0.34, points: 10, segments: 480, size: 0.55 });
-    case 'starScallopDollops':
-      return buildScallopedDollopPiping(material, radius, y, { lobes: 10, depth: 0.34, tubeRadius: 0.34, points: 10, segments: 480, size: 0.55 }, rand);
-    case 'starScallopLayered':
-      return buildScallopedDollopPiping(material, radius, y, { lobes: 10, depth: 0.34, valleyDepthFactor: 0.5, tubeRadius: 0.28, points: 12, segments: 720, size: 0.55 }, rand);
+    case 'starScallop': {
+      const lobes = Math.max(6, Math.round((radius * Math.PI * 2) / 2.6));
+      return buildScallopedPiping(material, radius, y, { lobes, radialDepth: 0.18, starPoints: 8, outerR: 0.16, innerR: 0.075, twistAmp: 0.35, surfaceLift: 0.18 });
+    }
+    case 'starScallopSoft': {
+      const lobes = Math.max(6, Math.round((radius * Math.PI * 2) / 3.0));
+      return buildScallopedPiping(material, radius, y, { lobes, radialDepth: 0.12, starPoints: 6, outerR: 0.15, innerR: 0.08, taperAmp: 0.15, twistAmp: 0.20, cuspSharpness: 0.7, surfaceLift: 0.16 });
+    }
+    case 'starScallopDollops': {
+      const lobes = Math.max(6, Math.round((radius * Math.PI * 2) / 2.6));
+      return buildScallopedDollopPiping(material, radius, y, { lobes, radialDepth: 0.18, starPoints: 8, outerR: 0.16, innerR: 0.075, dollopScale: 0.58, twistAmp: 0.35, surfaceLift: 0.18 }, rand);
+    }
+    case 'starScallopLayered': {
+      const lobes = Math.max(6, Math.round((radius * Math.PI * 2) / 2.6));
+      return buildScallopedDollopPiping(material, radius, y, { lobes, radialDepth: 0.15, starPoints: 8, outerR: 0.15, innerR: 0.07, dollopScale: 0.55, twistAmp: 0.30, layered: true, surfaceLift: 0.18 }, rand);
+    }
     case 'rope': {
       const geo = buildRopeRingGeometry(radius);
       const mesh = new THREE.Mesh(geo, material);
