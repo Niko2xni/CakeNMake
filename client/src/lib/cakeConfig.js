@@ -521,8 +521,20 @@ export const BRACELET_BEADS_VARIATIONS = [
   { id: 'beadedTrimPetite', label: 'Petite Beaded Trim' },
 ];
 
+export const DOLLOPS_VARIATIONS = [
+  { id: 'starDollop', label: 'Star Dollop' },
+  { id: 'starDollopSparse', label: 'Sparse Star Dollop' },
+];
+
+export const SCALLOPS_VARIATIONS = [
+  { id: 'starScallop', label: 'Star Scallop' },
+  { id: 'starScallopSoft', label: 'Soft Star Scallop' },
+  { id: 'starScallopDollops', label: 'Scallop with Dollops' },
+  { id: 'starScallopLayered', label: 'Layered Star Scallop' },
+];
+
 export const STANDALONE_EDGE_PIPING_OPTIONS = PIPING_TIPS
-  .filter(({ id }) => !['shell', 'star', 'round', 'leaf', 'lambeth'].includes(id));
+  .filter(({ id }) => ['rope', 'petal', 'dropFlower'].includes(id));
 
 export const EDGE_DECORATION_SETS = [
   { id: 'curtain', label: 'Curtain' },

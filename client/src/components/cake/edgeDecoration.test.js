@@ -35,9 +35,19 @@ describe('edge decoration placement', () => {
 
     expect(screen.queryByRole('button', { name: 'None' })).not.toBeInTheDocument();
     expect(screen.getByText('Rope')).toBeInTheDocument();
+    expect(screen.getByText('Petal')).toBeInTheDocument();
+    expect(screen.getByText('Drop Flower')).toBeInTheDocument();
     expect(screen.getByText('Bracelet Beads')).toBeInTheDocument();
     expect(screen.getByTitle('Beaded Trim')).toBeInTheDocument();
     expect(screen.getByTitle('Trio Beaded Trim')).toBeInTheDocument();
     expect(screen.getByTitle('Petite Beaded Trim')).toBeInTheDocument();
+    expect(screen.getByText('Dollops')).toBeInTheDocument();
+    expect(screen.getByTitle('Star Dollop')).toBeInTheDocument();
+    expect(screen.getByTitle('Sparse Star Dollop')).toBeInTheDocument();
+    expect(screen.getByText('Scallops')).toBeInTheDocument();
+    expect(screen.getByTitle('Star Scallop')).toBeInTheDocument();
+    expect(screen.getByTitle('Soft Star Scallop')).toBeInTheDocument();
+    expect(screen.getByTitle('Scallop with Dollops')).toBeInTheDocument();
+    expect(screen.getByTitle('Layered Star Scallop')).toBeInTheDocument();
   });
 });
