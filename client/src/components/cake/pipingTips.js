@@ -299,46 +299,77 @@ function buildStarDollopUnitGeometry({ radius = 0.28, height = 0.5, points = 12 
   return geometry;
 }
 
-class PerfectCircleCurve extends THREE.Curve {
-  constructor(radius = 4.0) {
-    super();
-    this.radius = radius;
-  }
-  getPoint(t, target = new THREE.Vector3()) {
-    const theta = t * Math.PI * 2;
-    return target.set(Math.cos(theta) * this.radius, 0, Math.sin(theta) * this.radius);
-  }
-  getTangent(t, target = new THREE.Vector3()) {
-    const theta = t * Math.PI * 2;
-    return target.set(-Math.sin(theta), 0, Math.cos(theta)).normalize();
-  }
-}
-
-function buildStarAppliqueGeometry({ radius = 0.16, height = 0.07, points = 6 } = {}) {
+/**
+ * Unified Star-Scallop Rim Geometry Generator
+ * - Base sweep path: True circle in XZ plane (R = ringRadius)
+ * - Single unified angle-driven morphing: The tube's own cross-section
+ *   morphs from a rounded narrow bead at the valleys into a crisp 5-6 pointed
+ *   star fluting at each of the N peaks (cos(N*θ) = 1).
+ * - Zero separate appliqué geometry — one continuous, seamless mesh.
+ * - Sharpened cusps: sign(cos(N*θ)) * |cos(N*θ)|^p for defined pinch points.
+ */
+function buildUnifiedStarScallopGeometry({
+  R = 4.0,
+  N = 10,
+  baseRadius = 0.14,
+  bulgeAmount = 0.20,
+  starSharpness = 0.45,
+  starPoints = 6,
+  cuspPower = 1.4,
+  segments = 360,
+  radialSegments = 48,
+} = {}) {
   const positions = [];
   const indices = [];
-  const rings = 8;
-  const segments = points * 4;
 
-  for (let r = 0; r <= rings; r++) {
-    const u = r / rings;
-    const baseR = radius * Math.sqrt(u);
-    const baseH = height * (1 - u * u);
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const theta = t * Math.PI * 2;
 
-    for (let s = 0; s <= segments; s++) {
-      const v = s / segments;
-      const angle = v * Math.PI * 2;
-      const starWave = Math.cos(points * angle);
-      const curR = baseR * (1 + 0.32 * starWave * (1 - u * 0.25));
-      positions.push(Math.cos(angle) * curR, baseH, Math.sin(angle) * curR);
+    const cosTheta = Math.cos(theta);
+    const sinTheta = Math.sin(theta);
+
+    // Center on perfect circle
+    const cx = cosTheta * R;
+    const cz = sinTheta * R;
+
+    // Normal = radial XZ direction
+    const nx = cosTheta;
+    const nz = sinTheta;
+
+    // Binormal = Y up (0, 1, 0)
+
+    // Sharpened cusp function: sign(cos) * |cos|^p
+    const rawCos = Math.cos(N * theta);
+    const cusp = Math.sign(rawCos) * Math.pow(Math.abs(rawCos), cuspPower);
+    // Normalized peak factor: 1 at peaks (cos = 1), 0 at valleys (cos = -1)
+    const k = (cusp + 1) / 2;
+
+    // Current base tube thickness with radial bulge modulation
+    const tubeR = baseRadius * (1 + bulgeAmount * cusp);
+
+    for (let j = 0; j <= radialSegments; j++) {
+      const phi = (j / radialSegments) * Math.PI * 2;
+
+      // Cross-section morphing:
+      // At valleys (k=0): smooth circular profile
+      // At peaks (k=1): crisp starburst with starPoints fluted points
+      const starFlute = Math.cos(starPoints * phi) - 0.28 * Math.cos(2 * starPoints * phi);
+      const r = tubeR * (1 + k * starSharpness * starFlute);
+
+      const lx = Math.cos(phi) * r;
+      const ly = Math.sin(phi) * r;
+
+      positions.push(cx + nx * lx, ly, cz + nz * lx);
     }
   }
 
-  const stride = segments + 1;
-  for (let r = 0; r < rings; r++) {
-    for (let s = 0; s < segments; s++) {
-      const curr = r * stride + s;
-      const next = (r + 1) * stride + s;
+  const ringStride = radialSegments + 1;
+  for (let i = 0; i < segments; i++) {
+    for (let j = 0; j < radialSegments; j++) {
+      const curr = i * ringStride + j;
+      const next = (i + 1) * ringStride + j;
+
       indices.push(curr, curr + 1, next);
       indices.push(curr + 1, next + 1, next);
     }
@@ -351,126 +382,46 @@ function buildStarAppliqueGeometry({ radius = 0.16, height = 0.07, points = 6 } 
   return geo;
 }
 
-function buildScallopedRingGeometry(ringRadius, {
-  lobes = Math.max(8, Math.round((ringRadius * Math.PI * 2) / 2.0)),
-  bulgeAmount = 0.24, // B: cross-section radial scale modulation s(θ) = 1 + B * cos(N * θ)
-  starPoints = 8,
-  outerR = 0.16,
-  innerR = 0.08,
-  twistAmp = 0.30,
-  segments = Math.max(120, lobes * 32),
-} = {}) {
-  const curve = new PerfectCircleCurve(ringRadius);
-  const profilePoints = starProfilePoints(starPoints, outerR, innerR);
-  const profileCount = profilePoints.length;
-  const positions = [];
-  const indices = [];
-  const worldUp = new THREE.Vector3(0, 1, 0);
-  const fallbackRef = new THREE.Vector3(1, 0, 0);
-
-  for (let i = 0; i <= segments; i++) {
-    const t = i / segments;
-    const theta = t * Math.PI * 2;
-    const center = curve.getPoint(t);
-    const tangent = curve.getTangent(t);
-
-    const ref = Math.abs(tangent.dot(worldUp)) > 0.98 ? fallbackRef : worldUp;
-    const normal = new THREE.Vector3().crossVectors(ref, tangent).normalize();
-    const binormal = new THREE.Vector3().crossVectors(tangent, normal).normalize();
-
-    // Cross-section pulse/scallop modulation along circular path
-    const s = 1 + bulgeAmount * Math.cos(lobes * theta);
-    const rot = Math.sin(lobes * theta) * twistAmp;
-    const cosRot = Math.cos(rot);
-    const sinRot = Math.sin(rot);
-
-    for (let j = 0; j < profileCount; j++) {
-      const p = profilePoints[j];
-      const px = (p.x * cosRot - p.y * sinRot) * s;
-      const py = (p.x * sinRot + p.y * cosRot) * s;
-
-      const x = normal.x * px + binormal.x * py;
-      const y = normal.y * px + binormal.y * py;
-      const z = normal.z * px + binormal.z * py;
-      positions.push(center.x + x, center.y + y, center.z + z);
-    }
-  }
-
-  for (let i = 0; i < segments; i++) {
-    for (let j = 0; j < profileCount; j++) {
-      const jNext = (j + 1) % profileCount;
-      const a = i * profileCount + j;
-      const b = i * profileCount + jNext;
-      const c = (i + 1) * profileCount + j;
-      const d = (i + 1) * profileCount + jNext;
-      indices.push(a, b, c, b, d, c);
-    }
-  }
-
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geo.setIndex(indices);
-  geo.computeVertexNormals();
-  return geo;
-}
-
 function buildScallopedPiping(material, radius, y, options = {}) {
   const surfaceLift = options.surfaceLift ?? 0.18;
-  const group = new THREE.Group();
-  const mesh = new THREE.Mesh(buildScallopedRingGeometry(radius, options), material);
+  const mesh = new THREE.Mesh(buildUnifiedStarScallopGeometry({ R: radius, ...options }), material);
   mesh.position.y = y + surfaceLift;
   mesh.castShadow = true;
-  group.add(mesh);
-
-  if (options.withNubs) {
-    const lobes = options.lobes || Math.max(8, Math.round((radius * Math.PI * 2) / 2.0));
-    const nubGeo = buildStarAppliqueGeometry({
-      radius: (options.outerR || 0.16) * 1.1,
-      height: 0.07,
-      points: 6,
-    });
-    group.add(instanceAroundRing(nubGeo, material, {
-      ringRadius: radius,
-      y: y + surfaceLift + (options.outerR || 0.16) * 0.9,
-      count: lobes,
-      angleOffset: 0,
-      scale: 1,
-    }));
-  }
-
-  return group;
+  return mesh;
 }
 
 function buildScallopedDollopPiping(material, radius, y, options = {}, rand) {
-  const lobes = options.lobes || Math.max(8, Math.round((radius * Math.PI * 2) / 2.0));
   const surfaceLift = options.surfaceLift ?? 0.18;
   const group = new THREE.Group();
-  group.add(buildScallopedPiping(material, radius, y, { ...options, lobes, surfaceLift, withNubs: false }));
+  group.add(buildScallopedPiping(material, radius, y, { ...options, surfaceLift }));
 
   if (options.layered) {
-    const lowerGeo = buildScallopedRingGeometry(radius * 0.96, {
-      lobes,
-      bulgeAmount: (options.bulgeAmount || 0.24) * 0.8,
-      starPoints: 6,
-      outerR: (options.outerR || 0.16) * 0.75,
-      innerR: (options.innerR || 0.08) * 0.75,
-      twistAmp: 0.2,
-    });
-    const lowerMesh = new THREE.Mesh(lowerGeo, material);
+    const lowerMesh = new THREE.Mesh(buildUnifiedStarScallopGeometry({
+      R: radius * 0.96,
+      N: options.N || Math.max(8, Math.round((radius * Math.PI * 2) / 2.0)),
+      baseRadius: (options.baseRadius || 0.14) * 0.75,
+      bulgeAmount: (options.bulgeAmount || 0.20) * 0.8,
+      starSharpness: (options.starSharpness || 0.45) * 0.7,
+      starPoints: 5,
+    }), material);
     lowerMesh.position.y = y + surfaceLift - 0.04;
     lowerMesh.castShadow = true;
     group.add(lowerMesh);
   }
 
-  const dollopScale = options.dollopScale || 0.58;
-  group.add(instanceAroundRing(getUnitGeometry('starDollop'), material, {
-    ringRadius: radius,
-    y: y + surfaceLift + (options.outerR || 0.16) * 0.75,
-    count: lobes,
-    angleOffset: 0,
-    rand,
-    scale: dollopScale,
-  }));
+  if (options.withDollops) {
+    const N = options.N || Math.max(8, Math.round((radius * Math.PI * 2) / 2.0));
+    const dollopScale = options.dollopScale || 0.55;
+    group.add(instanceAroundRing(getUnitGeometry('starDollop'), material, {
+      ringRadius: radius,
+      y: y + surfaceLift + (options.baseRadius || 0.14) * 0.8,
+      count: N,
+      angleOffset: 0,
+      rand,
+      scale: dollopScale,
+    }));
+  }
+
   return group;
 }
 
@@ -778,20 +729,20 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
       return instanceAroundRing(getUnitGeometry('starDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.55 });
     }
     case 'starScallop': {
-      const lobes = Math.max(8, Math.round((radius * Math.PI * 2) / 2.0));
-      return buildScallopedPiping(material, radius, y, { lobes, bulgeAmount: 0.25, starPoints: 8, outerR: 0.16, innerR: 0.08, withNubs: true, surfaceLift: 0.18 });
+      const N = Math.max(8, Math.round((radius * Math.PI * 2) / 2.0));
+      return buildScallopedPiping(material, radius, y, { N, baseRadius: 0.14, bulgeAmount: 0.22, starSharpness: 0.45, starPoints: 6, cuspPower: 1.4, surfaceLift: 0.18 });
     }
     case 'starScallopSoft': {
-      const lobes = Math.max(8, Math.round((radius * Math.PI * 2) / 2.2));
-      return buildScallopedPiping(material, radius, y, { lobes, bulgeAmount: 0.15, starPoints: 6, outerR: 0.15, innerR: 0.08, twistAmp: 0.20, withNubs: false, surfaceLift: 0.16 });
+      const N = Math.max(8, Math.round((radius * Math.PI * 2) / 2.2));
+      return buildScallopedPiping(material, radius, y, { N, baseRadius: 0.14, bulgeAmount: 0.14, starSharpness: 0.25, starPoints: 5, cuspPower: 1.1, surfaceLift: 0.16 });
     }
     case 'starScallopDollops': {
-      const lobes = Math.max(8, Math.round((radius * Math.PI * 2) / 2.0));
-      return buildScallopedDollopPiping(material, radius, y, { lobes, bulgeAmount: 0.22, starPoints: 8, outerR: 0.16, innerR: 0.08, dollopScale: 0.58, surfaceLift: 0.18 }, rand);
+      const N = Math.max(8, Math.round((radius * Math.PI * 2) / 2.0));
+      return buildScallopedDollopPiping(material, radius, y, { N, baseRadius: 0.14, bulgeAmount: 0.20, starSharpness: 0.40, starPoints: 6, withDollops: true, dollopScale: 0.52, surfaceLift: 0.18 }, rand);
     }
     case 'starScallopLayered': {
-      const lobes = Math.max(8, Math.round((radius * Math.PI * 2) / 2.0));
-      return buildScallopedDollopPiping(material, radius, y, { lobes, bulgeAmount: 0.20, starPoints: 8, outerR: 0.15, innerR: 0.075, dollopScale: 0.52, layered: true, surfaceLift: 0.18 }, rand);
+      const N = Math.max(8, Math.round((radius * Math.PI * 2) / 2.0));
+      return buildScallopedDollopPiping(material, radius, y, { N, baseRadius: 0.14, bulgeAmount: 0.20, starSharpness: 0.40, starPoints: 6, withDollops: true, dollopScale: 0.48, layered: true, surfaceLift: 0.18 }, rand);
     }
     case 'rope': {
       const geo = buildRopeRingGeometry(radius);
