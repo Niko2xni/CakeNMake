@@ -506,8 +506,7 @@ export const CENTER_DECORATION_VARIATIONS = [
   { id: 'diagonal', label: 'Diagonal Stripe' },
 ];
 
-export const EDGE_DECORATION_SETS = [
-  { id: 'curtain', label: 'Curtain' },
+export const BRACELET_BEADS_VARIATIONS = [
   { id: 'beadedTrim', label: 'Beaded Trim' },
   // Same underlying geometry as Beaded Trim (buildBeadedTrimRing in
   // DecorationSets.jsx), just a different bead-size rhythm per design —
@@ -520,6 +519,14 @@ export const EDGE_DECORATION_SETS = [
   // the smallest."
   { id: 'beadedTrimTrio', label: 'Trio Beaded Trim' },
   { id: 'beadedTrimPetite', label: 'Petite Beaded Trim' },
+];
+
+export const STANDALONE_EDGE_PIPING_OPTIONS = PIPING_TIPS
+  .filter(({ id }) => !['shell', 'star', 'round', 'leaf', 'lambeth'].includes(id));
+
+export const EDGE_DECORATION_SETS = [
+  { id: 'curtain', label: 'Curtain' },
+  ...BRACELET_BEADS_VARIATIONS,
 ];
 
 export const EDGE_PIPING_OPTIONS = [...EDGE_DECORATION_SETS, ...PIPING_TIPS]

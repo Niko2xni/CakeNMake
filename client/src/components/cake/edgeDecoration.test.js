@@ -9,9 +9,9 @@ describe('edge decoration placement', () => {
     expect(computeEdgeTrimY(1.25, 1.0, 'beadedTrim', 'fullyFrosted')).toBeCloseTo(1.09, 3);
     expect(computeEdgeTrimY(1.25, 1.0, 'piping', 'fullyFrosted')).toBeCloseTo(1.07, 3);
     expect(computeEdgeTrimY(1.25, 1.0, 'piping', 'texturedButtercream')).toBeCloseTo(1.07, 3);
-    expect(computeEdgeTrimRadius(1.0, 'beadedTrim', 'fullyFrosted')).toBeCloseTo(0.54, 3);
-    expect(computeEdgeTrimRadius(1.0, 'piping', 'texturedButtercream')).toBeCloseTo(0.46, 3);
-    expect(computeEdgeTrimRadius(1.0, 'piping', 'naked')).toBeCloseTo(0.56, 3);
+    expect(computeEdgeTrimRadius(1.0, 'beadedTrim', 'fullyFrosted')).toBeCloseTo(0.84, 3);
+    expect(computeEdgeTrimRadius(1.0, 'piping', 'texturedButtercream')).toBeCloseTo(0.82, 3);
+    expect(computeEdgeTrimRadius(1.0, 'piping', 'naked')).toBeCloseTo(0.72, 3);
   });
 
   it('does not render the generic None option in the edge picker and uses dedicated design rows', () => {
@@ -35,6 +35,9 @@ describe('edge decoration placement', () => {
 
     expect(screen.queryByRole('button', { name: 'None' })).not.toBeInTheDocument();
     expect(screen.getByText('Rope')).toBeInTheDocument();
-    expect(screen.getByText('Beaded Trim')).toBeInTheDocument();
+    expect(screen.getByText('Bracelet Beads')).toBeInTheDocument();
+    expect(screen.getByTitle('Beaded Trim')).toBeInTheDocument();
+    expect(screen.getByTitle('Trio Beaded Trim')).toBeInTheDocument();
+    expect(screen.getByTitle('Petite Beaded Trim')).toBeInTheDocument();
   });
 });
