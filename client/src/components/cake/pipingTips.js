@@ -300,24 +300,24 @@ function buildStarDollopUnitGeometry({ radius = 0.28, height = 0.5, points = 12 
 }
 
 /**
- * Unified Star-Scallop Rim Geometry Generator
- * - Base sweep path: True circle in XZ plane (R = ringRadius)
- * - Single unified angle-driven morphing: The tube's own cross-section
- *   morphs from a rounded narrow bead at the valleys into a crisp 5-6 pointed
- *   star fluting at each of the N peaks (cos(N*θ) = 1).
- * - Zero separate appliqué geometry — one continuous, seamless mesh.
- * - Sharpened cusps: sign(cos(N*θ)) * |cos(N*θ)|^p for defined pinch points.
+ * Solid Continuous Star-Scallop Rim Geometry Generator
+ * - Single continuous tube/bead along a pure circle of radius R (in XZ plane).
+ * - Sharpened cusp modulation: sign(cos(N*θ)) * |cos(N*θ)|^p with p ~ 0.5 for crisp lobe transitions.
+ * - Star-point cross-section morphing: The circular cross-section morphs into a crisp 5-6 pointed
+ *   star/burst shape at each peak (proud of the tube surface), and returns to a smooth round tube between peaks.
+ * - Single continuous watertight mesh seated directly on the cake surface with zero gap.
  */
-function buildUnifiedStarScallopGeometry({
+function buildSolidScallopRimGeometry({
   R = 4.0,
   N = 10,
-  baseRadius = 0.14,
-  bulgeAmount = 0.20,
-  starSharpness = 0.45,
+  tubeRadius = 0.13,
+  bulgeAmount = 0.12, // max ±12% variation from base T
+  starSharpness = 0.28, // must stay < 1.0 — at peakFactor=1 the valley radius is tubeRadius*(1 - starSharpness), which hits zero/inverts at starSharpness=1
   starPoints = 6,
-  cuspPower = 1.4,
+  cuspPower = 1.6, // >1 sharpens the corner of the (now genuinely cornered) triangle-wave lobe transition
+  peakSharpness = 1.0, // higher = narrower star window around each peak apex; this is now multiplied against a second windowing function (the phi-based outwardMask below), so keep this on the wider end (~1) — a narrow peakFactor compounding with a narrow phi mask is what made stars vanish in an earlier round
   segments = 360,
-  radialSegments = 48,
+  radialSegments = 64, // 36 gave a 6-point star only ~6 segments per point — too coarse to resolve a sharp tip, smoothed away by computeVertexNormals
 } = {}) {
   const positions = [];
   const indices = [];
@@ -329,7 +329,7 @@ function buildUnifiedStarScallopGeometry({
     const cosTheta = Math.cos(theta);
     const sinTheta = Math.sin(theta);
 
-    // Center on perfect circle
+    // Center on single circle
     const cx = cosTheta * R;
     const cz = sinTheta * R;
 
@@ -337,28 +337,78 @@ function buildUnifiedStarScallopGeometry({
     const nx = cosTheta;
     const nz = sinTheta;
 
-    // Binormal = Y up (0, 1, 0)
-
-    // Sharpened cusp function: sign(cos) * |cos|^p
+    // Cusp modulation: rawCos in [-1, 1] maps to a triangle wave first (linear
+    // ramp between peak and valley, true corners at both ends) via acos, then
+    // cuspPower reshapes that ramp. cuspPower > 1 now sharpens the corner
+    // (previous code's cuspPower < 1 direction was backwards — a fractional
+    // power on a smooth cosine cannot introduce a corner that isn't there;
+    // acos is what turns the smooth wave into a piecewise-linear one with
+    // real corners for the exponent to sharpen further).
     const rawCos = Math.cos(N * theta);
-    const cusp = Math.sign(rawCos) * Math.pow(Math.abs(rawCos), cuspPower);
-    // Normalized peak factor: 1 at peaks (cos = 1), 0 at valleys (cos = -1)
-    const k = (cusp + 1) / 2;
+    const triangle = 1 - (2 / Math.PI) * Math.acos(rawCos); // true triangle wave, corners at ±1
+    const cusp = Math.sign(triangle) * Math.pow(Math.abs(triangle), cuspPower);
 
-    // Current base tube thickness with radial bulge modulation
-    const tubeR = baseRadius * (1 + bulgeAmount * cusp);
+    // Peak localization for star morphing (1 at peak apex, dropping to 0
+    // toward the valley). Previous version used max(0, cos)^peakSharpness,
+    // which is within 10% of its peak value for only a couple degrees of
+    // theta at typical N — the star practically never renders, showing up
+    // as an all-but-invisible pinprick at the very apex (this is the bug:
+    // the tiny nubs with no visible star shape in the last render). Basing
+    // this on the same triangle wave instead gives a window whose *angular
+    // width* is controlled directly by peakSharpness, independent of N —
+    // predictable and visible at any lobe count.
+    const peakFactor = Math.pow(Math.max(0, triangle), peakSharpness);
+
+    // Controlled tube radius
+    const currentR = tubeRadius * (1 + bulgeAmount * cusp);
 
     for (let j = 0; j <= radialSegments; j++) {
       const phi = (j / radialSegments) * Math.PI * 2;
+      const sinPhi = Math.sin(phi);
+      const cosPhi = Math.cos(phi);
 
-      // Cross-section morphing:
-      // At valleys (k=0): smooth circular profile
-      // At peaks (k=1): crisp starburst with starPoints fluted points
-      const starFlute = Math.cos(starPoints * phi) - 0.28 * Math.cos(2 * starPoints * phi);
-      const r = tubeR * (1 + k * starSharpness * starFlute);
+      // Star-burst morphing at peak, plain smooth circular tube between peaks.
+      // lx = cosPhi*r is outward, ly = sinPhi*r is vertical: phi=0 is pure
+      // outward, phi=90° is straight up.
+      // Centering on phi=50° (a fixed lean toward outward-and-up) was a
+      // bug: that direction is defined in the tube's LOCAL cross-section
+      // frame, which is identical at every point around the ring — but
+      // "outward" flips relative to camera position as you go around a
+      // closed loop. On the near side of the ring (facing camera) it lined
+      // up and looked right; on the far side, that same local-outward
+      // direction faces away into the back of the tube, invisible to the
+      // camera, which is why stars vanished on the far arc while the near
+      // arc looked correct. phi=90° (true straight-up) has no such issue:
+      // "up" is the same direction in world space regardless of where you
+      // are on the ring or which way the camera is angled, so it reads
+      // consistently around the full 360° for any elevated/overhead camera.
+      // Centering on a single direction (whether phi=0 "outward" or phi=90°
+      // "up") doesn't work for a full ring under perspective: the near arc
+      // and far arc of a circle are seen from genuinely different local
+      // viewing angles relative to the tube's cross-section, so any one
+      // fixed bias foreshortens away on one side while reading clearly on
+      // the other — that's why previous versions had a strong side and a
+      // weak side that flipped depending on which phi was chosen, never
+      // both at once. Fix: use a much shallower falloff (exponent 0.15,
+      // not 0.6) so the mask covers the whole upper hemisphere of the
+      // cross-section (phi from roughly 0° to 180°, i.e. outward through
+      // up through inward-and-up) rather than a narrow band around one
+      // direction. This is visible from any camera elevation on both the
+      // near and far arc of the ring — the cost is the star technically
+      // extends a bit further around the tube than a literal directly-
+      // overhead burst would, which is the right trade since a technically
+      // purer but half-invisible star is worse than a slightly generous
+      // but consistently visible one.
+      // Align star burst so a proud ridge (+1.0) points straight up at phi = 90° (top of tube).
+      // Radiates symmetrically across the exposed upper hemisphere (sinPhi > 0)
+      // so star facets are visible uniformly across front, back, left, and right.
+      const starPhase = starPoints * (phi - Math.PI / 2);
+      const upperMask = sinPhi > 0 ? Math.pow(sinPhi, 0.25) : 0;
+      const starWave = Math.cos(starPhase) * upperMask;
+      const r = currentR * (1 + peakFactor * starSharpness * starWave);
 
-      const lx = Math.cos(phi) * r;
-      const ly = Math.sin(phi) * r;
+      const lx = cosPhi * r;
+      const ly = sinPhi * r;
 
       positions.push(cx + nx * lx, ly, cz + nz * lx);
     }
@@ -383,26 +433,27 @@ function buildUnifiedStarScallopGeometry({
 }
 
 function buildScallopedPiping(material, radius, y, options = {}) {
-  const surfaceLift = options.surfaceLift ?? 0.18;
-  const mesh = new THREE.Mesh(buildUnifiedStarScallopGeometry({ R: radius, ...options }), material);
+  const surfaceLift = options.surfaceLift ?? 0.04;
+  const mesh = new THREE.Mesh(buildSolidScallopRimGeometry({ R: radius, ...options }), material);
   mesh.position.y = y + surfaceLift;
   mesh.castShadow = true;
   return mesh;
 }
 
 function buildScallopedDollopPiping(material, radius, y, options = {}, rand) {
-  const surfaceLift = options.surfaceLift ?? 0.18;
+  const surfaceLift = options.surfaceLift ?? 0.04;
   const group = new THREE.Group();
   group.add(buildScallopedPiping(material, radius, y, { ...options, surfaceLift }));
 
   if (options.layered) {
-    const lowerMesh = new THREE.Mesh(buildUnifiedStarScallopGeometry({
-      R: radius * 0.96,
+    const lowerMesh = new THREE.Mesh(buildSolidScallopRimGeometry({
+      R: radius * 0.97,
       N: options.N || Math.max(8, Math.round((radius * Math.PI * 2) / 2.0)),
-      baseRadius: (options.baseRadius || 0.14) * 0.75,
-      bulgeAmount: (options.bulgeAmount || 0.20) * 0.8,
-      starSharpness: (options.starSharpness || 0.45) * 0.7,
+      tubeRadius: (options.tubeRadius || 0.13) * 0.8,
+      bulgeAmount: (options.bulgeAmount || 0.12) * 0.8,
+      starSharpness: (options.starSharpness || 0.28) * 0.7,
       starPoints: 5,
+      cuspPower: options.cuspPower || 1.6,
     }), material);
     lowerMesh.position.y = y + surfaceLift - 0.04;
     lowerMesh.castShadow = true;
@@ -411,10 +462,10 @@ function buildScallopedDollopPiping(material, radius, y, options = {}, rand) {
 
   if (options.withDollops) {
     const N = options.N || Math.max(8, Math.round((radius * Math.PI * 2) / 2.0));
-    const dollopScale = options.dollopScale || 0.55;
+    const dollopScale = options.dollopScale || 0.46;
     group.add(instanceAroundRing(getUnitGeometry('starDollop'), material, {
       ringRadius: radius,
-      y: y + surfaceLift + (options.baseRadius || 0.14) * 0.8,
+      y: y + surfaceLift + (options.tubeRadius || 0.13) * 0.9,
       count: N,
       angleOffset: 0,
       rand,
@@ -730,19 +781,19 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
     }
     case 'starScallop': {
       const N = Math.max(8, Math.round((radius * Math.PI * 2) / 2.0));
-      return buildScallopedPiping(material, radius, y, { N, baseRadius: 0.14, bulgeAmount: 0.22, starSharpness: 0.45, starPoints: 6, cuspPower: 1.4, surfaceLift: 0.18 });
+      return buildScallopedPiping(material, radius, y, { N, tubeRadius: 0.13, bulgeAmount: 0.12, starSharpness: 0.75, starPoints: 6, cuspPower: 1.6, peakSharpness: 1.0, surfaceLift: 0.04 });
     }
     case 'starScallopSoft': {
       const N = Math.max(8, Math.round((radius * Math.PI * 2) / 2.2));
-      return buildScallopedPiping(material, radius, y, { N, baseRadius: 0.14, bulgeAmount: 0.14, starSharpness: 0.25, starPoints: 5, cuspPower: 1.1, surfaceLift: 0.16 });
+      return buildScallopedPiping(material, radius, y, { N, tubeRadius: 0.13, bulgeAmount: 0.09, starSharpness: 0.6, starPoints: 5, cuspPower: 1.4, peakSharpness: 1.0, surfaceLift: 0.04 });
     }
     case 'starScallopDollops': {
       const N = Math.max(8, Math.round((radius * Math.PI * 2) / 2.0));
-      return buildScallopedDollopPiping(material, radius, y, { N, baseRadius: 0.14, bulgeAmount: 0.20, starSharpness: 0.40, starPoints: 6, withDollops: true, dollopScale: 0.52, surfaceLift: 0.18 }, rand);
+      return buildScallopedDollopPiping(material, radius, y, { N, tubeRadius: 0.13, bulgeAmount: 0.12, starSharpness: 0.7, starPoints: 6, cuspPower: 1.6, peakSharpness: 1.0, withDollops: true, dollopScale: 0.46, surfaceLift: 0.04 }, rand);
     }
     case 'starScallopLayered': {
       const N = Math.max(8, Math.round((radius * Math.PI * 2) / 2.0));
-      return buildScallopedDollopPiping(material, radius, y, { N, baseRadius: 0.14, bulgeAmount: 0.20, starSharpness: 0.40, starPoints: 6, withDollops: true, dollopScale: 0.48, layered: true, surfaceLift: 0.18 }, rand);
+      return buildScallopedDollopPiping(material, radius, y, { N, tubeRadius: 0.13, bulgeAmount: 0.12, starSharpness: 0.7, starPoints: 6, cuspPower: 1.6, peakSharpness: 1.0, withDollops: true, dollopScale: 0.42, layered: true, surfaceLift: 0.04 }, rand);
     }
     case 'rope': {
       const geo = buildRopeRingGeometry(radius);
