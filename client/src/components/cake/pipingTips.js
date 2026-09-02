@@ -312,10 +312,11 @@ function buildSolidScallopRimGeometry({
   N = 10,
   tubeRadius = 0.13,
   bulgeAmount = 0.12, // max ±12% variation from base T
-  starSharpness = 0.28, // must stay < 1.0 — at peakFactor=1 the valley radius is tubeRadius*(1 - starSharpness), which hits zero/inverts at starSharpness=1
+  starSharpness = 0.28, // must stay < 1.0 — at starFactor=1 the valley radius is tubeRadius*(1 - starSharpness), which hits zero/inverts at starSharpness=1
+  starFloor = 0.4, // minimum star factor in valleys (0 = plain round valleys, 1 = same as peaks). 0.4 means valleys still show 40% of peak star amplitude — no plain-round gaps around the ring
   starPoints = 6,
   cuspPower = 1.6, // >1 sharpens the corner of the (now genuinely cornered) triangle-wave lobe transition
-  peakSharpness = 1.0, // higher = narrower star window around each peak apex; this is now multiplied against a second windowing function (the phi-based outwardMask below), so keep this on the wider end (~1) — a narrow peakFactor compounding with a narrow phi mask is what made stars vanish in an earlier round
+  peakSharpness = 1.0, // controls how steeply peakFactor ramps from starFloor at valleys to 1.0 at peaks
   segments = 360,
   radialSegments = 64, // 36 gave a 6-point star only ~6 segments per point — too coarse to resolve a sharp tip, smoothed away by computeVertexNormals
 } = {}) {
@@ -357,7 +358,11 @@ function buildSolidScallopRimGeometry({
     // this on the same triangle wave instead gives a window whose *angular
     // width* is controlled directly by peakSharpness, independent of N —
     // predictable and visible at any lobe count.
+    // peakFactor ramps from 0 at valley to 1 at peak apex.
+    // starFactor raises the floor to starFloor so valleys always show star character
+    // (peakFactor=0 previously meant zero star morphing in valleys => plain round tube).
     const peakFactor = Math.pow(Math.max(0, triangle), peakSharpness);
+    const starFactor = starFloor + (1.0 - starFloor) * peakFactor;
 
     // Controlled tube radius
     const currentR = tubeRadius * (1 + bulgeAmount * cusp);
@@ -399,13 +404,14 @@ function buildSolidScallopRimGeometry({
       // overhead burst would, which is the right trade since a technically
       // purer but half-invisible star is worse than a slightly generous
       // but consistently visible one.
-      // Align star burst so a proud ridge (+1.0) points straight up at phi = 90° (top of tube).
-      // Radiates symmetrically across the exposed upper hemisphere (sinPhi > 0)
-      // so star facets are visible uniformly across front, back, left, and right.
-      const starPhase = starPoints * (phi - Math.PI / 2);
-      const upperMask = sinPhi > 0 ? Math.pow(sinPhi, 0.25) : 0;
-      const starWave = Math.cos(starPhase) * upperMask;
-      const r = currentR * (1 + peakFactor * starSharpness * starWave);
+      // exposedMask covers the entire hemisphere visible from a normal elevated camera:
+      // phi=0 (pure outward) = 1.0, phi=90 (straight up) = 1.0, inner+downward side = 0.
+      // No phase shift: cos(6*phi) places proud ridges at phi=0 (outward face, visible from
+      // camera side-view), phi=60 (upper-outer), phi=120 (upper-inner) — ridges are visible
+      // from both side-elevated and top-down camera positions simultaneously.
+      const exposedMask = Math.pow(Math.max(0, (sinPhi + cosPhi + 1) / 2), 0.25);
+      const starWave = Math.cos(starPoints * phi) * exposedMask;
+      const r = currentR * (1 + starFactor * starSharpness * starWave);
 
       const lx = cosPhi * r;
       const ly = sinPhi * r;
@@ -781,15 +787,15 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
     }
     case 'starScallop': {
       const N = Math.max(8, Math.round((radius * Math.PI * 2) / 2.0));
-      return buildScallopedPiping(material, radius, y, { N, tubeRadius: 0.13, bulgeAmount: 0.12, starSharpness: 0.75, starPoints: 6, cuspPower: 1.6, peakSharpness: 1.0, surfaceLift: 0.04 });
+      return buildScallopedPiping(material, radius, y, { N, tubeRadius: 0.15, bulgeAmount: 0.14, starSharpness: 0.75, starFloor: 0.25, starPoints: 6, cuspPower: 1.6, peakSharpness: 1.0, surfaceLift: 0.04 });
     }
     case 'starScallopSoft': {
       const N = Math.max(8, Math.round((radius * Math.PI * 2) / 2.2));
-      return buildScallopedPiping(material, radius, y, { N, tubeRadius: 0.13, bulgeAmount: 0.09, starSharpness: 0.6, starPoints: 5, cuspPower: 1.4, peakSharpness: 1.0, surfaceLift: 0.04 });
+      return buildScallopedPiping(material, radius, y, { N, tubeRadius: 0.14, bulgeAmount: 0.10, starSharpness: 0.55, starFloor: 0.3, starPoints: 5, cuspPower: 1.4, peakSharpness: 1.0, surfaceLift: 0.04 });
     }
     case 'starScallopDollops': {
       const N = Math.max(8, Math.round((radius * Math.PI * 2) / 2.0));
-      return buildScallopedDollopPiping(material, radius, y, { N, tubeRadius: 0.13, bulgeAmount: 0.12, starSharpness: 0.7, starPoints: 6, cuspPower: 1.6, peakSharpness: 1.0, withDollops: true, dollopScale: 0.46, surfaceLift: 0.04 }, rand);
+      return buildScallopedDollopPiping(material, radius, y, { N, tubeRadius: 0.15, bulgeAmount: 0.14, starSharpness: 0.7, starFloor: 0.25, starPoints: 6, cuspPower: 1.6, peakSharpness: 1.0, withDollops: true, dollopScale: 0.46, surfaceLift: 0.04 }, rand);
     }
     case 'starScallopLayered': {
       const N = Math.max(8, Math.round((radius * Math.PI * 2) / 2.0));
