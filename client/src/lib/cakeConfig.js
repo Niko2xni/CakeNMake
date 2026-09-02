@@ -268,6 +268,7 @@ export const PIPING_TIPS = [
   { id: 'lambeth', label: 'Lambeth Method' },
   { id: 'starDollop', label: 'Star Dollop' },
   { id: 'starDollopSparse', label: 'Sparse Star Dollop' },
+  { id: 'starDollopContinuous', label: 'Continuous Star Dollop' },
   { id: 'starScallop', label: 'Star Scallop' },
   { id: 'starScallopSoft', label: 'Soft Star Scallop' },
   { id: 'starScallopDollops', label: 'Scallop with Dollops' },
@@ -524,6 +525,7 @@ export const BRACELET_BEADS_VARIATIONS = [
 export const DOLLOPS_VARIATIONS = [
   { id: 'starDollop', label: 'Star Dollop' },
   { id: 'starDollopSparse', label: 'Sparse Star Dollop' },
+  { id: 'starDollopContinuous', label: 'Continuous Star Dollop' },
 ];
 
 export const SCALLOPS_VARIATIONS = [

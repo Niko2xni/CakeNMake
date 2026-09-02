@@ -44,6 +44,7 @@ describe('edge decoration placement', () => {
     expect(screen.getByText('Dollops')).toBeInTheDocument();
     expect(screen.getByTitle('Star Dollop')).toBeInTheDocument();
     expect(screen.getByTitle('Sparse Star Dollop')).toBeInTheDocument();
+    expect(screen.getByTitle('Continuous Star Dollop')).toBeInTheDocument();
     expect(screen.getByText('Scallops')).toBeInTheDocument();
     expect(screen.getByTitle('Star Scallop')).toBeInTheDocument();
     expect(screen.getByTitle('Soft Star Scallop')).toBeInTheDocument();
