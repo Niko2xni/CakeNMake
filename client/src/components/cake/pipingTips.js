@@ -787,15 +787,15 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
     }
     case 'starScallop': {
       const N = Math.max(8, Math.round((radius * Math.PI * 2) / 2.0));
-      return buildScallopedPiping(material, radius, y, { N, tubeRadius: 0.15, bulgeAmount: 0.14, starSharpness: 0.75, starFloor: 0.25, starPoints: 6, cuspPower: 1.6, peakSharpness: 1.0, surfaceLift: 0.04 });
+      return buildScallopedPiping(material, radius, y, { N, tubeRadius: 0.20, bulgeAmount: 0.14, starSharpness: 0.75, starFloor: 0.25, starPoints: 6, cuspPower: 1.6, peakSharpness: 1.0, surfaceLift: 0.05 });
     }
     case 'starScallopSoft': {
       const N = Math.max(8, Math.round((radius * Math.PI * 2) / 2.2));
-      return buildScallopedPiping(material, radius, y, { N, tubeRadius: 0.14, bulgeAmount: 0.10, starSharpness: 0.55, starFloor: 0.3, starPoints: 5, cuspPower: 1.4, peakSharpness: 1.0, surfaceLift: 0.04 });
+      return buildScallopedPiping(material, radius, y, { N, tubeRadius: 0.19, bulgeAmount: 0.10, starSharpness: 0.55, starFloor: 0.3, starPoints: 5, cuspPower: 1.4, peakSharpness: 1.0, surfaceLift: 0.05 });
     }
     case 'starScallopDollops': {
       const N = Math.max(8, Math.round((radius * Math.PI * 2) / 2.0));
-      return buildScallopedDollopPiping(material, radius, y, { N, tubeRadius: 0.15, bulgeAmount: 0.14, starSharpness: 0.7, starFloor: 0.25, starPoints: 6, cuspPower: 1.6, peakSharpness: 1.0, withDollops: true, dollopScale: 0.46, surfaceLift: 0.04 }, rand);
+      return buildScallopedDollopPiping(material, radius, y, { N, tubeRadius: 0.20, bulgeAmount: 0.14, starSharpness: 0.7, starFloor: 0.25, starPoints: 6, cuspPower: 1.6, peakSharpness: 1.0, withDollops: true, dollopScale: 0.46, surfaceLift: 0.05 }, rand);
     }
     case 'starScallopLayered': {
       const N = Math.max(8, Math.round((radius * Math.PI * 2) / 2.0));
