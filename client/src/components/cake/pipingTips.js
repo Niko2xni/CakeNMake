@@ -145,6 +145,25 @@ class WaveStripCurve extends THREE.Curve {
   }
 }
 
+/** Continuous zigzag wave along a flat strip — used for Zigzag Piping,
+ *  oscillating radially across the cake rim while advancing along the circumference,
+ *  then wrapped around the cake's ring in wrapStripAroundRing(). */
+class ZigzagStripCurve extends THREE.Curve {
+  constructor(length, amplitude, waves) {
+    super();
+    this.length = length;
+    this.amplitude = amplitude;
+    this.waves = waves;
+  }
+  getPoint(t, target = new THREE.Vector3()) {
+    const x = t * this.length;
+    const phase = t * Math.PI * 2 * this.waves;
+    const z = Math.sin(phase) * this.amplitude;
+    const y = 0.045 + 0.008 * Math.cos(phase * 2);
+    return target.set(x, y, z);
+  }
+}
+
 // ─── Core sweep — the shared engine behind Star / Shell / Rope / Petal / Leaf ──
 
 /**
@@ -818,6 +837,17 @@ function buildPetalRuffleRingGeometry(ringRadius) {
   return wrapStripAroundRing(geo, ringRadius);
 }
 
+function buildZigzagRingGeometry(ringRadius) {
+  const circumference = ringRadius * Math.PI * 2;
+  const wavesAroundRing = Math.max(32, Math.round(circumference / 0.22));
+  const curve = new ZigzagStripCurve(circumference, 0.16, wavesAroundRing);
+  const geo = sweepProfileAlongCurve(starProfilePoints(6, 0.065, 0.038), curve, {
+    segments: Math.max(128, wavesAroundRing * 8),
+    taper: () => 1,
+  });
+  return wrapStripAroundRing(geo, ringRadius);
+}
+
 /**
  * Lambeth Method piping — classic draped swags with vertical drop elements,
  * rosettes, coffee beans, and shell border. Creates a three-dimensional,
@@ -1010,6 +1040,14 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
     case 'starScallopLayered': {
       const N = Math.max(8, Math.round((radius * Math.PI * 2) / 2.0));
       return buildScallopedDollopPiping(material, radius, y, { N, tubeRadius: 0.13, bulgeAmount: 0.12, starSharpness: 0.7, starPoints: 6, cuspPower: 1.6, peakSharpness: 1.0, withDollops: true, dollopScale: 0.42, layered: true, surfaceLift: 0.04 }, rand);
+    }
+    case 'zigzag': {
+      const geo = buildZigzagRingGeometry(radius);
+      const mesh = new THREE.Mesh(geo, material);
+      mesh.position.y = y;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      return mesh;
     }
     case 'rope': {
       const geo = buildRopeRingGeometry(radius);

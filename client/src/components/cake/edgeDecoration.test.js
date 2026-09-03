@@ -19,6 +19,8 @@ describe('edge decoration placement', () => {
     expect(computeEdgeTrimRadius(4.0, 'shell', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
     expect(computeEdgeTrimRadius(4.0, 'bead', 'fullyFrosted')).toBeCloseTo(3.68, 2);
     expect(computeEdgeTrimRadius(4.0, 'bead', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
+    expect(computeEdgeTrimRadius(4.0, 'zigzag', 'fullyFrosted')).toBeCloseTo(3.78, 2);
+    expect(computeEdgeTrimRadius(4.0, 'zigzag', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
   });
 
   it('does not render the generic None option in the edge picker and uses dedicated design rows', () => {
@@ -45,6 +47,8 @@ describe('edge decoration placement', () => {
     expect(screen.getByTitle('Shell Border')).toBeInTheDocument();
     expect(screen.getByText('Bead Piping')).toBeInTheDocument();
     expect(screen.getByTitle('Bead Piping')).toBeInTheDocument();
+    expect(screen.getByText('Zigzag Piping')).toBeInTheDocument();
+    expect(screen.getByTitle('Zigzag Piping')).toBeInTheDocument();
     expect(screen.getByText('Rope')).toBeInTheDocument();
     expect(screen.getByText('Petal')).toBeInTheDocument();
     expect(screen.getByText('Drop Flower')).toBeInTheDocument();
