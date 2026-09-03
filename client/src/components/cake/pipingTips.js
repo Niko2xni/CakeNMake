@@ -503,10 +503,10 @@ function buildShellUnitGeometry({
   length = 0.35,
   maxWidth = 0.22,
   maxHeight = 0.13,
-  fluteCount = 7,
+  fluteCount = 26,
   fluteDepth = 0.22,
-  uSegments = 24,
-  thetaSegments = 20,
+  uSegments = 28,
+  thetaSegments = 56,
 } = {}) {
   const positions = [];
   const indices = [];
@@ -531,16 +531,20 @@ function buildShellUnitGeometry({
     const x = u * length;
     const { width, height } = getProfile(u);
     const halfW = width * 0.5;
+    const ridgeTwist = (1 - u) * 0.22;
 
     for (let j = 0; j <= thetaSegments; j++) {
       const theta = (j / thetaSegments) * Math.PI;
       const sinTheta = Math.sin(theta);
       const cosTheta = Math.cos(theta);
 
-      const fluteAngle = theta * fluteCount;
-      const fluteMod = Math.cos(fluteAngle) * fluteDepth * Math.pow(sinTheta, 0.5);
+      // Fine multi-ridge star flute modulation (12-14 crisp pleated ridges)
+      const fluteAngle = theta * fluteCount + ridgeTwist;
+      const cosF = Math.cos(fluteAngle);
+      const fluteShape = Math.sign(cosF) * Math.pow(Math.abs(cosF), 0.82);
+      const fluteMod = fluteShape * fluteDepth * Math.pow(sinTheta, 0.4);
 
-      const z = -halfW * cosTheta * (1 + fluteMod * 0.5);
+      const z = -halfW * cosTheta * (1 + fluteMod * 0.4);
       const y = Math.max(0, height * sinTheta * (1 + fluteMod));
 
       positions.push(x, y, z);
