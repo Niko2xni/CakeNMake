@@ -60,7 +60,15 @@ export function buildDripRing(radius, colorHex, rand, opts = {}) {
  * the "Round" piping tip in pipingTips.js — this is meant to read as a
  * strung decoration, not a piped border).
  */
-export function computeEdgeTrimY(topSurfaceY, radius, decorationType = 'piping', exteriorFinishStyle = 'fullyFrosted') {
+export function computeEdgeTrimY(topSurfaceY, radius, decorationType = 'piping', exteriorFinishStyle = 'fullyFrosted', isBottom = false) {
+  if (isBottom) {
+    // Bottom edge decorations rest on top of the cake board / plate plane
+    // rather than subtracting top-surface recess depths.
+    if (decorationType === 'dollops') {
+      return -0.02; // Dollop base sits directly on top of the cake board
+    }
+    return -0.05;
+  }
   if (exteriorFinishStyle === 'naked') {
     // compactDepth + extraInset below (0.10–0.16 depending on cake size
     // and decoration type — see the numbers this replaced) were tuned
@@ -117,7 +125,7 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
   // front of the surface, the way a piped border resting against the
   // board would really sit — rather than just closer to flush with it.
   const radialInset = isBottom
-    ? (decorationType === 'beadedTrim' ? -0.10 : (decorationType === 'dollops' ? -0.04 : -0.14))
+    ? (decorationType === 'beadedTrim' ? -0.10 : (decorationType === 'dollops' ? -0.06 : -0.14))
     : (decorationType === 'beadedTrim' ? 0.22 : (decorationType === 'dollops' ? 0.54 : 0.26));
   return Math.max(0.15, surfaceRadius - radialInset);
 }

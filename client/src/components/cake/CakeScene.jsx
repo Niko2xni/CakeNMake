@@ -1460,7 +1460,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         const beadedTrimPattern = BEADED_TRIM_PATTERNS[slot?.pipingTip];
         const decorationKind = beadedTrimPattern ? 'beadedTrim' : (isDollop ? 'dollops' : 'piping');
         const edgeTrimId = beadedTrimPattern ? slot.pipingTip : slot?.decorationSetId;
-        const edgeTrimY = computeEdgeTrimY(y, edgeRadius, decorationKind, exteriorFinishStyle);
+        const edgeTrimY = computeEdgeTrimY(y, edgeRadius, decorationKind, exteriorFinishStyle, isBottom);
         const edgeTrimRadius = computeEdgeTrimRadius(edgeRadius, decorationKind, exteriorFinishStyle, isBottom);
         if (beadedTrimPattern) {
           const trim = buildBeadedTrimRing(edgeTrimRadius, slot?.decorationColor || lastFrostColor, rand, { pattern: beadedTrimPattern });
