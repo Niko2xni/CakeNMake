@@ -145,21 +145,57 @@ class WaveStripCurve extends THREE.Curve {
   }
 }
 
-/** Continuous zigzag wave along a flat strip — used for Zigzag Piping,
- *  oscillating radially across the cake rim while advancing along the circumference,
- *  then wrapped around the cake's ring in wrapStripAroundRing(). */
+/** Continuous zigzag wave along a flat strip — used for Zigzag Piping.
+ *  Uses exact circular U-turn arcs at each hairpin crest (R_turn >= R_tube),
+ *  guaranteeing zero self-intersection, beautifully rounded curvy loops,
+ *  and seamless C1-continuous tangent transitions. */
 class ZigzagStripCurve extends THREE.Curve {
   constructor(length, amplitude, waves) {
     super();
     this.length = length;
     this.amplitude = amplitude;
     this.waves = waves;
+    this.L = length / waves;
+    this.R = this.L / 4;
+    this.innerAmp = Math.max(0.01, amplitude - this.R);
+
+    this.lenStroke = this.innerAmp * 2;
+    this.lenArc = Math.PI * this.R;
+    this.totalWaveLen = 2 * this.lenStroke + 2 * this.lenArc;
   }
+
   getPoint(t, target = new THREE.Vector3()) {
-    const x = t * this.length;
-    const phase = t * Math.PI * 2 * this.waves;
-    const z = Math.sin(phase) * this.amplitude;
-    const y = 0.045 + 0.008 * Math.cos(phase * 2);
+    const totalT = Math.max(0, Math.min(1, t)) * this.waves;
+    const waveIdx = Math.min(Math.floor(totalT), this.waves - 1);
+    const localU = totalT - waveIdx;
+    const waveX0 = waveIdx * this.L;
+
+    const s = localU * this.totalWaveLen;
+    let x, z;
+
+    if (s <= this.lenStroke) {
+      // 1. Straight Up stroke: from -innerAmp to +innerAmp
+      const u = s / this.lenStroke;
+      x = waveX0;
+      z = -this.innerAmp + u * 2 * this.innerAmp;
+    } else if (s <= this.lenStroke + this.lenArc) {
+      // 2. Top semi-circular turn: perfectly rounded dome around (waveX0 + R, innerAmp)
+      const u = (s - this.lenStroke) / this.lenArc;
+      x = waveX0 + this.R - this.R * Math.cos(u * Math.PI);
+      z = this.innerAmp + this.R * Math.sin(u * Math.PI);
+    } else if (s <= 2 * this.lenStroke + this.lenArc) {
+      // 3. Straight Down stroke: from +innerAmp to -innerAmp
+      const u = (s - (this.lenStroke + this.lenArc)) / this.lenStroke;
+      x = waveX0 + 2 * this.R;
+      z = this.innerAmp - u * 2 * this.innerAmp;
+    } else {
+      // 4. Bottom semi-circular turn: perfectly rounded dome around (waveX0 + 3*R, -innerAmp)
+      const u = (s - (2 * this.lenStroke + this.lenArc)) / this.lenArc;
+      x = waveX0 + 3 * this.R - this.R * Math.cos(u * Math.PI);
+      z = -this.innerAmp - this.R * Math.sin(u * Math.PI);
+    }
+
+    const y = 0.075 + 0.010 * Math.cos(t * Math.PI * 2 * this.waves * 2);
     return target.set(x, y, z);
   }
 }
@@ -839,10 +875,10 @@ function buildPetalRuffleRingGeometry(ringRadius) {
 
 function buildZigzagRingGeometry(ringRadius) {
   const circumference = ringRadius * Math.PI * 2;
-  const wavesAroundRing = Math.max(32, Math.round(circumference / 0.22));
-  const curve = new ZigzagStripCurve(circumference, 0.16, wavesAroundRing);
-  const geo = sweepProfileAlongCurve(starProfilePoints(6, 0.065, 0.038), curve, {
-    segments: Math.max(128, wavesAroundRing * 8),
+  const wavesAroundRing = Math.max(24, Math.round(circumference / 0.44));
+  const curve = new ZigzagStripCurve(circumference, 0.28, wavesAroundRing);
+  const geo = sweepProfileAlongCurve(starProfilePoints(6, 0.085, 0.048), curve, {
+    segments: Math.max(128, wavesAroundRing * 16),
     taper: () => 1,
   });
   return wrapStripAroundRing(geo, ringRadius);
