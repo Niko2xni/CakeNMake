@@ -607,97 +607,80 @@ function buildShellUnitGeometry({
 }
 
 /**
- * Classic Wilton-style Round Tip Bead Piping Unit Geometry:
- * - Piped with a round tip (e.g., Wilton #10/#12)
- * - Smooth, glossy bulbous dome head rising to peak at u ~ 0.30
- * - Soft, natural taper into a rounded tail at u = 1.0 (overlapped by subsequent bead)
- * - 100% solid flat base at y = 0 (sealed against cake surface, zero underside hollow)
- * - Watertight head and tail caps with smooth vertex normals
+ * Organic Wilton-style Round Tip Bead Piping Unit Geometry:
+ * - Piped with a smooth round tip (e.g., Wilton #10/#12)
+ * - Continuous, unbroken C-infinity droplet profile with zero piecewise kinks or creases
+ * - 360-degree smooth revolving cross-section curving under with horizontal tangents
+ * - Buttery smooth vertex normals with zero faceted cuts or sharp lateral seams
+ * - Closed, watertight droplet resting grounded against the cake surface
  */
 function buildBeadUnitGeometry({
-  length = 0.28,
+  length = 0.25,
   maxWidth = 0.22,
-  maxHeight = 0.16,
-  uSegments = 24,
-  thetaSegments = 24,
+  maxHeight = 0.15,
+  uSegments = 28,
+  phiSegments = 24,
 } = {}) {
   const positions = [];
   const indices = [];
 
-  function getProfile(u) {
-    let wScale, hScale;
-    if (u < 0.3) {
-      const t = u / 0.3;
-      const bulb = Math.sqrt(Math.max(0, 1 - (1 - t) * (1 - t)));
-      wScale = 0.4 + 0.6 * bulb;
-      hScale = 0.3 + 0.7 * bulb;
-    } else {
-      const t = (u - 0.3) / 0.7;
-      wScale = 1.0 - 0.70 * Math.pow(t, 0.75);
-      hScale = 1.0 - 0.75 * Math.pow(t, 0.8);
-    }
-    return { width: maxWidth * wScale, height: maxHeight * hScale };
+  // Smooth, organic droplet radius function r(u) for u in [0, 1]
+  // Peak dome around u ~ 0.30, smoothly tapering to rounded tail
+  function getDropletRadius(u) {
+    const s = Math.sin(Math.PI * Math.pow(u, 0.60));
+    return Math.max(0, s * (1.0 - 0.25 * u));
   }
 
   for (let i = 0; i <= uSegments; i++) {
     const u = i / uSegments;
     const x = u * length;
-    const { width, height } = getProfile(u);
-    const halfW = width * 0.5;
+    const r = getDropletRadius(u);
 
-    for (let j = 0; j <= thetaSegments; j++) {
-      const theta = (j / thetaSegments) * Math.PI;
-      const sinTheta = Math.sin(theta);
-      const cosTheta = Math.cos(theta);
+    const halfW = maxWidth * 0.5 * r;
+    const halfH = maxHeight * 0.5 * r;
+    const cy = halfH;
 
-      const z = -halfW * cosTheta;
-      const y = Math.max(0, height * sinTheta);
+    for (let j = 0; j < phiSegments; j++) {
+      const phi = (j / phiSegments) * Math.PI * 2;
+      const cosPhi = Math.cos(phi);
+      const sinPhi = Math.sin(phi);
+
+      const z = halfW * sinPhi;
+      const y = Math.max(0, cy + halfH * cosPhi);
 
       positions.push(x, y, z);
     }
   }
 
-  const numCols = thetaSegments + 1;
-
+  // Quads between rows (outward counter-clockwise winding for clean lighting)
   for (let i = 0; i < uSegments; i++) {
-    for (let j = 0; j < thetaSegments; j++) {
-      const current = i * numCols + j;
-      const currentNext = current + 1;
-      const nextRow = (i + 1) * numCols + j;
-      const nextRowNext = nextRow + 1;
+    for (let j = 0; j < phiSegments; j++) {
+      const nextJ = (j + 1) % phiSegments;
+      const current = i * phiSegments + j;
+      const currentNext = i * phiSegments + nextJ;
+      const nextRow = (i + 1) * phiSegments + j;
+      const nextRowNext = (i + 1) * phiSegments + nextJ;
 
       indices.push(current, currentNext, nextRow);
       indices.push(currentNext, nextRowNext, nextRow);
     }
   }
 
-  for (let i = 0; i < uSegments; i++) {
-    const leftCurrent = i * numCols;
-    const leftNext = (i + 1) * numCols;
-    const rightCurrent = i * numCols + thetaSegments;
-    const rightNext = (i + 1) * numCols + thetaSegments;
-
-    indices.push(leftCurrent, leftNext, rightCurrent);
-    indices.push(leftNext, rightNext, rightCurrent);
-  }
-
-  const headCenterIdx = positions.length / 3;
+  // Head tip cap at (0, 0, 0)
+  const headIdx = positions.length / 3;
   positions.push(0, 0, 0);
-
-  for (let j = 0; j < thetaSegments; j++) {
-    const v0 = j;
-    const v1 = j + 1;
-    indices.push(headCenterIdx, v1, v0);
+  for (let j = 0; j < phiSegments; j++) {
+    const nextJ = (j + 1) % phiSegments;
+    indices.push(headIdx, j, nextJ);
   }
 
-  const tailCenterIdx = positions.length / 3;
+  // Tail tip cap at (length, 0, 0)
+  const tailIdx = positions.length / 3;
   positions.push(length, 0, 0);
-
-  const lastRowOffset = uSegments * numCols;
-  for (let j = 0; j < thetaSegments; j++) {
-    const v0 = lastRowOffset + j;
-    const v1 = lastRowOffset + j + 1;
-    indices.push(tailCenterIdx, v0, v1);
+  const lastRow = uSegments * phiSegments;
+  for (let j = 0; j < phiSegments; j++) {
+    const nextJ = (j + 1) % phiSegments;
+    indices.push(tailIdx, lastRow + nextJ, lastRow + j);
   }
 
   const geo = new THREE.BufferGeometry();
@@ -983,7 +966,7 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
       return instanceAroundRing(getUnitGeometry('shell'), material, { ringRadius: radius, y, count, rand, scale });
     }
     case 'bead': {
-      const count = Math.max(16, Math.round((radius * Math.PI * 2) / (0.18 * scale)));
+      const count = Math.max(16, Math.round((radius * Math.PI * 2) / (0.15 * scale)));
       return instanceAroundRing(getUnitGeometry('bead'), material, { ringRadius: radius, y, count, rand, scale });
     }
     case 'round': {
