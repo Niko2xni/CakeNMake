@@ -17,6 +17,8 @@ describe('edge decoration placement', () => {
     expect(computeEdgeTrimRadius(4.0, 'dollops', 'fullyFrosted', true)).toBeCloseTo(4.12, 2);
     expect(computeEdgeTrimRadius(4.0, 'shell', 'fullyFrosted')).toBeCloseTo(3.66, 2);
     expect(computeEdgeTrimRadius(4.0, 'shell', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
+    expect(computeEdgeTrimRadius(4.0, 'bead', 'fullyFrosted')).toBeCloseTo(3.68, 2);
+    expect(computeEdgeTrimRadius(4.0, 'bead', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
   });
 
   it('does not render the generic None option in the edge picker and uses dedicated design rows', () => {
@@ -41,6 +43,8 @@ describe('edge decoration placement', () => {
     expect(screen.queryByRole('button', { name: 'None' })).not.toBeInTheDocument();
     expect(screen.getByText('Shell Border')).toBeInTheDocument();
     expect(screen.getByTitle('Shell Border')).toBeInTheDocument();
+    expect(screen.getByText('Bead Piping')).toBeInTheDocument();
+    expect(screen.getByTitle('Bead Piping')).toBeInTheDocument();
     expect(screen.getByText('Rope')).toBeInTheDocument();
     expect(screen.getByText('Petal')).toBeInTheDocument();
     expect(screen.getByText('Drop Flower')).toBeInTheDocument();

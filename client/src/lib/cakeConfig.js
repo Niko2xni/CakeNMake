@@ -259,6 +259,7 @@ export const FILLING_LAYER_OPTIONS = [
 // FILLING_PIPING_DESIGNS below for why it got its own.
 export const PIPING_TIPS = [
   { id: 'shell', label: 'Shell Border' },
+  { id: 'bead', label: 'Bead Piping' },
   { id: 'star', label: 'Star' },
   { id: 'rope', label: 'Rope' },
   { id: 'round', label: 'Round' },
@@ -536,7 +537,7 @@ export const SCALLOPS_VARIATIONS = [
 ];
 
 export const STANDALONE_EDGE_PIPING_OPTIONS = PIPING_TIPS
-  .filter(({ id }) => ['shell', 'rope', 'petal', 'dropFlower'].includes(id));
+  .filter(({ id }) => ['shell', 'bead', 'rope', 'petal', 'dropFlower'].includes(id));
 
 export const EDGE_DECORATION_SETS = [
   { id: 'curtain', label: 'Curtain' },
