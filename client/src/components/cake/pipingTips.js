@@ -482,12 +482,100 @@ function buildScallopedDollopPiping(material, radius, y, options = {}, rand) {
   return group;
 }
 
-function buildShellUnitGeometry() {
-  return sweepProfileAlongCurve(
-    starProfilePoints(),
-    new ShellCurve(0.32, 0.15, 0.5),
-    { segments: 18, taper: (t) => THREE.MathUtils.lerp(1, 0.06, t * t) }
-  );
+/**
+ * Realistic Wilton-style Shell Border Unit Geometry:
+ * - Convex, dome-like rounded swell head rising to peak at u ~ 0.20
+ * - Deep 8-star fluting radiating across upper/exposed crest
+ * - Smooth exponential taper to flattened tail (overlapping adjacent shell)
+ * - Flat base at y = 0 for clean seating on cake/plate surface
+ * - Watertight with smooth vertex normals
+ */
+function buildShellUnitGeometry({
+  length = 0.34,
+  width = 0.22,
+  height = 0.08,
+  fluteCount = 8,
+  fluteDepth = 0.28,
+  uSegments = 28,
+  vSegments = 32,
+} = {}) {
+  const positions = [];
+  const indices = [];
+
+  function spine(u) {
+    const cx = u * length;
+    const cy = Math.sin(Math.pow(u, 0.4) * Math.PI) * height * (1 - 0.5 * u);
+    const cz = -Math.sin(u * Math.PI) * 0.010;
+
+    let scale;
+    if (u < 0.18) {
+      const t = u / 0.18;
+      scale = 0.4 + 0.6 * Math.sqrt(Math.max(0, 1 - (1 - t) * (1 - t)));
+    } else {
+      const t = (u - 0.18) / 0.82;
+      scale = 1.0 - 0.80 * Math.pow(t, 0.75);
+    }
+    return { cx, cy, cz, scale };
+  }
+
+  for (let i = 0; i <= uSegments; i++) {
+    const u = i / uSegments;
+    const { cx, cy, cz, scale } = spine(u);
+
+    for (let j = 0; j < vSegments; j++) {
+      const v = (j / vSegments) * Math.PI * 2;
+      const cosV = Math.cos(v);
+      const sinV = Math.sin(v);
+
+      let flute = 1.0;
+      if (cosV > -0.3) {
+        const fluteAngle = v * fluteCount;
+        flute += Math.cos(fluteAngle) * fluteDepth * Math.max(0, cosV + 0.3);
+      }
+
+      let y = cosV * (height * 0.5 * scale) * flute;
+      let z = sinV * (width * 0.5 * scale) * flute;
+
+      if (y < 0) {
+        y = Math.max(y, -0.01 * scale);
+      }
+
+      positions.push(cx, cy + y, cz + z);
+    }
+  }
+
+  // Proper outward counter-clockwise winding
+  for (let i = 0; i < uSegments; i++) {
+    for (let j = 0; j < vSegments; j++) {
+      const nextJ = (j + 1) % vSegments;
+      const current = i * vSegments + j;
+      const currentNext = i * vSegments + nextJ;
+      const nextRow = (i + 1) * vSegments + j;
+      const nextRowNext = (i + 1) * vSegments + nextJ;
+
+      indices.push(current, currentNext, nextRow);
+      indices.push(currentNext, nextRowNext, nextRow);
+    }
+  }
+
+  const headCenterIdx = positions.length / 3;
+  positions.push(0, 0, 0);
+  const tailCenterIdx = headCenterIdx + 1;
+  positions.push(length, 0, 0);
+
+  for (let j = 0; j < vSegments; j++) {
+    const nextJ = (j + 1) % vSegments;
+    indices.push(headCenterIdx, j, nextJ);
+    const tailRow = uSegments * vSegments;
+    indices.push(tailCenterIdx, tailRow + nextJ, tailRow + j);
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  geo.computeBoundingBox();
+  return geo;
 }
 
 function buildLeafUnitGeometry() {
@@ -760,7 +848,7 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
       return instanceAroundRing(getUnitGeometry('star'), material, { ringRadius: radius, y, count, rand, scale });
     }
     case 'shell': {
-      const count = Math.max(12, Math.round((radius * Math.PI * 2) / (0.24 * scale)));
+      const count = Math.max(12, Math.round((radius * Math.PI * 2) / (0.22 * scale)));
       return instanceAroundRing(getUnitGeometry('shell'), material, { ringRadius: radius, y, count, rand, scale });
     }
     case 'round': {

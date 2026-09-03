@@ -258,7 +258,7 @@ export const FILLING_LAYER_OPTIONS = [
 // in the data model or the UI. Filling no longer draws from this list — see
 // FILLING_PIPING_DESIGNS below for why it got its own.
 export const PIPING_TIPS = [
-  { id: 'shell', label: 'Shell' },
+  { id: 'shell', label: 'Shell Border' },
   { id: 'star', label: 'Star' },
   { id: 'rope', label: 'Rope' },
   { id: 'round', label: 'Round' },
@@ -536,7 +536,7 @@ export const SCALLOPS_VARIATIONS = [
 ];
 
 export const STANDALONE_EDGE_PIPING_OPTIONS = PIPING_TIPS
-  .filter(({ id }) => ['rope', 'petal', 'dropFlower'].includes(id));
+  .filter(({ id }) => ['shell', 'rope', 'petal', 'dropFlower'].includes(id));
 
 export const EDGE_DECORATION_SETS = [
   { id: 'curtain', label: 'Curtain' },
@@ -544,7 +544,7 @@ export const EDGE_DECORATION_SETS = [
 ];
 
 export const EDGE_PIPING_OPTIONS = [...EDGE_DECORATION_SETS, ...PIPING_TIPS]
-  .filter(({ id }) => !['curtain', 'shell', 'star', 'round', 'leaf', 'lambeth'].includes(id));
+  .filter(({ id }) => !['curtain', 'star', 'round', 'leaf', 'lambeth'].includes(id));
 
 // ─── Side treatments — the seven options for side.mode ─────────────────────
 // Each is its own field in DEFAULT_CONFIG.side (not a nested "sets" list —

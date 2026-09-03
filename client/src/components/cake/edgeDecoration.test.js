@@ -37,6 +37,8 @@ describe('edge decoration placement', () => {
     );
 
     expect(screen.queryByRole('button', { name: 'None' })).not.toBeInTheDocument();
+    expect(screen.getByText('Shell Border')).toBeInTheDocument();
+    expect(screen.getByTitle('Shell Border')).toBeInTheDocument();
     expect(screen.getByText('Rope')).toBeInTheDocument();
     expect(screen.getByText('Petal')).toBeInTheDocument();
     expect(screen.getByText('Drop Flower')).toBeInTheDocument();
