@@ -125,8 +125,8 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
   // front of the surface, the way a piped border resting against the
   // board would really sit — rather than just closer to flush with it.
   const radialInset = isBottom
-    ? (decorationType === 'beadedTrim' ? -0.10 : (decorationType === 'dollops' ? -0.06 : -0.14))
-    : (decorationType === 'beadedTrim' ? 0.22 : (decorationType === 'dollops' ? 0.54 : 0.26));
+    ? (decorationType === 'beadedTrim' ? -0.10 : (decorationType === 'dollops' ? -0.06 : (decorationType === 'shell' ? -0.04 : -0.14)))
+    : (decorationType === 'beadedTrim' ? 0.22 : (decorationType === 'dollops' ? 0.54 : (decorationType === 'shell' ? 0.40 : 0.26)));
   return Math.max(0.15, surfaceRadius - radialInset);
 }
 

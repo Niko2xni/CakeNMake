@@ -490,84 +490,108 @@ function buildScallopedDollopPiping(material, radius, y, options = {}, rand) {
  * - Flat base at y = 0 for clean seating on cake/plate surface
  * - Watertight with smooth vertex normals
  */
+/**
+ * Realistic Wilton-style Shell Border Unit Geometry:
+ * - 100% solid, closed watertight geometry with flat solid base at y = 0 (no hollow underneath)
+ * - Convex, dome-like rounded swell head rising to peak at u ~ 0.25
+ * - Deep 7-point radiating star fluting across the upper crest
+ * - Smooth exponential taper down to a flattened tail (overlapping adjacent shell)
+ * - Solid base quad strip connecting left and right base rails with -Y normals
+ * - Watertight head and tail end caps with smooth vertex normals
+ */
 function buildShellUnitGeometry({
-  length = 0.34,
-  width = 0.22,
-  height = 0.08,
-  fluteCount = 8,
-  fluteDepth = 0.28,
-  uSegments = 28,
-  vSegments = 32,
+  length = 0.35,
+  maxWidth = 0.22,
+  maxHeight = 0.13,
+  fluteCount = 7,
+  fluteDepth = 0.22,
+  uSegments = 24,
+  thetaSegments = 20,
 } = {}) {
   const positions = [];
   const indices = [];
 
-  function spine(u) {
-    const cx = u * length;
-    const cy = Math.sin(Math.pow(u, 0.4) * Math.PI) * height * (1 - 0.5 * u);
-    const cz = -Math.sin(u * Math.PI) * 0.010;
-
-    let scale;
-    if (u < 0.18) {
-      const t = u / 0.18;
-      scale = 0.4 + 0.6 * Math.sqrt(Math.max(0, 1 - (1 - t) * (1 - t)));
+  function getProfile(u) {
+    let wScale, hScale;
+    if (u < 0.25) {
+      const t = u / 0.25;
+      const bulb = Math.sqrt(Math.max(0, 1 - (1 - t) * (1 - t)));
+      wScale = 0.35 + 0.65 * bulb;
+      hScale = 0.25 + 0.75 * bulb;
     } else {
-      const t = (u - 0.18) / 0.82;
-      scale = 1.0 - 0.80 * Math.pow(t, 0.75);
+      const t = (u - 0.25) / 0.75;
+      wScale = 1.0 - 0.75 * Math.pow(t, 0.8);
+      hScale = 1.0 - 0.85 * Math.pow(t, 0.85);
     }
-    return { cx, cy, cz, scale };
+    return { width: maxWidth * wScale, height: maxHeight * hScale };
   }
 
   for (let i = 0; i <= uSegments; i++) {
     const u = i / uSegments;
-    const { cx, cy, cz, scale } = spine(u);
+    const x = u * length;
+    const { width, height } = getProfile(u);
+    const halfW = width * 0.5;
 
-    for (let j = 0; j < vSegments; j++) {
-      const v = (j / vSegments) * Math.PI * 2;
-      const cosV = Math.cos(v);
-      const sinV = Math.sin(v);
+    for (let j = 0; j <= thetaSegments; j++) {
+      const theta = (j / thetaSegments) * Math.PI;
+      const sinTheta = Math.sin(theta);
+      const cosTheta = Math.cos(theta);
 
-      let flute = 1.0;
-      if (cosV > -0.3) {
-        const fluteAngle = v * fluteCount;
-        flute += Math.cos(fluteAngle) * fluteDepth * Math.max(0, cosV + 0.3);
-      }
+      const fluteAngle = theta * fluteCount;
+      const fluteMod = Math.cos(fluteAngle) * fluteDepth * Math.pow(sinTheta, 0.5);
 
-      let y = cosV * (height * 0.5 * scale) * flute;
-      let z = sinV * (width * 0.5 * scale) * flute;
+      const z = -halfW * cosTheta * (1 + fluteMod * 0.5);
+      const y = Math.max(0, height * sinTheta * (1 + fluteMod));
 
-      if (y < 0) {
-        y = Math.max(y, -0.01 * scale);
-      }
-
-      positions.push(cx, cy + y, cz + z);
+      positions.push(x, y, z);
     }
   }
 
-  // Proper outward counter-clockwise winding
+  const numCols = thetaSegments + 1;
+
+  // Dome (outward counter-clockwise winding)
   for (let i = 0; i < uSegments; i++) {
-    for (let j = 0; j < vSegments; j++) {
-      const nextJ = (j + 1) % vSegments;
-      const current = i * vSegments + j;
-      const currentNext = i * vSegments + nextJ;
-      const nextRow = (i + 1) * vSegments + j;
-      const nextRowNext = (i + 1) * vSegments + nextJ;
+    for (let j = 0; j < thetaSegments; j++) {
+      const current = i * numCols + j;
+      const currentNext = current + 1;
+      const nextRow = (i + 1) * numCols + j;
+      const nextRowNext = nextRow + 1;
 
       indices.push(current, currentNext, nextRow);
       indices.push(currentNext, nextRowNext, nextRow);
     }
   }
 
+  // Solid flat base (facing -Y)
+  for (let i = 0; i < uSegments; i++) {
+    const leftCurrent = i * numCols;
+    const leftNext = (i + 1) * numCols;
+    const rightCurrent = i * numCols + thetaSegments;
+    const rightNext = (i + 1) * numCols + thetaSegments;
+
+    indices.push(leftCurrent, leftNext, rightCurrent);
+    indices.push(leftNext, rightNext, rightCurrent);
+  }
+
+  // Head cap (facing -X)
   const headCenterIdx = positions.length / 3;
   positions.push(0, 0, 0);
-  const tailCenterIdx = headCenterIdx + 1;
+
+  for (let j = 0; j < thetaSegments; j++) {
+    const v0 = j;
+    const v1 = j + 1;
+    indices.push(headCenterIdx, v1, v0);
+  }
+
+  // Tail cap (facing +X)
+  const tailCenterIdx = positions.length / 3;
   positions.push(length, 0, 0);
 
-  for (let j = 0; j < vSegments; j++) {
-    const nextJ = (j + 1) % vSegments;
-    indices.push(headCenterIdx, j, nextJ);
-    const tailRow = uSegments * vSegments;
-    indices.push(tailCenterIdx, tailRow + nextJ, tailRow + j);
+  const lastRowOffset = uSegments * numCols;
+  for (let j = 0; j < thetaSegments; j++) {
+    const v0 = lastRowOffset + j;
+    const v1 = lastRowOffset + j + 1;
+    indices.push(tailCenterIdx, v0, v1);
   }
 
   const geo = new THREE.BufferGeometry();

@@ -1457,8 +1457,9 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           : [{ slot: edgeTop, y: topY, radius: topRadius, isBottom: false }, { slot: edgeBottom, y: 0, radius: BASE_RADIUS, isBottom: true }];
       for (const { slot, y, radius: edgeRadius, isBottom } of edgeSlotsToRender) {
         const isDollop = ['starDollop', 'starDollopSparse', 'starDollopContinuous'].includes(slot?.pipingTip);
+        const isShell = slot?.pipingTip === 'shell';
         const beadedTrimPattern = BEADED_TRIM_PATTERNS[slot?.pipingTip];
-        const decorationKind = beadedTrimPattern ? 'beadedTrim' : (isDollop ? 'dollops' : 'piping');
+        const decorationKind = beadedTrimPattern ? 'beadedTrim' : (isDollop ? 'dollops' : (isShell ? 'shell' : 'piping'));
         const edgeTrimId = beadedTrimPattern ? slot.pipingTip : slot?.decorationSetId;
         const edgeTrimY = computeEdgeTrimY(y, edgeRadius, decorationKind, exteriorFinishStyle, isBottom);
         const edgeTrimRadius = computeEdgeTrimRadius(edgeRadius, decorationKind, exteriorFinishStyle, isBottom);
