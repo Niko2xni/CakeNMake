@@ -923,6 +923,161 @@ export function buildWavePipingRingGeometry(ringRadius) {
  */
 export function buildRopeTwistRingGeometry(ringRadius) {
   const circumference = ringRadius * Math.PI * 2;
+  const N = Math.max(14, Math.round(circumference / 1.15));
+  const deltaTheta = (Math.PI * 2) / N;
+  const overlapFactor = 1.40;
+  const twistAngleSpan = deltaTheta * overlapFactor;
+
+  const tubularSegments = 28;
+  const starPoints = 8;
+  const numProfilePts = 64; // 8 samples per star flute ensures sharp, non-blurred ridges
+  const rMid = 0.180;
+  const fluteDepth = 0.36; // Deep Wilton 1M French star fluting
+  const rHead = ringRadius + 0.075; // Outer rim stroke region
+  const rTail = ringRadius - 0.095; // Sweeps inward and tucks under next shell
+  const twistRotation = 0.92; // radians of axial twist along the rope
+
+  // Build crisp 8-point fluted star profile in local 2D space
+  const baseProfile = [];
+  for (let i = 0; i < numProfilePts; i++) {
+    const phi = (i / numProfilePts) * Math.PI * 2;
+    const cosF = Math.cos(starPoints * phi);
+    const fluteShape = Math.sign(cosF) * Math.pow(Math.abs(cosF), 0.70);
+    const r = rMid * (1.0 + fluteDepth * fluteShape);
+    baseProfile.push({ x: Math.cos(phi) * r, y: Math.sin(phi) * r });
+  }
+
+  function getCurvePoint(thetaStart, t) {
+    const clampedT = Math.max(0, Math.min(1, t));
+    // Extended stroke progression along cake rim
+    const sTheta = clampedT + 0.10 * Math.sin(Math.PI * clampedT);
+    const theta = (thetaStart - 0.06) + sTheta * (twistAngleSpan + 0.06);
+
+    // Stroke sweeps from outer rim to inner rim, hugging the rim at the root
+    const smoothT = clampedT * clampedT * (3 - 2 * clampedT);
+    const rBase = THREE.MathUtils.lerp(rHead, rTail, smoothT);
+    const rootInset = (1.0 - Math.min(1.0, clampedT / 0.20)) * 0.025;
+    const r = rBase - rootInset;
+
+    // Continuous arch reaching the cake surface at both ends:
+    // t=0 (outer end extended down to surface at -0.015) -> t=0.36 (crests at 0.235) -> t=1.0 (inner end grounded at -0.015)
+    const y = -0.015 + 0.250 * Math.pow(Math.sin(Math.PI * Math.pow(clampedT, 0.68)), 0.88);
+    return new THREE.Vector3(Math.sin(theta) * r, y, Math.cos(theta) * r);
+  }
+
+  const geometries = [];
+
+  for (let k = 0; k < N; k++) {
+    const thetaStart = k * deltaTheta;
+    const positions = [];
+    const indices = [];
+
+    // Ring positions
+    for (let i = 0; i <= tubularSegments; i++) {
+      const t = i / tubularSegments;
+      const center = getCurvePoint(thetaStart, t);
+
+      // Tangent vector
+      const dt = 0.002;
+      const pNext = getCurvePoint(thetaStart, Math.min(1, t + dt));
+      const pPrev = getCurvePoint(thetaStart, Math.max(0, t - dt));
+      const tangent = new THREE.Vector3().subVectors(pNext, pPrev).normalize();
+
+      // Normal and binormal using world-up reference
+      const worldUp = new THREE.Vector3(0, 1, 0);
+      const normal = new THREE.Vector3().crossVectors(worldUp, tangent).normalize();
+      const binormal = new THREE.Vector3().crossVectors(tangent, normal).normalize();
+
+      // Asymmetric piped shell taper: firmly grounded root (0.72x) -> bulbous head (1.18x) -> slender tucked tail (0.16x)
+      let taperScale;
+      if (t < 0.20) {
+        taperScale = THREE.MathUtils.lerp(0.72, 1.18, t / 0.20);
+      } else if (t < 0.50) {
+        taperScale = THREE.MathUtils.lerp(1.18, 1.02, (t - 0.20) / 0.30);
+      } else if (t < 0.80) {
+        taperScale = THREE.MathUtils.lerp(1.02, 0.55, (t - 0.50) / 0.30);
+      } else {
+        taperScale = THREE.MathUtils.lerp(0.55, 0.16, (t - 0.80) / 0.20);
+      }
+
+      // Axial twist angle
+      const axialAngle = t * twistRotation;
+      const cosAx = Math.cos(axialAngle);
+      const sinAx = Math.sin(axialAngle);
+
+      for (let j = 0; j < numProfilePts; j++) {
+        const bp = baseProfile[j];
+        // Rotate profile by axialAngle
+        const px = bp.x * cosAx - bp.y * sinAx;
+        const py = bp.x * sinAx + bp.y * cosAx;
+
+        const vx = (normal.x * px + binormal.x * py) * taperScale;
+        const vy = (normal.y * px + binormal.y * py) * taperScale;
+        const vz = (normal.z * px + binormal.z * py) * taperScale;
+
+        positions.push(center.x + vx, center.y + vy, center.z + vz);
+      }
+    }
+
+    // Build tube indices
+    for (let i = 0; i < tubularSegments; i++) {
+      for (let j = 0; j < numProfilePts; j++) {
+        const jNext = (j + 1) % numProfilePts;
+        const a = i * numProfilePts + j;
+        const b = i * numProfilePts + jNext;
+        const c = (i + 1) * numProfilePts + j;
+        const d = (i + 1) * numProfilePts + jNext;
+        indices.push(a, b, c, b, d, c);
+      }
+    }
+
+    // 3D Soft Rounded Headcap at t = 0 (submerged beneath cake surface)
+    const startCenter = getCurvePoint(thetaStart, 0);
+    const dt = 0.002;
+    const tangent0 = new THREE.Vector3().subVectors(
+      getCurvePoint(thetaStart, dt),
+      getCurvePoint(thetaStart, 0)
+    ).normalize();
+    const headDomeCenter = startCenter.clone().addScaledVector(tangent0, -0.04);
+    const startCapIdx = positions.length / 3;
+    positions.push(headDomeCenter.x, headDomeCenter.y, headDomeCenter.z);
+    for (let j = 0; j < numProfilePts; j++) {
+      const jNext = (j + 1) % numProfilePts;
+      indices.push(startCapIdx, jNext, j);
+    }
+
+    // Slender Tucked Tail Tip at t = 1 (submerged beneath cake surface)
+    const endCenter = getCurvePoint(thetaStart, 1);
+    const tangent1 = new THREE.Vector3().subVectors(
+      getCurvePoint(thetaStart, 1),
+      getCurvePoint(thetaStart, 1 - dt)
+    ).normalize();
+    const tailTipCenter = endCenter.clone().addScaledVector(tangent1, 0.02);
+    const endCapIdx = positions.length / 3;
+    positions.push(tailTipCenter.x, tailTipCenter.y, tailTipCenter.z);
+    const lastRowOffset = tubularSegments * numProfilePts;
+    for (let j = 0; j < numProfilePts; j++) {
+      const jNext = (j + 1) % numProfilePts;
+      indices.push(endCapIdx, lastRowOffset + j, lastRowOffset + jNext);
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+    geometries.push(geo);
+  }
+
+  return mergeGeometries(geometries);
+}
+
+/**
+ * Rope Twist Piping (Classic Variation) — the original overlapping diagonal
+ * rope twist geometry from commit 9fd07cf, featuring compact diagonal strokes
+ * across the cake rim with crisp 8-point star fluting.
+ */
+export function buildRopeTwistClassicRingGeometry(ringRadius) {
+  const circumference = ringRadius * Math.PI * 2;
   const N = Math.max(14, Math.round(circumference / 1.10));
   const deltaTheta = (Math.PI * 2) / N;
   const overlapFactor = 1.38;
@@ -1274,6 +1429,14 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
     }
     case 'ropeTwist': {
       const geo = buildRopeTwistRingGeometry(radius);
+      const mesh = new THREE.Mesh(geo, material);
+      mesh.position.y = y;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      return mesh;
+    }
+    case 'ropeTwistClassic': {
+      const geo = buildRopeTwistClassicRingGeometry(radius);
       const mesh = new THREE.Mesh(geo, material);
       mesh.position.y = y;
       mesh.castShadow = true;

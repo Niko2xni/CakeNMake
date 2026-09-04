@@ -25,6 +25,8 @@ describe('edge decoration placement', () => {
     expect(computeEdgeTrimRadius(4.0, 'wavePiping', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
     expect(computeEdgeTrimRadius(4.0, 'ropeTwist', 'fullyFrosted')).toBeCloseTo(3.66, 2);
     expect(computeEdgeTrimRadius(4.0, 'ropeTwist', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
+    expect(computeEdgeTrimRadius(4.0, 'ropeTwistClassic', 'fullyFrosted')).toBeCloseTo(3.66, 2);
+    expect(computeEdgeTrimRadius(4.0, 'ropeTwistClassic', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
   });
 
   it('does not render the generic None option in the edge picker and uses dedicated design rows', () => {
@@ -58,6 +60,7 @@ describe('edge decoration placement', () => {
     expect(screen.getByText('Rope')).toBeInTheDocument();
     expect(screen.getByText('Rope Twist')).toBeInTheDocument();
     expect(screen.getByTitle('Rope Twist')).toBeInTheDocument();
+    expect(screen.getByTitle('Rope Twist (Classic)')).toBeInTheDocument();
     expect(screen.getByText('Petal')).toBeInTheDocument();
     expect(screen.getByText('Drop Flower')).toBeInTheDocument();
     expect(screen.getByText('Bracelet Beads')).toBeInTheDocument();
@@ -172,6 +175,29 @@ describe('edge decoration placement', () => {
     // Top surface radius is 4.06 — maximum vertex radius must strictly not exceed this (zero overhang!)
     expect(maxR).toBeLessThanOrEqual(4.06);
     expect(maxR).toBeGreaterThan(3.66); // Proud enough to form a visible outer border
+  });
+
+  it('generates classic rope twist geometry variation with zero overhang', async () => {
+    const { buildRopeTwistClassicRingGeometry } = await import('./pipingTips');
+
+    // Test built geometry on 8-inch cake top rim (radius 3.66)
+    const geo = buildRopeTwistClassicRingGeometry(3.66);
+    expect(geo.getAttribute('position').count).toBeGreaterThan(2000);
+
+    // Compute maximum radial distance of all vertices from origin
+    geo.computeBoundingBox();
+    const pos = geo.getAttribute('position');
+    let maxR = 0;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const z = pos.getZ(i);
+      const r = Math.sqrt(x * x + z * z);
+      if (r > maxR) maxR = r;
+    }
+
+    // Top surface radius is 4.06 — maximum vertex radius must strictly not exceed this (zero overhang!)
+    expect(maxR).toBeLessThanOrEqual(4.06);
+    expect(maxR).toBeGreaterThan(3.66);
   });
 });
 
