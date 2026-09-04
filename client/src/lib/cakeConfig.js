@@ -261,8 +261,10 @@ export const PIPING_TIPS = [
   { id: 'shell', label: 'Shell Border' },
   { id: 'bead', label: 'Bead Piping' },
   { id: 'zigzag', label: 'Zigzag Piping' },
+  { id: 'wavePiping', label: 'Wave Piping' },
   { id: 'star', label: 'Star' },
   { id: 'rope', label: 'Rope' },
+  { id: 'ropeTwist', label: 'Rope Twist' },
   { id: 'round', label: 'Round' },
   { id: 'petal', label: 'Petal' },
   { id: 'leaf', label: 'Leaf' },
@@ -538,7 +540,7 @@ export const SCALLOPS_VARIATIONS = [
 ];
 
 export const STANDALONE_EDGE_PIPING_OPTIONS = PIPING_TIPS
-  .filter(({ id }) => ['shell', 'bead', 'zigzag', 'rope', 'petal', 'dropFlower'].includes(id));
+  .filter(({ id }) => ['shell', 'bead', 'zigzag', 'wavePiping', 'rope', 'ropeTwist', 'petal', 'dropFlower'].includes(id));
 
 export const EDGE_DECORATION_SETS = [
   { id: 'curtain', label: 'Curtain' },

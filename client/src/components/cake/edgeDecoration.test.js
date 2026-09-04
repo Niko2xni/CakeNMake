@@ -21,6 +21,10 @@ describe('edge decoration placement', () => {
     expect(computeEdgeTrimRadius(4.0, 'bead', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
     expect(computeEdgeTrimRadius(4.0, 'zigzag', 'fullyFrosted')).toBeCloseTo(3.66, 2);
     expect(computeEdgeTrimRadius(4.0, 'zigzag', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
+    expect(computeEdgeTrimRadius(4.0, 'wavePiping', 'fullyFrosted')).toBeCloseTo(3.66, 2);
+    expect(computeEdgeTrimRadius(4.0, 'wavePiping', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
+    expect(computeEdgeTrimRadius(4.0, 'ropeTwist', 'fullyFrosted')).toBeCloseTo(3.66, 2);
+    expect(computeEdgeTrimRadius(4.0, 'ropeTwist', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
   });
 
   it('does not render the generic None option in the edge picker and uses dedicated design rows', () => {
@@ -49,7 +53,11 @@ describe('edge decoration placement', () => {
     expect(screen.getByTitle('Bead Piping')).toBeInTheDocument();
     expect(screen.getByText('Zigzag Piping')).toBeInTheDocument();
     expect(screen.getByTitle('Zigzag Piping')).toBeInTheDocument();
+    expect(screen.getByText('Wave Piping')).toBeInTheDocument();
+    expect(screen.getByTitle('Wave Piping')).toBeInTheDocument();
     expect(screen.getByText('Rope')).toBeInTheDocument();
+    expect(screen.getByText('Rope Twist')).toBeInTheDocument();
+    expect(screen.getByTitle('Rope Twist')).toBeInTheDocument();
     expect(screen.getByText('Petal')).toBeInTheDocument();
     expect(screen.getByText('Drop Flower')).toBeInTheDocument();
     expect(screen.getByText('Bracelet Beads')).toBeInTheDocument();
@@ -66,4 +74,104 @@ describe('edge decoration placement', () => {
     expect(screen.getByTitle('Scallop with Dollops')).toBeInTheDocument();
     expect(screen.getByTitle('Layered Star Scallop')).toBeInTheDocument();
   });
+
+  it('generates dense accordion-pleated zigzag geometry with zero overhang', async () => {
+    const { buildZigzagRingGeometry, ZigzagStripCurve } = await import('./pipingTips');
+    
+    // Test ZigzagStripCurve parameters
+    const circumference = 3.66 * Math.PI * 2;
+    const waves = Math.round(circumference / 0.28);
+    const curve = new ZigzagStripCurve(circumference, 0.185, waves);
+    
+    expect(curve.L).toBeLessThanOrEqual(0.30);
+    expect(curve.amplitude).toBeCloseTo(0.185, 2);
+
+    // Verify continuity of height profile
+    const ptStart = curve.getPoint(0);
+    const ptEnd = curve.getPoint(1);
+    expect(ptStart.y).toBeCloseTo(ptEnd.y, 3);
+    expect(ptStart.y).toBeCloseTo(0.072, 3);
+
+    // Test built geometry on 8-inch cake top rim (radius 3.66)
+    const geo = buildZigzagRingGeometry(3.66);
+    expect(geo.getAttribute('position').count).toBeGreaterThan(1000);
+
+    // Compute maximum radial distance of all vertices from origin
+    geo.computeBoundingBox();
+    const pos = geo.getAttribute('position');
+    let maxR = 0;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const z = pos.getZ(i);
+      const r = Math.sqrt(x * x + z * z);
+      if (r > maxR) maxR = r;
+    }
+
+    // Top surface radius is 4.06 — maximum vertex radius must strictly not exceed this (zero overhang!)
+    expect(maxR).toBeLessThanOrEqual(4.06);
+    expect(maxR).toBeGreaterThan(3.66); // Proud enough to form a visible outer border
+  });
+
+  it('generates flat-lying wave piping geometry with zero overhang', async () => {
+    const { buildWavePipingRingGeometry, FlatSineStripCurve } = await import('./pipingTips');
+
+    // Test FlatSineStripCurve parameters
+    const circumference = 3.66 * Math.PI * 2;
+    const waves = Math.round(circumference / 0.375);
+    const curve = new FlatSineStripCurve(circumference, 0.175, waves);
+
+    expect(curve.amplitude).toBeCloseTo(0.175, 2);
+    expect(curve.waves).toBe(waves);
+
+    // Verify curve is flat-lying: y is low (between 0.055 and 0.075)
+    const ptStart = curve.getPoint(0);
+    const ptMid = curve.getPoint(0.5);
+    const ptEnd = curve.getPoint(1);
+    expect(ptStart.y).toBeCloseTo(ptEnd.y, 3);
+    expect(ptStart.y).toBeCloseTo(0.055, 3);
+    expect(ptMid.y).toBeLessThan(0.08);
+
+    // Test built geometry on 8-inch cake top rim (radius 3.66)
+    const geo = buildWavePipingRingGeometry(3.66);
+    expect(geo.getAttribute('position').count).toBeGreaterThan(1000);
+
+    // Compute maximum radial distance of all vertices from origin
+    geo.computeBoundingBox();
+    const pos = geo.getAttribute('position');
+    let maxR = 0;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const z = pos.getZ(i);
+      const r = Math.sqrt(x * x + z * z);
+      if (r > maxR) maxR = r;
+    }
+
+    // Top surface radius is 4.06 — maximum vertex radius must strictly not exceed this (zero overhang!)
+    expect(maxR).toBeLessThanOrEqual(4.06);
+    expect(maxR).toBeGreaterThan(3.66); // Proud enough to form a visible outer border
+  });
+
+  it('generates interlocking rope twist geometry with zero overhang', async () => {
+    const { buildRopeTwistRingGeometry } = await import('./pipingTips');
+
+    // Test built geometry on 8-inch cake top rim (radius 3.66)
+    const geo = buildRopeTwistRingGeometry(3.66);
+    expect(geo.getAttribute('position').count).toBeGreaterThan(2000);
+
+    // Compute maximum radial distance of all vertices from origin
+    geo.computeBoundingBox();
+    const pos = geo.getAttribute('position');
+    let maxR = 0;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const z = pos.getZ(i);
+      const r = Math.sqrt(x * x + z * z);
+      if (r > maxR) maxR = r;
+    }
+
+    // Top surface radius is 4.06 — maximum vertex radius must strictly not exceed this (zero overhang!)
+    expect(maxR).toBeLessThanOrEqual(4.06);
+    expect(maxR).toBeGreaterThan(3.66); // Proud enough to form a visible outer border
+  });
 });
+

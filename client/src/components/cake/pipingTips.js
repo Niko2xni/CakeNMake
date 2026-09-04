@@ -30,6 +30,23 @@ function starProfilePoints(points = 6, outerR = 0.095, innerR = 0.048) {
   return pts;
 }
 
+/** Flattened 6-point star profile for wave piping:
+ *  Wider in X/Z (0.100 outer, 0.052 inner) than Y (0.065 outer, 0.038 inner).
+ *  This creates the realistic squashed buttercream shape pressed against the cake surface,
+ *  with crisp star fluting on top. */
+export function flatStarProfilePoints(points = 6, outerRx = 0.100, outerRy = 0.065, innerRx = 0.052, innerRy = 0.038) {
+  const pts = [];
+  const step = Math.PI / points;
+  for (let i = 0; i < points * 2; i++) {
+    const isOuter = i % 2 === 0;
+    const rx = isOuter ? outerRx : innerRx;
+    const ry = isOuter ? outerRy : innerRy;
+    const a = i * step - Math.PI / 2;
+    pts.push({ x: Math.cos(a) * rx, y: Math.sin(a) * ry });
+  }
+  return pts;
+}
+
 export function roundProfilePoints(radius = 0.09, segments = 14) {
   const pts = [];
   for (let i = 0; i < segments; i++) {
@@ -146,56 +163,59 @@ class WaveStripCurve extends THREE.Curve {
 }
 
 /** Continuous zigzag wave along a flat strip — used for Zigzag Piping.
- *  Uses exact circular U-turn arcs at each hairpin crest (R_turn >= R_tube),
- *  guaranteeing zero self-intersection, beautifully rounded curvy loops,
- *  and seamless C1-continuous tangent transitions. */
-class ZigzagStripCurve extends THREE.Curve {
+ *  Models the authentic Wilton Tip 16 buttercream zigzag border with
+ *  diagonal fluted sweeps, rounded C-shaped loop crests, and lush 3D body. */
+export class ZigzagStripCurve extends THREE.Curve {
   constructor(length, amplitude, waves) {
     super();
     this.length = length;
-    this.amplitude = amplitude;
+    this.amplitude = amplitude; // half-width of the zigzag sweep
     this.waves = waves;
     this.L = length / waves;
-    this.R = this.L / 4;
-    this.innerAmp = Math.max(0.01, amplitude - this.R);
-
-    this.lenStroke = this.innerAmp * 2;
-    this.lenArc = Math.PI * this.R;
-    this.totalWaveLen = 2 * this.lenStroke + 2 * this.lenArc;
+    this.B = this.L * 0.28; // forward loop bias for voluptuous rounded C-lobes
   }
 
   getPoint(t, target = new THREE.Vector3()) {
-    const totalT = Math.max(0, Math.min(1, t)) * this.waves;
-    const waveIdx = Math.min(Math.floor(totalT), this.waves - 1);
-    const localU = totalT - waveIdx;
-    const waveX0 = waveIdx * this.L;
+    const totalT = Math.max(0, Math.min(1, t));
+    const phase = totalT * this.waves * Math.PI * 2;
 
-    const s = localU * this.totalWaveLen;
-    let x, z;
+    // Continuous diagonal sweep with rounded loop expansion at crests
+    const x = totalT * this.length - this.B * Math.cos(phase);
+    const sinP = Math.sin(phase);
+    const z = this.amplitude * sinP;
 
-    if (s <= this.lenStroke) {
-      // 1. Straight Up stroke: from -innerAmp to +innerAmp
-      const u = s / this.lenStroke;
-      x = waveX0;
-      z = -this.innerAmp + u * 2 * this.innerAmp;
-    } else if (s <= this.lenStroke + this.lenArc) {
-      // 2. Top semi-circular turn: perfectly rounded dome around (waveX0 + R, innerAmp)
-      const u = (s - this.lenStroke) / this.lenArc;
-      x = waveX0 + this.R - this.R * Math.cos(u * Math.PI);
-      z = this.innerAmp + this.R * Math.sin(u * Math.PI);
-    } else if (s <= 2 * this.lenStroke + this.lenArc) {
-      // 3. Straight Down stroke: from +innerAmp to -innerAmp
-      const u = (s - (this.lenStroke + this.lenArc)) / this.lenStroke;
-      x = waveX0 + 2 * this.R;
-      z = this.innerAmp - u * 2 * this.innerAmp;
-    } else {
-      // 4. Bottom semi-circular turn: perfectly rounded dome around (waveX0 + 3*R, -innerAmp)
-      const u = (s - (2 * this.lenStroke + this.lenArc)) / this.lenArc;
-      x = waveX0 + 3 * this.R - this.R * Math.cos(u * Math.PI);
-      z = -this.innerAmp - this.R * Math.sin(u * Math.PI);
-    }
+    // Arched 3D buttercream body with plump elevation at crests
+    const y = 0.072 + 0.024 * Math.abs(sinP) + 0.010 * Math.sin(phase * 2);
 
-    const y = 0.075 + 0.010 * Math.cos(t * Math.PI * 2 * this.waves * 2);
+    return target.set(x, y, z);
+  }
+}
+
+/** Continuous flat sine wave along a strip — used for Wave Piping.
+ *  Models the authentic Wilton Tip 16 / Boquilla 16 flat-lying S-wave buttercream piping
+ *  with fat, flattened lobes oscillating radially in the XZ plane rather than vertically. */
+export class FlatSineStripCurve extends THREE.Curve {
+  constructor(length, amplitude, waves) {
+    super();
+    this.length = length;
+    this.amplitude = amplitude; // radial sweep width (in Z)
+    this.waves = waves;
+    this.L = length / waves;
+  }
+
+  getPoint(t, target = new THREE.Vector3()) {
+    const totalT = Math.max(0, Math.min(1, t));
+    const phase = totalT * this.waves * Math.PI * 2;
+
+    // Longitudinal advance along the strip
+    const x = totalT * this.length;
+    // Radial oscillation in XZ plane creates flat-lying serpentine lobes
+    const sinP = Math.sin(phase);
+    const z = this.amplitude * sinP;
+
+    // Low, flat profile with subtle organic lift over crests
+    const y = 0.055 + 0.018 * Math.abs(sinP);
+
     return target.set(x, y, z);
   }
 }
@@ -873,15 +893,167 @@ function buildPetalRuffleRingGeometry(ringRadius) {
   return wrapStripAroundRing(geo, ringRadius);
 }
 
-function buildZigzagRingGeometry(ringRadius) {
+export function buildZigzagRingGeometry(ringRadius) {
   const circumference = ringRadius * Math.PI * 2;
-  const wavesAroundRing = Math.max(24, Math.round(circumference / 0.44));
-  const curve = new ZigzagStripCurve(circumference, 0.28, wavesAroundRing);
-  const geo = sweepProfileAlongCurve(starProfilePoints(6, 0.085, 0.048), curve, {
-    segments: Math.max(128, wavesAroundRing * 16),
+  const wavesAroundRing = Math.max(28, Math.round(circumference / 0.28));
+  const curve = new ZigzagStripCurve(circumference, 0.185, wavesAroundRing);
+  const geo = sweepProfileAlongCurve(starProfilePoints(6, 0.086, 0.046), curve, {
+    segments: Math.max(128, wavesAroundRing * 14),
     taper: () => 1,
   });
   return wrapStripAroundRing(geo, ringRadius);
+}
+
+export function buildWavePipingRingGeometry(ringRadius) {
+  const circumference = ringRadius * Math.PI * 2;
+  const wavesAroundRing = Math.max(36, Math.round(circumference / 0.22));
+  const curve = new FlatSineStripCurve(circumference, 0.190, wavesAroundRing);
+  const geo = sweepProfileAlongCurve(flatStarProfilePoints(6, 0.092, 0.060, 0.046, 0.034), curve, {
+    segments: Math.max(128, wavesAroundRing * 12),
+    taper: () => 1,
+  });
+  return wrapStripAroundRing(geo, ringRadius);
+}
+
+/**
+ * Rope Twist Piping — authentic interlocking open-star buttercream rope border.
+ * Each twist forms an arched S-curve that starts nestled inside, crests outward
+ * in a bold rounded loop, and sweeps down into the next twist with ~40% overlap.
+ * Fluted with an 8-point star profile and axial twist rotation.
+ */
+export function buildRopeTwistRingGeometry(ringRadius) {
+  const circumference = ringRadius * Math.PI * 2;
+  const N = Math.max(14, Math.round(circumference / 1.10));
+  const deltaTheta = (Math.PI * 2) / N;
+  const overlapFactor = 1.38;
+  const twistAngleSpan = deltaTheta * overlapFactor;
+
+  const tubularSegments = 24;
+  const starPoints = 8;
+  const numProfilePts = 64; // 8 samples per star flute ensures sharp, non-blurred ridges
+  const rMid = 0.175;
+  const fluteDepth = 0.32;
+  const rHalf = 0.100; // half-width of diagonal radial travel
+  const yBase = 0.055;
+  const yLift = 0.19;
+  const twistRotation = 0.85; // radians of axial twist along the rope
+
+  // Build crisp 8-point fluted star profile in local 2D space
+  const baseProfile = [];
+  for (let i = 0; i < numProfilePts; i++) {
+    const phi = (i / numProfilePts) * Math.PI * 2;
+    const cosF = Math.cos(starPoints * phi);
+    const fluteShape = Math.sign(cosF) * Math.pow(Math.abs(cosF), 0.75);
+    const r = rMid * (1.0 + fluteDepth * fluteShape);
+    baseProfile.push({ x: Math.cos(phi) * r, y: Math.sin(phi) * r });
+  }
+
+  function getCurvePoint(thetaStart, t) {
+    const clampedT = Math.max(0, Math.min(1, t));
+    // S-curve angle inflection: gentle forward push in first half, curling in second half
+    const sTheta = clampedT + 0.09 * Math.sin(Math.PI * 2 * clampedT);
+    const theta = thetaStart + sTheta * twistAngleSpan;
+
+    // Diagonal stroke from inner rim (t=0) to outer rim (t=1)
+    const smoothT = clampedT * clampedT * (3 - 2 * clampedT);
+    const rDisp = rHalf * (2 * smoothT - 1);
+    const r = ringRadius + rDisp;
+
+    // Arched height profile
+    const y = yBase + yLift * Math.pow(Math.sin(Math.PI * clampedT), 0.75);
+    return new THREE.Vector3(Math.sin(theta) * r, y, Math.cos(theta) * r);
+  }
+
+  const geometries = [];
+
+  for (let k = 0; k < N; k++) {
+    const thetaStart = k * deltaTheta;
+    const positions = [];
+    const indices = [];
+
+    // Ring positions
+    for (let i = 0; i <= tubularSegments; i++) {
+      const t = i / tubularSegments;
+      const center = getCurvePoint(thetaStart, t);
+
+      // Tangent vector
+      const dt = 0.002;
+      const pNext = getCurvePoint(thetaStart, Math.min(1, t + dt));
+      const pPrev = getCurvePoint(thetaStart, Math.max(0, t - dt));
+      const tangent = new THREE.Vector3().subVectors(pNext, pPrev).normalize();
+
+      // Normal and binormal using world-up reference
+      const worldUp = new THREE.Vector3(0, 1, 0);
+      const normal = new THREE.Vector3().crossVectors(worldUp, tangent).normalize();
+      const binormal = new THREE.Vector3().crossVectors(tangent, normal).normalize();
+
+      // Plump body taper: maintains full body through middle, soft rounded ends
+      let taperScale;
+      if (t < 0.20) {
+        taperScale = THREE.MathUtils.lerp(0.78, 1.0, t / 0.20);
+      } else if (t < 0.70) {
+        taperScale = 1.0;
+      } else {
+        taperScale = THREE.MathUtils.lerp(1.0, 0.72, (t - 0.70) / 0.30);
+      }
+
+      // Axial twist angle
+      const axialAngle = t * twistRotation;
+      const cosAx = Math.cos(axialAngle);
+      const sinAx = Math.sin(axialAngle);
+
+      for (let j = 0; j < numProfilePts; j++) {
+        const bp = baseProfile[j];
+        // Rotate profile by axialAngle
+        const px = bp.x * cosAx - bp.y * sinAx;
+        const py = bp.x * sinAx + bp.y * cosAx;
+
+        const vx = (normal.x * px + binormal.x * py) * taperScale;
+        const vy = (normal.y * px + binormal.y * py) * taperScale;
+        const vz = (normal.z * px + binormal.z * py) * taperScale;
+
+        positions.push(center.x + vx, center.y + vy, center.z + vz);
+      }
+    }
+
+    // Build tube indices
+    for (let i = 0; i < tubularSegments; i++) {
+      for (let j = 0; j < numProfilePts; j++) {
+        const jNext = (j + 1) % numProfilePts;
+        const a = i * numProfilePts + j;
+        const b = i * numProfilePts + jNext;
+        const c = (i + 1) * numProfilePts + j;
+        const d = (i + 1) * numProfilePts + jNext;
+        indices.push(a, b, c, b, d, c);
+      }
+    }
+
+    // Watertight endcaps
+    const startCenter = getCurvePoint(thetaStart, 0);
+    const startCapIdx = positions.length / 3;
+    positions.push(startCenter.x, startCenter.y, startCenter.z);
+    for (let j = 0; j < numProfilePts; j++) {
+      const jNext = (j + 1) % numProfilePts;
+      indices.push(startCapIdx, jNext, j);
+    }
+
+    const endCenter = getCurvePoint(thetaStart, 1);
+    const endCapIdx = positions.length / 3;
+    positions.push(endCenter.x, endCenter.y, endCenter.z);
+    const lastRowOffset = tubularSegments * numProfilePts;
+    for (let j = 0; j < numProfilePts; j++) {
+      const jNext = (j + 1) % numProfilePts;
+      indices.push(endCapIdx, lastRowOffset + j, lastRowOffset + jNext);
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+    geometries.push(geo);
+  }
+
+  return mergeGeometries(geometries);
 }
 
 /**
@@ -1085,11 +1257,27 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
       mesh.receiveShadow = true;
       return mesh;
     }
+    case 'wavePiping': {
+      const geo = buildWavePipingRingGeometry(radius);
+      const mesh = new THREE.Mesh(geo, material);
+      mesh.position.y = y;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      return mesh;
+    }
     case 'rope': {
       const geo = buildRopeRingGeometry(radius);
       const mesh = new THREE.Mesh(geo, material);
       mesh.position.y = y;
       mesh.castShadow = true;
+      return mesh;
+    }
+    case 'ropeTwist': {
+      const geo = buildRopeTwistRingGeometry(radius);
+      const mesh = new THREE.Mesh(geo, material);
+      mesh.position.y = y;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
       return mesh;
     }
     case 'petal': {
