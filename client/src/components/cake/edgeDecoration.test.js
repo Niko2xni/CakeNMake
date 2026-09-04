@@ -56,10 +56,12 @@ describe('edge decoration placement', () => {
     expect(screen.getByTitle('Reverse Shell')).toBeInTheDocument();
     expect(screen.getByText('Bead Piping')).toBeInTheDocument();
     expect(screen.getByTitle('Bead Piping')).toBeInTheDocument();
-    expect(screen.getByText('Zigzag Piping')).toBeInTheDocument();
-    expect(screen.getByTitle('Zigzag Piping')).toBeInTheDocument();
-    expect(screen.getByText('Wave Piping')).toBeInTheDocument();
-    expect(screen.getByTitle('Wave Piping')).toBeInTheDocument();
+    expect(screen.queryByText('Zigzag Piping')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Zigzag Piping')).not.toBeInTheDocument();
+    expect(screen.queryByText('Wave Piping')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Wave Piping')).not.toBeInTheDocument();
+    expect(screen.queryByText('Scallops')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Star Scallop')).not.toBeInTheDocument();
     expect(screen.getByText('Rope')).toBeInTheDocument();
     expect(screen.getByText('Rope Twist')).toBeInTheDocument();
     expect(screen.getByTitle('Rope Twist')).toBeInTheDocument();
@@ -74,11 +76,6 @@ describe('edge decoration placement', () => {
     expect(screen.getByTitle('Star Dollop')).toBeInTheDocument();
     expect(screen.getByTitle('Sparse Star Dollop')).toBeInTheDocument();
     expect(screen.getByTitle('Continuous Star Dollop')).toBeInTheDocument();
-    expect(screen.getByText('Scallops')).toBeInTheDocument();
-    expect(screen.getByTitle('Star Scallop')).toBeInTheDocument();
-    expect(screen.getByTitle('Soft Star Scallop')).toBeInTheDocument();
-    expect(screen.getByTitle('Scallop with Dollops')).toBeInTheDocument();
-    expect(screen.getByTitle('Layered Star Scallop')).toBeInTheDocument();
   });
 
   it('generates dense accordion-pleated zigzag geometry with zero overhang', async () => {

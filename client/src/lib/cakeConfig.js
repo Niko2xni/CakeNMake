@@ -552,7 +552,7 @@ export const SHELL_VARIATIONS = [
 ];
 
 export const STANDALONE_EDGE_PIPING_OPTIONS = PIPING_TIPS
-  .filter(({ id }) => ['bead', 'zigzag', 'wavePiping', 'rope', 'petal', 'dropFlower'].includes(id));
+  .filter(({ id }) => ['bead', 'rope', 'petal', 'dropFlower'].includes(id));
 
 export const EDGE_DECORATION_SETS = [
   { id: 'curtain', label: 'Curtain' },
