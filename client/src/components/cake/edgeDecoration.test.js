@@ -17,6 +17,8 @@ describe('edge decoration placement', () => {
     expect(computeEdgeTrimRadius(4.0, 'dollops', 'fullyFrosted', true)).toBeCloseTo(4.12, 2);
     expect(computeEdgeTrimRadius(4.0, 'shell', 'fullyFrosted')).toBeCloseTo(3.66, 2);
     expect(computeEdgeTrimRadius(4.0, 'shell', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
+    expect(computeEdgeTrimRadius(4.0, 'reverseShell', 'fullyFrosted')).toBeCloseTo(3.66, 2);
+    expect(computeEdgeTrimRadius(4.0, 'reverseShell', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
     expect(computeEdgeTrimRadius(4.0, 'bead', 'fullyFrosted')).toBeCloseTo(3.68, 2);
     expect(computeEdgeTrimRadius(4.0, 'bead', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
     expect(computeEdgeTrimRadius(4.0, 'zigzag', 'fullyFrosted')).toBeCloseTo(3.66, 2);
@@ -51,6 +53,7 @@ describe('edge decoration placement', () => {
     expect(screen.queryByRole('button', { name: 'None' })).not.toBeInTheDocument();
     expect(screen.getByText('Shell Border')).toBeInTheDocument();
     expect(screen.getByTitle('Shell Border')).toBeInTheDocument();
+    expect(screen.getByTitle('Reverse Shell')).toBeInTheDocument();
     expect(screen.getByText('Bead Piping')).toBeInTheDocument();
     expect(screen.getByTitle('Bead Piping')).toBeInTheDocument();
     expect(screen.getByText('Zigzag Piping')).toBeInTheDocument();
@@ -182,6 +185,29 @@ describe('edge decoration placement', () => {
 
     // Test built geometry on 8-inch cake top rim (radius 3.66)
     const geo = buildRopeTwistClassicRingGeometry(3.66);
+    expect(geo.getAttribute('position').count).toBeGreaterThan(2000);
+
+    // Compute maximum radial distance of all vertices from origin
+    geo.computeBoundingBox();
+    const pos = geo.getAttribute('position');
+    let maxR = 0;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const z = pos.getZ(i);
+      const r = Math.sqrt(x * x + z * z);
+      if (r > maxR) maxR = r;
+    }
+
+    // Top surface radius is 4.06 — maximum vertex radius must strictly not exceed this (zero overhang!)
+    expect(maxR).toBeLessThanOrEqual(4.06);
+    expect(maxR).toBeGreaterThan(3.66);
+  });
+
+  it('generates reverse shell geometry variation with zero overhang', async () => {
+    const { buildReverseShellRingGeometry } = await import('./pipingTips');
+
+    // Test built geometry on 8-inch cake top rim (radius 3.66)
+    const geo = buildReverseShellRingGeometry(3.66);
     expect(geo.getAttribute('position').count).toBeGreaterThan(2000);
 
     // Compute maximum radial distance of all vertices from origin

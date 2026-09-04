@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  SHELL_VARIATIONS,
   BRACELET_BEADS_VARIATIONS,
   DOLLOPS_VARIATIONS,
   SCALLOPS_VARIATIONS,
@@ -73,6 +74,11 @@ export default function EdgeSection({
   const activeTipOrSet = currentSlot.piping?.tip || currentSlot.decorations?.setId;
 
   const multiVariantGroups = [
+    {
+      id: 'shell',
+      label: 'Shell Border',
+      variants: SHELL_VARIATIONS,
+    },
     {
       id: 'braceletBeads',
       label: 'Bracelet Beads',

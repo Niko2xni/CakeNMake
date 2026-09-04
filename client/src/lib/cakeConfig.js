@@ -259,6 +259,7 @@ export const FILLING_LAYER_OPTIONS = [
 // FILLING_PIPING_DESIGNS below for why it got its own.
 export const PIPING_TIPS = [
   { id: 'shell', label: 'Shell Border' },
+  { id: 'reverseShell', label: 'Reverse Shell' },
   { id: 'bead', label: 'Bead Piping' },
   { id: 'zigzag', label: 'Zigzag Piping' },
   { id: 'wavePiping', label: 'Wave Piping' },
@@ -545,8 +546,13 @@ export const ROPE_TWIST_VARIATIONS = [
   { id: 'ropeTwistClassic', label: 'Rope Twist (Classic)' },
 ];
 
+export const SHELL_VARIATIONS = [
+  { id: 'shell', label: 'Shell Border' },
+  { id: 'reverseShell', label: 'Reverse Shell' },
+];
+
 export const STANDALONE_EDGE_PIPING_OPTIONS = PIPING_TIPS
-  .filter(({ id }) => ['shell', 'bead', 'zigzag', 'wavePiping', 'rope', 'petal', 'dropFlower'].includes(id));
+  .filter(({ id }) => ['bead', 'zigzag', 'wavePiping', 'rope', 'petal', 'dropFlower'].includes(id));
 
 export const EDGE_DECORATION_SETS = [
   { id: 'curtain', label: 'Curtain' },

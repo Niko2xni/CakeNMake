@@ -1457,7 +1457,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           : [{ slot: edgeTop, y: topY, radius: topRadius, isBottom: false }, { slot: edgeBottom, y: 0, radius: BASE_RADIUS, isBottom: true }];
       for (const { slot, y, radius: edgeRadius, isBottom } of edgeSlotsToRender) {
         const isDollop = ['starDollop', 'starDollopSparse', 'starDollopContinuous'].includes(slot?.pipingTip);
-        const isShell = slot?.pipingTip === 'shell';
+        const isShell = ['shell', 'reverseShell'].includes(slot?.pipingTip);
         const isBead = slot?.pipingTip === 'bead';
         const isZigzag = slot?.pipingTip === 'zigzag';
         const isWavePiping = slot?.pipingTip === 'wavePiping';

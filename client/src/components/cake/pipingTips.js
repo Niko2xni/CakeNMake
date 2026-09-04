@@ -1216,6 +1216,164 @@ export function buildRopeTwistClassicRingGeometry(ringRadius) {
 }
 
 /**
+ * Reverse Shell Piping — classic bakery border piping technique.
+ * Alternates left-curving and right-curving crescent star shells in a seamless,
+ * interlocking braided chain around the cake rim.
+ * Each shell squeezed with a star tip:
+ * - Starts at the centerline radius R
+ * - Swells into a rounded, star-fluted bulb while arcing laterally (+side or -side)
+ * - Tapers and sweeps back to the centerline R
+ * - The next shell's bulbous head overlaps the preceding tail, with zero seam closure glitch.
+ */
+export function buildReverseShellRingGeometry(ringRadius) {
+  const circumference = ringRadius * Math.PI * 2;
+  // Enforce an even count so the left/right alternation closes seamlessly around the 360-degree loop
+  const rawN = Math.round(circumference / 0.58);
+  const N = Math.max(12, rawN % 2 === 0 ? rawN : rawN + 1);
+  const deltaTheta = (Math.PI * 2) / N;
+  const overlapFactor = 1.38;
+  const shellAngleSpan = deltaTheta * overlapFactor;
+
+  const tubularSegments = 24;
+  const starPoints = 8;
+  const numProfilePts = 64; // 8 samples per star flute ensures sharp, non-blurred ridges
+  const rMid = 0.130;
+  const fluteDepth = 0.32; // Wilton open-star fluting
+  const camber = 0.085; // lateral crescent arch displacement
+
+  // Build crisp 8-point fluted star profile in local 2D space
+  const baseProfile = [];
+  for (let i = 0; i < numProfilePts; i++) {
+    const phi = (i / numProfilePts) * Math.PI * 2;
+    const cosF = Math.cos(starPoints * phi);
+    const fluteShape = Math.sign(cosF) * Math.pow(Math.abs(cosF), 0.72);
+    const r = rMid * (1.0 + fluteDepth * fluteShape);
+    baseProfile.push({ x: Math.cos(phi) * r, y: Math.sin(phi) * r });
+  }
+
+  function getCurvePoint(k, t) {
+    const clampedT = Math.max(0, Math.min(1, t));
+    const side = (k % 2 === 0) ? 1 : -1;
+    const thetaStart = k * deltaTheta;
+
+    // Progression along the ring
+    const theta = thetaStart + clampedT * shellAngleSpan;
+
+    // Crescent C-curve lateral excursion:
+    // Starts at 0 (r = ringRadius), arches outward/inward by camber, returns to 0 (r = ringRadius) at tail
+    const rOffset = side * camber * Math.sin(Math.PI * Math.pow(clampedT, 0.85));
+    const r = ringRadius + rOffset;
+
+    // Height profile: firmly grounded head (-0.015) -> bulb peak (0.165) at t=0.22 -> grounded tail (-0.015)
+    const y = -0.015 + 0.165 * Math.pow(Math.sin(Math.PI * Math.pow(clampedT, 0.65)), 0.90);
+
+    return new THREE.Vector3(Math.sin(theta) * r, y, Math.cos(theta) * r);
+  }
+
+  const geometries = [];
+
+  for (let k = 0; k < N; k++) {
+    const side = (k % 2 === 0) ? 1 : -1;
+    const positions = [];
+    const indices = [];
+
+    // Ring positions
+    for (let i = 0; i <= tubularSegments; i++) {
+      const t = i / tubularSegments;
+      const center = getCurvePoint(k, t);
+
+      // Tangent vector
+      const dt = 0.002;
+      const pNext = getCurvePoint(k, Math.min(1, t + dt));
+      const pPrev = getCurvePoint(k, Math.max(0, t - dt));
+      const tangent = new THREE.Vector3().subVectors(pNext, pPrev).normalize();
+
+      // Normal and binormal using world-up reference
+      const worldUp = new THREE.Vector3(0, 1, 0);
+      const normal = new THREE.Vector3().crossVectors(worldUp, tangent).normalize();
+      const binormal = new THREE.Vector3().crossVectors(tangent, normal).normalize();
+
+      // Wilton shell taper: firm base (0.75x) -> bulbous head (1.15x) -> full body (0.90x) -> thin tail (0.18x)
+      let taperScale;
+      if (t < 0.22) {
+        taperScale = THREE.MathUtils.lerp(0.75, 1.15, t / 0.22);
+      } else if (t < 0.55) {
+        taperScale = THREE.MathUtils.lerp(1.15, 0.90, (t - 0.22) / 0.33);
+      } else {
+        taperScale = THREE.MathUtils.lerp(0.90, 0.18, (t - 0.55) / 0.45);
+      }
+
+      // Axial roll: subtle wrist roll fanning out along the crescent curve
+      const axialAngle = side * 0.32 * Math.sin(Math.PI * t);
+      const cosAx = Math.cos(axialAngle);
+      const sinAx = Math.sin(axialAngle);
+
+      for (let j = 0; j < numProfilePts; j++) {
+        const bp = baseProfile[j];
+        const px = bp.x * cosAx - bp.y * sinAx;
+        const py = bp.x * sinAx + bp.y * cosAx;
+
+        const vx = (normal.x * px + binormal.x * py) * taperScale;
+        const vy = (normal.y * px + binormal.y * py) * taperScale;
+        const vz = (normal.z * px + binormal.z * py) * taperScale;
+
+        positions.push(center.x + vx, center.y + vy, center.z + vz);
+      }
+    }
+
+    // Build tube indices
+    for (let i = 0; i < tubularSegments; i++) {
+      for (let j = 0; j < numProfilePts; j++) {
+        const jNext = (j + 1) % numProfilePts;
+        const a = i * numProfilePts + j;
+        const b = i * numProfilePts + jNext;
+        const c = (i + 1) * numProfilePts + j;
+        const d = (i + 1) * numProfilePts + jNext;
+        indices.push(a, b, c, b, d, c);
+      }
+    }
+
+    // Rounded Head Dome at t = 0
+    const startCenter = getCurvePoint(k, 0);
+    const dt = 0.002;
+    const tangent0 = new THREE.Vector3().subVectors(
+      getCurvePoint(k, dt),
+      getCurvePoint(k, 0)
+    ).normalize();
+    const headDomeCenter = startCenter.clone().addScaledVector(tangent0, -0.03);
+    const startCapIdx = positions.length / 3;
+    positions.push(headDomeCenter.x, headDomeCenter.y, headDomeCenter.z);
+    for (let j = 0; j < numProfilePts; j++) {
+      const jNext = (j + 1) % numProfilePts;
+      indices.push(startCapIdx, jNext, j);
+    }
+
+    // Tapered Tail Tip at t = 1
+    const endCenter = getCurvePoint(k, 1);
+    const tangent1 = new THREE.Vector3().subVectors(
+      getCurvePoint(k, 1),
+      getCurvePoint(k, 1 - dt)
+    ).normalize();
+    const tailTipCenter = endCenter.clone().addScaledVector(tangent1, 0.02);
+    const endCapIdx = positions.length / 3;
+    positions.push(tailTipCenter.x, tailTipCenter.y, tailTipCenter.z);
+    const lastRowOffset = tubularSegments * numProfilePts;
+    for (let j = 0; j < numProfilePts; j++) {
+      const jNext = (j + 1) % numProfilePts;
+      indices.push(endCapIdx, lastRowOffset + j, lastRowOffset + jNext);
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+    geometries.push(geo);
+  }
+
+  return mergeGeometries(geometries);
+}
+
+/**
  * Lambeth Method piping — classic draped swags with vertical drop elements,
  * rosettes, coffee beans, and shell border. Creates a three-dimensional,
  * fabric-like appearance with multiple decorative elements arranged around
@@ -1361,6 +1519,14 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
     case 'shell': {
       const count = Math.max(12, Math.round((radius * Math.PI * 2) / (0.22 * scale)));
       return instanceAroundRing(getUnitGeometry('shell'), material, { ringRadius: radius, y, count, rand, scale });
+    }
+    case 'reverseShell': {
+      const geo = buildReverseShellRingGeometry(radius);
+      const mesh = new THREE.Mesh(geo, material);
+      mesh.position.y = y;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      return mesh;
     }
     case 'bead': {
       const count = Math.max(16, Math.round((radius * Math.PI * 2) / (0.15 * scale)));
