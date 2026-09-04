@@ -302,7 +302,7 @@ function buildStarUnitGeometry() {
 }
 
 /** Tall, ridged star-tip dollop based on a continuous buttercream squeeze:
- * a rounded shoulder narrows into a pointed release at the top. */
+ * broad, grounded base that flares smoothly into the belly and narrows into a pointed release at the top. */
 function buildStarDollopUnitGeometry({ radius = 0.28, height = 0.5, points = 12 } = {}) {
   const radialSegments = points * 4;
   const heightSegments = 32;
@@ -310,11 +310,12 @@ function buildStarDollopUnitGeometry({ radius = 0.28, height = 0.5, points = 12 
   const indices = [];
 
   const bodyTaper = (t) => {
-    const peakT = 0.38;
+    const peakT = 0.22;
     const bodyEndT = 0.6;
     if (t < peakT) {
-      const u = 1 - t / peakT;
-      return 0.2 + 0.8 * Math.sqrt(Math.max(0, 1 - u * u));
+      // Broad, grounded base (88% of peak width) that flares gently to full width
+      const u = t / peakT;
+      return 0.88 + 0.12 * Math.sin(u * Math.PI / 2);
     }
 
     const taperAt = (value) => {
@@ -334,15 +335,18 @@ function buildStarDollopUnitGeometry({ radius = 0.28, height = 0.5, points = 12 
     return h00 * valueAtEnd + h10 * slopeAtEnd * (1 - bodyEndT) + h11 * (-1) * (1 - bodyEndT);
   };
 
+  const baseYOffset = -0.06 * height; // Embed slightly into surface so dollop sits grounded on cake/plate
+
   for (let y = 0; y <= heightSegments; y++) {
     const t = y / heightSegments;
     const taper = bodyTaper(t);
     const ridgeStrength = 0.16 - t * 0.035;
+    const currentY = t * height + baseYOffset;
     for (let i = 0; i < radialSegments; i++) {
       const angle = (i / radialSegments) * Math.PI * 2;
       const radialVariation = 1 + Math.cos(points * angle) * ridgeStrength;
       const r = radius * taper * radialVariation;
-      positions.push(Math.cos(angle) * r, t * height, Math.sin(angle) * r);
+      positions.push(Math.cos(angle) * r, currentY, Math.sin(angle) * r);
     }
   }
 
@@ -358,10 +362,10 @@ function buildStarDollopUnitGeometry({ radius = 0.28, height = 0.5, points = 12 
   }
 
   const bottomCenter = positions.length / 3;
-  positions.push(0, 0, 0);
+  positions.push(0, baseYOffset, 0);
   const topStart = heightSegments * radialSegments;
   const topCenter = positions.length / 3;
-  positions.push(0, height, 0);
+  positions.push(0, height + baseYOffset, 0);
   for (let i = 0; i < radialSegments; i++) {
     const next = (i + 1) % radialSegments;
     indices.push(bottomCenter, next, i, topCenter, topStart + i, topStart + next);
@@ -1385,7 +1389,7 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
       return instanceAroundRing(getUnitGeometry('starDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.55 });
     }
     case 'starDollopContinuous': {
-      const count = Math.max(12, Math.round((radius * Math.PI * 2) / (0.28 * scale)));
+      const count = Math.max(12, Math.round((radius * Math.PI * 2) / (0.365 * scale)));
       return instanceAroundRing(getUnitGeometry('starDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.55 });
     }
     case 'starScallop': {
