@@ -609,11 +609,11 @@ export const PIPING_SCROLLS_SETS = [
 // which is keyed off exactly that.
 export const SUNSHINE_PLAY_SETS = [
   { id: 'rainbowArc', label: 'Rainbow Arc', price: 140 }, // hardened buttercream rainbow with cloud puffs at its feet
+  { id: 'cloudyChump', label: 'Cloudy Champ', price: 130 }, // randomized clouds only
   { id: 'starBurst', label: 'Star Burst', price: 125 }, // scattered buttercream stars hugging the cake side
-  { id: 'cloudyChump', label: 'Cloudy Chump', price: 130 }, // randomized clouds only
-  { id: 'rainbowChamp', label: 'Rainbow Champ', price: 155 }, // combination of Rainbow Arc and Cloudy Champ
-  { id: 'starryRainbow', label: 'Starry Rainbow', price: 170 }, // combination of Rainbow Arc, Cloudy Champ, and Star Burst
   { id: 'assortedStarBurst', label: 'Assorted Star Burst', price: 135 }, // scattered buttercream stars in assorted colors
+  { id: 'starryRainbow', label: 'Starry Rainbow', price: 170 }, // combination of Rainbow Arc, Cloudy Champ, and Star Burst
+  { id: 'assortedStarryRainbow', label: 'Assorted Starry Rainbow', price: 180 }, // Starry Rainbow with assorted star colors
 ];
 
 export const VICTORIAN_LAMBETH_SETS = [

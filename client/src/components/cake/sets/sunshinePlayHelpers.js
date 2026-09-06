@@ -633,7 +633,7 @@ function buildRainbowChamp(radius, height, colorHex) {
 // ─── Starry Rainbow (Rainbow Arc + Cloudy Champ + Star Burst) ───────────────
 // A dreamscape combining rainbow arcs, 3D fluffy clouds, and twinkling stars.
 
-function buildStarryRainbow(radius, height, colorHex) {
+function buildStarryRainbow(radius, height, colorHex, isAssortedStars = false) {
   const group = new THREE.Group();
 
   // 1. Rainbow Arcs
@@ -678,11 +678,25 @@ function buildStarryRainbow(radius, height, colorHex) {
   }
 
   // 3. Twinkling Star Burst Stars scattered in the open sky areas
-  const starMat = new THREE.MeshStandardMaterial({
-    color: colorHex || CLOUD_COLOR,
-    roughness: 0.7,
-    metalness: 0,
-  });
+  let starMats;
+  if (isAssortedStars) {
+    starMats = ASSORTED_STAR_COLORS.map(
+      (c) =>
+        new THREE.MeshStandardMaterial({
+          color: c,
+          roughness: 0.7,
+          metalness: 0,
+        })
+    );
+  } else {
+    starMats = [
+      new THREE.MeshStandardMaterial({
+        color: colorHex || CLOUD_COLOR,
+        roughness: 0.7,
+        metalness: 0,
+      }),
+    ];
+  }
 
   const starGeo = buildStarGeo(1);
   const standoffRadius = radius + 0.02;
@@ -747,10 +761,20 @@ function buildStarryRainbow(radius, height, colorHex) {
     }
 
     if (!collides) {
-      const starScale = 0.65 + rand() * 0.50;
+      // Distinct, dynamic size tiers matching Star Burst
+      let starScale;
+      const sizeFrac = rand();
+      if (sizeFrac < 0.36) {
+        starScale = 0.45 + (sizeFrac / 0.36) * 0.22; // small delicate star (0.45–0.67)
+      } else if (sizeFrac < 0.72) {
+        starScale = 0.85 + ((sizeFrac - 0.36) / 0.36) * 0.30; // medium classic star (0.85–1.15)
+      } else {
+        starScale = 1.35 + ((sizeFrac - 0.72) / 0.28) * 0.40; // large statement star (1.35–1.75)
+      }
       stars.push({ angle, y, scale: starScale });
 
-      const star = new THREE.Mesh(starGeo, starMat);
+      const mat = starMats[stars.length % starMats.length];
+      const star = new THREE.Mesh(starGeo, mat);
       star.position.set(
         Math.sin(angle) * standoffRadius,
         y,
@@ -782,9 +806,7 @@ export function buildSunshinePlay(radius, height, colorHex, variant = 'rainbowAr
   const group = new THREE.Group();
 
   if (variant === 'rainbowArc') {
-    // 3 copies of Rainbow Arc placed in varying locations around the cake cylinder:
-    // [angleDeg, yFrac, scale]
-    // Distributed organically across heights and angles with generous clearance.
+    // Variation 1: Rainbow Arc (3 copies in varying locations around cylinder)
     const RAINBOW_COPIES = [
       { angleDeg: 0,   yFrac:  0.00, scale: 1.00 }, // Front center
       { angleDeg: 118, yFrac:  0.10, scale: 0.88 }, // Right/back-right, slightly higher
@@ -797,26 +819,30 @@ export function buildSunshinePlay(radius, height, colorHex, variant = 'rainbowAr
       arc.position.y = spec.yFrac * height;
       group.add(arc);
     }
-  } else if (variant === 'starBurst') {
-    // Star Burst: scattered buttercream stars hugging the cake side, respects colorHex
-    const starBurst = buildStarBurst(radius, height, colorHex);
-    group.add(starBurst);
   } else if (variant === 'cloudyChump') {
-    // Cloudy Chump: randomized clouds only, respects colorHex
+    // Variation 2: Cloudy Champ (randomized clouds only, respects colorHex)
     const cloudyChump = buildCloudyChump(radius, height, colorHex);
     group.add(cloudyChump);
-  } else if (variant === 'rainbowChamp') {
-    // Rainbow Champ: combination of Rainbow Arc and Cloudy Champ
-    const rainbowChamp = buildRainbowChamp(radius, height, colorHex);
-    group.add(rainbowChamp);
-  } else if (variant === 'starryRainbow') {
-    // Starry Rainbow: combination of Rainbow Arc, Cloudy Champ, and Star Burst
-    const starryRainbow = buildStarryRainbow(radius, height, colorHex);
-    group.add(starryRainbow);
+  } else if (variant === 'starBurst') {
+    // Variation 3: Star Burst (scattered buttercream stars, respects colorHex)
+    const starBurst = buildStarBurst(radius, height, colorHex);
+    group.add(starBurst);
   } else if (variant === 'assortedStarBurst') {
-    // Assorted Star Burst: scattered buttercream stars in cheerful assorted colors
+    // Variation 4: Assorted Star Burst (scattered buttercream stars in assorted colors)
     const assortedStarBurst = buildStarBurst(radius, height, colorHex, true);
     group.add(assortedStarBurst);
+  } else if (variant === 'starryRainbow') {
+    // Variation 5: Starry Rainbow (Rainbow Arc + Cloudy Champ + Star Burst)
+    const starryRainbow = buildStarryRainbow(radius, height, colorHex, false);
+    group.add(starryRainbow);
+  } else if (variant === 'assortedStarryRainbow') {
+    // Variation 6: Same as Starry Rainbow but with assorted star colors
+    const assortedStarryRainbow = buildStarryRainbow(radius, height, colorHex, true);
+    group.add(assortedStarryRainbow);
+  } else if (variant === 'rainbowChamp') {
+    // Legacy support: combination of Rainbow Arc and Cloudy Champ
+    const rainbowChamp = buildRainbowChamp(radius, height, colorHex);
+    group.add(rainbowChamp);
   }
 
   return group;
