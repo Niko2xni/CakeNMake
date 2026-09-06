@@ -3,6 +3,7 @@ import {
   SHELL_VARIATIONS,
   BRACELET_BEADS_VARIATIONS,
   DOLLOPS_VARIATIONS,
+  SCALLOPS_VARIATIONS,
   ROPE_TWIST_VARIATIONS,
   STANDALONE_EDGE_PIPING_OPTIONS,
   PIPING_TIPS,
@@ -93,6 +94,11 @@ export default function EdgeSection({
       label: 'Dollops',
       variants: DOLLOPS_VARIATIONS,
     },
+    {
+      id: 'scallops',
+      label: 'Scallops',
+      variants: SCALLOPS_VARIATIONS,
+    },
   ];
 
   return (
@@ -165,7 +171,7 @@ export default function EdgeSection({
         </div>
 
         <div className="grid grid-cols-2 gap-2">
-          {/* 1. Standalone Piping Options (Bead, Rope, Petal, Drop Flower) */}
+          {/* 1. Standalone Piping Options (Bead, Zigzag, Wave, Rope, Petal, Drop Flower) */}
           {STANDALONE_EDGE_PIPING_OPTIONS.map((option, index) => {
             const active = activeTipOrSet === option.id;
             const isLastOdd =
@@ -207,7 +213,7 @@ export default function EdgeSection({
             );
           })}
 
-          {/* 2. Grouped Multi-Variant Designs (Shell Border, Bracelet Beads, Rope Twist, Dollops) */}
+          {/* 2. Grouped Multi-Variant Designs (Shell Border, Bracelet Beads, Rope Twist, Dollops, Scallops) */}
           {multiVariantGroups.map((group) => {
             const groupActive = group.variants.some((v) => v.id === activeTipOrSet);
             return (
