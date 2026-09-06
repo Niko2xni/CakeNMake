@@ -142,7 +142,18 @@ function buildStarBurst(radius, height, colorHex, isAssorted = false) {
 
     // Position star on the cake side with slight standoff
     const y = -height / 2 + height * 0.05 + heightFrac * height * 0.9;
-    const scale = 0.8 + sizeFrac * 0.6; // varied sizes: 0.8–1.4
+
+    // Distinct, dynamic size tiers ranging from delicate small accent stars (~0.45–0.67)
+    // to medium classic stars (~0.85–1.15) to bold statement stars (~1.35–1.75)
+    let scale;
+    if (sizeFrac < 0.36) {
+      scale = 0.45 + (sizeFrac / 0.36) * 0.22; // small delicate star (0.45–0.67)
+    } else if (sizeFrac < 0.72) {
+      scale = 0.85 + ((sizeFrac - 0.36) / 0.36) * 0.30; // medium classic star (0.85–1.15)
+    } else {
+      scale = 1.35 + ((sizeFrac - 0.72) / 0.28) * 0.40; // large statement star (1.35–1.75)
+    }
+
     const standoffRadius = radius + 0.02; // thin stars hug the wall closely
 
     const mat = materials[i % materials.length];
