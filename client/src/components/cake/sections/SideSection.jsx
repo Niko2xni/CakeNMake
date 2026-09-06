@@ -86,11 +86,13 @@ export default function SideSection({ side, onChange, sugarColor, onSugarColorCh
                       showDefaultColorPicker
                       colorOverrideDisabled={
                         (t.id === 'chevronPattern' && currentSetId === 'multiColor') ||
-                        (t.id === 'sunshinePlay' && currentSetId === 'rainbowArc')
+                        (t.id === 'sunshinePlay' && (currentSetId === 'rainbowArc' || currentSetId === 'assortedStarBurst'))
                       }
                       colorOverrideDisabledReason={
                         (t.id === 'sunshinePlay' && currentSetId === 'rainbowArc')
                           ? 'Rainbow Arc uses its own fixed rainbow palette — Color Override has no effect on it.'
+                          : (t.id === 'sunshinePlay' && currentSetId === 'assortedStarBurst')
+                          ? 'Assorted Star Burst uses its own assorted color palette — Color Override has no effect on it.'
                           : (t.id === 'chevronPattern' && currentSetId === 'multiColor')
                           ? 'Multi-Color uses its own fixed palette per row — Color Override has no effect on it.'
                           : ''

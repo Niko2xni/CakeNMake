@@ -96,15 +96,37 @@ function buildStarGeo(scale = 1) {
   return geo;
 }
 
-function buildStarBurst(radius, height, colorHex) {
+const ASSORTED_STAR_COLORS = [
+  '#FF6B9D', // strawberry pink
+  '#FFD93D', // golden sunny yellow
+  '#6BCB77', // mint green
+  '#4D96FF', // sky pastel blue
+  '#FF8B3D', // tangerine orange
+  '#C77DFF', // lavender purple
+];
+
+function buildStarBurst(radius, height, colorHex, isAssorted = false) {
   const group = new THREE.Group();
 
-  // Buttercream material for stars — slightly rough, soft buttercream look
-  const mat = new THREE.MeshStandardMaterial({
-    color: colorHex || '#FFFDF7',
-    roughness: 0.7,
-    metalness: 0,
-  });
+  let materials;
+  if (isAssorted) {
+    materials = ASSORTED_STAR_COLORS.map(
+      (c) =>
+        new THREE.MeshStandardMaterial({
+          color: c,
+          roughness: 0.7,
+          metalness: 0,
+        })
+    );
+  } else {
+    materials = [
+      new THREE.MeshStandardMaterial({
+        color: colorHex || '#FFFDF7',
+        roughness: 0.7,
+        metalness: 0,
+      }),
+    ];
+  }
 
   // Create reusable star geometry
   const starGeo = buildStarGeo(1);
@@ -123,6 +145,7 @@ function buildStarBurst(radius, height, colorHex) {
     const scale = 0.8 + sizeFrac * 0.6; // varied sizes: 0.8–1.4
     const standoffRadius = radius + 0.02; // thin stars hug the wall closely
 
+    const mat = materials[i % materials.length];
     const star = new THREE.Mesh(starGeo, mat);
     star.position.set(
       Math.sin(angle) * standoffRadius,
@@ -779,6 +802,10 @@ export function buildSunshinePlay(radius, height, colorHex, variant = 'rainbowAr
     // Starry Rainbow: combination of Rainbow Arc, Cloudy Champ, and Star Burst
     const starryRainbow = buildStarryRainbow(radius, height, colorHex);
     group.add(starryRainbow);
+  } else if (variant === 'assortedStarBurst') {
+    // Assorted Star Burst: scattered buttercream stars in cheerful assorted colors
+    const assortedStarBurst = buildStarBurst(radius, height, colorHex, true);
+    group.add(assortedStarBurst);
   }
 
   return group;

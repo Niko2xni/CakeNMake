@@ -613,6 +613,7 @@ export const SUNSHINE_PLAY_SETS = [
   { id: 'cloudyChump', label: 'Cloudy Chump', price: 130 }, // randomized clouds only
   { id: 'rainbowChamp', label: 'Rainbow Champ', price: 155 }, // combination of Rainbow Arc and Cloudy Champ
   { id: 'starryRainbow', label: 'Starry Rainbow', price: 170 }, // combination of Rainbow Arc, Cloudy Champ, and Star Burst
+  { id: 'assortedStarBurst', label: 'Assorted Star Burst', price: 135 }, // scattered buttercream stars in assorted colors
 ];
 
 export const VICTORIAN_LAMBETH_SETS = [
