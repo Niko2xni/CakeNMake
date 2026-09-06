@@ -555,6 +555,76 @@ function addHandmadeWobble(geo, seedOffset, amount = 0.006) {
   geo.computeVertexNormals();
 }
 
+// Builds a single complete rainbow arc with its 4 color bands and 2 fondant cloud feet,
+// wrapped flush to the cake cylinder at the specified radius.
+function buildSingleRainbowArc(radius, height, scale = 1) {
+  const arcGroup = new THREE.Group();
+  const effectiveHeight = height * scale;
+
+  const bandCount = RAINBOW_BAND_COLORS.length;
+
+  // Wide, authentic rainbow proportions:
+  // A generous outer radius and wide archway give it the classic rainbow curve,
+  // with short straight vertical leg extensions so the ends plunge cleanly into the clouds.
+  const outerRadius = effectiveHeight * 0.29; // generous outer radius for a wide, expansive arch
+  const bandWidth = effectiveHeight * 0.050; // center-to-center band spacing
+  const tube = bandWidth * 0.52; // tube radius (ensures seamless touching between neighboring bands)
+  const legLength = effectiveHeight * 0.065; // subtle vertical leg extension into the clouds
+
+  const bandRadii = [];
+  for (let i = 0; i < bandCount; i++) {
+    bandRadii.push(outerRadius - (bandCount - 1 - i) * bandWidth);
+  }
+
+  const innerRadius = bandRadii[0];
+  const legMidX = (innerRadius + outerRadius) / 2;
+  const legSpan = (outerRadius + tube) - (innerRadius - tube);
+
+  // Vertical centering within tier height budget:
+  // Top apex: y = outerRadius + tube
+  // Bottom of legs: y = -legLength
+  // Cloud bottom padding: ~0.05 * height
+  const topY = outerRadius + tube;
+  const bottomY = -legLength - 0.05 * effectiveHeight;
+  const centerYOffset = -(topY + bottomY) / 2;
+
+  const rainbowGroup = new THREE.Group();
+
+  for (let i = 0; i < bandCount; i++) {
+    const bRadius = bandRadii[i];
+    const curve = new UArchCurve(bRadius, legLength);
+    const geo = new THREE.TubeGeometry(curve, 64, tube, 12, false);
+    addHandmadeWobble(geo, i * 1.7, tube * 0.015);
+    geo.translate(0, centerYOffset, tube);
+    wrapGeometryToCylinder(geo, radius);
+    const mat = new THREE.MeshStandardMaterial({
+      color: RAINBOW_BAND_COLORS[i],
+      roughness: 0.55,
+      metalness: 0.02,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    rainbowGroup.add(mesh);
+  }
+
+  arcGroup.add(rainbowGroup);
+
+  // 3D extruded fondant cloud puffs (clean flat front face and crisp perpendicular side walls, like cut fondant)
+  // centered over the leg midpoints (±legMidX) to cleanly cover all 4 band cut ends.
+  const cloudScale = (legSpan * 1.35) / 2.62;
+  const cloudDepth = 0.22 * scale; // sleek 3D plaque thickness (~10-12% of width)
+  const zBack = tube * 2 + 0.015 - cloudDepth;
+  const cloudFootY = -legLength + centerYOffset;
+  const leftCloud = buildFlatCloud(-legMidX, cloudFootY, radius, cloudScale, cloudDepth, zBack, true);
+  arcGroup.add(leftCloud);
+
+  const rightCloud = buildFlatCloud(legMidX, cloudFootY, radius, cloudScale, cloudDepth, zBack, false);
+  arcGroup.add(rightCloud);
+
+  return arcGroup;
+}
+
 /**
  * Builds the Sunshine Play side decoration as a single Group, sized to fit
  * within `height` and stuck flush against the cake wall at `radius` — one
@@ -565,70 +635,21 @@ export function buildSunshinePlay(radius, height, colorHex, variant = 'rainbowAr
   const group = new THREE.Group();
 
   if (variant === 'rainbowArc') {
-    // Rainbow Arc: concentric U-shaped arch bands with straight vertical legs
-    // and puffy buttercream cloud clusters covering the ends. Fixed palette,
-    // ignores colorHex/flavorId on purpose — see the doc comment at the top
-    // of this file and SideSection.jsx's colorOverrideDisabled.
-    const bandCount = RAINBOW_BAND_COLORS.length;
+    // 3 copies of Rainbow Arc placed in varying locations around the cake cylinder:
+    // [angleDeg, yFrac, scale]
+    // Distributed organically across heights and angles with generous clearance.
+    const RAINBOW_COPIES = [
+      { angleDeg: 0,   yFrac:  0.00, scale: 1.00 }, // Front center
+      { angleDeg: 118, yFrac:  0.10, scale: 0.88 }, // Right/back-right, slightly higher
+      { angleDeg: 238, yFrac: -0.08, scale: 0.94 }, // Left/back-left, slightly lower
+    ];
 
-    // Wide, authentic rainbow proportions:
-    // A generous outer radius and wide archway give it the classic rainbow curve,
-    // with short straight vertical leg extensions so the ends plunge cleanly into the clouds.
-    const outerRadius = height * 0.29; // generous outer radius for a wide, expansive arch
-    const bandWidth = height * 0.050; // center-to-center band spacing
-    const tube = bandWidth * 0.52; // tube radius (ensures seamless touching between neighboring bands)
-    const legLength = height * 0.065; // subtle vertical leg extension into the clouds
-
-    const bandRadii = [];
-    for (let i = 0; i < bandCount; i++) {
-      bandRadii.push(outerRadius - (bandCount - 1 - i) * bandWidth);
+    for (const spec of RAINBOW_COPIES) {
+      const arc = buildSingleRainbowArc(radius, height, spec.scale);
+      arc.rotation.y = (spec.angleDeg * Math.PI) / 180;
+      arc.position.y = spec.yFrac * height;
+      group.add(arc);
     }
-
-    const innerRadius = bandRadii[0];
-    const legMidX = (innerRadius + outerRadius) / 2;
-    const legSpan = (outerRadius + tube) - (innerRadius - tube);
-
-    // Vertical centering within tier height budget:
-    // Top apex: y = outerRadius + tube
-    // Bottom of legs: y = -legLength
-    // Cloud bottom padding: ~0.05 * height
-    const topY = outerRadius + tube;
-    const bottomY = -legLength - 0.05 * height;
-    const centerYOffset = -(topY + bottomY) / 2;
-
-    const rainbowGroup = new THREE.Group();
-
-    for (let i = 0; i < bandCount; i++) {
-      const bRadius = bandRadii[i];
-      const curve = new UArchCurve(bRadius, legLength);
-      const geo = new THREE.TubeGeometry(curve, 64, tube, 12, false);
-      addHandmadeWobble(geo, i * 1.7, tube * 0.015);
-      geo.translate(0, centerYOffset, tube);
-      wrapGeometryToCylinder(geo, radius);
-      const mat = new THREE.MeshStandardMaterial({
-        color: RAINBOW_BAND_COLORS[i],
-        roughness: 0.55,
-        metalness: 0.02,
-      });
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      rainbowGroup.add(mesh);
-    }
-
-    group.add(rainbowGroup);
-
-    // 3D extruded fondant cloud puffs (clean flat front face and crisp perpendicular side walls, like cut fondant)
-    // centered over the leg midpoints (±legMidX) to cleanly cover all 4 band cut ends.
-    const cloudScale = (legSpan * 1.35) / 2.62;
-    const cloudDepth = 0.22; // sleek 3D plaque thickness (~10-12% of width)
-    const zBack = tube * 2 + 0.015 - cloudDepth;
-    const cloudFootY = -legLength + centerYOffset;
-    const leftCloud = buildFlatCloud(-legMidX, cloudFootY, radius, cloudScale, cloudDepth, zBack, true);
-    group.add(leftCloud);
-
-    const rightCloud = buildFlatCloud(legMidX, cloudFootY, radius, cloudScale, cloudDepth, zBack, false);
-    group.add(rightCloud);
   } else if (variant === 'starBurst') {
     // Star Burst: scattered buttercream stars hugging the cake side, respects colorHex
     const starBurst = buildStarBurst(radius, height, colorHex);
