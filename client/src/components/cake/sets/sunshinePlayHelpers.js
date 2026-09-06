@@ -378,19 +378,71 @@ function buildCloudyChump(radius, height, colorHex) {
 // wraps each individual sphere's center onto the cylinder itself — see
 // wrapPointToCylinder's comment for why a pre-baked flat offset isn't
 // enough once the rest of the piece is doing the same.
-function buildCloudPuff(centerX, centerY, centerZ, wallRadius, scale = 1, colorHex = CLOUD_COLOR) {
+// A continuous C1-smooth inverted U-shaped arch curve in the local XY plane:
+// - Left straight vertical leg: going UP from (-R, -L) to (-R, 0)
+// - Semicircular top arc: from (-R, 0) over the apex (0, R) to (+R, 0)
+// - Right straight vertical leg: going DOWN from (+R, 0) to (+R, -L)
+class UArchCurve extends THREE.Curve {
+  constructor(radius, legLength) {
+    super();
+    this.radius = radius;
+    this.legLength = legLength;
+    this.arcLength = Math.PI * radius;
+    this.totalLength = 2 * legLength + this.arcLength;
+  }
+
+  getPoint(t, optionalTarget = new THREE.Vector3()) {
+    const s = t * this.totalLength;
+    const R = this.radius;
+    const L = this.legLength;
+
+    if (s <= L) {
+      return optionalTarget.set(-R, -L + s, 0);
+    } else if (s <= L + this.arcLength) {
+      const theta = Math.PI - (s - L) / R;
+      return optionalTarget.set(R * Math.cos(theta), R * Math.sin(theta), 0);
+    } else {
+      const u = s - (L + this.arcLength);
+      return optionalTarget.set(R, -u, 0);
+    }
+  }
+}
+
+// Multi-lobed organic buttercream cloud cluster designed to fully cover and
+// envelop the cut ends of the rainbow bands at the base of the legs.
+// Each sphere center is mapped to the cake cylinder via wrapPointToCylinder
+// so the cloud curves flush against the cake surface.
+function buildCloudPuff(centerX, bottomY, centerZ, wallRadius, legSpan, tube, height, isLeft = false, colorHex = CLOUD_COLOR) {
   const group = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color: colorHex || CLOUD_COLOR, roughness: 0.6, metalness: 0 });
+  const mat = new THREE.MeshStandardMaterial({
+    color: colorHex || CLOUD_COLOR,
+    roughness: 0.55,
+    metalness: 0.02,
+  });
+
+  const sign = isLeft ? -1 : 1;
+
+  // Rich organic cluster of 10 puffy lobes designed to envelop the rainbow ends
   const puffs = [
-    [0, 0, 0, 0.34],
-    [0.24, 0.05, 0.05, 0.24],
-    [-0.24, 0.04, 0.05, 0.24],
-    [0.08, 0.20, 0.04, 0.20],
-    [-0.10, 0.18, 0.03, 0.19],
+    // Front center lobes sitting proudly in front of the tubes
+    [0.0 * sign, 0.025 * height, 0.75 * tube, 0.22 * legSpan],
+    [0.0 * sign, -0.015 * height, 0.65 * tube, 0.24 * legSpan],
+    // Inner lobes (extending towards center of archway, covering green/yellow)
+    [-0.30 * legSpan * sign, 0.015 * height, 0.55 * tube, 0.21 * legSpan],
+    [-0.18 * legSpan * sign, 0.045 * height, 0.65 * tube, 0.19 * legSpan],
+    [-0.26 * legSpan * sign, -0.035 * height, 0.45 * tube, 0.18 * legSpan],
+    // Outer lobes (extending towards outer cake wall, covering orange/red)
+    [0.30 * legSpan * sign, 0.015 * height, 0.55 * tube, 0.22 * legSpan],
+    [0.18 * legSpan * sign, 0.045 * height, 0.65 * tube, 0.20 * legSpan],
+    [0.26 * legSpan * sign, -0.035 * height, 0.45 * tube, 0.19 * legSpan],
+    // Base grounding lobes tucked underneath to seal against cake
+    [-0.10 * legSpan * sign, -0.045 * height, 0.15 * tube, 0.18 * legSpan],
+    [0.10 * legSpan * sign, -0.045 * height, 0.15 * tube, 0.18 * legSpan],
   ];
+
   for (const [ox, oy, oz, r] of puffs) {
-    const p = wrapPointToCylinder(centerX + ox * scale, centerY + oy * scale, centerZ + oz * scale, wallRadius);
-    const sphere = new THREE.Mesh(new THREE.SphereGeometry(r * scale, 14, 10), mat);
+    const p = wrapPointToCylinder(centerX + ox, bottomY + oy, centerZ + oz, wallRadius);
+    const sphere = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), mat);
     sphere.position.copy(p);
     sphere.castShadow = true;
     sphere.receiveShadow = true;
@@ -455,49 +507,49 @@ function addHandmadeWobble(geo, seedOffset, amount = 0.006) {
  * accent piece, not tiled around the circumference like the other Side
  * treatments.
  */
-export function buildSunshinePlay(radius, height, colorHex, variant = 'rainbowArc', flavorId = 'vanilla') {
+export function buildSunshinePlay(radius, height, colorHex, variant = 'rainbowArc', _flavorId = 'vanilla') {
   const group = new THREE.Group();
 
   if (variant === 'rainbowArc') {
-    // Rainbow Arc: concentric half-torus bands with cloud puffs. Fixed
-    // palette, ignores colorHex/flavorId on purpose — see the doc comment
-    // at the top of this file and SideSection.jsx's colorOverrideDisabled.
+    // Rainbow Arc: concentric U-shaped arch bands with straight vertical legs
+    // and puffy buttercream cloud clusters covering the ends. Fixed palette,
+    // ignores colorHex/flavorId on purpose — see the doc comment at the top
+    // of this file and SideSection.jsx's colorOverrideDisabled.
     const bandCount = RAINBOW_BAND_COLORS.length;
-    const outerRadius = height * 0.32; // overall arch height budget — also the outermost band's own radius
-    const bandWidth = outerRadius / bandCount;
-    // Bands sit bandWidth apart center-to-center, so two neighbors only
-    // physically touch when tube > bandWidth / 2 — anything at or below
-    // that is a real, un-fakeable gap between the round tubes themselves.
-    // A flat colored "backer" behind the seam (the previous approach)
-    // covers the missing color, but a flat surface tucked behind two
-    // convex ropes catches light completely differently and reads as a
-    // dark shadow crease instead of true contact — which is exactly the
-    // seam visible in the last render. 0.52 is only just past that 0.5
-    // touching line — a ~30% thickness bump from the thinnest previous
-    // attempt (0.40), not the ~45% bump that was already rejected as too
-    // fat (0.58) — enough for the tubes to genuinely meet and shade like
-    // real touching rope, without ballooning back into that fat look.
-    const tube = bandWidth * 0.52;
-    const archY = -outerRadius / 2; // centers the arch vertically within the `height` budget
+
+    // Wide, authentic rainbow proportions:
+    // A generous outer radius and wide archway give it the classic rainbow curve,
+    // with short straight vertical leg extensions so the ends plunge cleanly into the clouds.
+    const outerRadius = height * 0.29; // generous outer radius for a wide, expansive arch
+    const bandWidth = height * 0.050; // center-to-center band spacing
+    const tube = bandWidth * 0.52; // tube radius (ensures seamless touching between neighboring bands)
+    const legLength = height * 0.065; // subtle vertical leg extension into the clouds
+
+    const bandRadii = [];
+    for (let i = 0; i < bandCount; i++) {
+      bandRadii.push(outerRadius - (bandCount - 1 - i) * bandWidth);
+    }
+
+    const innerRadius = bandRadii[0];
+    const legMidX = (innerRadius + outerRadius) / 2;
+    const legSpan = (outerRadius + tube) - (innerRadius - tube);
+
+    // Vertical centering within tier height budget:
+    // Top apex: y = outerRadius + tube
+    // Bottom of legs: y = -legLength
+    // Cloud bottom padding: ~0.05 * height
+    const topY = outerRadius + tube;
+    const bottomY = -legLength - 0.05 * height;
+    const centerYOffset = -(topY + bottomY) / 2;
 
     const rainbowGroup = new THREE.Group();
 
     for (let i = 0; i < bandCount; i++) {
-      const bandRadius = bandWidth * (i + 1);
-      // THREE.TorusGeometry's ring lies in the local XY plane by default,
-      // sweeping from angle 0 (+X) through the upper half to angle π (-X)
-      // when `arc` is Math.PI — exactly the arch shape we want, with both
-      // feet resting on the local Y = 0 line.
-      const geo = new THREE.TorusGeometry(bandRadius, tube, 10, 56, Math.PI);
-      // Wobble amplitude is kept to a small fraction of tube — at a
-      // touching-but-thin ratio like 0.52 the overlap margin between
-      // neighbors is naturally tight, and a wobble much bigger than this
-      // risks pushing a vertex back out of contact and reopening a
-      // hairline gap right where it matters most.
+      const bRadius = bandRadii[i];
+      const curve = new UArchCurve(bRadius, legLength);
+      const geo = new THREE.TubeGeometry(curve, 64, tube, 12, false);
       addHandmadeWobble(geo, i * 1.7, tube * 0.015);
-      // Bake in vertical centering + this ring's own standoff from the
-      // wall (still flat), then curve it onto the actual cake wall.
-      geo.translate(0, archY, tube);
+      geo.translate(0, centerYOffset, tube);
       wrapGeometryToCylinder(geo, radius);
       const mat = new THREE.MeshStandardMaterial({
         color: RAINBOW_BAND_COLORS[i],
@@ -512,25 +564,14 @@ export function buildSunshinePlay(radius, height, colorHex, variant = 'rainbowAr
 
     group.add(rainbowGroup);
 
-    // Cloud puffs, centered exactly on the outermost band's own end-cap
-    // plane (x = ±its radius, z = tube — the ring's own standoff) so the
-    // cluster sits right over the flat cut end its Math.PI sweep leaves
-    // exposed, then curved onto the wall the same way everything above
-    // is, instead of floating near it in one flat plane. Scaled up well
-    // past the tube's own diameter (the previous 2.1× left the biggest
-    // puff smaller than the tube itself, which is why it barely grazed
-    // the end instead of wrapping around and covering it).
-    const cloudScale = tube * 4.0;
-    const leftCloud = buildCloudPuff(-outerRadius, archY, tube, radius, cloudScale);
+    // Multi-lobed cloud puffs centered over the leg midpoints (±legMidX)
+    // so they fully envelop and cover all 4 band cut ends.
+    const cloudFootY = -legLength + centerYOffset;
+    const leftCloud = buildCloudPuff(-legMidX, cloudFootY, tube, radius, legSpan, tube, height, true);
     group.add(leftCloud);
 
-    const rightCloud = buildCloudPuff(outerRadius, archY, tube, radius, cloudScale);
+    const rightCloud = buildCloudPuff(legMidX, cloudFootY, tube, radius, legSpan, tube, height, false);
     group.add(rightCloud);
-
-    // No group-level z push needed anymore — every vertex above already
-    // has its own correctly curved (radius + local standoff) position
-    // baked in by the wrap step, so the whole piece follows the cake's
-    // actual wall instead of sitting in one flat plane tangent to it.
   } else if (variant === 'starBurst') {
     // Star Burst: scattered buttercream stars hugging the cake side, respects colorHex
     const starBurst = buildStarBurst(radius, height, colorHex);
