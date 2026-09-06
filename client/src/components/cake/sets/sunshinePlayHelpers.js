@@ -41,19 +41,19 @@ function scatterStarPositions(count) {
   // while remaining deterministic (same pattern every time)
   const seed = 54321; // changed seed for different random pattern
   const points = [];
-  
+
   // Simple linear congruential generator for deterministic randomness
   let current = seed;
   const seededRandom = () => {
     current = (current * 1103515245 + 12345) & 0x7fffffff;
     return current / 0x7fffffff;
   };
-  
+
   for (let i = 0; i < count; i++) {
     points.push({
-      angle:      seededRandom() * Math.PI * 2,
+      angle: seededRandom() * Math.PI * 2,
       heightFrac: seededRandom(),
-      sizeFrac:   seededRandom(),
+      sizeFrac: seededRandom(),
     });
   }
   return points;
@@ -67,13 +67,13 @@ function buildStarGeo(scale = 1) {
   const outerRadius = 0.15 * scale;
   const innerRadius = 0.07 * scale;
   const points = 5;
-  
+
   for (let i = 0; i < points * 2; i++) {
     const radius = i % 2 === 0 ? outerRadius : innerRadius;
     const angle = (i * Math.PI) / points - Math.PI / 2;
     const x = Math.cos(angle) * radius;
     const y = Math.sin(angle) * radius;
-    
+
     if (i === 0) {
       starShape.moveTo(x, y);
     } else {
@@ -81,7 +81,7 @@ function buildStarGeo(scale = 1) {
     }
   }
   starShape.closePath();
-  
+
   const extrudeSettings = {
     depth: 0.08 * scale, // thickness of the star
     bevelEnabled: true,
@@ -89,7 +89,7 @@ function buildStarGeo(scale = 1) {
     bevelSize: 0.02 * scale,
     bevelSegments: 2
   };
-  
+
   const geo = new THREE.ExtrudeGeometry(starShape, extrudeSettings);
   // No rotation needed - ExtrudeGeometry creates shape in XY plane, extruded along Z
   addHandmadeWobble(geo, 0, 0.003); // subtle wobble for hand-piped look
@@ -98,31 +98,31 @@ function buildStarGeo(scale = 1) {
 
 function buildStarBurst(radius, height, colorHex) {
   const group = new THREE.Group();
-  
+
   // Buttercream material for stars — slightly rough, soft buttercream look
   const mat = new THREE.MeshStandardMaterial({
     color: colorHex || '#FFFDF7',
     roughness: 0.7,
     metalness: 0,
   });
-  
+
   // Create reusable star geometry
   const starGeo = buildStarGeo(1);
-  
+
   // Calculate star count based on cake surface area
   const areaPerStar = 1.2; // reduced density - fewer stars
   const starCount = Math.max(40, Math.round((2 * Math.PI * radius * height) / areaPerStar));
-  
+
   const points = scatterStarPositions(starCount);
-  
+
   for (let i = 0; i < starCount; i++) {
     const { angle, heightFrac, sizeFrac } = points[i];
-    
+
     // Position star on the cake side with slight standoff
     const y = -height / 2 + height * 0.05 + heightFrac * height * 0.9;
     const scale = 0.8 + sizeFrac * 0.6; // varied sizes: 0.8–1.4
     const standoffRadius = radius + 0.02; // thin stars hug the wall closely
-    
+
     const star = new THREE.Mesh(starGeo, mat);
     star.position.set(
       Math.sin(angle) * standoffRadius,
@@ -130,7 +130,7 @@ function buildStarBurst(radius, height, colorHex) {
       Math.cos(angle) * standoffRadius
     );
     star.scale.setScalar(scale);
-    
+
     // Rotate star to face sideways (outward from cake center)
     // Calculate the outward normal from the cylinder center at this position
     const normal = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle)).normalize();
@@ -138,41 +138,15 @@ function buildStarBurst(radius, height, colorHex) {
     const up = new THREE.Vector3(0, 0, 1);
     const quaternion = new THREE.Quaternion().setFromUnitVectors(up, normal);
     star.setRotationFromQuaternion(quaternion);
-    
+
     star.castShadow = true;
     star.receiveShadow = true;
     group.add(star);
   }
-  
+
   return group;
 }
 
-// ─── Cloudy Chump (randomized clouds only) ─────────────────────────────────
-// Wide cloud shapes scattered around the cake side, no stars.
-// Uses seeded random for deterministic placement while looking organic.
-// Respects colorHex for buttercream coloring.
-
-function scatterCloudPositions(count) {
-  // Use a simple seeded random approach for organic cloud placement
-  const seed = 98765; // different seed for cloud pattern
-  const points = [];
-  
-  // Simple linear congruential generator for deterministic randomness
-  let current = seed;
-  const seededRandom = () => {
-    current = (current * 1103515245 + 12345) & 0x7fffffff;
-    return current / 0x7fffffff;
-  };
-  
-  for (let i = 0; i < count; i++) {
-    points.push({
-      angle:      seededRandom() * Math.PI * 2,
-      heightFrac: seededRandom(),
-      scale:      0.7 + seededRandom() * 0.6, // varied cloud sizes: 0.7–1.3
-    });
-  }
-  return points;
-}
 
 // Build a single cloud (no stars). Outline is hand-placed to match a
 // specific reference sketch, not procedurally generated like the rest of
@@ -242,18 +216,9 @@ function buildClosedSplineOutline(rawPoints, scale, samplesPerSegment = 16) {
 // `anchors` below — move a point to reshape that part of the outline,
 // add one for a new bump/notch, or delete one to merge two features.
 // Coordinates are roughly -1..1 in both axes before `scale` is applied.
-function buildCloud(scale = 1, colorHex = CLOUD_COLOR) {
-  const group = new THREE.Group();
-
-  const cloudMat = new THREE.MeshStandardMaterial({
-    color: colorHex || CLOUD_COLOR,
-    roughness: 0.6,
-    metalness: 0,
-  });
-
-  const anchors = [
+const CLOUD_ANCHORS = [
   // --- TOP OUTLINE (4 Distinct Circular Spheres Clumped Together) ---
-  
+
   // Base transition from bottom-left curve
   [-1.25, -0.10],
   [-1.22, 0.08],
@@ -299,75 +264,164 @@ function buildCloud(scale = 1, colorHex = CLOUD_COLOR) {
   [-1.18, -0.24],
 ];
 
-  const outline = buildClosedSplineOutline(anchors, scale);
-  const cloudShape = new THREE.Shape();
-  cloudShape.moveTo(outline[0].x, outline[0].y);
-  for (let i = 1; i < outline.length; i++) cloudShape.lineTo(outline[i].x, outline[i].y);
-  cloudShape.closePath(); // outline[last] === outline[0] already, so this closes a zero-length gap, not a visible facet
+// Wraps geometry vertices onto the cylinder while preserving sharp 90-degree
+// edges and flat faces (rotates analytical normals around the cylinder axis
+// instead of computeVertexNormals(), which blurs across sharp edges and creates creases).
+function wrapGeometryPreservingNormals(geo, wallRadius) {
+  const pos = geo.attributes.position;
+  const norm = geo.attributes.normal;
+  const v = new THREE.Vector3();
+  const n = new THREE.Vector3();
 
-  const cloudExtrudeSettings = {
-    depth: 0.05 * scale,
-    bevelEnabled: true,
-    // Rounder bevel than a typical piped-outline shape needs elsewhere in
-    // this file — a bigger bevel is what actually reads as a "soft edge"
-    // in the render, on top of the closed-curve fix above.
-    bevelThickness: 0.03 * scale,
-    bevelSize: 0.03 * scale,
-    bevelSegments: 3,
-  };
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i);
+    n.fromBufferAttribute(norm, i);
 
-  const cloudGeo = new THREE.ExtrudeGeometry(cloudShape, cloudExtrudeSettings);
-  // WOBBLE CONTROL: the "0.002 * scale" below is the wobble amount (how
-  // far vertices get displaced — bigger number = bumpier/more textured
-  // surface). The `0` before it is the seed offset (shifts the wobble
-  // pattern; only matters if you want two clouds built side by side to
-  // wobble differently — irrelevant here since only one cloud shape is
-  // built at a time). The wave frequency itself (how many ripples appear
-  // across the shape, independent of how deep they are) lives in
-  // addHandmadeWobble's own definition near the top of this file — the
-  // "9" and "7" multipliers on v.x/v.y there.
-  addHandmadeWobble(cloudGeo, 0, 0.000 * scale);
+    const theta = v.x / wallRadius;
+    const effR = wallRadius + v.z;
 
-  const cloud = new THREE.Mesh(cloudGeo, cloudMat);
-  cloud.castShadow = true;
-  cloud.receiveShadow = true;
-  group.add(cloud);
+    pos.setXYZ(i, effR * Math.sin(theta), v.y, effR * Math.cos(theta));
 
-  return group;
+    const nx = n.x * Math.cos(theta) + n.z * Math.sin(theta);
+    const ny = n.y;
+    const nz = -n.x * Math.sin(theta) + n.z * Math.cos(theta);
+    norm.setXYZ(i, nx, ny, nz);
+  }
+  norm.needsUpdate = true;
 }
+
+// ─── Cloudy Chump (fluffy 3D clouds with flat look) ──────────────────────────
+// Fluffy 3D clouds scattered around the cake side wall.
+// Curvature wraps flush onto the cake cylinder with zero gaps or sticking-out planks.
+// Staggered 2-row placement guarantees zero collisions/overlapping.
+// Flat front face with crisp 90-degree perpendicular side walls (no bevel bulges).
+// Respects colorHex for buttercream coloring.
+
+function createFluffyCloudShapeA(scale = 1) {
+  const shape = new THREE.Shape();
+  shape.moveTo(-0.85 * scale, -0.20 * scale);
+  // Left lobe
+  shape.bezierCurveTo(
+    -1.15 * scale, -0.10 * scale,
+    -1.15 * scale, 0.30 * scale,
+    -0.75 * scale, 0.32 * scale
+  );
+  // Mid-left lobe
+  shape.bezierCurveTo(
+    -0.70 * scale, 0.55 * scale,
+    -0.35 * scale, 0.60 * scale,
+    -0.15 * scale, 0.48 * scale
+  );
+  // Center-top main lobe
+  shape.bezierCurveTo(
+    -0.05 * scale, 0.68 * scale,
+    0.35 * scale, 0.68 * scale,
+    0.48 * scale, 0.42 * scale
+  );
+  // Right lobe
+  shape.bezierCurveTo(
+    0.80 * scale, 0.45 * scale,
+    1.05 * scale, 0.15 * scale,
+    0.85 * scale, -0.15 * scale
+  );
+  // Bottom undulating curve connecting smoothly back to start
+  shape.bezierCurveTo(
+    0.60 * scale, -0.32 * scale,
+    0.25 * scale, -0.32 * scale,
+    0.05 * scale, -0.22 * scale
+  );
+  shape.bezierCurveTo(
+    -0.15 * scale, -0.30 * scale,
+    -0.55 * scale, -0.32 * scale,
+    -0.85 * scale, -0.20 * scale
+  );
+  return shape;
+}
+
+function createFluffyCloudShapeB(scale = 1) {
+  const shape = new THREE.Shape();
+  shape.moveTo(-0.75 * scale, -0.18 * scale);
+  // Left lobe
+  shape.bezierCurveTo(
+    -1.05 * scale, -0.05 * scale,
+    -1.00 * scale, 0.38 * scale,
+    -0.60 * scale, 0.42 * scale
+  );
+  // Center tall lobe
+  shape.bezierCurveTo(
+    -0.45 * scale, 0.72 * scale,
+    0.15 * scale, 0.72 * scale,
+    0.35 * scale, 0.45 * scale
+  );
+  // Right lobe
+  shape.bezierCurveTo(
+    0.70 * scale, 0.45 * scale,
+    0.95 * scale, 0.10 * scale,
+    0.75 * scale, -0.15 * scale
+  );
+  // Bottom undulating curve
+  shape.bezierCurveTo(
+    0.50 * scale, -0.28 * scale,
+    0.15 * scale, -0.28 * scale,
+    -0.05 * scale, -0.20 * scale
+  );
+  shape.bezierCurveTo(
+    -0.25 * scale, -0.28 * scale,
+    -0.55 * scale, -0.28 * scale,
+    -0.75 * scale, -0.18 * scale
+  );
+  return shape;
+}
+
+// Curated 7-piece asymmetrical layout around the cake cylinder:
+// [angleDeg, yFrac, sizeMul, variant]
+// Distributed organically across heights and angles without forming a grid or rows.
+const CLOUDY_CHUMP_SPECS = [
+  { angleDeg: 12, yFrac: 0.22, sizeMul: 1.08, variant: 'A' }, // front-right, high
+  { angleDeg: 68, yFrac: -0.24, sizeMul: 0.95, variant: 'B' }, // right, low
+  { angleDeg: 122, yFrac: 0.15, sizeMul: 1.12, variant: 'A' }, // back-right, mid-high
+  { angleDeg: 175, yFrac: -0.18, sizeMul: 0.90, variant: 'B' }, // back, mid-low
+  { angleDeg: 226, yFrac: 0.25, sizeMul: 1.05, variant: 'A' }, // back-left, high
+  { angleDeg: 278, yFrac: -0.08, sizeMul: 1.15, variant: 'B' }, // left, mid
+  { angleDeg: 326, yFrac: -0.26, sizeMul: 0.92, variant: 'A' }, // front-left, low
+];
 
 function buildCloudyChump(radius, height, colorHex) {
   const group = new THREE.Group();
-  
-  // Calculate cloud count - reduced since clouds are wide
-  const areaPerCloud = 3; // larger area per cloud since they're wide
-  const cloudCount = Math.max(12, Math.round((1 * Math.PI * radius * height) / areaPerCloud));
-  
-  const points = scatterCloudPositions(cloudCount);
-  
-  for (let i = 0; i < cloudCount; i++) {
-    const { angle, heightFrac, scale } = points[i];
-    
-    // Position cloud on the cake side
-    const y = -height / 2 + height * 0.05 + heightFrac * height * 0.9;
-    const standoffRadius = radius + 0.05; // clouds stand out slightly from wall
-    
-    const cloud = buildCloud(scale, colorHex);
-    cloud.position.set(
-      Math.sin(angle) * standoffRadius,
-      y,
-      Math.cos(angle) * standoffRadius
-    );
-    
-    // Rotate cloud to face outward from cake center
-    const normal = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle)).normalize();
-    const up = new THREE.Vector3(0, 0, 1);
-    const quaternion = new THREE.Quaternion().setFromUnitVectors(up, normal);
-    cloud.setRotationFromQuaternion(quaternion);
-    
-    group.add(cloud);
+
+  const cloudMat = new THREE.MeshStandardMaterial({
+    color: colorHex || CLOUD_COLOR,
+    roughness: 0.55,
+    metalness: 0.02,
+  });
+
+  // Generous cloud scale for bold, cute, visible fondant cloud cutouts
+  const baseScale = Math.min(0.85, height * 0.40);
+  const cloudDepth = 0.09; // 3D fondant thickness with flat look
+  const standoff = 0.002; // flush against the cake cylinder wall
+
+  for (let i = 0; i < CLOUDY_CHUMP_SPECS.length; i++) {
+    const spec = CLOUDY_CHUMP_SPECS[i];
+    const angle = (spec.angleDeg * Math.PI) / 180;
+    const y = spec.yFrac * height;
+    const scale = baseScale * spec.sizeMul;
+    const isB = spec.variant === 'B';
+
+    const tangentialX = angle * radius;
+    const shape = isB ? createFluffyCloudShapeB(scale) : createFluffyCloudShapeA(scale);
+    const geo = new THREE.ExtrudeGeometry(shape, {
+      depth: cloudDepth,
+      bevelEnabled: false,
+    });
+    geo.translate(tangentialX, y, standoff);
+    wrapGeometryPreservingNormals(geo, radius);
+
+    const mesh = new THREE.Mesh(geo, cloudMat);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    group.add(mesh);
   }
-  
+
   return group;
 }
 
@@ -408,48 +462,48 @@ class UArchCurve extends THREE.Curve {
   }
 }
 
-// Multi-lobed organic buttercream cloud cluster designed to fully cover and
-// envelop the cut ends of the rainbow bands at the base of the legs.
-// Each sphere center is mapped to the cake cylinder via wrapPointToCylinder
-// so the cloud curves flush against the cake surface.
-function buildCloudPuff(centerX, bottomY, centerZ, wallRadius, legSpan, tube, height, isLeft = false, colorHex = CLOUD_COLOR) {
-  const group = new THREE.Group();
+// 3D extruded fondant cloud with flat front face and crisp perpendicular side walls (no bevel, no bulges).
+// Sits over the cut ends of the rainbow bands like a 3D cut fondant piece.
+function buildFlatCloud(centerX, bottomY, wallRadius, scale, depth, zBack, isLeft = false, colorHex = CLOUD_COLOR) {
+  const outline = buildClosedSplineOutline(CLOUD_ANCHORS, scale, 3);
+  const xOffset = 0.057 * scale;
+  const yOffset = 0.193 * scale;
+
+  const shape = new THREE.Shape();
+  if (isLeft) {
+    const last = outline.length - 1;
+    shape.moveTo((outline[last].x - xOffset) * -1, outline[last].y - yOffset);
+    for (let i = last - 1; i >= 0; i--) {
+      shape.lineTo((outline[i].x - xOffset) * -1, outline[i].y - yOffset);
+    }
+  } else {
+    shape.moveTo(outline[0].x - xOffset, outline[0].y - yOffset);
+    for (let i = 1; i < outline.length; i++) {
+      shape.lineTo(outline[i].x - xOffset, outline[i].y - yOffset);
+    }
+  }
+  shape.closePath();
+
+  // Real 3D extrusion with NO bevel for clean, flat front and crisp perpendicular side walls
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: depth,
+    bevelEnabled: false,
+  });
+  geo.translate(centerX, bottomY, zBack);
+  wrapGeometryPreservingNormals(geo, wallRadius);
+
   const mat = new THREE.MeshStandardMaterial({
     color: colorHex || CLOUD_COLOR,
     roughness: 0.55,
     metalness: 0.02,
   });
 
-  const sign = isLeft ? -1 : 1;
-
-  // Rich organic cluster of 10 puffy lobes designed to envelop the rainbow ends
-  const puffs = [
-    // Front center lobes sitting proudly in front of the tubes
-    [0.0 * sign, 0.025 * height, 0.75 * tube, 0.22 * legSpan],
-    [0.0 * sign, -0.015 * height, 0.65 * tube, 0.24 * legSpan],
-    // Inner lobes (extending towards center of archway, covering green/yellow)
-    [-0.30 * legSpan * sign, 0.015 * height, 0.55 * tube, 0.21 * legSpan],
-    [-0.18 * legSpan * sign, 0.045 * height, 0.65 * tube, 0.19 * legSpan],
-    [-0.26 * legSpan * sign, -0.035 * height, 0.45 * tube, 0.18 * legSpan],
-    // Outer lobes (extending towards outer cake wall, covering orange/red)
-    [0.30 * legSpan * sign, 0.015 * height, 0.55 * tube, 0.22 * legSpan],
-    [0.18 * legSpan * sign, 0.045 * height, 0.65 * tube, 0.20 * legSpan],
-    [0.26 * legSpan * sign, -0.035 * height, 0.45 * tube, 0.19 * legSpan],
-    // Base grounding lobes tucked underneath to seal against cake
-    [-0.10 * legSpan * sign, -0.045 * height, 0.15 * tube, 0.18 * legSpan],
-    [0.10 * legSpan * sign, -0.045 * height, 0.15 * tube, 0.18 * legSpan],
-  ];
-
-  for (const [ox, oy, oz, r] of puffs) {
-    const p = wrapPointToCylinder(centerX + ox, bottomY + oy, centerZ + oz, wallRadius);
-    const sphere = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), mat);
-    sphere.position.copy(p);
-    sphere.castShadow = true;
-    sphere.receiveShadow = true;
-    group.add(sphere);
-  }
-  return group;
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
 }
+
 
 // ─── Cylinder wrap ─────────────────────────────────────────────────────────
 // The rainbow bands/backers/clouds are all authored flat, in a "tangential
@@ -564,13 +618,16 @@ export function buildSunshinePlay(radius, height, colorHex, variant = 'rainbowAr
 
     group.add(rainbowGroup);
 
-    // Multi-lobed cloud puffs centered over the leg midpoints (±legMidX)
-    // so they fully envelop and cover all 4 band cut ends.
+    // 3D extruded fondant cloud puffs (clean flat front face and crisp perpendicular side walls, like cut fondant)
+    // centered over the leg midpoints (±legMidX) to cleanly cover all 4 band cut ends.
+    const cloudScale = (legSpan * 1.35) / 2.62;
+    const cloudDepth = 0.22; // sleek 3D plaque thickness (~10-12% of width)
+    const zBack = tube * 2 + 0.015 - cloudDepth;
     const cloudFootY = -legLength + centerYOffset;
-    const leftCloud = buildCloudPuff(-legMidX, cloudFootY, tube, radius, legSpan, tube, height, true);
+    const leftCloud = buildFlatCloud(-legMidX, cloudFootY, radius, cloudScale, cloudDepth, zBack, true);
     group.add(leftCloud);
 
-    const rightCloud = buildCloudPuff(legMidX, cloudFootY, tube, radius, legSpan, tube, height, false);
+    const rightCloud = buildFlatCloud(legMidX, cloudFootY, radius, cloudScale, cloudDepth, zBack, false);
     group.add(rightCloud);
   } else if (variant === 'starBurst') {
     // Star Burst: scattered buttercream stars hugging the cake side, respects colorHex
