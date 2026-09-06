@@ -9,7 +9,6 @@ import {
   SUNSHINE_PLAY_SETS,
   VICTORIAN_LAMBETH_SETS,
 } from '@/lib/cakeConfig';
-import { FLAVORS, FLAVOR_ORDER } from '@/lib/cakeFlavors';
 import SugarColorSection from './SugarColorSection';
 
 export default function SideSection({ side, onChange, sugarColor, onSugarColorChange }) {
@@ -35,9 +34,6 @@ export default function SideSection({ side, onChange, sugarColor, onSugarColorCh
 
   const selectSunshinePlayVariant = (setId) =>
     onChange({ ...side, mode: 'sunshinePlay', sunshinePlay: { ...side.sunshinePlay, setId } });
-
-  const selectSunshinePlayFlavor = (flavorId) =>
-    onChange({ ...side, mode: 'sunshinePlay', sunshinePlay: { ...side.sunshinePlay, flavorId } });
 
   const selectVictorianLambethVariant = (setId) =>
     onChange({ ...side, mode: 'victorianLambeth', victorianLambeth: { ...side.victorianLambeth, setId } });

@@ -148,121 +148,7 @@ function buildStarBurst(radius, height, colorHex) {
 }
 
 
-// Build a single cloud (no stars). Outline is hand-placed to match a
-// specific reference sketch, not procedurally generated like the rest of
-// this file's scatters — the whole point of this shape is the asymmetry:
-// four TOP bumps that each start and end at different points and are
-// different widths/heights (not a repeating scallop) — smallest bump
-// nearest the left cusp, tallest just right of center, a second tall bump
-// close behind it, then a small one tucked against the right cusp —
-// separated by notches of different depths (deep after bump 1, barely
-// there between bumps 2–3, shallow after bump 3). The BOTTOM has its own
-// waviness, but it's wide, shallow, and blends together far more than the
-// top does — a couple of very broad, barely-differentiated undulations
-// rather than separate lobes. Both side "tips" are small cusp notches,
-// not points sticking straight out.
-//
-// Built by fitting a spline through hand-placed anchor points (Shape's
-// built-in splineThru — a Catmull-Rom curve) rather than hand-tuned
-// bezier handles: it's a much more reliable way to guarantee the curve
-// actually passes through each intended peak/notch at the intended
-// height, instead of fighting control-point math to get there. Verified
-// by rendering this exact point set to a flat SVG preview and comparing
-// it against the reference sketch before wiring it in here.
-// Samples a smoothly CLOSED Catmull-Rom loop through `rawPoints`.
-// THREE.SplineCurve (the 2D spline) has no built-in "closed" option, and
-// Shape's convenience method (moveTo + splineThru + closePath) doesn't
-// fake one either — closePath() draws a flat, straight LineCurve from the
-// last spline point back to the start instead of curving into it. For a
-// widely-spaced pair of points (like the last bottom anchor back to the
-// left cusp here) that straight segment is long enough to read as an
-// actual flat facet cutting across the shape — that's what the sharp
-// edge was. Fixed by padding the point list with the last/first points
-// (so the curve has correct tangent info right at the seam) and sampling
-// only the real range plus the one wrap-around segment back to the start,
-// so every part of the outline — including the seam — is genuine curve,
-// not a straight line pretending to be one.
-function buildClosedSplineOutline(rawPoints, scale, samplesPerSegment = 16) {
-  const n = rawPoints.length;
-  const pts = rawPoints.map(([x, y]) => new THREE.Vector2(x * scale, y * scale));
-  const padded = [pts[n - 1], ...pts, pts[0]];
-  const curve = new THREE.SplineCurve(padded);
-  const knotSpacing = 1 / (padded.length - 1);
-  const startT = knotSpacing;   // first real point
-  const endT = 1;               // wraps exactly back to the first real point
-  const totalSamples = n * samplesPerSegment;
-  const outline = [];
-  for (let i = 0; i <= totalSamples; i++) {
-    outline.push(curve.getPoint(startT + (endT - startT) * (i / totalSamples)));
-  }
-  return outline;
-}
 
-// Build a single cloud (no stars). Outline is hand-placed to match a
-// specific reference sketch, not procedurally generated like the rest of
-// this file's scatters — the whole point of this shape is the asymmetry:
-// four TOP bumps that each start and end at different points and are
-// different widths/heights (not a repeating scallop) — smallest bump
-// nearest the left cusp, tallest just right of center, a second tall bump
-// close behind it, then a small one tucked against the right cusp —
-// separated by notches of different depths (deep after bump 1, barely
-// there between bumps 2–3, shallow after bump 3). The BOTTOM has its own
-// waviness, but it's wide, shallow, and blends together far more than the
-// top does — a couple of very broad, barely-differentiated undulations
-// rather than separate lobes. Both side "tips" are small, gently rounded
-// cusps, not sharp points or flat facets.
-//
-// EDITING THIS SHAPE: every peak, notch, and cusp is one [x, y] pair in
-// `anchors` below — move a point to reshape that part of the outline,
-// add one for a new bump/notch, or delete one to merge two features.
-// Coordinates are roughly -1..1 in both axes before `scale` is applied.
-const CLOUD_ANCHORS = [
-  // --- TOP OUTLINE (4 Distinct Circular Spheres Clumped Together) ---
-
-  // Base transition from bottom-left curve
-  [-1.25, -0.10],
-  [-1.22, 0.08],
-
-  // CIRCLE 1 (Far Left - Small Circular Sphere)
-  [-1.18, 0.22],   // Vertical left side
-  [-1.08, 0.36],   // Round apex top
-  [-0.98, 0.36],   // Round apex top (flattens peak into a circle)
-  [-0.88, 0.20],   // Vertical right side
-  [-0.82, 0.18],   // Notch between Circle 1 & 2
-
-  // CIRCLE 2 (Mid Left - Medium Circular Sphere)
-  [-0.78, 0.42],   // Vertical left side
-  [-0.64, 0.68],   // Round apex top
-  [-0.50, 0.68],   // Round apex top
-  [-0.36, 0.42],   // Vertical right side
-  [-0.28, 0.38],   // Notch between Circle 2 & 3
-
-  // CIRCLE 3 (Center - Large Dominant Circular Sphere)
-  [-0.18, 0.62],   // Vertical left side
-  [0.08, 0.92],    // Round apex top
-  [0.38, 0.92],    // Round apex top
-  [0.64, 0.62],    // Vertical right side
-  [0.72, 0.50],    // Notch between Circle 3 & 4
-
-  // CIRCLE 4 (Far Right - Medium-Right Circular Sphere)
-  [0.82, 0.60],    // Vertical left side
-  [0.98, 0.72],    // Round apex top
-  [1.12, 0.72],    // Round apex top
-  [1.26, 0.44],    // Vertical right side
-
-  // Far Right Edge Transition
-  [1.36, 0.12],
-  [1.32, -0.18],
-
-  // --- BOTTOM OUTLINE (Smooth Deep Baseline) ---
-  [1.05, -0.38],
-  [0.65, -0.48],
-  [0.10, -0.56],
-  [-0.20, -0.56],
-  [-0.65, -0.46],
-  [-1.02, -0.36],
-  [-1.18, -0.24],
-];
 
 // Wraps geometry vertices onto the cylinder while preserving sharp 90-degree
 // edges and flat faces (rotates analytical normals around the cylinder axis
@@ -297,44 +183,79 @@ function wrapGeometryPreservingNormals(geo, wallRadius) {
 // Flat front face with crisp 90-degree perpendicular side walls (no bevel bulges).
 // Respects colorHex for buttercream coloring.
 
-function createFluffyCloudShapeA(scale = 1) {
+function createFluffyCloudShapeA(scale = 1, mirrored = false) {
   const shape = new THREE.Shape();
-  shape.moveTo(-0.85 * scale, -0.20 * scale);
-  // Left lobe
-  shape.bezierCurveTo(
-    -1.15 * scale, -0.10 * scale,
-    -1.15 * scale, 0.30 * scale,
-    -0.75 * scale, 0.32 * scale
-  );
-  // Mid-left lobe
-  shape.bezierCurveTo(
-    -0.70 * scale, 0.55 * scale,
-    -0.35 * scale, 0.60 * scale,
-    -0.15 * scale, 0.48 * scale
-  );
-  // Center-top main lobe
-  shape.bezierCurveTo(
-    -0.05 * scale, 0.68 * scale,
-    0.35 * scale, 0.68 * scale,
-    0.48 * scale, 0.42 * scale
-  );
-  // Right lobe
-  shape.bezierCurveTo(
-    0.80 * scale, 0.45 * scale,
-    1.05 * scale, 0.15 * scale,
-    0.85 * scale, -0.15 * scale
-  );
-  // Bottom undulating curve connecting smoothly back to start
-  shape.bezierCurveTo(
-    0.60 * scale, -0.32 * scale,
-    0.25 * scale, -0.32 * scale,
-    0.05 * scale, -0.22 * scale
-  );
-  shape.bezierCurveTo(
-    -0.15 * scale, -0.30 * scale,
-    -0.55 * scale, -0.32 * scale,
-    -0.85 * scale, -0.20 * scale
-  );
+  if (!mirrored) {
+    shape.moveTo(-0.85 * scale, -0.20 * scale);
+    // Left lobe
+    shape.bezierCurveTo(
+      -1.15 * scale, -0.10 * scale,
+      -1.15 * scale, 0.30 * scale,
+      -0.75 * scale, 0.32 * scale
+    );
+    // Mid-left lobe
+    shape.bezierCurveTo(
+      -0.70 * scale, 0.55 * scale,
+      -0.35 * scale, 0.60 * scale,
+      -0.15 * scale, 0.48 * scale
+    );
+    // Center-top main lobe
+    shape.bezierCurveTo(
+      -0.05 * scale, 0.68 * scale,
+      0.35 * scale, 0.68 * scale,
+      0.48 * scale, 0.42 * scale
+    );
+    // Right lobe
+    shape.bezierCurveTo(
+      0.80 * scale, 0.45 * scale,
+      1.05 * scale, 0.15 * scale,
+      0.85 * scale, -0.15 * scale
+    );
+    // Bottom undulating curve connecting smoothly back to start
+    shape.bezierCurveTo(
+      0.60 * scale, -0.32 * scale,
+      0.25 * scale, -0.32 * scale,
+      0.05 * scale, -0.22 * scale
+    );
+    shape.bezierCurveTo(
+      -0.15 * scale, -0.30 * scale,
+      -0.55 * scale, -0.32 * scale,
+      -0.85 * scale, -0.20 * scale
+    );
+  } else {
+    // Horizontally mirrored (x -> -x, reversing point traversal to maintain CW winding)
+    shape.moveTo(0.85 * scale, -0.20 * scale);
+    shape.bezierCurveTo(
+      0.55 * scale, -0.32 * scale,
+      0.15 * scale, -0.30 * scale,
+      -0.05 * scale, -0.22 * scale
+    );
+    shape.bezierCurveTo(
+      -0.25 * scale, -0.32 * scale,
+      -0.60 * scale, -0.32 * scale,
+      -0.85 * scale, -0.15 * scale
+    );
+    shape.bezierCurveTo(
+      -1.05 * scale, 0.15 * scale,
+      -0.80 * scale, 0.45 * scale,
+      -0.48 * scale, 0.42 * scale
+    );
+    shape.bezierCurveTo(
+      -0.35 * scale, 0.68 * scale,
+      0.05 * scale, 0.68 * scale,
+      0.15 * scale, 0.48 * scale
+    );
+    shape.bezierCurveTo(
+      0.35 * scale, 0.60 * scale,
+      0.70 * scale, 0.55 * scale,
+      0.75 * scale, 0.32 * scale
+    );
+    shape.bezierCurveTo(
+      1.15 * scale, 0.30 * scale,
+      1.15 * scale, -0.10 * scale,
+      0.85 * scale, -0.20 * scale
+    );
+  }
   return shape;
 }
 
@@ -462,34 +383,21 @@ class UArchCurve extends THREE.Curve {
   }
 }
 
-// 3D extruded fondant cloud with flat front face and crisp perpendicular side walls (no bevel, no bulges).
+// 3D extruded fondant cloud puff with flat front face and crisp perpendicular side walls (no bevel, no bulges).
 // Sits over the cut ends of the rainbow bands like a 3D cut fondant piece.
+// Uses the same cute, fluffy cloud shape as Cloudy Chump.
 function buildFlatCloud(centerX, bottomY, wallRadius, scale, depth, zBack, isLeft = false, colorHex = CLOUD_COLOR) {
-  const outline = buildClosedSplineOutline(CLOUD_ANCHORS, scale, 3);
-  const xOffset = 0.057 * scale;
-  const yOffset = 0.193 * scale;
-
-  const shape = new THREE.Shape();
-  if (isLeft) {
-    const last = outline.length - 1;
-    shape.moveTo((outline[last].x - xOffset) * -1, outline[last].y - yOffset);
-    for (let i = last - 1; i >= 0; i--) {
-      shape.lineTo((outline[i].x - xOffset) * -1, outline[i].y - yOffset);
-    }
-  } else {
-    shape.moveTo(outline[0].x - xOffset, outline[0].y - yOffset);
-    for (let i = 1; i < outline.length; i++) {
-      shape.lineTo(outline[i].x - xOffset, outline[i].y - yOffset);
-    }
-  }
-  shape.closePath();
+  // Left foot has wider lobes facing outward (unmirrored); right foot is mirrored so wider lobes face outward
+  const isMirrored = !isLeft;
+  const shape = createFluffyCloudShapeA(scale, isMirrored);
+  const xOffset = (isMirrored ? 0.071 : -0.071) * scale;
 
   // Real 3D extrusion with NO bevel for clean, flat front and crisp perpendicular side walls
   const geo = new THREE.ExtrudeGeometry(shape, {
     depth: depth,
     bevelEnabled: false,
   });
-  geo.translate(centerX, bottomY, zBack);
+  geo.translate(centerX - xOffset, bottomY, zBack);
   wrapGeometryPreservingNormals(geo, wallRadius);
 
   const mat = new THREE.MeshStandardMaterial({
@@ -557,7 +465,7 @@ function addHandmadeWobble(geo, seedOffset, amount = 0.006) {
 
 // Builds a single complete rainbow arc with its 4 color bands and 2 fondant cloud feet,
 // wrapped flush to the cake cylinder at the specified radius.
-function buildSingleRainbowArc(radius, height, scale = 1) {
+function buildSingleRainbowArc(radius, height, scale = 1, colorHex = CLOUD_COLOR) {
   const arcGroup = new THREE.Group();
   const effectiveHeight = height * scale;
 
@@ -569,7 +477,7 @@ function buildSingleRainbowArc(radius, height, scale = 1) {
   const outerRadius = effectiveHeight * 0.29; // generous outer radius for a wide, expansive arch
   const bandWidth = effectiveHeight * 0.050; // center-to-center band spacing
   const tube = bandWidth * 0.52; // tube radius (ensures seamless touching between neighboring bands)
-  const legLength = effectiveHeight * 0.065; // subtle vertical leg extension into the clouds
+  const legLength = effectiveHeight * 0.050; // subtle vertical leg extension into the clouds
 
   const bandRadii = [];
   for (let i = 0; i < bandCount; i++) {
@@ -610,19 +518,224 @@ function buildSingleRainbowArc(radius, height, scale = 1) {
 
   arcGroup.add(rainbowGroup);
 
-  // 3D extruded fondant cloud puffs (clean flat front face and crisp perpendicular side walls, like cut fondant)
+  // 3D extruded fluffy fondant cloud puffs (matching Cloudy Chump's shape)
   // centered over the leg midpoints (±legMidX) to cleanly cover all 4 band cut ends.
-  const cloudScale = (legSpan * 1.35) / 2.62;
-  const cloudDepth = 0.22 * scale; // sleek 3D plaque thickness (~10-12% of width)
-  const zBack = tube * 2 + 0.015 - cloudDepth;
-  const cloudFootY = -legLength + centerYOffset;
-  const leftCloud = buildFlatCloud(-legMidX, cloudFootY, radius, cloudScale, cloudDepth, zBack, true);
+  const cloudScale = (legSpan * 1.68) / 1.985;
+  const cloudDepth = 0.24 * scale; // sleek 3D plaque thickness (~10-12% of width)
+  const zBack = tube * 2 + 0.048 - cloudDepth;
+  const cloudFootY = -legLength + centerYOffset + 0.015 * effectiveHeight;
+  const leftCloud = buildFlatCloud(-legMidX, cloudFootY, radius, cloudScale, cloudDepth, zBack, true, colorHex);
   arcGroup.add(leftCloud);
 
-  const rightCloud = buildFlatCloud(legMidX, cloudFootY, radius, cloudScale, cloudDepth, zBack, false);
+  const rightCloud = buildFlatCloud(legMidX, cloudFootY, radius, cloudScale, cloudDepth, zBack, false, colorHex);
   arcGroup.add(rightCloud);
 
   return arcGroup;
+}
+
+// ─── Rainbow Champ (combination of Rainbow Arc and Cloudy Champ) ─────────────
+// Features rainbow arcs and scattered 3D fluffy clouds around the cake cylinder.
+
+const RAINBOW_CHAMP_ARCS = [
+  { angleDeg: 0,   yFrac:  0.00, scale: 1.00 }, // Front center
+  { angleDeg: 165, yFrac:  0.06, scale: 0.90 }, // Back-right, slightly higher
+];
+
+const RAINBOW_CHAMP_CLOUDS = [
+  { angleDeg: 50,  yFrac:  0.22, sizeMul: 1.05, variant: 'A' }, // Front-right, high
+  { angleDeg: 105, yFrac: -0.22, sizeMul: 0.95, variant: 'B' }, // Right side, low
+  { angleDeg: 220, yFrac: -0.18, sizeMul: 0.92, variant: 'A' }, // Back-left, mid-low
+  { angleDeg: 265, yFrac:  0.20, sizeMul: 1.10, variant: 'B' }, // Left side, high
+  { angleDeg: 315, yFrac: -0.12, sizeMul: 0.96, variant: 'A' }, // Front-left, mid-low
+];
+
+function buildRainbowChamp(radius, height, colorHex) {
+  const group = new THREE.Group();
+
+  // 1. Add the Rainbow Arcs
+  for (const spec of RAINBOW_CHAMP_ARCS) {
+    const arc = buildSingleRainbowArc(radius, height, spec.scale, colorHex);
+    arc.rotation.y = (spec.angleDeg * Math.PI) / 180;
+    arc.position.y = spec.yFrac * height;
+    group.add(arc);
+  }
+
+  // 2. Add the scattered Cloudy Champ clouds
+  const cloudMat = new THREE.MeshStandardMaterial({
+    color: colorHex || CLOUD_COLOR,
+    roughness: 0.55,
+    metalness: 0.02,
+  });
+
+  const baseScale = Math.min(0.85, height * 0.38);
+  const cloudDepth = 0.09;
+  const standoff = 0.002;
+
+  for (let i = 0; i < RAINBOW_CHAMP_CLOUDS.length; i++) {
+    const spec = RAINBOW_CHAMP_CLOUDS[i];
+    const angle = (spec.angleDeg * Math.PI) / 180;
+    const y = spec.yFrac * height;
+    const scale = baseScale * spec.sizeMul;
+    const isB = spec.variant === 'B';
+
+    const tangentialX = angle * radius;
+    const shape = isB ? createFluffyCloudShapeB(scale) : createFluffyCloudShapeA(scale);
+    const geo = new THREE.ExtrudeGeometry(shape, {
+      depth: cloudDepth,
+      bevelEnabled: false,
+    });
+    geo.translate(tangentialX, y, standoff);
+    wrapGeometryPreservingNormals(geo, radius);
+
+    const mesh = new THREE.Mesh(geo, cloudMat);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    group.add(mesh);
+  }
+
+  return group;
+}
+
+// ─── Starry Rainbow (Rainbow Arc + Cloudy Champ + Star Burst) ───────────────
+// A dreamscape combining rainbow arcs, 3D fluffy clouds, and twinkling stars.
+
+function buildStarryRainbow(radius, height, colorHex) {
+  const group = new THREE.Group();
+
+  // 1. Rainbow Arcs
+  for (const spec of RAINBOW_CHAMP_ARCS) {
+    const arc = buildSingleRainbowArc(radius, height, spec.scale, colorHex);
+    arc.rotation.y = (spec.angleDeg * Math.PI) / 180;
+    arc.position.y = spec.yFrac * height;
+    group.add(arc);
+  }
+
+  // 2. Cloudy Champ Clouds
+  const cloudMat = new THREE.MeshStandardMaterial({
+    color: colorHex || CLOUD_COLOR,
+    roughness: 0.55,
+    metalness: 0.02,
+  });
+
+  const baseScale = Math.min(0.85, height * 0.38);
+  const cloudDepth = 0.09;
+  const cloudStandoff = 0.002;
+
+  for (let i = 0; i < RAINBOW_CHAMP_CLOUDS.length; i++) {
+    const spec = RAINBOW_CHAMP_CLOUDS[i];
+    const angle = (spec.angleDeg * Math.PI) / 180;
+    const y = spec.yFrac * height;
+    const scale = baseScale * spec.sizeMul;
+    const isB = spec.variant === 'B';
+
+    const tangentialX = angle * radius;
+    const shape = isB ? createFluffyCloudShapeB(scale) : createFluffyCloudShapeA(scale);
+    const geo = new THREE.ExtrudeGeometry(shape, {
+      depth: cloudDepth,
+      bevelEnabled: false,
+    });
+    geo.translate(tangentialX, y, cloudStandoff);
+    wrapGeometryPreservingNormals(geo, radius);
+
+    const mesh = new THREE.Mesh(geo, cloudMat);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    group.add(mesh);
+  }
+
+  // 3. Twinkling Star Burst Stars scattered in the open sky areas
+  const starMat = new THREE.MeshStandardMaterial({
+    color: colorHex || CLOUD_COLOR,
+    roughness: 0.7,
+    metalness: 0,
+  });
+
+  const starGeo = buildStarGeo(1);
+  const standoffRadius = radius + 0.02;
+
+  // Build obstacle bounding boxes (rainbows and clouds) so stars don't collide with them
+  const obstacles = [];
+  for (const a of RAINBOW_CHAMP_ARCS) {
+    obstacles.push({
+      angle: (a.angleDeg * Math.PI) / 180,
+      y: a.yFrac * height,
+      halfW: (1.25 * a.scale) / 2 + 0.16,
+      halfH: (0.70 * a.scale) / 2 + 0.12,
+    });
+  }
+  for (const c of RAINBOW_CHAMP_CLOUDS) {
+    const scale = baseScale * c.sizeMul;
+    obstacles.push({
+      angle: (c.angleDeg * Math.PI) / 180,
+      y: c.yFrac * height,
+      halfW: ((c.variant === 'B' ? 1.35 : 1.50) * scale) / 2 + 0.14,
+      halfH: (0.70 * scale) / 2 + 0.10,
+    });
+  }
+
+  // Seeded deterministic scattering
+  let seed = 839201;
+  const rand = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+
+  const stars = [];
+  const targetStars = Math.max(18, Math.round(24 * (radius / 2.5) * (height / 1.7)));
+
+  for (let attempt = 0; attempt < 600 && stars.length < targetStars; attempt++) {
+    const angle = rand() * Math.PI * 2;
+    const y = (-0.38 + rand() * 0.76) * height;
+
+    let collides = false;
+    for (const obs of obstacles) {
+      let dTheta = Math.abs(angle - obs.angle);
+      if (dTheta > Math.PI) dTheta = 2 * Math.PI - dTheta;
+      const arcDist = dTheta * radius;
+      const dy = Math.abs(y - obs.y);
+      if (arcDist < obs.halfW && dy < obs.halfH) {
+        collides = true;
+        break;
+      }
+    }
+
+    if (!collides) {
+      for (const s of stars) {
+        let dTheta = Math.abs(angle - s.angle);
+        if (dTheta > Math.PI) dTheta = 2 * Math.PI - dTheta;
+        const arcDist = dTheta * radius;
+        const dy = Math.abs(y - s.y);
+        if (Math.hypot(arcDist, dy) < 0.38) {
+          collides = true;
+          break;
+        }
+      }
+    }
+
+    if (!collides) {
+      const starScale = 0.65 + rand() * 0.50;
+      stars.push({ angle, y, scale: starScale });
+
+      const star = new THREE.Mesh(starGeo, starMat);
+      star.position.set(
+        Math.sin(angle) * standoffRadius,
+        y,
+        Math.cos(angle) * standoffRadius
+      );
+      star.scale.setScalar(starScale);
+
+      const normal = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle)).normalize();
+      const up = new THREE.Vector3(0, 0, 1);
+      const quaternion = new THREE.Quaternion().setFromUnitVectors(up, normal);
+      star.setRotationFromQuaternion(quaternion);
+
+      star.castShadow = true;
+      star.receiveShadow = true;
+      group.add(star);
+    }
+  }
+
+  return group;
 }
 
 /**
@@ -645,7 +758,7 @@ export function buildSunshinePlay(radius, height, colorHex, variant = 'rainbowAr
     ];
 
     for (const spec of RAINBOW_COPIES) {
-      const arc = buildSingleRainbowArc(radius, height, spec.scale);
+      const arc = buildSingleRainbowArc(radius, height, spec.scale, colorHex);
       arc.rotation.y = (spec.angleDeg * Math.PI) / 180;
       arc.position.y = spec.yFrac * height;
       group.add(arc);
@@ -658,6 +771,14 @@ export function buildSunshinePlay(radius, height, colorHex, variant = 'rainbowAr
     // Cloudy Chump: randomized clouds only, respects colorHex
     const cloudyChump = buildCloudyChump(radius, height, colorHex);
     group.add(cloudyChump);
+  } else if (variant === 'rainbowChamp') {
+    // Rainbow Champ: combination of Rainbow Arc and Cloudy Champ
+    const rainbowChamp = buildRainbowChamp(radius, height, colorHex);
+    group.add(rainbowChamp);
+  } else if (variant === 'starryRainbow') {
+    // Starry Rainbow: combination of Rainbow Arc, Cloudy Champ, and Star Burst
+    const starryRainbow = buildStarryRainbow(radius, height, colorHex);
+    group.add(starryRainbow);
   }
 
   return group;
