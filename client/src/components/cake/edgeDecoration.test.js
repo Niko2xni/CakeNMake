@@ -240,17 +240,17 @@ describe('edge decoration placement', () => {
     expect(ringMesh.isInstancedMesh).toBe(true);
     expect(ringMesh.count).toBeGreaterThanOrEqual(16);
 
-    // Medium count (~14 dollops matching Image 1)
+    // 5th variation: Medium count with spacing of the previous 6th variation (10 dollops on 8" rim)
     const ringMeshMedium = buildPipingRing('roundDollopMedium', mat, { radius: 3.66, y: 1.0, scale: 3 });
     expect(ringMeshMedium).toBeDefined();
     expect(ringMeshMedium.isInstancedMesh).toBe(true);
-    expect(ringMeshMedium.count).toBe(14);
+    expect(ringMeshMedium.count).toBe(10);
 
-    // Sparse count (~10 dollops matching Image 2)
+    // 6th variation: Sparse count with even wider spacing (7 dollops on 8" rim)
     const ringMeshSparse = buildPipingRing('roundDollopSparse', mat, { radius: 3.66, y: 1.0, scale: 3 });
     expect(ringMeshSparse).toBeDefined();
     expect(ringMeshSparse.isInstancedMesh).toBe(true);
-    expect(ringMeshSparse.count).toBe(10);
+    expect(ringMeshSparse.count).toBe(7);
   });
 });
 

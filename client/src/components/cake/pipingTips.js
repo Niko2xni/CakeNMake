@@ -1631,11 +1631,11 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
       return instanceAroundRing(getUnitGeometry('roundDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.60 });
     }
     case 'roundDollopMedium': {
-      const count = Math.max(8, Math.round((radius * Math.PI * 2) / (0.55 * scale)));
+      const count = Math.max(6, Math.round((radius * Math.PI * 2) / (0.78 * scale)));
       return instanceAroundRing(getUnitGeometry('roundDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.60 });
     }
     case 'roundDollopSparse': {
-      const count = Math.max(6, Math.round((radius * Math.PI * 2) / (0.78 * scale)));
+      const count = Math.max(4, Math.round((radius * Math.PI * 2) / (1.10 * scale)));
       return instanceAroundRing(getUnitGeometry('roundDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.60 });
     }
     case 'starScallop': {
