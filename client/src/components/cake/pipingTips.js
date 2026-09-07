@@ -446,6 +446,71 @@ export function buildRoundDollopUnitGeometry({ radius = 0.40, height = 0.66 } = 
 }
 
 /**
+ * Hershey's Kiss shaped piping dollop:
+ * - Broad, grounded base embedded slightly into surface
+ * - Wide spherical bulb reaching peak belly width around lower 20% of height (t = 0.20)
+ * - Sinuous concave inward sweep tapering gracefully up to a tall, elegant pointed kiss spire (t = 1.0)
+ * - Taller and bolder than standard round dollops
+ */
+export function buildKissDollopUnitGeometry({ radius = 0.38, height = 0.88 } = {}) {
+  const radialSegments = 36;
+  const heightSegments = 36;
+  const positions = [];
+  const indices = [];
+
+  const bodyTaper = (t) => {
+    // Lower 14%: tight flare from seated base (0.84) to peak belly (1.0)
+    if (t <= 0.14) {
+      const s = t / 0.14;
+      return 0.84 + 0.16 * Math.sin(s * Math.PI * 0.5);
+    }
+    // Upper 86%: graceful concave curve sweeping to a tall slender kiss peak
+    const u = (t - 0.14) / 0.86;
+    return Math.pow(Math.cos(u * Math.PI * 0.5), 1.9);
+  };
+
+  const baseYOffset = -0.05 * height;
+
+  for (let y = 0; y <= heightSegments; y++) {
+    const t = y / heightSegments;
+    const taper = bodyTaper(t);
+    const currentY = t * height + baseYOffset;
+    const r = radius * taper;
+    for (let i = 0; i < radialSegments; i++) {
+      const angle = (i / radialSegments) * Math.PI * 2;
+      positions.push(Math.cos(angle) * r, currentY, Math.sin(angle) * r);
+    }
+  }
+
+  for (let y = 0; y < heightSegments; y++) {
+    for (let i = 0; i < radialSegments; i++) {
+      const next = (i + 1) % radialSegments;
+      const current = y * radialSegments + i;
+      const currentNext = y * radialSegments + next;
+      const nextRow = (y + 1) * radialSegments + i;
+      const nextRowNext = (y + 1) * radialSegments + next;
+      indices.push(current, nextRow, currentNext, currentNext, nextRow, nextRowNext);
+    }
+  }
+
+  const bottomCenter = positions.length / 3;
+  positions.push(0, baseYOffset, 0);
+  const topStart = heightSegments * radialSegments;
+  const topCenter = positions.length / 3;
+  positions.push(0, height + baseYOffset, 0);
+  for (let i = 0; i < radialSegments; i++) {
+    const next = (i + 1) % radialSegments;
+    indices.push(bottomCenter, next, i, topCenter, topStart + i, topStart + next);
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+/**
  * Solid Continuous Star-Scallop Rim Geometry Generator
  * - Single continuous tube/bead along a pure circle of radius R (in XZ plane).
  * - Sharpened cusp modulation: sign(cos(N*θ)) * |cos(N*θ)|^p with p ~ 0.5 for crisp lobe transitions.
@@ -1549,6 +1614,7 @@ function getUnitGeometry(tip) {
       case 'dropFlower': unitGeometryCache[tip] = buildDropFlowerUnitGeometry(); break;
       case 'starDollop': unitGeometryCache[tip] = buildStarDollopUnitGeometry(); break;
       case 'roundDollop': unitGeometryCache[tip] = buildRoundDollopUnitGeometry(); break;
+      case 'kissDollop': unitGeometryCache[tip] = buildKissDollopUnitGeometry(); break;
       default: return null;
     }
     // Reused across every ring built from now on — CakeScene's disposal
@@ -1637,6 +1703,18 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
     case 'roundDollopSparse': {
       const count = Math.max(4, Math.round((radius * Math.PI * 2) / (1.10 * scale)));
       return instanceAroundRing(getUnitGeometry('roundDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.60 });
+    }
+    case 'kissDollop': {
+      const count = Math.max(10, Math.round((radius * Math.PI * 2) / (0.42 * scale)));
+      return instanceAroundRing(getUnitGeometry('kissDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.48 });
+    }
+    case 'kissDollopMedium': {
+      const count = Math.max(6, Math.round((radius * Math.PI * 2) / (0.62 * scale)));
+      return instanceAroundRing(getUnitGeometry('kissDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.48 });
+    }
+    case 'kissDollopSparse': {
+      const count = Math.max(4, Math.round((radius * Math.PI * 2) / (0.95 * scale)));
+      return instanceAroundRing(getUnitGeometry('kissDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.48 });
     }
     case 'starScallop': {
       const N = Math.max(8, Math.round((radius * Math.PI * 2) / 2.0));

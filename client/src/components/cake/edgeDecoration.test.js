@@ -79,6 +79,9 @@ describe('edge decoration placement', () => {
     expect(screen.getByTitle('Round Tip Dollop')).toBeInTheDocument();
     expect(screen.getByTitle('Medium Round Tip Dollop')).toBeInTheDocument();
     expect(screen.getByTitle('Sparse Round Tip Dollop')).toBeInTheDocument();
+    expect(screen.getByTitle('Kisses Dollop')).toBeInTheDocument();
+    expect(screen.getByTitle('Medium Kisses Dollop')).toBeInTheDocument();
+    expect(screen.getByTitle('Sparse Kisses Dollop')).toBeInTheDocument();
   });
 
   it('generates dense accordion-pleated zigzag geometry with zero overhang', async () => {
@@ -251,6 +254,34 @@ describe('edge decoration placement', () => {
     expect(ringMeshSparse).toBeDefined();
     expect(ringMeshSparse.isInstancedMesh).toBe(true);
     expect(ringMeshSparse.count).toBe(7);
+  });
+
+  it('generates tall kisses-shaped dollop geometry and piping ring with adjusted spacing variations', async () => {
+    const { buildKissDollopUnitGeometry, buildPipingRing } = await import('./pipingTips');
+    const THREE = await import('three');
+
+    const unitGeo = buildKissDollopUnitGeometry();
+    expect(unitGeo.getAttribute('position').count).toBeGreaterThan(1000);
+    expect(unitGeo.getAttribute('normal')).toBeDefined();
+
+    const mat = new THREE.MeshBasicMaterial();
+    // 7th variation: Continuous kisses dollops (touching shoulder-to-shoulder, 18 count)
+    const ringMeshContinuous = buildPipingRing('kissDollop', mat, { radius: 3.66, y: 1.0, scale: 3 });
+    expect(ringMeshContinuous).toBeDefined();
+    expect(ringMeshContinuous.isInstancedMesh).toBe(true);
+    expect(ringMeshContinuous.count).toBe(18);
+
+    // 8th variation: Medium count with adjusted spacing (12 count on 8" rim)
+    const ringMeshMedium = buildPipingRing('kissDollopMedium', mat, { radius: 3.66, y: 1.0, scale: 3 });
+    expect(ringMeshMedium).toBeDefined();
+    expect(ringMeshMedium.isInstancedMesh).toBe(true);
+    expect(ringMeshMedium.count).toBe(12);
+
+    // 9th variation: Sparse count with wide airy spacing (8 count on 8" rim)
+    const ringMeshSparse = buildPipingRing('kissDollopSparse', mat, { radius: 3.66, y: 1.0, scale: 3 });
+    expect(ringMeshSparse).toBeDefined();
+    expect(ringMeshSparse.isInstancedMesh).toBe(true);
+    expect(ringMeshSparse.count).toBe(8);
   });
 });
 

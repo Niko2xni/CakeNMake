@@ -278,6 +278,9 @@ export const PIPING_TIPS = [
   { id: 'roundDollop', label: 'Round Tip Dollop' },
   { id: 'roundDollopMedium', label: 'Medium Round Tip Dollop' },
   { id: 'roundDollopSparse', label: 'Sparse Round Tip Dollop' },
+  { id: 'kissDollop', label: 'Kisses Dollop' },
+  { id: 'kissDollopMedium', label: 'Medium Kisses Dollop' },
+  { id: 'kissDollopSparse', label: 'Sparse Kisses Dollop' },
   { id: 'starScallop', label: 'Star Scallop' },
   { id: 'starScallopSoft', label: 'Soft Star Scallop' },
   { id: 'starScallopDollops', label: 'Scallop with Dollops' },
@@ -538,6 +541,9 @@ export const DOLLOPS_VARIATIONS = [
   { id: 'roundDollop', label: 'Round Tip Dollop' },
   { id: 'roundDollopMedium', label: 'Medium Round Tip Dollop' },
   { id: 'roundDollopSparse', label: 'Sparse Round Tip Dollop' },
+  { id: 'kissDollop', label: 'Kisses Dollop' },
+  { id: 'kissDollopMedium', label: 'Medium Kisses Dollop' },
+  { id: 'kissDollopSparse', label: 'Sparse Kisses Dollop' },
 ];
 
 export const SCALLOPS_VARIATIONS = [
