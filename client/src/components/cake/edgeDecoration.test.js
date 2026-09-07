@@ -76,6 +76,7 @@ describe('edge decoration placement', () => {
     expect(screen.getByTitle('Star Dollop')).toBeInTheDocument();
     expect(screen.getByTitle('Sparse Star Dollop')).toBeInTheDocument();
     expect(screen.getByTitle('Continuous Star Dollop')).toBeInTheDocument();
+    expect(screen.getByTitle('Round Tip Dollop')).toBeInTheDocument();
   });
 
   it('generates dense accordion-pleated zigzag geometry with zero overhang', async () => {
@@ -221,6 +222,21 @@ describe('edge decoration placement', () => {
     // Top surface radius is 4.06 — maximum vertex radius must strictly not exceed this (zero overhang!)
     expect(maxR).toBeLessThanOrEqual(4.06);
     expect(maxR).toBeGreaterThan(3.66);
+  });
+
+  it('generates smooth round tip dollop geometry and piping ring', async () => {
+    const { buildRoundDollopUnitGeometry, buildPipingRing } = await import('./pipingTips');
+    const THREE = await import('three');
+
+    const unitGeo = buildRoundDollopUnitGeometry();
+    expect(unitGeo.getAttribute('position').count).toBeGreaterThan(1000);
+    expect(unitGeo.getAttribute('normal')).toBeDefined();
+
+    const mat = new THREE.MeshBasicMaterial();
+    const ringMesh = buildPipingRing('roundDollop', mat, { radius: 3.66, y: 1.0, scale: 3 });
+    expect(ringMesh).toBeDefined();
+    expect(ringMesh.isInstancedMesh).toBe(true);
+    expect(ringMesh.count).toBeGreaterThanOrEqual(14);
   });
 });
 

@@ -379,6 +379,73 @@ function buildStarDollopUnitGeometry({ radius = 0.28, height = 0.5, points = 12 
 }
 
 /**
+ * Smooth, plump plain round-tip dollop based on a large round nozzle squeeze:
+ * broad seated base embedded slightly into surface, generous spherical belly that flares to full width,
+ * and narrows smoothly into an organic pointed kiss peak at the top.
+ */
+export function buildRoundDollopUnitGeometry({ radius = 0.40, height = 0.66 } = {}) {
+  const radialSegments = 36;
+  const heightSegments = 36;
+  const positions = [];
+  const indices = [];
+
+  const bodyTaper = (t) => {
+    // Plump spherical belly from base up to shoulder (t = 0.74),
+    // then graceful pinch into an organic kiss tip at the top (t = 1.0).
+    const shoulderT = 0.74;
+    const centerY = 0.35;
+    const semiY = 0.46;
+    if (t < shoulderT) {
+      const dy = (t - centerY) / semiY;
+      return Math.sqrt(Math.max(0.05, 1 - dy * dy));
+    }
+    const u = (t - shoulderT) / (1 - shoulderT);
+    const shoulderR = Math.sqrt(Math.max(0.05, 1 - Math.pow((shoulderT - centerY) / semiY, 2)));
+    return shoulderR * Math.pow(1 - u, 1.6);
+  };
+
+  const baseYOffset = -0.06 * height;
+
+  for (let y = 0; y <= heightSegments; y++) {
+    const t = y / heightSegments;
+    const taper = bodyTaper(t);
+    const currentY = t * height + baseYOffset;
+    const r = radius * taper;
+    for (let i = 0; i < radialSegments; i++) {
+      const angle = (i / radialSegments) * Math.PI * 2;
+      positions.push(Math.cos(angle) * r, currentY, Math.sin(angle) * r);
+    }
+  }
+
+  for (let y = 0; y < heightSegments; y++) {
+    for (let i = 0; i < radialSegments; i++) {
+      const next = (i + 1) % radialSegments;
+      const current = y * radialSegments + i;
+      const currentNext = y * radialSegments + next;
+      const nextRow = (y + 1) * radialSegments + i;
+      const nextRowNext = (y + 1) * radialSegments + next;
+      indices.push(current, nextRow, currentNext, currentNext, nextRow, nextRowNext);
+    }
+  }
+
+  const bottomCenter = positions.length / 3;
+  positions.push(0, baseYOffset, 0);
+  const topStart = heightSegments * radialSegments;
+  const topCenter = positions.length / 3;
+  positions.push(0, height + baseYOffset, 0);
+  for (let i = 0; i < radialSegments; i++) {
+    const next = (i + 1) % radialSegments;
+    indices.push(bottomCenter, next, i, topCenter, topStart + i, topStart + next);
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+/**
  * Solid Continuous Star-Scallop Rim Geometry Generator
  * - Single continuous tube/bead along a pure circle of radius R (in XZ plane).
  * - Sharpened cusp modulation: sign(cos(N*θ)) * |cos(N*θ)|^p with p ~ 0.5 for crisp lobe transitions.
@@ -1481,6 +1548,7 @@ function getUnitGeometry(tip) {
       case 'leaf': unitGeometryCache[tip] = buildLeafUnitGeometry(); break;
       case 'dropFlower': unitGeometryCache[tip] = buildDropFlowerUnitGeometry(); break;
       case 'starDollop': unitGeometryCache[tip] = buildStarDollopUnitGeometry(); break;
+      case 'roundDollop': unitGeometryCache[tip] = buildRoundDollopUnitGeometry(); break;
       default: return null;
     }
     // Reused across every ring built from now on — CakeScene's disposal
@@ -1557,6 +1625,10 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
     case 'starDollopContinuous': {
       const count = Math.max(12, Math.round((radius * Math.PI * 2) / (0.365 * scale)));
       return instanceAroundRing(getUnitGeometry('starDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.55 });
+    }
+    case 'roundDollop': {
+      const count = Math.max(10, Math.round((radius * Math.PI * 2) / (0.46 * scale)));
+      return instanceAroundRing(getUnitGeometry('roundDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.60 });
     }
     case 'starScallop': {
       const N = Math.max(8, Math.round((radius * Math.PI * 2) / 2.0));
