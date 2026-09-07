@@ -77,6 +77,8 @@ describe('edge decoration placement', () => {
     expect(screen.getByTitle('Sparse Star Dollop')).toBeInTheDocument();
     expect(screen.getByTitle('Continuous Star Dollop')).toBeInTheDocument();
     expect(screen.getByTitle('Round Tip Dollop')).toBeInTheDocument();
+    expect(screen.getByTitle('Medium Round Tip Dollop')).toBeInTheDocument();
+    expect(screen.getByTitle('Sparse Round Tip Dollop')).toBeInTheDocument();
   });
 
   it('generates dense accordion-pleated zigzag geometry with zero overhang', async () => {
@@ -236,7 +238,19 @@ describe('edge decoration placement', () => {
     const ringMesh = buildPipingRing('roundDollop', mat, { radius: 3.66, y: 1.0, scale: 3 });
     expect(ringMesh).toBeDefined();
     expect(ringMesh.isInstancedMesh).toBe(true);
-    expect(ringMesh.count).toBeGreaterThanOrEqual(14);
+    expect(ringMesh.count).toBeGreaterThanOrEqual(16);
+
+    // Medium count (~14 dollops matching Image 1)
+    const ringMeshMedium = buildPipingRing('roundDollopMedium', mat, { radius: 3.66, y: 1.0, scale: 3 });
+    expect(ringMeshMedium).toBeDefined();
+    expect(ringMeshMedium.isInstancedMesh).toBe(true);
+    expect(ringMeshMedium.count).toBe(14);
+
+    // Sparse count (~10 dollops matching Image 2)
+    const ringMeshSparse = buildPipingRing('roundDollopSparse', mat, { radius: 3.66, y: 1.0, scale: 3 });
+    expect(ringMeshSparse).toBeDefined();
+    expect(ringMeshSparse.isInstancedMesh).toBe(true);
+    expect(ringMeshSparse.count).toBe(10);
   });
 });
 

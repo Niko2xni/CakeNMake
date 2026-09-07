@@ -1630,6 +1630,14 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
       const count = Math.max(10, Math.round((radius * Math.PI * 2) / (0.46 * scale)));
       return instanceAroundRing(getUnitGeometry('roundDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.60 });
     }
+    case 'roundDollopMedium': {
+      const count = Math.max(8, Math.round((radius * Math.PI * 2) / (0.55 * scale)));
+      return instanceAroundRing(getUnitGeometry('roundDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.60 });
+    }
+    case 'roundDollopSparse': {
+      const count = Math.max(6, Math.round((radius * Math.PI * 2) / (0.78 * scale)));
+      return instanceAroundRing(getUnitGeometry('roundDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.60 });
+    }
     case 'starScallop': {
       const N = Math.max(8, Math.round((radius * Math.PI * 2) / 2.0));
       return buildScallopedPiping(material, radius, y, { N, tubeRadius: 0.20, bulgeAmount: 0.14, starSharpness: 0.75, starFloor: 0.25, starPoints: 6, cuspPower: 1.6, peakSharpness: 1.0, surfaceLift: 0.05 });
