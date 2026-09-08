@@ -61,10 +61,11 @@ export function buildDripRing(radius, colorHex, rand, opts = {}) {
  * strung decoration, not a piped border).
  */
 export function computeEdgeTrimY(topSurfaceY, radius, decorationType = 'piping', exteriorFinishStyle = 'fullyFrosted', isBottom = false) {
+  const isDollopType = decorationType === 'dollops' || (typeof decorationType === 'string' && decorationType.toLowerCase().includes('dollop'));
   if (isBottom) {
     // Bottom edge decorations rest on top of the cake board / plate plane
     // rather than subtracting top-surface recess depths.
-    if (decorationType === 'dollops') {
+    if (isDollopType) {
       return -0.02; // Dollop base sits directly on top of the cake board
     }
     return -0.05;
@@ -124,9 +125,20 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
   // negative instead pushes it genuinely proud of the wall — actually in
   // front of the surface, the way a piped border resting against the
   // board would really sit — rather than just closer to flush with it.
+  const isDollopType = decorationType === 'dollops' || (typeof decorationType === 'string' && decorationType.toLowerCase().includes('dollop'));
+
+  let topDollopInset = 0.76;
+  if (decorationType === 'starDollopContinuous') {
+    topDollopInset = 0.66; // R = 4.06 - 0.66 = 3.40 -> outer edge: 3.40 + 0.625 = 4.025 (right by edge, strictly <= 4.06)
+  } else if (decorationType === 'starDollop') {
+    topDollopInset = 0.76; // R = 4.06 - 0.76 = 3.30 -> outer edge: 3.30 + 0.725 = 4.025 (right by edge, strictly <= 4.06)
+  } else if (decorationType === 'starDollopSparse') {
+    topDollopInset = 0.82; // R = 4.06 - 0.82 = 3.24 -> outer edge: 3.24 + 0.7875 = 4.028 (right by edge, strictly <= 4.06)
+  }
+
   const radialInset = isBottom
-    ? (decorationType === 'beadedTrim' ? -0.10 : (decorationType === 'dollops' ? -0.06 : (['shell', 'reverseShell', 'bead', 'zigzag', 'wavePiping', 'ropeTwist', 'ropeTwistClassic'].includes(decorationType) ? -0.04 : -0.14)))
-    : (decorationType === 'beadedTrim' ? 0.22 : (decorationType === 'dollops' ? 0.54 : (['shell', 'reverseShell'].includes(decorationType) ? 0.40 : (decorationType === 'bead' ? 0.38 : (decorationType === 'zigzag' ? 0.40 : (decorationType === 'wavePiping' ? 0.40 : (['ropeTwist', 'ropeTwistClassic'].includes(decorationType) ? 0.40 : 0.26)))))));
+    ? (decorationType === 'beadedTrim' ? -0.10 : (isDollopType ? -0.06 : (['shell', 'reverseShell', 'bead', 'zigzag', 'wavePiping', 'ropeTwist', 'ropeTwistClassic'].includes(decorationType) ? -0.04 : -0.14)))
+    : (decorationType === 'beadedTrim' ? 0.22 : (isDollopType ? topDollopInset : (['shell', 'reverseShell'].includes(decorationType) ? 0.40 : (decorationType === 'bead' ? 0.38 : (decorationType === 'zigzag' ? 0.40 : (decorationType === 'wavePiping' ? 0.40 : (['ropeTwist', 'ropeTwistClassic'].includes(decorationType) ? 0.40 : 0.26)))))));
   return Math.max(0.15, surfaceRadius - radialInset);
 }
 

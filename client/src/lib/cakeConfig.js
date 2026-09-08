@@ -272,9 +272,9 @@ export const PIPING_TIPS = [
   { id: 'leaf', label: 'Leaf' },
   { id: 'dropFlower', label: 'Drop Flower' },
   { id: 'lambeth', label: 'Lambeth Method' },
-  { id: 'starDollop', label: 'Star Dollop' },
-  { id: 'starDollopSparse', label: 'Sparse Star Dollop' },
-  { id: 'starDollopContinuous', label: 'Continuous Star Dollop' },
+  { id: 'starDollopContinuous', label: 'Continuous Star Dollop (20 pc)' },
+  { id: 'starDollop', label: 'Star Dollop (12 pc)' },
+  { id: 'starDollopSparse', label: 'Sparse Star Dollop (8 pc)' },
   { id: 'roundDollop', label: 'Round Tip Dollop' },
   { id: 'roundDollopMedium', label: 'Medium Round Tip Dollop' },
   { id: 'roundDollopSparse', label: 'Sparse Round Tip Dollop' },
@@ -535,9 +535,9 @@ export const BRACELET_BEADS_VARIATIONS = [
 ];
 
 export const DOLLOPS_VARIATIONS = [
-  { id: 'starDollop', label: 'Star Dollop' },
-  { id: 'starDollopSparse', label: 'Sparse Star Dollop' },
-  { id: 'starDollopContinuous', label: 'Continuous Star Dollop' },
+  { id: 'starDollopContinuous', label: 'Continuous Star Dollop (20 pc)' },
+  { id: 'starDollop', label: 'Star Dollop (12 pc)' },
+  { id: 'starDollopSparse', label: 'Sparse Star Dollop (8 pc)' },
   { id: 'roundDollop', label: 'Round Tip Dollop' },
   { id: 'roundDollopMedium', label: 'Medium Round Tip Dollop' },
   { id: 'roundDollopSparse', label: 'Sparse Round Tip Dollop' },

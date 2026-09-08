@@ -12,7 +12,11 @@ describe('edge decoration placement', () => {
     expect(computeEdgeTrimRadius(1.0, 'beadedTrim', 'fullyFrosted')).toBeCloseTo(0.84, 3);
     expect(computeEdgeTrimRadius(1.0, 'piping', 'texturedButtercream')).toBeCloseTo(0.82, 3);
     expect(computeEdgeTrimRadius(1.0, 'piping', 'naked')).toBeCloseTo(0.72, 3);
-    expect(computeEdgeTrimRadius(1.0, 'dollops', 'fullyFrosted')).toBeCloseTo(0.52, 3);
+    expect(computeEdgeTrimRadius(1.0, 'dollops', 'fullyFrosted')).toBeCloseTo(0.30, 2);
+    expect(computeEdgeTrimRadius(4.0, 'dollops', 'fullyFrosted')).toBeCloseTo(3.30, 2);
+    expect(computeEdgeTrimRadius(4.0, 'starDollopContinuous', 'fullyFrosted')).toBeCloseTo(3.40, 2);
+    expect(computeEdgeTrimRadius(4.0, 'starDollop', 'fullyFrosted')).toBeCloseTo(3.30, 2);
+    expect(computeEdgeTrimRadius(4.0, 'starDollopSparse', 'fullyFrosted')).toBeCloseTo(3.24, 2);
     expect(computeEdgeTrimY(0, 4.0, 'dollops', 'fullyFrosted', true)).toBeCloseTo(-0.02, 2);
     expect(computeEdgeTrimRadius(4.0, 'dollops', 'fullyFrosted', true)).toBeCloseTo(4.12, 2);
     expect(computeEdgeTrimRadius(4.0, 'shell', 'fullyFrosted')).toBeCloseTo(3.66, 2);
@@ -73,9 +77,9 @@ describe('edge decoration placement', () => {
     expect(screen.getByTitle('Trio Beaded Trim')).toBeInTheDocument();
     expect(screen.getByTitle('Petite Beaded Trim')).toBeInTheDocument();
     expect(screen.getByText('Dollops')).toBeInTheDocument();
-    expect(screen.getByTitle('Star Dollop')).toBeInTheDocument();
-    expect(screen.getByTitle('Sparse Star Dollop')).toBeInTheDocument();
-    expect(screen.getByTitle('Continuous Star Dollop')).toBeInTheDocument();
+    expect(screen.getByTitle('Continuous Star Dollop (20 pc)')).toBeInTheDocument();
+    expect(screen.getByTitle('Star Dollop (12 pc)')).toBeInTheDocument();
+    expect(screen.getByTitle('Sparse Star Dollop (8 pc)')).toBeInTheDocument();
     expect(screen.getByTitle('Round Tip Dollop')).toBeInTheDocument();
     expect(screen.getByTitle('Medium Round Tip Dollop')).toBeInTheDocument();
     expect(screen.getByTitle('Sparse Round Tip Dollop')).toBeInTheDocument();
@@ -283,5 +287,43 @@ describe('edge decoration placement', () => {
     expect(ringMeshSparse.isInstancedMesh).toBe(true);
     expect(ringMeshSparse.count).toBe(8);
   });
+
+  it('generates star dollop geometry and inverse-scaled piping ring variations (20 pc, 12 pc, 8 pc)', async () => {
+    const { buildStarDollopUnitGeometry, buildPipingRing } = await import('./pipingTips');
+    const THREE = await import('three');
+
+    const unitGeo = buildStarDollopUnitGeometry();
+    expect(unitGeo.getAttribute('position').count).toBeGreaterThan(500);
+    expect(unitGeo.getAttribute('normal')).toBeDefined();
+
+    // Unit geometry base dimensions (pre-scale):
+    unitGeo.computeBoundingBox();
+    const bb = unitGeo.boundingBox;
+    const baseDiameter = bb.max.x - bb.min.x;
+    const baseHeight = bb.max.y - bb.min.y;
+    expect(baseDiameter).toBeCloseTo(0.6453, 3);
+    expect(baseHeight).toBeCloseTo(0.50, 2);
+
+    const mat = new THREE.MeshBasicMaterial();
+    // 8x5 cake top rim: placement radii tailored so outer edges sit right by the edge (4.025"–4.028") without exceeding 4.06"
+    // 1st variation: 20-Piece Seamless Border (Base D = 1.25", radius = 3.40", outer edge = 4.025")
+    const ringMesh20 = buildPipingRing('starDollopContinuous', mat, { radius: 3.40, y: 1.0, scale: 3 });
+    expect(ringMesh20).toBeDefined();
+    expect(ringMesh20.isInstancedMesh).toBe(true);
+    expect(ringMesh20.count).toBe(20);
+
+    // 2nd variation: 12-Piece Slicing Guide (Base D = 1.45", radius = 3.30", outer edge = 4.025")
+    const ringMesh12 = buildPipingRing('starDollop', mat, { radius: 3.30, y: 1.0, scale: 3 });
+    expect(ringMesh12).toBeDefined();
+    expect(ringMesh12.isInstancedMesh).toBe(true);
+    expect(ringMesh12.count).toBe(12);
+
+    // 3rd variation: 8-Piece Statement Mound (Base D = 1.575" [10% reduction], H = 1.37", radius = 3.24", outer edge = 4.028")
+    const ringMesh8 = buildPipingRing('starDollopSparse', mat, { radius: 3.24, y: 1.0, scale: 3 });
+    expect(ringMesh8).toBeDefined();
+    expect(ringMesh8.isInstancedMesh).toBe(true);
+    expect(ringMesh8.count).toBe(8);
+  });
 });
+
 
