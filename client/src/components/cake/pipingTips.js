@@ -1698,28 +1698,28 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
       return instanceAroundRing(getUnitGeometry('starDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.6457 });
     }
     case 'roundDollop': {
-      const count = Math.max(12, Math.round((radius * Math.PI * 2) / (0.35 * scale)));
-      return instanceAroundRing(getUnitGeometry('roundDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.55 });
+      const count = Math.max(12, Math.round((radius * Math.PI * 2) / (0.3645 * scale)));
+      return instanceAroundRing(getUnitGeometry('roundDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.5637 });
     }
     case 'roundDollopMedium': {
-      const count = Math.max(6, Math.round((radius * Math.PI * 2) / (0.76 * scale)));
-      return instanceAroundRing(getUnitGeometry('roundDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.55 });
+      const count = Math.max(6, Math.round((radius * Math.PI * 2) / (0.5760 * scale)));
+      return instanceAroundRing(getUnitGeometry('roundDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.7505 });
     }
     case 'roundDollopSparse': {
-      const count = Math.max(4, Math.round((radius * Math.PI * 2) / (1.10 * scale)));
-      return instanceAroundRing(getUnitGeometry('roundDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.55 });
+      const count = Math.max(4, Math.round((radius * Math.PI * 2) / (0.8482 * scale)));
+      return instanceAroundRing(getUnitGeometry('roundDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.8152, scaleY: scale * 0.912 });
     }
     case 'kissDollop': {
-      const count = Math.max(10, Math.round((radius * Math.PI * 2) / (0.42 * scale)));
-      return instanceAroundRing(getUnitGeometry('kissDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.48 });
+      const count = Math.max(12, Math.round((radius * Math.PI * 2) / (0.3644 * scale)));
+      return instanceAroundRing(getUnitGeometry('kissDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.4775 });
     }
     case 'kissDollopMedium': {
-      const count = Math.max(6, Math.round((radius * Math.PI * 2) / (0.62 * scale)));
-      return instanceAroundRing(getUnitGeometry('kissDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.48 });
+      const count = Math.max(6, Math.round((radius * Math.PI * 2) / (0.5760 * scale)));
+      return instanceAroundRing(getUnitGeometry('kissDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.6360 });
     }
     case 'kissDollopSparse': {
-      const count = Math.max(4, Math.round((radius * Math.PI * 2) / (0.95 * scale)));
-      return instanceAroundRing(getUnitGeometry('kissDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.48 });
+      const count = Math.max(4, Math.round((radius * Math.PI * 2) / (0.8482 * scale)));
+      return instanceAroundRing(getUnitGeometry('kissDollop'), material, { ringRadius: radius, y, count, rand, scale: scale * 0.6908 });
     }
     case 'starScallop': {
       const N = Math.max(8, Math.round((radius * Math.PI * 2) / 2.0));

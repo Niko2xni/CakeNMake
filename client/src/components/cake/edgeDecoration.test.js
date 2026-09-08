@@ -17,6 +17,12 @@ describe('edge decoration placement', () => {
     expect(computeEdgeTrimRadius(4.0, 'starDollopContinuous', 'fullyFrosted')).toBeCloseTo(3.40, 2);
     expect(computeEdgeTrimRadius(4.0, 'starDollop', 'fullyFrosted')).toBeCloseTo(3.30, 2);
     expect(computeEdgeTrimRadius(4.0, 'starDollopSparse', 'fullyFrosted')).toBeCloseTo(3.24, 2);
+    expect(computeEdgeTrimRadius(4.0, 'roundDollop', 'fullyFrosted')).toBeCloseTo(3.48, 2);
+    expect(computeEdgeTrimRadius(4.0, 'roundDollopMedium', 'fullyFrosted')).toBeCloseTo(3.30, 2);
+    expect(computeEdgeTrimRadius(4.0, 'roundDollopSparse', 'fullyFrosted')).toBeCloseTo(3.24, 2);
+    expect(computeEdgeTrimRadius(4.0, 'kissDollop', 'fullyFrosted')).toBeCloseTo(3.48, 2);
+    expect(computeEdgeTrimRadius(4.0, 'kissDollopMedium', 'fullyFrosted')).toBeCloseTo(3.30, 2);
+    expect(computeEdgeTrimRadius(4.0, 'kissDollopSparse', 'fullyFrosted')).toBeCloseTo(3.24, 2);
     expect(computeEdgeTrimY(0, 4.0, 'dollops', 'fullyFrosted', true)).toBeCloseTo(-0.02, 2);
     expect(computeEdgeTrimRadius(4.0, 'dollops', 'fullyFrosted', true)).toBeCloseTo(4.12, 2);
     expect(computeEdgeTrimRadius(4.0, 'shell', 'fullyFrosted')).toBeCloseTo(3.66, 2);
@@ -48,9 +54,9 @@ describe('edge decoration placement', () => {
           bottom: { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
           middle: { piping: { tip: null, colorId: 'vanilla' } },
         },
-        onChange: () => {},
+        onChange: () => { },
         sugarColor: {},
-        onSugarColorChange: () => {},
+        onSugarColorChange: () => { },
       })
     );
 
@@ -80,22 +86,22 @@ describe('edge decoration placement', () => {
     expect(screen.getByTitle('Continuous Star Dollop (20 pc)')).toBeInTheDocument();
     expect(screen.getByTitle('Star Dollop (12 pc)')).toBeInTheDocument();
     expect(screen.getByTitle('Sparse Star Dollop (8 pc)')).toBeInTheDocument();
-    expect(screen.getByTitle('Round Tip Dollop')).toBeInTheDocument();
-    expect(screen.getByTitle('Medium Round Tip Dollop')).toBeInTheDocument();
-    expect(screen.getByTitle('Sparse Round Tip Dollop')).toBeInTheDocument();
-    expect(screen.getByTitle('Kisses Dollop')).toBeInTheDocument();
-    expect(screen.getByTitle('Medium Kisses Dollop')).toBeInTheDocument();
-    expect(screen.getByTitle('Sparse Kisses Dollop')).toBeInTheDocument();
+    expect(screen.getByTitle('Continuous Round Tip Dollop (20 pc)')).toBeInTheDocument();
+    expect(screen.getByTitle('Round Tip Dollop (12 pc)')).toBeInTheDocument();
+    expect(screen.getByTitle('Sparse Round Tip Dollop (8 pc)')).toBeInTheDocument();
+    expect(screen.getByTitle('Continuous Kisses Dollop (20 pc)')).toBeInTheDocument();
+    expect(screen.getByTitle('Kisses Dollop (12 pc)')).toBeInTheDocument();
+    expect(screen.getByTitle('Sparse Kisses Dollop (8 pc)')).toBeInTheDocument();
   });
 
   it('generates dense accordion-pleated zigzag geometry with zero overhang', async () => {
     const { buildZigzagRingGeometry, ZigzagStripCurve } = await import('./pipingTips');
-    
+
     // Test ZigzagStripCurve parameters
     const circumference = 3.66 * Math.PI * 2;
     const waves = Math.round(circumference / 0.28);
     const curve = new ZigzagStripCurve(circumference, 0.185, waves);
-    
+
     expect(curve.L).toBeLessThanOrEqual(0.30);
     expect(curve.amplitude).toBeCloseTo(0.185, 2);
 
@@ -242,25 +248,26 @@ describe('edge decoration placement', () => {
     expect(unitGeo.getAttribute('normal')).toBeDefined();
 
     const mat = new THREE.MeshBasicMaterial();
-    const ringMesh = buildPipingRing('roundDollop', mat, { radius: 3.66, y: 1.0, scale: 3 });
+    // 4th variation: Continuous round dollops touching side-by-side (20 count on 8" rim, R=3.48)
+    const ringMesh = buildPipingRing('roundDollop', mat, { radius: 3.48, y: 1.0, scale: 3 });
     expect(ringMesh).toBeDefined();
     expect(ringMesh.isInstancedMesh).toBe(true);
-    expect(ringMesh.count).toBeGreaterThanOrEqual(16);
+    expect(ringMesh.count).toBe(20);
 
-    // 5th variation: Medium count with spacing of the previous 6th variation (10 dollops on 8" rim)
-    const ringMeshMedium = buildPipingRing('roundDollopMedium', mat, { radius: 3.66, y: 1.0, scale: 3 });
+    // 5th variation: Slicing guide round dollops (12 count on 8" rim, R=3.30)
+    const ringMeshMedium = buildPipingRing('roundDollopMedium', mat, { radius: 3.30, y: 1.0, scale: 3 });
     expect(ringMeshMedium).toBeDefined();
     expect(ringMeshMedium.isInstancedMesh).toBe(true);
-    expect(ringMeshMedium.count).toBe(10);
+    expect(ringMeshMedium.count).toBe(12);
 
-    // 6th variation: Sparse count with even wider spacing (7 dollops on 8" rim)
-    const ringMeshSparse = buildPipingRing('roundDollopSparse', mat, { radius: 3.66, y: 1.0, scale: 3 });
+    // 6th variation: Sparse round dollops (8 count on 8" rim, R=3.24)
+    const ringMeshSparse = buildPipingRing('roundDollopSparse', mat, { radius: 3.24, y: 1.0, scale: 3 });
     expect(ringMeshSparse).toBeDefined();
     expect(ringMeshSparse.isInstancedMesh).toBe(true);
-    expect(ringMeshSparse.count).toBe(7);
+    expect(ringMeshSparse.count).toBe(8);
   });
 
-  it('generates tall kisses-shaped dollop geometry and piping ring with adjusted spacing variations', async () => {
+  it('generates tall kisses-shaped dollop geometry and inverse-scaled piping ring variations (20 pc, 12 pc, 8 pc)', async () => {
     const { buildKissDollopUnitGeometry, buildPipingRing } = await import('./pipingTips');
     const THREE = await import('three');
 
@@ -269,20 +276,20 @@ describe('edge decoration placement', () => {
     expect(unitGeo.getAttribute('normal')).toBeDefined();
 
     const mat = new THREE.MeshBasicMaterial();
-    // 7th variation: Continuous kisses dollops (touching shoulder-to-shoulder, 18 count)
-    const ringMeshContinuous = buildPipingRing('kissDollop', mat, { radius: 3.66, y: 1.0, scale: 3 });
+    // 7th variation: Continuous kisses dollops (touching side-by-side, 20 count on 8" rim, R=3.48)
+    const ringMeshContinuous = buildPipingRing('kissDollop', mat, { radius: 3.48, y: 1.0, scale: 3 });
     expect(ringMeshContinuous).toBeDefined();
     expect(ringMeshContinuous.isInstancedMesh).toBe(true);
-    expect(ringMeshContinuous.count).toBe(18);
+    expect(ringMeshContinuous.count).toBe(20);
 
-    // 8th variation: Medium count with adjusted spacing (12 count on 8" rim)
-    const ringMeshMedium = buildPipingRing('kissDollopMedium', mat, { radius: 3.66, y: 1.0, scale: 3 });
+    // 8th variation: Slicing guide kisses dollops (12 count on 8" rim, R=3.30)
+    const ringMeshMedium = buildPipingRing('kissDollopMedium', mat, { radius: 3.30, y: 1.0, scale: 3 });
     expect(ringMeshMedium).toBeDefined();
     expect(ringMeshMedium.isInstancedMesh).toBe(true);
     expect(ringMeshMedium.count).toBe(12);
 
-    // 9th variation: Sparse count with wide airy spacing (8 count on 8" rim)
-    const ringMeshSparse = buildPipingRing('kissDollopSparse', mat, { radius: 3.66, y: 1.0, scale: 3 });
+    // 9th variation: Sparse kisses dollops (8 count on 8" rim, R=3.24)
+    const ringMeshSparse = buildPipingRing('kissDollopSparse', mat, { radius: 3.24, y: 1.0, scale: 3 });
     expect(ringMeshSparse).toBeDefined();
     expect(ringMeshSparse.isInstancedMesh).toBe(true);
     expect(ringMeshSparse.count).toBe(8);

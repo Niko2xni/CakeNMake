@@ -130,10 +130,12 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
   let topDollopInset = 0.76;
   if (decorationType === 'starDollopContinuous') {
     topDollopInset = 0.66; // R = 4.06 - 0.66 = 3.40 -> outer edge: 3.40 + 0.625 = 4.025 (right by edge, strictly <= 4.06)
-  } else if (decorationType === 'starDollop') {
+  } else if (decorationType === 'starDollop' || decorationType === 'roundDollopMedium' || decorationType === 'kissDollopMedium') {
     topDollopInset = 0.76; // R = 4.06 - 0.76 = 3.30 -> outer edge: 3.30 + 0.725 = 4.025 (right by edge, strictly <= 4.06)
-  } else if (decorationType === 'starDollopSparse') {
+  } else if (decorationType === 'starDollopSparse' || decorationType === 'roundDollopSparse' || decorationType === 'kissDollopSparse') {
     topDollopInset = 0.82; // R = 4.06 - 0.82 = 3.24 -> outer edge: 3.24 + 0.7875 = 4.028 (right by edge, strictly <= 4.06)
+  } else if (decorationType === 'roundDollop' || decorationType === 'kissDollop') {
+    topDollopInset = 0.58; // R = 4.06 - 0.58 = 3.48 -> outer edge: 3.48 + 0.5445 = 4.025 (touching side-by-side)
   }
 
   const radialInset = isBottom
@@ -617,9 +619,9 @@ function scatterPearlPositions(count) {
   };
   for (let i = 0; i < count; i++) {
     points.push({
-      angle:      seededRandom() * Math.PI * 2,
+      angle: seededRandom() * Math.PI * 2,
       heightFrac: seededRandom(),
-      sizeFrac:   seededRandom(),
+      sizeFrac: seededRandom(),
     });
   }
   return points;
