@@ -61,11 +61,12 @@ describe('edge decoration placement', () => {
     );
 
     expect(screen.queryByRole('button', { name: 'None' })).not.toBeInTheDocument();
-    expect(screen.getByText('Shell Border')).toBeInTheDocument();
+    expect(screen.getByText('Border Piping')).toBeInTheDocument();
     expect(screen.getByTitle('Shell Border')).toBeInTheDocument();
     expect(screen.getByTitle('Reverse Shell')).toBeInTheDocument();
-    expect(screen.getByText('Bead Piping')).toBeInTheDocument();
     expect(screen.getByTitle('Bead Piping')).toBeInTheDocument();
+    expect(screen.getByTitle('Rope Twist')).toBeInTheDocument();
+    expect(screen.getByTitle('Rope Twist (Classic)')).toBeInTheDocument();
     expect(screen.queryByText('Zigzag Piping')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Zigzag Piping')).not.toBeInTheDocument();
     expect(screen.queryByText('Wave Piping')).not.toBeInTheDocument();
@@ -73,9 +74,6 @@ describe('edge decoration placement', () => {
     expect(screen.queryByText('Scallops')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Star Scallop')).not.toBeInTheDocument();
     expect(screen.getByText('Rope')).toBeInTheDocument();
-    expect(screen.getByText('Rope Twist')).toBeInTheDocument();
-    expect(screen.getByTitle('Rope Twist')).toBeInTheDocument();
-    expect(screen.getByTitle('Rope Twist (Classic)')).toBeInTheDocument();
     expect(screen.getByText('Petal')).toBeInTheDocument();
     expect(screen.getByText('Drop Flower')).toBeInTheDocument();
     expect(screen.getByText('Bracelet Beads')).toBeInTheDocument();

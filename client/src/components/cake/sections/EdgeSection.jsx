@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import {
-  SHELL_VARIATIONS,
+  BORDER_PIPING_VARIATIONS,
   BRACELET_BEADS_VARIATIONS,
   DOLLOPS_VARIATIONS,
-  ROPE_TWIST_VARIATIONS,
   STANDALONE_EDGE_PIPING_OPTIONS,
   PIPING_TIPS,
 } from '@/lib/cakeConfig';
@@ -134,13 +133,13 @@ export default function EdgeSection({
         </div>
 
         <div className="space-y-3">
-          {/* Shell Border — grouped multi-variant row */}
+          {/* Border Piping — grouped multi-variant row */}
           <div>
             <span className="text-xs font-semibold text-foreground/80 mb-1.5 block">
-              Shell Border
+              Border Piping
             </span>
             <div className="flex flex-wrap gap-2">
-              {SHELL_VARIATIONS.map((variant, i) => {
+              {BORDER_PIPING_VARIATIONS.map((variant, i) => {
                 const active =
                   (currentSlot.piping?.tip || currentSlot.decorations?.setId) === variant.id;
                 return (
@@ -200,7 +199,7 @@ export default function EdgeSection({
             </div>
           </div>
 
-          {/* Standalone piping designs (Bead, Rope, Petal, Drop Flower) */}
+          {/* Standalone piping designs (Rope, Petal, Drop Flower) */}
           {STANDALONE_EDGE_PIPING_OPTIONS.map((option) => {
             const active =
               (currentSlot.piping?.tip || currentSlot.decorations?.setId) === option.id;
@@ -231,39 +230,6 @@ export default function EdgeSection({
               </div>
             );
           })}
-
-          {/* Rope Twist — grouped multi-variant row */}
-          <div>
-            <span className="text-xs font-semibold text-foreground/80 mb-1.5 block">
-              Rope Twist
-            </span>
-            <div className="flex flex-wrap gap-2">
-              {ROPE_TWIST_VARIATIONS.map((variant, i) => {
-                const active =
-                  (currentSlot.piping?.tip || currentSlot.decorations?.setId) === variant.id;
-                return (
-                  <button
-                    key={variant.id}
-                    type="button"
-                    onClick={() =>
-                      updateSlot({
-                        decorations: { ...currentSlot.decorations, setId: null },
-                        piping: { ...currentSlot.piping, tip: active ? null : variant.id },
-                      })
-                    }
-                    title={variant.label}
-                    className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
-                      active
-                        ? 'bg-primary text-primary-foreground border-primary shadow-md'
-                        : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
-                    }`}
-                  >
-                    {i + 1}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
 
           {/* Dollops — grouped multi-variant row */}
           <div>

@@ -563,8 +563,16 @@ export const SHELL_VARIATIONS = [
   { id: 'reverseShell', label: 'Reverse Shell' },
 ];
 
+export const BORDER_PIPING_VARIATIONS = [
+  { id: 'shell', label: 'Shell Border' },
+  { id: 'reverseShell', label: 'Reverse Shell' },
+  { id: 'bead', label: 'Bead Piping' },
+  { id: 'ropeTwist', label: 'Rope Twist' },
+  { id: 'ropeTwistClassic', label: 'Rope Twist (Classic)' },
+];
+
 export const STANDALONE_EDGE_PIPING_OPTIONS = PIPING_TIPS
-  .filter(({ id }) => ['bead', 'rope', 'petal', 'dropFlower'].includes(id));
+  .filter(({ id }) => ['rope', 'petal', 'dropFlower'].includes(id));
 
 export const EDGE_DECORATION_SETS = [
   { id: 'curtain', label: 'Curtain' },
