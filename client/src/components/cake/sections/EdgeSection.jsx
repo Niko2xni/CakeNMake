@@ -10,6 +10,7 @@ import {
   DOLLOPS_ALTERNATING_VARIATIONS,
   DOLLOPS_ALTERNATING_CHERRY_VARIATIONS,
   DOLLOPS_VARIATIONS,
+  WHIPPED_CREAM_VARIATIONS,
   STANDALONE_EDGE_PIPING_OPTIONS,
   PIPING_TIPS,
   SUGAR_COLORS,
@@ -301,6 +302,39 @@ export default function EdgeSection({
               </div>
             );
           })}
+
+          {/* Whipped Cream Rosettes — solid-only, 3 count variants */}
+          <div>
+            <span className="text-xs font-semibold text-foreground/80 mb-1.5 block">
+              Whipped Cream 🍦
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {WHIPPED_CREAM_VARIATIONS.map((variant, i) => {
+                const active =
+                  (currentSlot.piping?.tip || currentSlot.decorations?.setId) === variant.id;
+                return (
+                  <button
+                    key={variant.id}
+                    type="button"
+                    onClick={() =>
+                      updateSlot({
+                        decorations: { ...currentSlot.decorations, setId: null },
+                        piping: { ...currentSlot.piping, tip: active ? null : variant.id },
+                      })
+                    }
+                    title={variant.label}
+                    className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
+                      active
+                        ? 'bg-primary text-primary-foreground border-primary shadow-md'
+                        : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
+                    }`}
+                  >
+                    {i + 1}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           {/* Dollops — grouped multi-variant rows */}
           <div>

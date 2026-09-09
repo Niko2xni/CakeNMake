@@ -125,7 +125,8 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
   // negative instead pushes it genuinely proud of the wall — actually in
   // front of the surface, the way a piped border resting against the
   // board would really sit — rather than just closer to flush with it.
-  const isDollopType = decorationType === 'dollops' || (typeof decorationType === 'string' && decorationType.toLowerCase().includes('dollop'));
+  const isWhippedCream = typeof decorationType === 'string' && decorationType.startsWith('whippedCreamRosette');
+  const isDollopType = isWhippedCream || decorationType === 'dollops' || (typeof decorationType === 'string' && decorationType.toLowerCase().includes('dollop'));
 
   const baseTip = typeof decorationType === 'string' ? decorationType.replace(/Cherry$/, '').replace(/Alt$/, '') : decorationType;
   let topDollopInset = 0.76;
@@ -137,12 +138,19 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
     topDollopInset = 0.82; // R = 4.06 - 0.82 = 3.24 -> outer edge: 3.24 + 0.7875 = 4.028 (right by edge, strictly <= 4.06)
   } else if (baseTip === 'roundDollop' || baseTip === 'kissDollop') {
     topDollopInset = 0.58; // R = 4.06 - 0.58 = 3.48 -> outer edge: 3.48 + 0.5445 = 4.025 (touching side-by-side)
+  } else if (baseTip === 'whippedCreamRosetteContinuous') {
+    topDollopInset = 0.70; // wider rosette, compact spacing — sits just at edge
+  } else if (baseTip === 'whippedCreamRosette') {
+    topDollopInset = 0.84; // standard 12 pc — larger footprint than a regular dollop
+  } else if (baseTip === 'whippedCreamRosetteSparse') {
+    topDollopInset = 0.92; // largest individual rosettes, sparse 8 pc
   }
 
   const radialInset = isBottom
     ? (baseTip === 'beadedTrim' ? -0.10 : (isDollopType ? -0.06 : (['shell', 'reverseShell', 'bead', 'zigzag', 'wavePiping', 'ropeTwist', 'ropeTwistClassic'].includes(baseTip) ? -0.04 : -0.14)))
     : (baseTip === 'beadedTrim' ? 0.22 : (isDollopType ? topDollopInset : (['shell', 'reverseShell'].includes(baseTip) ? 0.40 : (baseTip === 'bead' ? 0.38 : (baseTip === 'zigzag' ? 0.40 : (baseTip === 'wavePiping' ? 0.40 : (['ropeTwist', 'ropeTwistClassic'].includes(baseTip) ? 0.40 : 0.26)))))));
   return Math.max(0.15, surfaceRadius - radialInset);
+
 }
 
 /**

@@ -302,6 +302,100 @@ function buildStarUnitGeometry() {
   );
 }
 
+/**
+ * Whipped cream rosette — models a single swirl piped with a large open-star
+ * tip (Wilton 1M / equivalent), the classic whipped cream border shape.
+ *
+ * Key characteristics vs. a plain starDollop:
+ *   • Wider base (radius 0.40 vs 0.28) — more generous, airy footprint.
+ *   • Fewer, deeper points (8 vs 12) — fat open petals, not tight flutes.
+ *   • Spiraling ridges — `ridgeAngle = angle + swirlAngle(t)` rotates the
+ *     radial-variation phase as height increases, so the peaks/valleys
+ *     describe a continuous spiral from base to tip, exactly like the
+ *     hand-swirling motion used to pipe a real rosette.
+ *   • Plumper belly — holds full width from 18 % to 55 % of height before
+ *     gracefully tapering to a soft rounded central peak.
+ */
+export function buildWhippedCreamRosetteUnitGeometry({ radius = 0.40, height = 0.60, points = 8 } = {}) {
+  const radialSegments = points * 6; // 48 — smooth enough to read the open petal curves
+  const heightSegments = 44;
+  const positions = [];
+  const indices = [];
+
+  const bodyTaper = (t) => {
+    // 0–18 %: base flares from 82 % to full width (seated, grounded look)
+    if (t < 0.18) {
+      const u = t / 0.18;
+      return 0.82 + 0.18 * Math.sin(u * Math.PI / 2);
+    }
+    // 18–55 %: plump open belly — nearly constant, only very gentle narrowing
+    if (t < 0.55) {
+      const u = (t - 0.18) / 0.37;
+      return 1.0 - 0.04 * u;
+    }
+    // 55–100 %: graceful taper to the soft spiral peak
+    const u = (t - 0.55) / 0.45;
+    return 0.96 * Math.pow(1 - u, 1.55);
+  };
+
+  // Ridge amplitude — starts deep (0.23) and fades as we approach the tip,
+  // so the top 15 % reads as a smooth, rounded centre point.
+  const ridgeAmpAt = (t) => 0.23 * Math.max(0, 1 - t / 0.85);
+
+  // The total swirl angle over the full height.  0.9π ≈ 162° of rotation
+  // gives one clear visual twist without completing a full turn, exactly
+  // mimicking the one-and-a-bit swirl of a real piped rosette.
+  const totalSwirl = Math.PI * 0.9;
+
+  const baseYOffset = -0.06 * height; // embed base slightly below y=0
+
+  for (let yi = 0; yi <= heightSegments; yi++) {
+    const t = yi / heightSegments;
+    const taper = bodyTaper(t);
+    const currentY = t * height + baseYOffset;
+    const ridgeAmp = ridgeAmpAt(t);
+    // Rotate the ridge phase with height — this is what creates the spiral.
+    const swirlAngle = t * totalSwirl;
+
+    for (let i = 0; i < radialSegments; i++) {
+      const angle = (i / radialSegments) * Math.PI * 2;
+      const ridgeAngle = angle + swirlAngle; // phase-shifted ridge gives the spiral
+      const radialVariation = 1 + Math.cos(points * ridgeAngle) * ridgeAmp;
+      const r = radius * taper * radialVariation;
+      positions.push(Math.cos(angle) * r, currentY, Math.sin(angle) * r);
+    }
+  }
+
+  // Lateral face indices
+  for (let yi = 0; yi < heightSegments; yi++) {
+    for (let i = 0; i < radialSegments; i++) {
+      const next = (i + 1) % radialSegments;
+      const current = yi * radialSegments + i;
+      const currentNext = yi * radialSegments + next;
+      const nextRow = (yi + 1) * radialSegments + i;
+      const nextRowNext = (yi + 1) * radialSegments + next;
+      indices.push(current, nextRow, currentNext, currentNext, nextRow, nextRowNext);
+    }
+  }
+
+  // Bottom and top cap centres
+  const bottomCenter = positions.length / 3;
+  positions.push(0, baseYOffset, 0);
+  const topStart = heightSegments * radialSegments;
+  const topCenter = positions.length / 3;
+  positions.push(0, height + baseYOffset, 0);
+  for (let i = 0; i < radialSegments; i++) {
+    const next = (i + 1) % radialSegments;
+    indices.push(bottomCenter, next, i, topCenter, topStart + i, topStart + next);
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 /** Tall, ridged star-tip dollop based on a continuous buttercream squeeze:
  * broad, grounded base that flares smoothly into the belly and narrows into a pointed release at the top. */
 export function buildStarDollopUnitGeometry({ radius = 0.28, height = 0.5, points = 12 } = {}) {
@@ -1707,6 +1801,7 @@ function getUnitGeometry(tip) {
       case 'starDollop': unitGeometryCache[tip] = buildStarDollopUnitGeometry(); break;
       case 'roundDollop': unitGeometryCache[tip] = buildRoundDollopUnitGeometry(); break;
       case 'kissDollop': unitGeometryCache[tip] = buildKissDollopUnitGeometry(); break;
+      case 'whippedCreamRosette': unitGeometryCache[tip] = buildWhippedCreamRosetteUnitGeometry(); break;
       default: return null;
     }
     // Reused across every ring built from now on — CakeScene's disposal
@@ -2029,6 +2124,25 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
       mesh.position.y = y;
       mesh.castShadow = true;
       return mesh;
+    }
+    // ─── Whipped Cream Rosettes ───────────────────────────────────────────
+    case 'whippedCreamRosetteContinuous': {
+      // Tight ring — rosettes just kiss each other (≈20 pc on standard cake)
+      const count = Math.max(12, Math.round((radius * Math.PI * 2) / (0.54 * scale)));
+      const dScale = scale * 0.74;
+      return instanceAroundRing(getUnitGeometry('whippedCreamRosette'), material, { ringRadius: radius, y, count, rand, scale: dScale });
+    }
+    case 'whippedCreamRosette': {
+      // Standard spaced ring (≈12 pc on standard cake)
+      const count = Math.max(8, Math.round((radius * Math.PI * 2) / (0.82 * scale)));
+      const dScale = scale * 0.88;
+      return instanceAroundRing(getUnitGeometry('whippedCreamRosette'), material, { ringRadius: radius, y, count, rand, scale: dScale });
+    }
+    case 'whippedCreamRosetteSparse': {
+      // Generous gaps between each rosette (≈8 pc on standard cake)
+      const count = Math.max(6, Math.round((radius * Math.PI * 2) / (1.20 * scale)));
+      const dScale = scale * 1.00;
+      return instanceAroundRing(getUnitGeometry('whippedCreamRosette'), material, { ringRadius: radius, y, count, rand, scale: dScale });
     }
     default:
       return null;

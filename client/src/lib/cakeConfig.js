@@ -319,6 +319,9 @@ export const PIPING_TIPS = [
   { id: 'starScallopSoft', label: 'Soft Star Scallop' },
   { id: 'starScallopDollops', label: 'Scallop with Dollops' },
   { id: 'starScallopLayered', label: 'Layered Star Scallop' },
+  { id: 'whippedCreamRosetteContinuous', label: 'Whipped Cream Rosettes (Continuous)' },
+  { id: 'whippedCreamRosette', label: 'Whipped Cream Rosettes (12 pc)' },
+  { id: 'whippedCreamRosetteSparse', label: 'Whipped Cream Rosettes (Sparse)' },
 ];
 
 // ─── Filling Piping Designs — Filling's own piping vocabulary, split out
@@ -551,6 +554,12 @@ export const CENTER_DECORATION_VARIATIONS = [
   { id: 'crescent', label: 'Crescent Arc' },
   { id: 'cluster', label: 'Offset Cluster' },
   { id: 'diagonal', label: 'Diagonal Stripe' },
+];
+
+export const WHIPPED_CREAM_VARIATIONS = [
+  { id: 'whippedCreamRosetteContinuous', label: 'Whipped Cream Rosettes (Continuous ~20 pc)' },
+  { id: 'whippedCreamRosette', label: 'Whipped Cream Rosettes (12 pc)' },
+  { id: 'whippedCreamRosetteSparse', label: 'Sparse Whipped Cream Rosettes (8 pc)' },
 ];
 
 export const BRACELET_BEADS_VARIATIONS = [
