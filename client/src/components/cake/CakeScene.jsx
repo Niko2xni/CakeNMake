@@ -1456,7 +1456,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         edgeMode === 'both' ? [{ slot: edgeBoth, y: topY, radius: topRadius, isBottom: false }, { slot: edgeBoth, y: 0, radius: BASE_RADIUS, isBottom: true }]
           : [{ slot: edgeTop, y: topY, radius: topRadius, isBottom: false }, { slot: edgeBottom, y: 0, radius: BASE_RADIUS, isBottom: true }];
       for (const { slot, y, radius: edgeRadius, isBottom } of edgeSlotsToRender) {
-        const baseTip = typeof slot?.pipingTip === 'string' ? slot.pipingTip.replace(/Alt$/, '') : '';
+        const baseTip = typeof slot?.pipingTip === 'string' ? slot.pipingTip.replace(/Cherry$/, '').replace(/Alt$/, '') : '';
         const isDollop = baseTip.toLowerCase().includes('dollop');
         const isShell = ['shell', 'reverseShell'].includes(baseTip);
         const isBead = baseTip === 'bead';
@@ -1476,7 +1476,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           group.add(trim);
         }
         if (slot?.pipingTip) {
-          const isAltTip = typeof slot.pipingTip === 'string' && slot.pipingTip.endsWith('Alt');
+          const isAltTip = typeof slot.pipingTip === 'string' && slot.pipingTip.includes('Alt');
           const pipingMat = getFillingMaterial(slot?.pipingColor || lastFrostColor);
           const secondaryMat = isAltTip
             ? getFillingMaterial(slot?.pipingSecondaryColor || '#D6293E')
@@ -1498,7 +1498,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       // Edge > Middle (Layer 1 shelf piping ring for 2-layer cakes) —
       // same Sugar Color colorization as the main Edge slots above.
       if (layerCount >= 2 && edgeMiddle?.pipingTip) {
-        const isAltMiddle = typeof edgeMiddle.pipingTip === 'string' && edgeMiddle.pipingTip.endsWith('Alt');
+        const isAltMiddle = typeof edgeMiddle.pipingTip === 'string' && edgeMiddle.pipingTip.includes('Alt');
         const middlePipingMat = getFillingMaterial(edgeMiddle.pipingColor || lastFrostColor);
         const middleSecondaryMat = isAltMiddle
           ? getFillingMaterial(edgeMiddle.pipingSecondaryColor || '#D6293E')

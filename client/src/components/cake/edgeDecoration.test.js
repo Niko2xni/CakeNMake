@@ -632,6 +632,125 @@ describe('edge decoration placement', () => {
     expect(legacyDefault.surfaceFrostingColorHex).toBeNull();
     expect(legacyDefault.frostingColor).toBe('chocolate');
   });
+
+  it('generates cherry dollop variations with correct cherry counts, heights, and zero overhang', async () => {
+    const { buildPipingRing } = await import('./pipingTips');
+    const THREE = await import('three');
+
+    // Verify radial calculation maintains zero overhang for all cherry variations
+    expect(computeEdgeTrimRadius(4.0, 'starDollopContinuousCherry', 'fullyFrosted')).toBeCloseTo(3.40, 2);
+    expect(computeEdgeTrimRadius(4.0, 'starDollopCherry', 'fullyFrosted')).toBeCloseTo(3.30, 2);
+    expect(computeEdgeTrimRadius(4.0, 'starDollopSparseCherry', 'fullyFrosted')).toBeCloseTo(3.24, 2);
+    expect(computeEdgeTrimRadius(4.0, 'roundDollopCherry', 'fullyFrosted')).toBeCloseTo(3.48, 2);
+    expect(computeEdgeTrimRadius(4.0, 'roundDollopMediumCherry', 'fullyFrosted')).toBeCloseTo(3.30, 2);
+    expect(computeEdgeTrimRadius(4.0, 'roundDollopSparseCherry', 'fullyFrosted')).toBeCloseTo(3.24, 2);
+    expect(computeEdgeTrimRadius(4.0, 'kissDollopCherry', 'fullyFrosted')).toBeCloseTo(3.48, 2);
+    expect(computeEdgeTrimRadius(4.0, 'kissDollopMediumCherry', 'fullyFrosted')).toBeCloseTo(3.30, 2);
+    expect(computeEdgeTrimRadius(4.0, 'kissDollopSparseCherry', 'fullyFrosted')).toBeCloseTo(3.24, 2);
+
+    expect(computeEdgeTrimRadius(4.0, 'starDollopContinuousAltCherry', 'fullyFrosted')).toBeCloseTo(3.40, 2);
+    expect(computeEdgeTrimRadius(4.0, 'starDollopAltCherry', 'fullyFrosted')).toBeCloseTo(3.30, 2);
+    expect(computeEdgeTrimRadius(4.0, 'starDollopSparseAltCherry', 'fullyFrosted')).toBeCloseTo(3.24, 2);
+    expect(computeEdgeTrimRadius(4.0, 'roundDollopAltCherry', 'fullyFrosted')).toBeCloseTo(3.48, 2);
+    expect(computeEdgeTrimRadius(4.0, 'roundDollopMediumAltCherry', 'fullyFrosted')).toBeCloseTo(3.30, 2);
+    expect(computeEdgeTrimRadius(4.0, 'roundDollopSparseAltCherry', 'fullyFrosted')).toBeCloseTo(3.24, 2);
+    expect(computeEdgeTrimRadius(4.0, 'kissDollopAltCherry', 'fullyFrosted')).toBeCloseTo(3.48, 2);
+    expect(computeEdgeTrimRadius(4.0, 'kissDollopMediumAltCherry', 'fullyFrosted')).toBeCloseTo(3.30, 2);
+    expect(computeEdgeTrimRadius(4.0, 'kissDollopSparseAltCherry', 'fullyFrosted')).toBeCloseTo(3.24, 2);
+
+    const matA = new THREE.MeshBasicMaterial({ color: '#FFF' });
+    const matB = new THREE.MeshBasicMaterial({ color: '#D6293E' });
+
+    // 1. Continuous Star Dollop with Cherry (20 dollops + 20 cherries)
+    const starCherry20 = buildPipingRing('starDollopContinuousCherry', matA, { radius: 3.40, y: 1.0, scale: 3 });
+    expect(starCherry20).toBeDefined();
+    expect(starCherry20.isGroup).toBe(true);
+    // child 0: dollop instanced mesh (20 pc), children 1..20: 20 cherries
+    expect(starCherry20.children[0].isInstancedMesh).toBe(true);
+    expect(starCherry20.children[0].count).toBe(20);
+    const cherries20 = starCherry20.children.slice(1);
+    expect(cherries20.length).toBe(20);
+    cherries20.forEach((c) => {
+      expect(c.isGroup).toBe(true);
+      expect(c.position.y).toBeGreaterThan(1.0); // Seated on top of dollop peak
+    });
+
+    // 2. Star Dollop with Cherry (12 dollops + 12 cherries)
+    const starCherry12 = buildPipingRing('starDollopCherry', matA, { radius: 3.30, y: 1.0, scale: 3 });
+    expect(starCherry12.children[0].count).toBe(12);
+    expect(starCherry12.children.slice(1).length).toBe(12);
+
+    // 3. Sparse Star Dollop with Cherry (8 dollops + 8 cherries)
+    const starCherry8 = buildPipingRing('starDollopSparseCherry', matA, { radius: 3.24, y: 1.0, scale: 3 });
+    expect(starCherry8.children[0].count).toBe(8);
+    expect(starCherry8.children.slice(1).length).toBe(8);
+
+    // 4. Alternating Continuous Star Dollop with Cherry (10+10 dual material + 20 cherries)
+    const starCherry20Alt = buildPipingRing('starDollopContinuousAltCherry', matA, {
+      radius: 3.40,
+      y: 1.0,
+      scale: 3,
+      secondaryMaterial: matB,
+    });
+    expect(starCherry20Alt.isGroup).toBe(true);
+    const altDollopGroup = starCherry20Alt.children[0];
+    expect(altDollopGroup.isGroup).toBe(true);
+    expect(altDollopGroup.children.length).toBe(2);
+    expect(altDollopGroup.children[0].count).toBe(10);
+    expect(altDollopGroup.children[1].count).toBe(10);
+    expect(starCherry20Alt.children.slice(1).length).toBe(20);
+
+    // 5. Alternating Round Tip Dollop with Cherry (6+6 dual material + 12 cherries)
+    const roundCherry12Alt = buildPipingRing('roundDollopMediumAltCherry', matA, {
+      radius: 3.30,
+      y: 1.0,
+      scale: 3,
+      secondaryMaterial: matB,
+    });
+    expect(roundCherry12Alt.children[0].children[0].count).toBe(6);
+    expect(roundCherry12Alt.children[0].children[1].count).toBe(6);
+    expect(roundCherry12Alt.children.slice(1).length).toBe(12);
+
+    // 6. Alternating Kiss Dollop with Cherry (4+4 dual material + 8 cherries)
+    const kissCherry8Alt = buildPipingRing('kissDollopSparseAltCherry', matA, {
+      radius: 3.24,
+      y: 1.0,
+      scale: 3,
+      secondaryMaterial: matB,
+    });
+    expect(kissCherry8Alt.children[0].children[0].count).toBe(4);
+    expect(kissCherry8Alt.children[0].children[1].count).toBe(4);
+    expect(kissCherry8Alt.children.slice(1).length).toBe(8);
+  });
+
+  it('renders all 4 dollop sub-rows in EdgeSection including cherry options', () => {
+    render(
+      React.createElement(EdgeSection, {
+        edge: {
+          mode: 'both',
+          both: {
+            decorations: { setId: null, colorId: 'vanilla' },
+            piping: { tip: 'starDollopContinuousCherry', colorId: 'vanilla', secondaryColorId: 'red' },
+          },
+          top: { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
+          bottom: { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
+          middle: { piping: { tip: null, colorId: 'vanilla' } },
+        },
+        onChange: () => { },
+        sugarColor: {},
+        onSugarColorChange: () => { },
+      })
+    );
+
+    const dollopsHeader = screen.getByText('Dollops');
+    const dollopsContainer = dollopsHeader.closest('div');
+    const dollopsWithin = within(dollopsContainer);
+
+    expect(dollopsWithin.getByText('Solid with Cherries 🍒')).toBeInTheDocument();
+    expect(dollopsWithin.getByText('Alternating with Cherries 🍒')).toBeInTheDocument();
+    expect(dollopsWithin.getByText('Solid')).toBeInTheDocument();
+    expect(dollopsWithin.getByText('Alternating (2 Colors)')).toBeInTheDocument();
+  });
 });
 
 

@@ -288,6 +288,15 @@ export const PIPING_TIPS = [
   { id: 'kissDollop', label: 'Continuous Kisses Dollop (20 pc)' },
   { id: 'kissDollopMedium', label: 'Kisses Dollop (12 pc)' },
   { id: 'kissDollopSparse', label: 'Sparse Kisses Dollop (8 pc)' },
+  { id: 'starDollopContinuousCherry', label: 'Continuous Star Dollop (20 pc) with Cherry' },
+  { id: 'starDollopCherry', label: 'Star Dollop (12 pc) with Cherry' },
+  { id: 'starDollopSparseCherry', label: 'Sparse Star Dollop (8 pc) with Cherry' },
+  { id: 'roundDollopCherry', label: 'Continuous Round Tip Dollop (20 pc) with Cherry' },
+  { id: 'roundDollopMediumCherry', label: 'Round Tip Dollop (12 pc) with Cherry' },
+  { id: 'roundDollopSparseCherry', label: 'Sparse Round Tip Dollop (8 pc) with Cherry' },
+  { id: 'kissDollopCherry', label: 'Continuous Kisses Dollop (20 pc) with Cherry' },
+  { id: 'kissDollopMediumCherry', label: 'Kisses Dollop (12 pc) with Cherry' },
+  { id: 'kissDollopSparseCherry', label: 'Sparse Kisses Dollop (8 pc) with Cherry' },
   { id: 'starDollopContinuousAlt', label: 'Continuous Star Dollop (20 pc) - Alternating' },
   { id: 'starDollopAlt', label: 'Star Dollop (12 pc) - Alternating' },
   { id: 'starDollopSparseAlt', label: 'Sparse Star Dollop (8 pc) - Alternating' },
@@ -297,6 +306,15 @@ export const PIPING_TIPS = [
   { id: 'kissDollopAlt', label: 'Continuous Kisses Dollop (20 pc) - Alternating' },
   { id: 'kissDollopMediumAlt', label: 'Kisses Dollop (12 pc) - Alternating' },
   { id: 'kissDollopSparseAlt', label: 'Sparse Kisses Dollop (8 pc) - Alternating' },
+  { id: 'starDollopContinuousAltCherry', label: 'Continuous Star Dollop (20 pc) - Alternating with Cherry' },
+  { id: 'starDollopAltCherry', label: 'Star Dollop (12 pc) - Alternating with Cherry' },
+  { id: 'starDollopSparseAltCherry', label: 'Sparse Star Dollop (8 pc) - Alternating with Cherry' },
+  { id: 'roundDollopAltCherry', label: 'Continuous Round Tip Dollop (20 pc) - Alternating with Cherry' },
+  { id: 'roundDollopMediumAltCherry', label: 'Round Tip Dollop (12 pc) - Alternating with Cherry' },
+  { id: 'roundDollopSparseAltCherry', label: 'Sparse Round Tip Dollop (8 pc) - Alternating with Cherry' },
+  { id: 'kissDollopAltCherry', label: 'Continuous Kisses Dollop (20 pc) - Alternating with Cherry' },
+  { id: 'kissDollopMediumAltCherry', label: 'Kisses Dollop (12 pc) - Alternating with Cherry' },
+  { id: 'kissDollopSparseAltCherry', label: 'Sparse Kisses Dollop (8 pc) - Alternating with Cherry' },
   { id: 'starScallop', label: 'Star Scallop' },
   { id: 'starScallopSoft', label: 'Soft Star Scallop' },
   { id: 'starScallopDollops', label: 'Scallop with Dollops' },
@@ -562,6 +580,18 @@ export const DOLLOPS_SOLID_VARIATIONS = [
   { id: 'kissDollopSparse', label: 'Sparse Kisses Dollop (8 pc)' },
 ];
 
+export const DOLLOPS_SOLID_CHERRY_VARIATIONS = [
+  { id: 'starDollopContinuousCherry', label: 'Continuous Star Dollop (20 pc) with Cherry' },
+  { id: 'starDollopCherry', label: 'Star Dollop (12 pc) with Cherry' },
+  { id: 'starDollopSparseCherry', label: 'Sparse Star Dollop (8 pc) with Cherry' },
+  { id: 'roundDollopCherry', label: 'Continuous Round Tip Dollop (20 pc) with Cherry' },
+  { id: 'roundDollopMediumCherry', label: 'Round Tip Dollop (12 pc) with Cherry' },
+  { id: 'roundDollopSparseCherry', label: 'Sparse Round Tip Dollop (8 pc) with Cherry' },
+  { id: 'kissDollopCherry', label: 'Continuous Kisses Dollop (20 pc) with Cherry' },
+  { id: 'kissDollopMediumCherry', label: 'Kisses Dollop (12 pc) with Cherry' },
+  { id: 'kissDollopSparseCherry', label: 'Sparse Kisses Dollop (8 pc) with Cherry' },
+];
+
 export const DOLLOPS_ALTERNATING_VARIATIONS = [
   { id: 'starDollopContinuousAlt', label: 'Continuous Star Dollop (20 pc) - Alternating' },
   { id: 'starDollopAlt', label: 'Star Dollop (12 pc) - Alternating' },
@@ -574,9 +604,23 @@ export const DOLLOPS_ALTERNATING_VARIATIONS = [
   { id: 'kissDollopSparseAlt', label: 'Sparse Kisses Dollop (8 pc) - Alternating' },
 ];
 
+export const DOLLOPS_ALTERNATING_CHERRY_VARIATIONS = [
+  { id: 'starDollopContinuousAltCherry', label: 'Continuous Star Dollop (20 pc) - Alternating with Cherry' },
+  { id: 'starDollopAltCherry', label: 'Star Dollop (12 pc) - Alternating with Cherry' },
+  { id: 'starDollopSparseAltCherry', label: 'Sparse Star Dollop (8 pc) - Alternating with Cherry' },
+  { id: 'roundDollopAltCherry', label: 'Continuous Round Tip Dollop (20 pc) - Alternating with Cherry' },
+  { id: 'roundDollopMediumAltCherry', label: 'Round Tip Dollop (12 pc) - Alternating with Cherry' },
+  { id: 'roundDollopSparseAltCherry', label: 'Sparse Round Tip Dollop (8 pc) - Alternating with Cherry' },
+  { id: 'kissDollopAltCherry', label: 'Continuous Kisses Dollop (20 pc) - Alternating with Cherry' },
+  { id: 'kissDollopMediumAltCherry', label: 'Kisses Dollop (12 pc) - Alternating with Cherry' },
+  { id: 'kissDollopSparseAltCherry', label: 'Sparse Kisses Dollop (8 pc) - Alternating with Cherry' },
+];
+
 export const DOLLOPS_VARIATIONS = [
   ...DOLLOPS_SOLID_VARIATIONS,
+  ...DOLLOPS_SOLID_CHERRY_VARIATIONS,
   ...DOLLOPS_ALTERNATING_VARIATIONS,
+  ...DOLLOPS_ALTERNATING_CHERRY_VARIATIONS,
 ];
 
 export const SCALLOPS_VARIATIONS = [

@@ -127,7 +127,7 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
   // board would really sit — rather than just closer to flush with it.
   const isDollopType = decorationType === 'dollops' || (typeof decorationType === 'string' && decorationType.toLowerCase().includes('dollop'));
 
-  const baseTip = typeof decorationType === 'string' ? decorationType.replace(/Alt$/, '') : decorationType;
+  const baseTip = typeof decorationType === 'string' ? decorationType.replace(/Cherry$/, '').replace(/Alt$/, '') : decorationType;
   let topDollopInset = 0.76;
   if (baseTip === 'starDollopContinuous') {
     topDollopInset = 0.66; // R = 4.06 - 0.66 = 3.40 -> outer edge: 3.40 + 0.625 = 4.025 (right by edge, strictly <= 4.06)
