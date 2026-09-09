@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import EdgeSection from './sections/EdgeSection';
 import { computeEdgeTrimRadius, computeEdgeTrimY } from './DecorationSets';
@@ -90,6 +90,15 @@ describe('edge decoration placement', () => {
     expect(screen.getByTitle('Continuous Kisses Dollop (20 pc)')).toBeInTheDocument();
     expect(screen.getByTitle('Kisses Dollop (12 pc)')).toBeInTheDocument();
     expect(screen.getByTitle('Sparse Kisses Dollop (8 pc)')).toBeInTheDocument();
+    expect(screen.getByTitle('Continuous Star Dollop (20 pc) - Alternating')).toBeInTheDocument();
+    expect(screen.getByTitle('Star Dollop (12 pc) - Alternating')).toBeInTheDocument();
+    expect(screen.getByTitle('Sparse Star Dollop (8 pc) - Alternating')).toBeInTheDocument();
+    expect(screen.getByTitle('Continuous Round Tip Dollop (20 pc) - Alternating')).toBeInTheDocument();
+    expect(screen.getByTitle('Round Tip Dollop (12 pc) - Alternating')).toBeInTheDocument();
+    expect(screen.getByTitle('Sparse Round Tip Dollop (8 pc) - Alternating')).toBeInTheDocument();
+    expect(screen.getByTitle('Continuous Kisses Dollop (20 pc) - Alternating')).toBeInTheDocument();
+    expect(screen.getByTitle('Kisses Dollop (12 pc) - Alternating')).toBeInTheDocument();
+    expect(screen.getByTitle('Sparse Kisses Dollop (8 pc) - Alternating')).toBeInTheDocument();
   });
 
   it('generates dense accordion-pleated zigzag geometry with zero overhang', async () => {
@@ -328,6 +337,95 @@ describe('edge decoration placement', () => {
     expect(ringMesh8).toBeDefined();
     expect(ringMesh8.isInstancedMesh).toBe(true);
     expect(ringMesh8.count).toBe(8);
+  });
+
+  it('generates alternating dollop variations with dual-material groups, correct counts, and zero overhang', async () => {
+    const { buildPipingRing } = await import('./pipingTips');
+    const THREE = await import('three');
+
+    const matA = new THREE.MeshBasicMaterial({ color: '#FFF' });
+    const matB = new THREE.MeshBasicMaterial({ color: '#D6293E' });
+
+    // 1. Continuous Star Dollop Alternating (20 count: 10 + 10)
+    const starRing20Alt = buildPipingRing('starDollopContinuousAlt', matA, {
+      radius: 3.40,
+      y: 1.0,
+      scale: 3,
+      secondaryMaterial: matB,
+    });
+    expect(starRing20Alt).toBeDefined();
+    expect(starRing20Alt.isGroup).toBe(true);
+    expect(starRing20Alt.children.length).toBe(2);
+    expect(starRing20Alt.children[0].count).toBe(10);
+    expect(starRing20Alt.children[1].count).toBe(10);
+    expect(starRing20Alt.children[0].material).toBe(matA);
+    expect(starRing20Alt.children[1].material).toBe(matB);
+
+    // 2. Round Tip Dollop Alternating (12 count: 6 + 6)
+    const roundRing12Alt = buildPipingRing('roundDollopMediumAlt', matA, {
+      radius: 3.30,
+      y: 1.0,
+      scale: 3,
+      secondaryMaterial: matB,
+    });
+    expect(roundRing12Alt).toBeDefined();
+    expect(roundRing12Alt.isGroup).toBe(true);
+    expect(roundRing12Alt.children.length).toBe(2);
+    expect(roundRing12Alt.children[0].count).toBe(6);
+    expect(roundRing12Alt.children[1].count).toBe(6);
+
+    // 3. Kisses Dollop Alternating (8 count: 4 + 4)
+    const kissRing8Alt = buildPipingRing('kissDollopSparseAlt', matA, {
+      radius: 3.24,
+      y: 1.0,
+      scale: 3,
+      secondaryMaterial: matB,
+    });
+    expect(kissRing8Alt).toBeDefined();
+    expect(kissRing8Alt.isGroup).toBe(true);
+    expect(kissRing8Alt.children.length).toBe(2);
+    expect(kissRing8Alt.children[0].count).toBe(4);
+    expect(kissRing8Alt.children[1].count).toBe(4);
+  });
+
+  it('renders alternating color options that reflect the Color Override palette', () => {
+    render(
+      React.createElement(EdgeSection, {
+        edge: {
+          mode: 'both',
+          both: {
+            decorations: { setId: null, colorId: 'vanilla' },
+            piping: { tip: 'starDollopContinuousAlt', colorId: 'vanilla', secondaryColorId: 'red' },
+          },
+          top: { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
+          bottom: { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
+          middle: { piping: { tip: null, colorId: 'vanilla' } },
+        },
+        onChange: () => { },
+        sugarColor: {},
+        onSugarColorChange: () => { },
+      })
+    );
+
+    expect(screen.getByText('Alternating Color (Color 2)')).toBeInTheDocument();
+    expect(screen.getByText('Primary Color (Color 1)')).toBeInTheDocument();
+
+    const altSection = screen.getByText('Alternating Color (Color 2)').closest('div.pt-3');
+    const altWithin = within(altSection);
+
+    // Page 1 of Color Override has Red, Black, Pink, White, Ivory, Blush
+    expect(altWithin.getByTitle('Red')).toBeInTheDocument();
+    expect(altWithin.getByTitle('Black')).toBeInTheDocument();
+    expect(altWithin.getByTitle('Pink')).toBeInTheDocument();
+    expect(altWithin.getByTitle('White')).toBeInTheDocument();
+    expect(altWithin.getByTitle('Ivory (+₱50)')).toBeInTheDocument();
+    expect(altWithin.getByTitle('Blush (+₱50)')).toBeInTheDocument();
+
+    // Flavor mirror colors must NOT be in Alternating Color (Color 2)
+    expect(altWithin.queryByTitle('Chocolate')).not.toBeInTheDocument();
+    expect(altWithin.queryByTitle('Vanilla')).not.toBeInTheDocument();
+    expect(altWithin.queryByTitle('Ube')).not.toBeInTheDocument();
+    expect(altWithin.queryByTitle('Mocha')).not.toBeInTheDocument();
   });
 });
 

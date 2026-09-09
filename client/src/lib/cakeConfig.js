@@ -163,11 +163,11 @@ export const DEFAULT_CONFIG = {
   // just hidden.
   edge: {
     mode: 'both', // 'topBottomSeparate' | 'both'
-    top:    { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
-    bottom: { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
-    both:   { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
+    top:    { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla', secondaryColorId: 'red' } },
+    bottom: { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla', secondaryColorId: 'red' } },
+    both:   { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla', secondaryColorId: 'red' } },
     // Layer 1 shelf ring — only active on 2-layer cakes
-    middle: { piping: { tip: null, colorId: 'vanilla' } },
+    middle: { piping: { tip: null, colorId: 'vanilla', secondaryColorId: 'red' } },
   },
 
   // 7. Side — vertical walls. Exactly one of the seven treatments below is
@@ -281,6 +281,15 @@ export const PIPING_TIPS = [
   { id: 'kissDollop', label: 'Continuous Kisses Dollop (20 pc)' },
   { id: 'kissDollopMedium', label: 'Kisses Dollop (12 pc)' },
   { id: 'kissDollopSparse', label: 'Sparse Kisses Dollop (8 pc)' },
+  { id: 'starDollopContinuousAlt', label: 'Continuous Star Dollop (20 pc) - Alternating' },
+  { id: 'starDollopAlt', label: 'Star Dollop (12 pc) - Alternating' },
+  { id: 'starDollopSparseAlt', label: 'Sparse Star Dollop (8 pc) - Alternating' },
+  { id: 'roundDollopAlt', label: 'Continuous Round Tip Dollop (20 pc) - Alternating' },
+  { id: 'roundDollopMediumAlt', label: 'Round Tip Dollop (12 pc) - Alternating' },
+  { id: 'roundDollopSparseAlt', label: 'Sparse Round Tip Dollop (8 pc) - Alternating' },
+  { id: 'kissDollopAlt', label: 'Continuous Kisses Dollop (20 pc) - Alternating' },
+  { id: 'kissDollopMediumAlt', label: 'Kisses Dollop (12 pc) - Alternating' },
+  { id: 'kissDollopSparseAlt', label: 'Sparse Kisses Dollop (8 pc) - Alternating' },
   { id: 'starScallop', label: 'Star Scallop' },
   { id: 'starScallopSoft', label: 'Soft Star Scallop' },
   { id: 'starScallopDollops', label: 'Scallop with Dollops' },
@@ -534,7 +543,7 @@ export const BRACELET_BEADS_VARIATIONS = [
   { id: 'beadedTrimPetite', label: 'Petite Beaded Trim' },
 ];
 
-export const DOLLOPS_VARIATIONS = [
+export const DOLLOPS_SOLID_VARIATIONS = [
   { id: 'starDollopContinuous', label: 'Continuous Star Dollop (20 pc)' },
   { id: 'starDollop', label: 'Star Dollop (12 pc)' },
   { id: 'starDollopSparse', label: 'Sparse Star Dollop (8 pc)' },
@@ -544,6 +553,23 @@ export const DOLLOPS_VARIATIONS = [
   { id: 'kissDollop', label: 'Continuous Kisses Dollop (20 pc)' },
   { id: 'kissDollopMedium', label: 'Kisses Dollop (12 pc)' },
   { id: 'kissDollopSparse', label: 'Sparse Kisses Dollop (8 pc)' },
+];
+
+export const DOLLOPS_ALTERNATING_VARIATIONS = [
+  { id: 'starDollopContinuousAlt', label: 'Continuous Star Dollop (20 pc) - Alternating' },
+  { id: 'starDollopAlt', label: 'Star Dollop (12 pc) - Alternating' },
+  { id: 'starDollopSparseAlt', label: 'Sparse Star Dollop (8 pc) - Alternating' },
+  { id: 'roundDollopAlt', label: 'Continuous Round Tip Dollop (20 pc) - Alternating' },
+  { id: 'roundDollopMediumAlt', label: 'Round Tip Dollop (12 pc) - Alternating' },
+  { id: 'roundDollopSparseAlt', label: 'Sparse Round Tip Dollop (8 pc) - Alternating' },
+  { id: 'kissDollopAlt', label: 'Continuous Kisses Dollop (20 pc) - Alternating' },
+  { id: 'kissDollopMediumAlt', label: 'Kisses Dollop (12 pc) - Alternating' },
+  { id: 'kissDollopSparseAlt', label: 'Sparse Kisses Dollop (8 pc) - Alternating' },
+];
+
+export const DOLLOPS_VARIATIONS = [
+  ...DOLLOPS_SOLID_VARIATIONS,
+  ...DOLLOPS_ALTERNATING_VARIATIONS,
 ];
 
 export const SCALLOPS_VARIATIONS = [

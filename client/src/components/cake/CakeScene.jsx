@@ -1456,7 +1456,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         edgeMode === 'both' ? [{ slot: edgeBoth, y: topY, radius: topRadius, isBottom: false }, { slot: edgeBoth, y: 0, radius: BASE_RADIUS, isBottom: true }]
           : [{ slot: edgeTop, y: topY, radius: topRadius, isBottom: false }, { slot: edgeBottom, y: 0, radius: BASE_RADIUS, isBottom: true }];
       for (const { slot, y, radius: edgeRadius, isBottom } of edgeSlotsToRender) {
-        const isDollop = ['starDollop', 'starDollopSparse', 'starDollopContinuous', 'roundDollop', 'roundDollopMedium', 'roundDollopSparse', 'kissDollop', 'kissDollopMedium', 'kissDollopSparse'].includes(slot?.pipingTip);
+        const isDollop = typeof slot?.pipingTip === 'string' && slot.pipingTip.toLowerCase().includes('dollop');
         const isShell = ['shell', 'reverseShell'].includes(slot?.pipingTip);
         const isBead = slot?.pipingTip === 'bead';
         const isZigzag = slot?.pipingTip === 'zigzag';
@@ -1475,12 +1475,17 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           group.add(trim);
         }
         if (slot?.pipingTip) {
+          const isAltTip = typeof slot.pipingTip === 'string' && slot.pipingTip.endsWith('Alt');
           const pipingMat = getFillingMaterial(slot?.pipingColor || lastFrostColor);
+          const secondaryMat = isAltTip
+            ? getFillingMaterial(slot?.pipingSecondaryColor || '#D6293E')
+            : null;
           const edgePiping = buildPipingRing(slot.pipingTip, pipingMat, {
             radius: edgeTrimRadius,
             y: edgeTrimY,
             rand,
             scale: 3,
+            secondaryMaterial: secondaryMat,
           });
           if (edgePiping) {
             edgePiping.receiveShadow = true;
@@ -1492,12 +1497,17 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       // Edge > Middle (Layer 1 shelf piping ring for 2-layer cakes) —
       // same Sugar Color colorization as the main Edge slots above.
       if (layerCount >= 2 && edgeMiddle?.pipingTip) {
+        const isAltMiddle = typeof edgeMiddle.pipingTip === 'string' && edgeMiddle.pipingTip.endsWith('Alt');
         const middlePipingMat = getFillingMaterial(edgeMiddle.pipingColor || lastFrostColor);
+        const middleSecondaryMat = isAltMiddle
+          ? getFillingMaterial(edgeMiddle.pipingSecondaryColor || '#D6293E')
+          : null;
         const middlePiping = buildPipingRing(edgeMiddle.pipingTip, middlePipingMat, {
           radius: Math.max(0.2, layer1OuterRadius - 0.12),
           y: ledgeY + 0.045,
           rand,
           scale: 3,
+          secondaryMaterial: middleSecondaryMat,
         });
         if (middlePiping) {
           middlePiping.receiveShadow = true;

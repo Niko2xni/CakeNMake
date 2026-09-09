@@ -228,6 +228,7 @@ export function adaptConfigToLegacy(newConfig) {
     decorationColor: resolveContextSugarColor(context, null, true) || resolveColor(slot?.decorations?.colorId),
     pipingTip: slot?.piping?.tip || null,
     pipingColor: resolveContextSugarColor(context, null, true) || resolveColor(slot?.piping?.colorId),
+    pipingSecondaryColor: resolveContextSugarColor(`${context}Secondary`, null, true) || resolveColor(slot?.piping?.secondaryColorId || 'red'),
   });
   const edgeTop = resolveEdgeSlot(edge.top, 'edgeTop');
   const edgeBottom = resolveEdgeSlot(edge.bottom, 'edgeBottom');
@@ -236,6 +237,7 @@ export function adaptConfigToLegacy(newConfig) {
   const edgeMiddle = {
     pipingTip: edge.middle?.piping?.tip || null,
     pipingColor: resolveColor(edge.middle?.piping?.colorId),
+    pipingSecondaryColor: resolveColor(edge.middle?.piping?.secondaryColorId || 'red'),
   };
 
   // ── Side — exactly one of seven treatments is active at a time

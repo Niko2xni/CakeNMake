@@ -1,16 +1,20 @@
 import React, { useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   BORDER_PIPING_VARIATIONS,
   BRACELET_BEADS_VARIATIONS,
+  DOLLOPS_SOLID_VARIATIONS,
+  DOLLOPS_ALTERNATING_VARIATIONS,
   DOLLOPS_VARIATIONS,
   STANDALONE_EDGE_PIPING_OPTIONS,
   PIPING_TIPS,
+  SUGAR_COLORS,
 } from '@/lib/cakeConfig';
 import SugarColorSection from './SugarColorSection';
 
 const EMPTY_SLOT = () => ({
   decorations: { setId: null, colorId: 'vanilla' },
-  piping: { tip: null, colorId: 'vanilla' },
+  piping: { tip: null, colorId: 'vanilla', secondaryColorId: 'red' },
 });
 
 // NOTE: single whole-cake setting for now, not per-tier — see
@@ -49,6 +53,22 @@ export default function EdgeSection({
 
   const currentSlotKey = mode === 'both' ? 'both' : activeSlot;
   const currentSlot = edge[currentSlotKey] || EMPTY_SLOT();
+
+  const isAlternating = typeof currentSlot.piping?.tip === 'string' && currentSlot.piping.tip.endsWith('Alt');
+  const overrideColors = SUGAR_COLORS.filter((c) => !c.isFlavorMirror);
+  const ALT_COLORS_PER_PAGE = 6;
+  const [altColorPage, setAltColorPage] = useState(0);
+  const altPageCount = Math.ceil(overrideColors.length / ALT_COLORS_PER_PAGE);
+  const visibleAltColors = overrideColors.slice(
+    altColorPage * ALT_COLORS_PER_PAGE,
+    (altColorPage + 1) * ALT_COLORS_PER_PAGE
+  );
+
+  const activeSecondaryColorId = currentSlot.piping?.secondaryColorId || 'red';
+  const activeSecondaryColor =
+    overrideColors.find((c) => c.id === activeSecondaryColorId) ||
+    SUGAR_COLORS.find((c) => c.id === activeSecondaryColorId) ||
+    overrideColors[0];
 
   const updateSlot = (changes) => {
     onChange({ ...edge, [currentSlotKey]: { ...currentSlot, ...changes } });
@@ -231,36 +251,83 @@ export default function EdgeSection({
             );
           })}
 
-          {/* Dollops — grouped multi-variant row */}
+          {/* Dollops — grouped multi-variant rows */}
           <div>
             <span className="text-xs font-semibold text-foreground/80 mb-1.5 block">
               Dollops
             </span>
-            <div className="flex flex-wrap gap-2">
-              {DOLLOPS_VARIATIONS.map((variant, i) => {
-                const active =
-                  (currentSlot.piping?.tip || currentSlot.decorations?.setId) === variant.id;
-                return (
-                  <button
-                    key={variant.id}
-                    type="button"
-                    onClick={() =>
-                      updateSlot({
-                        decorations: { ...currentSlot.decorations, setId: null },
-                        piping: { ...currentSlot.piping, tip: active ? null : variant.id },
-                      })
-                    }
-                    title={variant.label}
-                    className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
-                      active
-                        ? 'bg-primary text-primary-foreground border-primary shadow-md'
-                        : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
-                    }`}
-                  >
-                    {i + 1}
-                  </button>
-                );
-              })}
+            <div className="space-y-3">
+              <div>
+                <span className="text-[11px] font-medium text-muted-foreground mb-1 block">
+                  Solid
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {DOLLOPS_SOLID_VARIATIONS.map((variant, i) => {
+                    const active =
+                      (currentSlot.piping?.tip || currentSlot.decorations?.setId) === variant.id;
+                    return (
+                      <button
+                        key={variant.id}
+                        type="button"
+                        onClick={() =>
+                          updateSlot({
+                            decorations: { ...currentSlot.decorations, setId: null },
+                            piping: { ...currentSlot.piping, tip: active ? null : variant.id },
+                          })
+                        }
+                        title={variant.label}
+                        className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
+                          active
+                            ? 'bg-primary text-primary-foreground border-primary shadow-md'
+                            : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
+                        }`}
+                      >
+                        {i + 1}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <span className="text-[11px] font-medium text-muted-foreground mb-1 block">
+                  Alternating (2 Colors)
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {DOLLOPS_ALTERNATING_VARIATIONS.map((variant, i) => {
+                    const active =
+                      (currentSlot.piping?.tip || currentSlot.decorations?.setId) === variant.id;
+                    return (
+                      <button
+                        key={variant.id}
+                        type="button"
+                        onClick={() =>
+                          updateSlot({
+                            decorations: { ...currentSlot.decorations, setId: null },
+                            piping: {
+                              ...currentSlot.piping,
+                              tip: active ? null : variant.id,
+                              secondaryColorId: currentSlot.piping?.secondaryColorId || 'red',
+                            },
+                          })
+                        }
+                        title={variant.label}
+                        className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 relative ${
+                          active
+                            ? 'bg-primary text-primary-foreground border-primary shadow-md'
+                            : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
+                        }`}
+                      >
+                        <span>{i + 1}</span>
+                        <span
+                          className="absolute bottom-1 w-1.5 h-1.5 rounded-full border border-black/20"
+                          style={{ backgroundColor: activeSecondaryColor?.hex || '#D6293E' }}
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -307,11 +374,92 @@ export default function EdgeSection({
       )}
 
       {mode && (
-        <SugarColorSection
-          sugarColor={sugarColor}
-          onChange={onSugarColorChange}
-          showDefaultColorPicker
-        />
+        <div className="space-y-4 pt-2 border-t border-border/50">
+          <div className="space-y-1">
+            {isAlternating && (
+              <span className="text-xs font-semibold text-foreground/80 block">
+                Primary Color (Color 1)
+              </span>
+            )}
+            <SugarColorSection
+              sugarColor={sugarColor}
+              onChange={onSugarColorChange}
+              showDefaultColorPicker
+            />
+          </div>
+
+          {isAlternating && (
+            <div className="pt-3 border-t border-border/50">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-muted-foreground">Alternating Color (Color 2)</span>
+                <span className="text-[10px] text-muted-foreground">
+                  {altColorPage + 1} / {altPageCount} · {Math.max(0, overrideColors.length - ((altColorPage + 1) * ALT_COLORS_PER_PAGE))} more
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {visibleAltColors.map((c) => {
+                  const isActive = activeSecondaryColorId === c.id;
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() =>
+                        updateSlot({
+                          piping: { ...currentSlot.piping, secondaryColorId: c.id },
+                        })
+                      }
+                      title={`${c.label}${c.price ? ` (+₱${c.price})` : ''}`}
+                      className={`flex flex-col items-center gap-1.5 rounded-xl p-3 text-left transition-all duration-200 border-2 ${
+                        isActive
+                          ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-[1.02]'
+                          : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
+                      }`}
+                    >
+                      <span
+                        className="w-8 h-8 rounded-full border-2 border-black/10"
+                        style={{ background: c.swatchCss || c.hex }}
+                      />
+                      <span className="text-xs font-semibold">{c.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex items-center justify-center gap-3 mt-3">
+                <button
+                  type="button"
+                  onClick={() => setAltColorPage((page) => Math.max(0, page - 1))}
+                  disabled={altColorPage === 0}
+                  aria-label="Previous Alternating colors"
+                  className="w-8 h-8 rounded-full bg-muted text-muted-foreground disabled:opacity-30 hover:bg-muted/80"
+                >
+                  <ChevronLeft className="w-4 h-4 mx-auto" />
+                </button>
+                <div className="flex gap-1.5" aria-label={`Alternating color page ${altColorPage + 1} of ${altPageCount}`}>
+                  {Array.from({ length: altPageCount }).map((_, page) => (
+                    <span
+                      key={page}
+                      className={`w-1.5 h-1.5 rounded-full ${page === altColorPage ? 'bg-primary' : 'bg-muted-foreground/30'}`}
+                    />
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAltColorPage((page) => Math.min(altPageCount - 1, page + 1))}
+                  disabled={altColorPage === altPageCount - 1}
+                  aria-label="Next Alternating colors"
+                  className="w-8 h-8 rounded-full bg-muted text-muted-foreground disabled:opacity-30 hover:bg-muted/80"
+                >
+                  <ChevronRight className="w-4 h-4 mx-auto" />
+                </button>
+              </div>
+              {activeSecondaryColor && (
+                <p className="text-[10px] text-muted-foreground mt-1.5">
+                  {activeSecondaryColor.label}{activeSecondaryColor.price ? ` — +₱${activeSecondaryColor.price}` : ''}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
