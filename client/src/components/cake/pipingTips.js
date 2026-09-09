@@ -1808,7 +1808,7 @@ function instanceAroundRing(geometry, material, {
  * maxLeanRad: maximum random tilt angle (radians) applied on X and Z
  *   independently, simulating imperfect hand-placement.
  */
-function wrapWithCherries(dollopMesh, { count, radius, y, rand, cherryScale, peakYOffset, sinkAmount = 0, maxLeanRad = 0.21 }) {
+function wrapWithCherries(dollopMesh, { count, radius, y, rand, cherryScale, cherryScaleY, peakYOffset, sinkAmount = 0, maxLeanRad = 0.21 }) {
   const group = new THREE.Group();
   group.add(dollopMesh);
   for (let i = 0; i < count; i++) {
@@ -1819,6 +1819,10 @@ function wrapWithCherries(dollopMesh, { count, radius, y, rand, cherryScale, pea
     // into the buttercream so it looks nestled rather than balanced on the tip.
     const cy = y + peakYOffset - sinkAmount;
     const cherry = buildCherryMesh(cx, cy, cz, cherryScale, rand);
+    // Apply non-uniform Y scale to simulate cherry settling into soft cream.
+    if (cherryScaleY !== undefined && cherryScaleY !== cherryScale) {
+      cherry.scale.set(cherryScale, cherryScaleY, cherryScale);
+    }
     // Add a gentle random lean on each axis independently to simulate
     // hand-placed placement — cherries never sit perfectly upright in real life.
     cherry.rotation.x += (rand() - 0.5) * 2 * maxLeanRad;
@@ -1887,11 +1891,16 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
     const dollopScaleY = scaleY !== null && scaleY !== undefined ? scaleY : dollopScale;
     const peakYOffset = peakRatio * dollopScaleY;
     const cherryScale = baseCherryScale * (scale / 3);
-    // Sink the cherry 20% of its scaled body radius into the dollop so it
-    // looks nestled into the buttercream rather than perched on the tip.
-    // Cherry body base radius ≈ 0.38 world units before cherryScale is applied.
-    const sinkAmount = cherryScale * 0.38 * 0.20;
-    return wrapWithCherries(mesh, { count, radius, y, rand, cherryScale, peakYOffset, sinkAmount });
+    // Sink the cherry ~55% of its scaled body radius into the dollop so the
+    // lower half is embedded in the soft buttercream -- giving a realistic
+    // 'settled into cream' look rather than perched on the tip.
+    // Cherry body base radius ~0.38 world units before cherryScale is applied.
+    const sinkAmount = cherryScale * 0.38 * 0.55;
+    // Compress the cherry slightly on Y to simulate soft cream squishing up
+    // around the sides -- the weight of the fruit dents the dollop and the
+    // cream rises slightly on the equatorial band.
+    const cherryScaleY = cherryScale * 0.88;
+    return wrapWithCherries(mesh, { count, radius, y, rand, cherryScale, cherryScaleY, peakYOffset, sinkAmount, maxLeanRad: 0.14 });
   };
 
   switch (cleanTip) {
