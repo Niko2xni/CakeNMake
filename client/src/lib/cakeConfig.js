@@ -322,6 +322,9 @@ export const PIPING_TIPS = [
   { id: 'whippedCreamRosetteContinuous', label: 'Whipped Cream Rosettes (Continuous)' },
   { id: 'whippedCreamRosette', label: 'Whipped Cream Rosettes (12 pc)' },
   { id: 'whippedCreamRosetteSparse', label: 'Whipped Cream Rosettes (Sparse)' },
+  { id: 'whippedCreamRosetteContinuousCherry', label: 'Whipped Cream Rosettes with Cherry (Continuous)' },
+  { id: 'whippedCreamRosetteCherry', label: 'Whipped Cream Rosettes with Cherry (12 pc)' },
+  { id: 'whippedCreamRosetteSparseCherry', label: 'Sparse Whipped Cream Rosettes with Cherry (8 pc)' },
 ];
 
 // ─── Filling Piping Designs — Filling's own piping vocabulary, split out
@@ -556,10 +559,21 @@ export const CENTER_DECORATION_VARIATIONS = [
   { id: 'diagonal', label: 'Diagonal Stripe' },
 ];
 
-export const WHIPPED_CREAM_VARIATIONS = [
+export const WHIPPED_CREAM_SOLID_VARIATIONS = [
   { id: 'whippedCreamRosetteContinuous', label: 'Whipped Cream Rosettes (Continuous ~20 pc)' },
   { id: 'whippedCreamRosette', label: 'Whipped Cream Rosettes (12 pc)' },
   { id: 'whippedCreamRosetteSparse', label: 'Sparse Whipped Cream Rosettes (8 pc)' },
+];
+
+export const WHIPPED_CREAM_CHERRY_VARIATIONS = [
+  { id: 'whippedCreamRosetteContinuousCherry', label: 'Whipped Cream Rosettes with Cherry (Continuous ~20 pc)' },
+  { id: 'whippedCreamRosetteCherry', label: 'Whipped Cream Rosettes with Cherry (12 pc)' },
+  { id: 'whippedCreamRosetteSparseCherry', label: 'Sparse Whipped Cream Rosettes with Cherry (8 pc)' },
+];
+
+export const WHIPPED_CREAM_VARIATIONS = [
+  ...WHIPPED_CREAM_SOLID_VARIATIONS,
+  ...WHIPPED_CREAM_CHERRY_VARIATIONS,
 ];
 
 export const BRACELET_BEADS_VARIATIONS = [

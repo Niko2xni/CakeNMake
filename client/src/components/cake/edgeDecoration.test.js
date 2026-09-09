@@ -410,6 +410,17 @@ describe('edge decoration placement', () => {
     expect(computeEdgeTrimY(0, 4.0, 'whippedCreamRosetteContinuous', 'fullyFrosted', true)).toBeCloseTo(-0.02, 2);
     expect(computeEdgeTrimY(0, 4.0, 'whippedCreamRosette', 'fullyFrosted', true)).toBeCloseTo(-0.02, 2);
     expect(computeEdgeTrimY(0, 4.0, 'whippedCreamRosetteSparse', 'fullyFrosted', true)).toBeCloseTo(-0.02, 2);
+
+    // Cherry whipped cream variations automatically inherit same insets
+    expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteContinuousCherry', 'fullyFrosted')).toBeCloseTo(3.34, 2);
+    expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteCherry', 'fullyFrosted')).toBeCloseTo(3.24, 2);
+    expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteSparseCherry', 'fullyFrosted')).toBeCloseTo(3.12, 2);
+    expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteContinuousCherry', 'fullyFrosted', true)).toBeCloseTo(4.08, 2);
+    expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteCherry', 'fullyFrosted', true)).toBeCloseTo(4.08, 2);
+    expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteSparseCherry', 'fullyFrosted', true)).toBeCloseTo(4.08, 2);
+    expect(computeEdgeTrimY(0, 4.0, 'whippedCreamRosetteContinuousCherry', 'fullyFrosted', true)).toBeCloseTo(-0.02, 2);
+    expect(computeEdgeTrimY(0, 4.0, 'whippedCreamRosetteCherry', 'fullyFrosted', true)).toBeCloseTo(-0.02, 2);
+    expect(computeEdgeTrimY(0, 4.0, 'whippedCreamRosetteSparseCherry', 'fullyFrosted', true)).toBeCloseTo(-0.02, 2);
   });
 
   it('generates correct instance counts for whipped cream rosette variations', async () => {
@@ -833,6 +844,76 @@ describe('edge decoration placement', () => {
     expect(dollopsWithin.getByText('Alternating with Cherries 🍒')).toBeInTheDocument();
     expect(dollopsWithin.getByText('Solid')).toBeInTheDocument();
     expect(dollopsWithin.getByText('Alternating (2 Colors)')).toBeInTheDocument();
+  });
+
+  it('generates cherry whipped cream rosette variations with correct counts, nested cherries, and zero overhang', async () => {
+    const { buildPipingRing } = await import('./pipingTips');
+    const THREE = await import('three');
+    const mat = new THREE.MeshBasicMaterial({ color: '#FFF' });
+
+    // 1. Continuous with Cherry (~20 rosettes + ~20 cherries)
+    const ring20Cherry = buildPipingRing('whippedCreamRosetteContinuousCherry', mat, { radius: 3.34, y: 1.0, scale: 3 });
+    expect(ring20Cherry).toBeDefined();
+    expect(ring20Cherry.isGroup).toBe(true);
+    expect(ring20Cherry.children[0].isInstancedMesh).toBe(true);
+    const count20 = ring20Cherry.children[0].count;
+    expect(count20).toBeGreaterThanOrEqual(18);
+    expect(count20).toBeLessThanOrEqual(22);
+    const cherries20 = ring20Cherry.children.slice(1);
+    expect(cherries20.length).toBe(count20);
+    cherries20.forEach((c) => {
+      expect(c.isGroup).toBe(true);
+      expect(c.position.y).toBeGreaterThan(1.0); // Seated on top of rosette peak
+    });
+
+    // 2. Standard with Cherry (12 rosettes + 12 cherries)
+    const ring12Cherry = buildPipingRing('whippedCreamRosetteCherry', mat, { radius: 3.24, y: 1.0, scale: 3 });
+    expect(ring12Cherry).toBeDefined();
+    expect(ring12Cherry.isGroup).toBe(true);
+    expect(ring12Cherry.children[0].isInstancedMesh).toBe(true);
+    expect(ring12Cherry.children[0].count).toBe(12);
+    expect(ring12Cherry.children.slice(1).length).toBe(12);
+
+    // 3. Sparse with Cherry (8 rosettes + 8 cherries)
+    const ring8Cherry = buildPipingRing('whippedCreamRosetteSparseCherry', mat, { radius: 3.12, y: 1.0, scale: 3 });
+    expect(ring8Cherry).toBeDefined();
+    expect(ring8Cherry.isGroup).toBe(true);
+    expect(ring8Cherry.children[0].isInstancedMesh).toBe(true);
+    expect(ring8Cherry.children[0].count).toBe(8);
+    expect(ring8Cherry.children.slice(1).length).toBe(8);
+  });
+
+  it('renders both solid and cherry sub-rows in EdgeSection under Whipped Cream', () => {
+    render(
+      React.createElement(EdgeSection, {
+        edge: {
+          mode: 'both',
+          both: {
+            decorations: { setId: null, colorId: 'vanilla' },
+            piping: { tip: 'whippedCreamRosetteContinuousCherry', colorId: 'vanilla', secondaryColorId: 'red' },
+          },
+          top: { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
+          bottom: { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
+          middle: { piping: { tip: null, colorId: 'vanilla' } },
+        },
+        onChange: () => { },
+        sugarColor: {},
+        onSugarColorChange: () => { },
+      })
+    );
+
+    const wcHeader = screen.getByText('Whipped Cream 🍦');
+    const wcContainer = wcHeader.closest('div');
+    const wcWithin = within(wcContainer);
+
+    expect(wcWithin.getByText('Solid')).toBeInTheDocument();
+    expect(wcWithin.getByText('Solid with Cherries 🍒')).toBeInTheDocument();
+    expect(screen.getByTitle('Whipped Cream Rosettes (Continuous ~20 pc)')).toBeInTheDocument();
+    expect(screen.getByTitle('Whipped Cream Rosettes (12 pc)')).toBeInTheDocument();
+    expect(screen.getByTitle('Sparse Whipped Cream Rosettes (8 pc)')).toBeInTheDocument();
+    expect(screen.getByTitle('Whipped Cream Rosettes with Cherry (Continuous ~20 pc)')).toBeInTheDocument();
+    expect(screen.getByTitle('Whipped Cream Rosettes with Cherry (12 pc)')).toBeInTheDocument();
+    expect(screen.getByTitle('Sparse Whipped Cream Rosettes with Cherry (8 pc)')).toBeInTheDocument();
   });
 });
 
