@@ -391,6 +391,52 @@ describe('edge decoration placement', () => {
     expect(Math.hypot(topCenterX, topCenterZ)).toBeGreaterThan(0.035);
   });
 
+  it('computes correct edge trim radii and Y positions for whipped cream rosette variations', () => {
+    // Top edge: ring centers must keep outer rosette envelope inside cake surface.
+    // surfaceRadius for edgeRadius=4.0, fullyFrosted = 4.0 + 0.06 = 4.06.
+    // Continuous: topDollopInset=0.72 → ring R = 4.06 - 0.72 = 3.34
+    expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteContinuous', 'fullyFrosted')).toBeCloseTo(3.34, 2);
+    // Medium (12 pc): topDollopInset=0.82 → ring R = 4.06 - 0.82 = 3.24
+    expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosette', 'fullyFrosted')).toBeCloseTo(3.24, 2);
+    // Sparse (8 pc): topDollopInset=0.94 → ring R = 4.06 - 0.94 = 3.12
+    expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteSparse', 'fullyFrosted')).toBeCloseTo(3.12, 2);
+
+    // Bottom edge: isWhippedCream radialInset=-0.02 → ring R = 4.06 - (-0.02) = 4.08
+    expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteContinuous', 'fullyFrosted', true)).toBeCloseTo(4.08, 2);
+    expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosette', 'fullyFrosted', true)).toBeCloseTo(4.08, 2);
+    expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteSparse', 'fullyFrosted', true)).toBeCloseTo(4.08, 2);
+
+    // Bottom edge Y: whipped cream is dollop-type, so sits at y=-0.02 (on cake board)
+    expect(computeEdgeTrimY(0, 4.0, 'whippedCreamRosetteContinuous', 'fullyFrosted', true)).toBeCloseTo(-0.02, 2);
+    expect(computeEdgeTrimY(0, 4.0, 'whippedCreamRosette', 'fullyFrosted', true)).toBeCloseTo(-0.02, 2);
+    expect(computeEdgeTrimY(0, 4.0, 'whippedCreamRosetteSparse', 'fullyFrosted', true)).toBeCloseTo(-0.02, 2);
+  });
+
+  it('generates correct instance counts for whipped cream rosette variations', async () => {
+    const { buildPipingRing } = await import('./pipingTips');
+    const THREE = await import('three');
+    const mat = new THREE.MeshBasicMaterial({ color: '#FFF' });
+
+    // Continuous (~20 pc): ring R=3.34, divisor=0.345*3=1.035 → count=round(2π*3.34/1.035)≈20
+    const ring20 = buildPipingRing('whippedCreamRosetteContinuous', mat, { radius: 3.34, y: 1.0, scale: 3 });
+    expect(ring20).toBeDefined();
+    expect(ring20.isInstancedMesh).toBe(true);
+    expect(ring20.count).toBeGreaterThanOrEqual(18);
+    expect(ring20.count).toBeLessThanOrEqual(22);
+
+    // Medium (12 pc): ring R=3.24, divisor=0.570*3=1.71 → count=round(2π*3.24/1.71)≈12
+    const ring12 = buildPipingRing('whippedCreamRosette', mat, { radius: 3.24, y: 1.0, scale: 3 });
+    expect(ring12).toBeDefined();
+    expect(ring12.isInstancedMesh).toBe(true);
+    expect(ring12.count).toBe(12);
+
+    // Sparse (8 pc): ring R=3.12, divisor=0.820*3=2.46 → count=round(2π*3.12/2.46)≈8
+    const ring8 = buildPipingRing('whippedCreamRosetteSparse', mat, { radius: 3.12, y: 1.0, scale: 3 });
+    expect(ring8).toBeDefined();
+    expect(ring8.isInstancedMesh).toBe(true);
+    expect(ring8.count).toBe(8);
+  });
+
   it('generates alternating dollop variations with dual-material groups, correct counts, and zero overhang', async () => {
     const { buildPipingRing } = await import('./pipingTips');
     const THREE = await import('three');

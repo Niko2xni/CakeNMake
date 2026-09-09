@@ -1458,6 +1458,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       for (const { slot, y, radius: edgeRadius, isBottom } of edgeSlotsToRender) {
         const baseTip = typeof slot?.pipingTip === 'string' ? slot.pipingTip.replace(/Cherry$/, '').replace(/Alt$/, '') : '';
         const isDollop = baseTip.toLowerCase().includes('dollop');
+        const isWhippedCreamEdge = baseTip.startsWith('whippedCreamRosette');
         const isShell = ['shell', 'reverseShell'].includes(baseTip);
         const isBead = baseTip === 'bead';
         const isZigzag = baseTip === 'zigzag';
@@ -1466,7 +1467,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         const beadedTrimPattern = BEADED_TRIM_PATTERNS[slot?.pipingTip];
         const decorationKind = beadedTrimPattern
           ? 'beadedTrim'
-          : (isDollop ? baseTip : (isShell ? baseTip : (isBead ? 'bead' : (isZigzag ? 'zigzag' : (isWavePiping ? 'wavePiping' : (isRopeTwist ? baseTip : 'piping'))))));
+          : (isWhippedCreamEdge ? baseTip : (isDollop ? baseTip : (isShell ? baseTip : (isBead ? 'bead' : (isZigzag ? 'zigzag' : (isWavePiping ? 'wavePiping' : (isRopeTwist ? baseTip : 'piping')))))));
         const edgeTrimId = beadedTrimPattern ? slot.pipingTip : slot?.decorationSetId;
         const edgeTrimY = computeEdgeTrimY(y, edgeRadius, decorationKind, exteriorFinishStyle, isBottom);
         const edgeTrimRadius = computeEdgeTrimRadius(edgeRadius, decorationKind, exteriorFinishStyle, isBottom);

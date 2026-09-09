@@ -2173,20 +2173,24 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
     // ─── Whipped Cream Rosettes ───────────────────────────────────────────
     case 'whippedCreamRosetteContinuous': {
       // Tight ring — rosettes just kiss each other (≈20 pc on standard cake)
-      const count = Math.max(12, Math.round((radius * Math.PI * 2) / (0.54 * scale)));
-      const dScale = scale * 0.74;
+      // dScale=0.48*scale => each rosette outer approx stays inside cake rim.
+      // Divisor 0.345*scale => ~20 pieces at ring radius ~3.34.
+      const count = Math.max(12, Math.round((radius * Math.PI * 2) / (0.345 * scale)));
+      const dScale = scale * 0.48;
       return instanceAroundRing(getUnitGeometry('whippedCreamRosette'), material, { ringRadius: radius, y, count, rand, scale: dScale });
     }
     case 'whippedCreamRosette': {
       // Standard spaced ring (≈12 pc on standard cake)
-      const count = Math.max(8, Math.round((radius * Math.PI * 2) / (0.82 * scale)));
-      const dScale = scale * 0.88;
+      // dScale=0.56*scale => each rosette outer approx 0.779; ring radius ~3.24.
+      const count = Math.max(8, Math.round((radius * Math.PI * 2) / (0.570 * scale)));
+      const dScale = scale * 0.56;
       return instanceAroundRing(getUnitGeometry('whippedCreamRosette'), material, { ringRadius: radius, y, count, rand, scale: dScale });
     }
     case 'whippedCreamRosetteSparse': {
       // Generous gaps between each rosette (≈8 pc on standard cake)
-      const count = Math.max(6, Math.round((radius * Math.PI * 2) / (1.20 * scale)));
-      const dScale = scale * 1.00;
+      // dScale=0.64*scale => each rosette outer approx 0.891; ring radius ~3.12.
+      const count = Math.max(6, Math.round((radius * Math.PI * 2) / (0.820 * scale)));
+      const dScale = scale * 0.64;
       return instanceAroundRing(getUnitGeometry('whippedCreamRosette'), material, { ringRadius: radius, y, count, rand, scale: dScale });
     }
     default:
