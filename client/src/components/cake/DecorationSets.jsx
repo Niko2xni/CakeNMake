@@ -140,8 +140,8 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
   }
 
   const radialInset = isBottom
-    ? (decorationType === 'beadedTrim' ? -0.10 : (isDollopType ? -0.06 : (['shell', 'reverseShell', 'bead', 'zigzag', 'wavePiping', 'ropeTwist', 'ropeTwistClassic'].includes(decorationType) ? -0.04 : -0.14)))
-    : (decorationType === 'beadedTrim' ? 0.22 : (isDollopType ? topDollopInset : (['shell', 'reverseShell'].includes(decorationType) ? 0.40 : (decorationType === 'bead' ? 0.38 : (decorationType === 'zigzag' ? 0.40 : (decorationType === 'wavePiping' ? 0.40 : (['ropeTwist', 'ropeTwistClassic'].includes(decorationType) ? 0.40 : 0.26)))))));
+    ? (baseTip === 'beadedTrim' ? -0.10 : (isDollopType ? -0.06 : (['shell', 'reverseShell', 'bead', 'zigzag', 'wavePiping', 'ropeTwist', 'ropeTwistClassic'].includes(baseTip) ? -0.04 : -0.14)))
+    : (baseTip === 'beadedTrim' ? 0.22 : (isDollopType ? topDollopInset : (['shell', 'reverseShell'].includes(baseTip) ? 0.40 : (baseTip === 'bead' ? 0.38 : (baseTip === 'zigzag' ? 0.40 : (baseTip === 'wavePiping' ? 0.40 : (['ropeTwist', 'ropeTwistClassic'].includes(baseTip) ? 0.40 : 0.26)))))));
   return Math.max(0.15, surfaceRadius - radialInset);
 }
 

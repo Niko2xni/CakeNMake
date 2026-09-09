@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import {
+  BORDER_PIPING_SOLID_VARIATIONS,
+  BORDER_PIPING_ALTERNATING_VARIATIONS,
   BORDER_PIPING_VARIATIONS,
   BRACELET_BEADS_VARIATIONS,
   DOLLOPS_SOLID_VARIATIONS,
@@ -158,31 +160,78 @@ export default function EdgeSection({
             <span className="text-xs font-semibold text-foreground/80 mb-1.5 block">
               Border Piping
             </span>
-            <div className="flex flex-wrap gap-2">
-              {BORDER_PIPING_VARIATIONS.map((variant, i) => {
-                const active =
-                  (currentSlot.piping?.tip || currentSlot.decorations?.setId) === variant.id;
-                return (
-                  <button
-                    key={variant.id}
-                    type="button"
-                    onClick={() =>
-                      updateSlot({
-                        decorations: { ...currentSlot.decorations, setId: null },
-                        piping: { ...currentSlot.piping, tip: active ? null : variant.id },
-                      })
-                    }
-                    title={variant.label}
-                    className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
-                      active
-                        ? 'bg-primary text-primary-foreground border-primary shadow-md'
-                        : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
-                    }`}
-                  >
-                    {i + 1}
-                  </button>
-                );
-              })}
+            <div className="space-y-3">
+              <div>
+                <span className="text-[11px] font-medium text-muted-foreground mb-1 block">
+                  Solid
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {BORDER_PIPING_SOLID_VARIATIONS.map((variant, i) => {
+                    const active =
+                      (currentSlot.piping?.tip || currentSlot.decorations?.setId) === variant.id;
+                    return (
+                      <button
+                        key={variant.id}
+                        type="button"
+                        onClick={() =>
+                          updateSlot({
+                            decorations: { ...currentSlot.decorations, setId: null },
+                            piping: { ...currentSlot.piping, tip: active ? null : variant.id },
+                          })
+                        }
+                        title={variant.label}
+                        className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
+                          active
+                            ? 'bg-primary text-primary-foreground border-primary shadow-md'
+                            : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
+                        }`}
+                      >
+                        {i + 1}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <span className="text-[11px] font-medium text-muted-foreground mb-1 block">
+                  Alternating (2 Colors)
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {BORDER_PIPING_ALTERNATING_VARIATIONS.map((variant, i) => {
+                    const active =
+                      (currentSlot.piping?.tip || currentSlot.decorations?.setId) === variant.id;
+                    return (
+                      <button
+                        key={variant.id}
+                        type="button"
+                        onClick={() =>
+                          updateSlot({
+                            decorations: { ...currentSlot.decorations, setId: null },
+                            piping: {
+                              ...currentSlot.piping,
+                              tip: active ? null : variant.id,
+                              secondaryColorId: currentSlot.piping?.secondaryColorId || 'red',
+                            },
+                          })
+                        }
+                        title={variant.label}
+                        className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 relative ${
+                          active
+                            ? 'bg-primary text-primary-foreground border-primary shadow-md'
+                            : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
+                        }`}
+                      >
+                        <span>{i + 1}</span>
+                        <span
+                          className="absolute bottom-1 w-1.5 h-1.5 rounded-full border border-black/20"
+                          style={{ backgroundColor: activeSecondaryColor?.hex || '#D6293E' }}
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
 

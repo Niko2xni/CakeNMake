@@ -28,10 +28,11 @@ function resolveColor(colorId) {
 // in the UI as a read-only preview (see SugarColorSection.jsx) rather than
 // resolved here. Reused below for Surface Treatment's Glaze color too
 // (same "only one real mode resolves to a hex" shape).
-function resolveSugarColorHex(mode, colorId) {
+function resolveSugarColorHex(mode, colorId, overrideColorId) {
   if (mode !== 'colorOverride') return null;
-  if (!colorId) return null;
-  const entry = SUGAR_COLORS.find((c) => c.id === colorId);
+  const id = overrideColorId || colorId;
+  if (!id) return null;
+  const entry = SUGAR_COLORS.find((c) => c.id === id);
   return entry ? entry.hex : null;
 }
 
@@ -57,8 +58,11 @@ export function adaptConfigToLegacy(newConfig) {
   const isIndividual = structure.layerDesign === 'individual' && structure.layers > 1;
   const resolveContextSugarColor = (context, index = null, allowDefault = false) => {
     const value = sugarColorOverrides[index === null ? context : `${context}-${index}`] || sugarColorOverrides[context];
-    if (allowDefault && value?.mode === 'default' && value.colorId) return resolveColor(value.colorId);
-    return resolveSugarColorHex(value?.mode || 'default', value?.colorId);
+    if (allowDefault && value?.mode === 'default') {
+      const flavorId = value.flavorColorId || (SUGAR_COLORS.some((c) => c.isFlavorMirror && c.id === value.colorId) ? value.colorId : 'vanilla');
+      return resolveColor(flavorId);
+    }
+    return resolveSugarColorHex(value?.mode || 'default', value?.colorId, value?.overrideColorId);
   };
 
   // Map structure

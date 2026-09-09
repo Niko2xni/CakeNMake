@@ -27,18 +27,28 @@ describe('edge decoration placement', () => {
     expect(computeEdgeTrimRadius(4.0, 'dollops', 'fullyFrosted', true)).toBeCloseTo(4.12, 2);
     expect(computeEdgeTrimRadius(4.0, 'shell', 'fullyFrosted')).toBeCloseTo(3.66, 2);
     expect(computeEdgeTrimRadius(4.0, 'shell', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
+    expect(computeEdgeTrimRadius(4.0, 'shellAlt', 'fullyFrosted')).toBeCloseTo(3.66, 2);
+    expect(computeEdgeTrimRadius(4.0, 'shellAlt', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
     expect(computeEdgeTrimRadius(4.0, 'reverseShell', 'fullyFrosted')).toBeCloseTo(3.66, 2);
     expect(computeEdgeTrimRadius(4.0, 'reverseShell', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
+    expect(computeEdgeTrimRadius(4.0, 'reverseShellAlt', 'fullyFrosted')).toBeCloseTo(3.66, 2);
+    expect(computeEdgeTrimRadius(4.0, 'reverseShellAlt', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
     expect(computeEdgeTrimRadius(4.0, 'bead', 'fullyFrosted')).toBeCloseTo(3.68, 2);
     expect(computeEdgeTrimRadius(4.0, 'bead', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
+    expect(computeEdgeTrimRadius(4.0, 'beadAlt', 'fullyFrosted')).toBeCloseTo(3.68, 2);
+    expect(computeEdgeTrimRadius(4.0, 'beadAlt', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
     expect(computeEdgeTrimRadius(4.0, 'zigzag', 'fullyFrosted')).toBeCloseTo(3.66, 2);
     expect(computeEdgeTrimRadius(4.0, 'zigzag', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
     expect(computeEdgeTrimRadius(4.0, 'wavePiping', 'fullyFrosted')).toBeCloseTo(3.66, 2);
     expect(computeEdgeTrimRadius(4.0, 'wavePiping', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
     expect(computeEdgeTrimRadius(4.0, 'ropeTwist', 'fullyFrosted')).toBeCloseTo(3.66, 2);
     expect(computeEdgeTrimRadius(4.0, 'ropeTwist', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
+    expect(computeEdgeTrimRadius(4.0, 'ropeTwistAlt', 'fullyFrosted')).toBeCloseTo(3.66, 2);
+    expect(computeEdgeTrimRadius(4.0, 'ropeTwistAlt', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
     expect(computeEdgeTrimRadius(4.0, 'ropeTwistClassic', 'fullyFrosted')).toBeCloseTo(3.66, 2);
     expect(computeEdgeTrimRadius(4.0, 'ropeTwistClassic', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
+    expect(computeEdgeTrimRadius(4.0, 'ropeTwistClassicAlt', 'fullyFrosted')).toBeCloseTo(3.66, 2);
+    expect(computeEdgeTrimRadius(4.0, 'ropeTwistClassicAlt', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
   });
 
   it('does not render the generic None option in the edge picker and uses dedicated design rows', () => {
@@ -67,6 +77,11 @@ describe('edge decoration placement', () => {
     expect(screen.getByTitle('Bead Piping')).toBeInTheDocument();
     expect(screen.getByTitle('Rope Twist')).toBeInTheDocument();
     expect(screen.getByTitle('Rope Twist (Classic)')).toBeInTheDocument();
+    expect(screen.getByTitle('Shell Border - Alternating')).toBeInTheDocument();
+    expect(screen.getByTitle('Reverse Shell - Alternating')).toBeInTheDocument();
+    expect(screen.getByTitle('Bead Piping - Alternating')).toBeInTheDocument();
+    expect(screen.getByTitle('Rope Twist - Alternating')).toBeInTheDocument();
+    expect(screen.getByTitle('Rope Twist (Classic) - Alternating')).toBeInTheDocument();
     expect(screen.queryByText('Zigzag Piping')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Zigzag Piping')).not.toBeInTheDocument();
     expect(screen.queryByText('Wave Piping')).not.toBeInTheDocument();
@@ -426,6 +441,196 @@ describe('edge decoration placement', () => {
     expect(altWithin.queryByTitle('Vanilla')).not.toBeInTheDocument();
     expect(altWithin.queryByTitle('Ube')).not.toBeInTheDocument();
     expect(altWithin.queryByTitle('Mocha')).not.toBeInTheDocument();
+  });
+
+  it('generates alternating border piping variations with dual-material groups and zero overhang', async () => {
+    const { buildPipingRing } = await import('./pipingTips');
+    const THREE = await import('three');
+
+    const matA = new THREE.MeshBasicMaterial({ color: '#FFF' });
+    const matB = new THREE.MeshBasicMaterial({ color: '#D6293E' });
+
+    // 1. Shell Border Alternating (instanced dual meshes)
+    const shellRingAlt = buildPipingRing('shellAlt', matA, {
+      radius: 3.66,
+      y: 1.0,
+      scale: 3,
+      secondaryMaterial: matB,
+    });
+    expect(shellRingAlt).toBeDefined();
+    expect(shellRingAlt.isGroup).toBe(true);
+    expect(shellRingAlt.children.length).toBe(2);
+    expect(shellRingAlt.children[0].material).toBe(matA);
+    expect(shellRingAlt.children[1].material).toBe(matB);
+    expect(shellRingAlt.children[0].count).toBe(shellRingAlt.children[1].count);
+
+    // 2. Bead Piping Alternating (instanced dual meshes)
+    const beadRingAlt = buildPipingRing('beadAlt', matA, {
+      radius: 3.68,
+      y: 1.0,
+      scale: 3,
+      secondaryMaterial: matB,
+    });
+    expect(beadRingAlt).toBeDefined();
+    expect(beadRingAlt.isGroup).toBe(true);
+    expect(beadRingAlt.children.length).toBe(2);
+    expect(beadRingAlt.children[0].material).toBe(matA);
+    expect(beadRingAlt.children[1].material).toBe(matB);
+    expect(beadRingAlt.children[0].count).toBe(beadRingAlt.children[1].count);
+
+    // 3. Reverse Shell Alternating (merged dual meshes)
+    const revShellRingAlt = buildPipingRing('reverseShellAlt', matA, {
+      radius: 3.66,
+      y: 1.0,
+      scale: 3,
+      secondaryMaterial: matB,
+    });
+    expect(revShellRingAlt).toBeDefined();
+    expect(revShellRingAlt.isGroup).toBe(true);
+    expect(revShellRingAlt.children.length).toBe(2);
+    expect(revShellRingAlt.children[0].material).toBe(matA);
+    expect(revShellRingAlt.children[1].material).toBe(matB);
+
+    // 4. Rope Twist Alternating (merged dual meshes)
+    const ropeTwistRingAlt = buildPipingRing('ropeTwistAlt', matA, {
+      radius: 3.66,
+      y: 1.0,
+      scale: 3,
+      secondaryMaterial: matB,
+    });
+    expect(ropeTwistRingAlt).toBeDefined();
+    expect(ropeTwistRingAlt.isGroup).toBe(true);
+    expect(ropeTwistRingAlt.children.length).toBe(2);
+    expect(ropeTwistRingAlt.children[0].material).toBe(matA);
+    expect(ropeTwistRingAlt.children[1].material).toBe(matB);
+
+    // 5. Rope Twist Classic Alternating (merged dual meshes)
+    const ropeClassicRingAlt = buildPipingRing('ropeTwistClassicAlt', matA, {
+      radius: 3.66,
+      y: 1.0,
+      scale: 3,
+      secondaryMaterial: matB,
+    });
+    expect(ropeClassicRingAlt).toBeDefined();
+    expect(ropeClassicRingAlt.isGroup).toBe(true);
+    expect(ropeClassicRingAlt.children.length).toBe(2);
+    expect(ropeClassicRingAlt.children[0].material).toBe(matA);
+    expect(ropeClassicRingAlt.children[1].material).toBe(matB);
+  });
+
+  it('renders alternating color options when a border piping alternating tip is selected', () => {
+    render(
+      React.createElement(EdgeSection, {
+        edge: {
+          mode: 'both',
+          both: {
+            decorations: { setId: null, colorId: 'vanilla' },
+            piping: { tip: 'shellAlt', colorId: 'vanilla', secondaryColorId: 'navy' },
+          },
+          top: { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
+          bottom: { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
+          middle: { piping: { tip: null, colorId: 'vanilla' } },
+        },
+        onChange: () => { },
+        sugarColor: {},
+        onSugarColorChange: () => { },
+      })
+    );
+
+    expect(screen.getByText('Alternating Color (Color 2)')).toBeInTheDocument();
+    expect(screen.getByText('Primary Color (Color 1)')).toBeInTheDocument();
+  });
+
+  it('keeps flavor color selected when color override is active and resolves color override in adapter', async () => {
+    const { default: SugarColorSection } = await import('./sections/SugarColorSection');
+    const { adaptConfigToLegacy } = await import('@/lib/configAdapter');
+
+    // 1. Render SugarColorSection in colorOverride mode with flavorColorId='chocolate' and overrideColorId='red'
+    const { rerender } = render(
+      React.createElement(SugarColorSection, {
+        sugarColor: {
+          mode: 'colorOverride',
+          flavorColorId: 'chocolate',
+          overrideColorId: 'red',
+          colorId: 'red',
+        },
+        onChange: () => { },
+        showDefaultColorPicker: true,
+      })
+    );
+
+    // Both "Flavor Color" and "Color Override" are visible
+    expect(screen.getByText('Flavor Color')).toBeInTheDocument();
+    expect(screen.getAllByText('Color Override').length).toBeGreaterThanOrEqual(1);
+
+    // Chocolate must remain selected (has bg-primary class)
+    const chocBtn = screen.getByTitle('Chocolate');
+    expect(chocBtn.className).toContain('bg-primary');
+
+    // Red in Color Override must be selected (has bg-primary class)
+    const redBtn = screen.getByTitle('Red');
+    expect(redBtn.className).toContain('bg-primary');
+
+    // Vanilla should NOT be selected
+    const vanillaBtn = screen.getByTitle('Vanilla');
+    expect(vanillaBtn.className).not.toContain('bg-primary');
+
+    // 2. Verify adaptConfigToLegacy applies the color override when mode='colorOverride'
+    const legacyOverride = adaptConfigToLegacy({
+      structure: { layers: 1, size: 'big' },
+      edge: {
+        mode: 'both',
+        both: { piping: { tip: 'shell', colorId: 'vanilla' } },
+      },
+      sugarColorOverrides: {
+        edgeBoth: {
+          mode: 'colorOverride',
+          flavorColorId: 'chocolate',
+          overrideColorId: 'red',
+          colorId: 'red',
+        },
+        exterior: {
+          mode: 'colorOverride',
+          overrideColorId: 'pink',
+          colorId: 'pink',
+        },
+      },
+      exteriorFinish: { flavor: 'chocolate', style: 'fullyFrosted' },
+    });
+
+    // Piping color must be Red hex (#D6293E), not Chocolate!
+    expect(legacyOverride.edgeBoth.pipingColor).toBe('#D6293E');
+    // Surface frosting color must be Pink hex (#F5A9C0)
+    expect(legacyOverride.surfaceFrostingColorHex).toBe('#F5A9C0');
+    // But chosen frosting flavor remains chocolate!
+    expect(legacyOverride.frostingColor).toBe('chocolate');
+
+    // 3. Verify adaptConfigToLegacy applies the flavor color when mode='default'
+    const legacyDefault = adaptConfigToLegacy({
+      structure: { layers: 1, size: 'big' },
+      edge: {
+        mode: 'both',
+        both: { piping: { tip: 'shell', colorId: 'vanilla' } },
+      },
+      sugarColorOverrides: {
+        edgeBoth: {
+          mode: 'default',
+          flavorColorId: 'chocolate',
+          overrideColorId: 'red',
+          colorId: 'chocolate',
+        },
+        exterior: {
+          mode: 'default',
+        },
+      },
+      exteriorFinish: { flavor: 'chocolate', style: 'fullyFrosted' },
+    });
+
+    // When default, piping color uses the chosen flavor color (Chocolate #7A4433)
+    expect(legacyDefault.edgeBoth.pipingColor).toBe('#7A4433');
+    // Exterior frosting has no override (null), letting exteriorFinish.flavor determine appearance
+    expect(legacyDefault.surfaceFrostingColorHex).toBeNull();
+    expect(legacyDefault.frostingColor).toBe('chocolate');
   });
 });
 

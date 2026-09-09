@@ -1456,16 +1456,17 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         edgeMode === 'both' ? [{ slot: edgeBoth, y: topY, radius: topRadius, isBottom: false }, { slot: edgeBoth, y: 0, radius: BASE_RADIUS, isBottom: true }]
           : [{ slot: edgeTop, y: topY, radius: topRadius, isBottom: false }, { slot: edgeBottom, y: 0, radius: BASE_RADIUS, isBottom: true }];
       for (const { slot, y, radius: edgeRadius, isBottom } of edgeSlotsToRender) {
-        const isDollop = typeof slot?.pipingTip === 'string' && slot.pipingTip.toLowerCase().includes('dollop');
-        const isShell = ['shell', 'reverseShell'].includes(slot?.pipingTip);
-        const isBead = slot?.pipingTip === 'bead';
-        const isZigzag = slot?.pipingTip === 'zigzag';
-        const isWavePiping = slot?.pipingTip === 'wavePiping';
-        const isRopeTwist = ['ropeTwist', 'ropeTwistClassic'].includes(slot?.pipingTip);
+        const baseTip = typeof slot?.pipingTip === 'string' ? slot.pipingTip.replace(/Alt$/, '') : '';
+        const isDollop = baseTip.toLowerCase().includes('dollop');
+        const isShell = ['shell', 'reverseShell'].includes(baseTip);
+        const isBead = baseTip === 'bead';
+        const isZigzag = baseTip === 'zigzag';
+        const isWavePiping = baseTip === 'wavePiping';
+        const isRopeTwist = ['ropeTwist', 'ropeTwistClassic'].includes(baseTip);
         const beadedTrimPattern = BEADED_TRIM_PATTERNS[slot?.pipingTip];
         const decorationKind = beadedTrimPattern
           ? 'beadedTrim'
-          : (isDollop ? slot.pipingTip : (isShell ? 'shell' : (isBead ? 'bead' : (isZigzag ? 'zigzag' : (isWavePiping ? 'wavePiping' : (isRopeTwist ? slot.pipingTip : 'piping'))))));
+          : (isDollop ? baseTip : (isShell ? baseTip : (isBead ? 'bead' : (isZigzag ? 'zigzag' : (isWavePiping ? 'wavePiping' : (isRopeTwist ? baseTip : 'piping'))))));
         const edgeTrimId = beadedTrimPattern ? slot.pipingTip : slot?.decorationSetId;
         const edgeTrimY = computeEdgeTrimY(y, edgeRadius, decorationKind, exteriorFinishStyle, isBottom);
         const edgeTrimRadius = computeEdgeTrimRadius(edgeRadius, decorationKind, exteriorFinishStyle, isBottom);

@@ -1057,9 +1057,10 @@ export function buildWavePipingRingGeometry(ringRadius) {
  * in a bold rounded loop, and sweeps down into the next twist with ~40% overlap.
  * Fluted with an 8-point star profile and axial twist rotation.
  */
-export function buildRopeTwistRingGeometry(ringRadius) {
+export function buildRopeTwistUnitGeometries(ringRadius) {
   const circumference = ringRadius * Math.PI * 2;
-  const N = Math.max(14, Math.round(circumference / 1.15));
+  const rawN = Math.round(circumference / 1.15);
+  const N = Math.max(14, rawN % 2 === 0 ? rawN : rawN + 1);
   const deltaTheta = (Math.PI * 2) / N;
   const overlapFactor = 1.40;
   const twistAngleSpan = deltaTheta * overlapFactor;
@@ -1204,7 +1205,11 @@ export function buildRopeTwistRingGeometry(ringRadius) {
     geometries.push(geo);
   }
 
-  return mergeGeometries(geometries);
+  return geometries;
+}
+
+export function buildRopeTwistRingGeometry(ringRadius) {
+  return mergeGeometries(buildRopeTwistUnitGeometries(ringRadius));
 }
 
 /**
@@ -1212,9 +1217,10 @@ export function buildRopeTwistRingGeometry(ringRadius) {
  * rope twist geometry from commit 9fd07cf, featuring compact diagonal strokes
  * across the cake rim with crisp 8-point star fluting.
  */
-export function buildRopeTwistClassicRingGeometry(ringRadius) {
+export function buildRopeTwistClassicUnitGeometries(ringRadius) {
   const circumference = ringRadius * Math.PI * 2;
-  const N = Math.max(14, Math.round(circumference / 1.10));
+  const rawN = Math.round(circumference / 1.10);
+  const N = Math.max(14, rawN % 2 === 0 ? rawN : rawN + 1);
   const deltaTheta = (Math.PI * 2) / N;
   const overlapFactor = 1.38;
   const twistAngleSpan = deltaTheta * overlapFactor;
@@ -1344,7 +1350,11 @@ export function buildRopeTwistClassicRingGeometry(ringRadius) {
     geometries.push(geo);
   }
 
-  return mergeGeometries(geometries);
+  return geometries;
+}
+
+export function buildRopeTwistClassicRingGeometry(ringRadius) {
+  return mergeGeometries(buildRopeTwistClassicUnitGeometries(ringRadius));
 }
 
 /**
@@ -1357,7 +1367,7 @@ export function buildRopeTwistClassicRingGeometry(ringRadius) {
  * - Tapers and sweeps back to the centerline R
  * - The next shell's bulbous head overlaps the preceding tail, with zero seam closure glitch.
  */
-export function buildReverseShellRingGeometry(ringRadius) {
+export function buildReverseShellUnitGeometries(ringRadius) {
   const circumference = ringRadius * Math.PI * 2;
   // Enforce an even count so the left/right alternation closes seamlessly around the 360-degree loop
   const rawN = Math.round(circumference / 0.58);
@@ -1502,7 +1512,11 @@ export function buildReverseShellRingGeometry(ringRadius) {
     geometries.push(geo);
   }
 
-  return mergeGeometries(geometries);
+  return geometries;
+}
+
+export function buildReverseShellRingGeometry(ringRadius) {
+  return mergeGeometries(buildReverseShellUnitGeometries(ringRadius));
 }
 
 /**
@@ -1700,8 +1714,14 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
       return instanceAroundRing(getUnitGeometry('star'), material, { ringRadius: radius, y, count, rand, scale });
     }
     case 'shell': {
-      const count = Math.max(12, Math.round((radius * Math.PI * 2) / (0.22 * scale)));
+      const rawCount = Math.round((radius * Math.PI * 2) / (0.22 * scale));
+      const count = Math.max(12, rawCount % 2 === 0 ? rawCount : rawCount + 1);
       return instanceAroundRing(getUnitGeometry('shell'), material, { ringRadius: radius, y, count, rand, scale });
+    }
+    case 'shellAlt': {
+      const rawCount = Math.round((radius * Math.PI * 2) / (0.22 * scale));
+      const count = Math.max(12, rawCount % 2 === 0 ? rawCount : rawCount + 1);
+      return instanceAroundRing(getUnitGeometry('shell'), material, { ringRadius: radius, y, count, rand, scale, secondaryMaterial: secMat });
     }
     case 'reverseShell': {
       const geo = buildReverseShellRingGeometry(radius);
@@ -1711,9 +1731,31 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
       mesh.receiveShadow = true;
       return mesh;
     }
+    case 'reverseShellAlt': {
+      const geos = buildReverseShellUnitGeometries(radius);
+      const geoA = mergeGeometries(geos.filter((_, i) => i % 2 === 0));
+      const geoB = mergeGeometries(geos.filter((_, i) => i % 2 === 1));
+      const group = new THREE.Group();
+      const meshA = new THREE.Mesh(geoA, material);
+      const meshB = new THREE.Mesh(geoB, secMat);
+      meshA.castShadow = true;
+      meshA.receiveShadow = true;
+      meshB.castShadow = true;
+      meshB.receiveShadow = true;
+      group.add(meshA);
+      group.add(meshB);
+      group.position.y = y;
+      return group;
+    }
     case 'bead': {
-      const count = Math.max(16, Math.round((radius * Math.PI * 2) / (0.15 * scale)));
+      const rawCount = Math.round((radius * Math.PI * 2) / (0.15 * scale));
+      const count = Math.max(16, rawCount % 2 === 0 ? rawCount : rawCount + 1);
       return instanceAroundRing(getUnitGeometry('bead'), material, { ringRadius: radius, y, count, rand, scale });
+    }
+    case 'beadAlt': {
+      const rawCount = Math.round((radius * Math.PI * 2) / (0.15 * scale));
+      const count = Math.max(16, rawCount % 2 === 0 ? rawCount : rawCount + 1);
+      return instanceAroundRing(getUnitGeometry('bead'), material, { ringRadius: radius, y, count, rand, scale, secondaryMaterial: secMat });
     }
     case 'round': {
       const count = Math.max(16, Math.round((radius * Math.PI * 2) / (0.2 * scale)));
@@ -1848,6 +1890,22 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
       mesh.receiveShadow = true;
       return mesh;
     }
+    case 'ropeTwistAlt': {
+      const geos = buildRopeTwistUnitGeometries(radius);
+      const geoA = mergeGeometries(geos.filter((_, i) => i % 2 === 0));
+      const geoB = mergeGeometries(geos.filter((_, i) => i % 2 === 1));
+      const group = new THREE.Group();
+      const meshA = new THREE.Mesh(geoA, material);
+      const meshB = new THREE.Mesh(geoB, secMat);
+      meshA.castShadow = true;
+      meshA.receiveShadow = true;
+      meshB.castShadow = true;
+      meshB.receiveShadow = true;
+      group.add(meshA);
+      group.add(meshB);
+      group.position.y = y;
+      return group;
+    }
     case 'ropeTwistClassic': {
       const geo = buildRopeTwistClassicRingGeometry(radius);
       const mesh = new THREE.Mesh(geo, material);
@@ -1855,6 +1913,22 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       return mesh;
+    }
+    case 'ropeTwistClassicAlt': {
+      const geos = buildRopeTwistClassicUnitGeometries(radius);
+      const geoA = mergeGeometries(geos.filter((_, i) => i % 2 === 0));
+      const geoB = mergeGeometries(geos.filter((_, i) => i % 2 === 1));
+      const group = new THREE.Group();
+      const meshA = new THREE.Mesh(geoA, material);
+      const meshB = new THREE.Mesh(geoB, secMat);
+      meshA.castShadow = true;
+      meshA.receiveShadow = true;
+      meshB.castShadow = true;
+      meshB.receiveShadow = true;
+      group.add(meshA);
+      group.add(meshB);
+      group.position.y = y;
+      return group;
     }
     case 'petal': {
       const geo = buildPetalRuffleRingGeometry(radius);

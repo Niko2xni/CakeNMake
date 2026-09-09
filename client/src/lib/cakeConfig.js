@@ -125,6 +125,8 @@ export const DEFAULT_CONFIG = {
   sugarColor: {
     mode: 'default',
     colorId: null,
+    flavorColorId: 'vanilla',
+    overrideColorId: 'red',
   },
   // Each contextual Sugar Color picker owns its own selection so changing
   // one decorated region does not recolor the rest of the cake.
@@ -267,6 +269,11 @@ export const PIPING_TIPS = [
   { id: 'rope', label: 'Rope' },
   { id: 'ropeTwist', label: 'Rope Twist' },
   { id: 'ropeTwistClassic', label: 'Rope Twist (Classic)' },
+  { id: 'shellAlt', label: 'Shell Border - Alternating' },
+  { id: 'reverseShellAlt', label: 'Reverse Shell - Alternating' },
+  { id: 'beadAlt', label: 'Bead Piping - Alternating' },
+  { id: 'ropeTwistAlt', label: 'Rope Twist - Alternating' },
+  { id: 'ropeTwistClassicAlt', label: 'Rope Twist (Classic) - Alternating' },
   { id: 'round', label: 'Round' },
   { id: 'petal', label: 'Petal' },
   { id: 'leaf', label: 'Leaf' },
@@ -589,12 +596,25 @@ export const SHELL_VARIATIONS = [
   { id: 'reverseShell', label: 'Reverse Shell' },
 ];
 
-export const BORDER_PIPING_VARIATIONS = [
+export const BORDER_PIPING_SOLID_VARIATIONS = [
   { id: 'shell', label: 'Shell Border' },
   { id: 'reverseShell', label: 'Reverse Shell' },
   { id: 'bead', label: 'Bead Piping' },
   { id: 'ropeTwist', label: 'Rope Twist' },
   { id: 'ropeTwistClassic', label: 'Rope Twist (Classic)' },
+];
+
+export const BORDER_PIPING_ALTERNATING_VARIATIONS = [
+  { id: 'shellAlt', label: 'Shell Border - Alternating' },
+  { id: 'reverseShellAlt', label: 'Reverse Shell - Alternating' },
+  { id: 'beadAlt', label: 'Bead Piping - Alternating' },
+  { id: 'ropeTwistAlt', label: 'Rope Twist - Alternating' },
+  { id: 'ropeTwistClassicAlt', label: 'Rope Twist (Classic) - Alternating' },
+];
+
+export const BORDER_PIPING_VARIATIONS = [
+  ...BORDER_PIPING_SOLID_VARIATIONS,
+  ...BORDER_PIPING_ALTERNATING_VARIATIONS,
 ];
 
 export const STANDALONE_EDGE_PIPING_OPTIONS = PIPING_TIPS
