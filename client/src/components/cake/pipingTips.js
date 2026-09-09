@@ -311,10 +311,10 @@ function buildStarUnitGeometry() {
  *   • Fewer, deeper points (8 vs 12) — fat open petals, not tight flutes.
  *   • Spiraling ridges — `ridgeAngle = angle + swirlAngle(t)` rotates the
  *     radial-variation phase as height increases, so the peaks/valleys
- *     describe a continuous spiral from base to tip, exactly like the
- *     hand-swirling motion used to pipe a real rosette.
- *   • Plumper belly — holds full width from 18 % to 55 % of height before
- *     gracefully tapering to a soft rounded central peak.
+ *     describe a continuous spiral from base to tip.
+ *   • Plumper belly — holds full width from 18 % to 55 % of height. Above
+ *     that, a broad single-start fold wraps around a rounded tapered core,
+ *     recreating the layered upper silhouette of freshly piped cream.
  */
 export function buildWhippedCreamRosetteUnitGeometry({ radius = 0.40, height = 0.60, points = 8 } = {}) {
   const radialSegments = points * 6; // 48 — smooth enough to read the open petal curves
@@ -333,19 +333,24 @@ export function buildWhippedCreamRosetteUnitGeometry({ radius = 0.40, height = 0
       const u = (t - 0.18) / 0.37;
       return 1.0 - 0.04 * u;
     }
-    // 55–100 %: graceful taper to the soft spiral peak
+    // 55–100 %: a fuller core leaves room for the upper spiral fold before
+    // resolving into a clean release point. The previous 1.55 exponent
+    // collapsed too quickly and made this section read as a smooth cone.
     const u = (t - 0.55) / 0.45;
-    return 0.96 * Math.pow(1 - u, 1.55);
+    return 0.96 * Math.pow(1 - u, 0.92);
   };
 
-  // Ridge amplitude — starts deep (0.23) and fades as we approach the tip,
-  // so the top 15 % reads as a smooth, rounded centre point.
-  const ridgeAmpAt = (t) => 0.23 * Math.max(0, 1 - t / 0.85);
+  // Keep the accepted lower-half relief unchanged. The upper star flutes
+  // soften gradually but remain present around the wrapped cream fold.
+  const ridgeAmpAt = (t) => {
+    if (t <= 0.55) return 0.23 * Math.max(0, 1 - t / 0.85);
+    const u = (t - 0.55) / 0.45;
+    const joinAmplitude = 0.23 * (1 - 0.55 / 0.85);
+    return joinAmplitude * Math.pow(1 - u, 1.4);
+  };
 
-  // The total swirl angle over the full height.  0.9π ≈ 162° of rotation
-  // gives one clear visual twist without completing a full turn, exactly
-  // mimicking the one-and-a-bit swirl of a real piped rosette.
-  const totalSwirl = Math.PI * 0.9;
+  const lowerSwirlRate = Math.PI * 0.9;
+  const upperSwirl = Math.PI * 0.85;
 
   const baseYOffset = -0.06 * height; // embed base slightly below y=0
 
@@ -353,16 +358,51 @@ export function buildWhippedCreamRosetteUnitGeometry({ radius = 0.40, height = 0
     const t = yi / heightSegments;
     const taper = bodyTaper(t);
     const currentY = t * height + baseYOffset;
+    const peakT = THREE.MathUtils.clamp((t - 0.80) / 0.20, 0, 1);
+    const peakLift = height * 0.08 * (peakT * peakT * (3 - 2 * peakT));
     const ridgeAmp = ridgeAmpAt(t);
-    // Rotate the ridge phase with height — this is what creates the spiral.
-    const swirlAngle = t * totalSwirl;
+    // Preserve the original ridge phase below the join, then continue the
+    // twist through the upper body so the surface remains visually connected.
+    const upperT = t > 0.55 ? (t - 0.55) / 0.45 : 0;
+    const swirlAngle = t <= 0.55
+      ? t * lowerSwirlRate
+      : 0.55 * lowerSwirlRate + upperT * upperSwirl;
+    const tipT = THREE.MathUtils.clamp((t - 0.68) / 0.32, 0, 1);
+    const tipEase = tipT * tipT * (3 - 2 * tipT);
+    const tipDirection = -Math.PI * 0.65 + tipEase * Math.PI * 0.45;
+    const tipOffset = radius * 0.10 * tipEase;
+    const centerX = Math.cos(tipDirection) * tipOffset;
+    const centerZ = Math.sin(tipDirection) * tipOffset;
 
     for (let i = 0; i < radialSegments; i++) {
       const angle = (i / radialSegments) * Math.PI * 2;
       const ridgeAngle = angle + swirlAngle; // phase-shifted ridge gives the spiral
       const radialVariation = 1 + Math.cos(points * ridgeAngle) * ridgeAmp;
-      const r = radius * taper * radialVariation;
-      positions.push(Math.cos(angle) * r, currentY, Math.sin(angle) * r);
+
+      // One broad raised fold winds 1.65 turns around the upper core. Because
+      // its envelope is zero at both ends, the accepted lower body and pointed
+      // finish stay seamless. This is a single continuous surface, avoiding
+      // the detached tubes and stacked-ring look of separate meshes.
+      let spiralFold = 0;
+      let spiralLift = 0;
+      if (t > 0.55) {
+        const foldEnvelope = Math.pow(Math.sin(upperT * Math.PI), 0.72);
+        const tierPhase = angle - upperT * Math.PI * 3.0 + Math.PI * 0.35;
+        const tierHalfWave = Math.pow(0.5 + 0.5 * Math.cos(tierPhase), 0.7);
+        const stackedFold = radius * 0.16 * foldEnvelope * tierHalfWave;
+        const foldPhase = angle - upperT * Math.PI * 3.3 - Math.PI * 0.18;
+        const raisedHalfWave = Math.pow(0.5 + 0.5 * Math.cos(foldPhase), 1.1);
+        const helicalBias = radius * 0.02 * (1 - 0.30 * upperT) * foldEnvelope * raisedHalfWave;
+        spiralFold = stackedFold + helicalBias;
+        spiralLift = height * 0.016 * foldEnvelope * Math.sin(tierPhase);
+      }
+
+      const r = radius * taper * radialVariation + spiralFold;
+      positions.push(
+        centerX + Math.cos(angle) * r,
+        currentY + peakLift + spiralLift,
+        centerZ + Math.sin(angle) * r
+      );
     }
   }
 
@@ -383,7 +423,12 @@ export function buildWhippedCreamRosetteUnitGeometry({ radius = 0.40, height = 0
   positions.push(0, baseYOffset, 0);
   const topStart = heightSegments * radialSegments;
   const topCenter = positions.length / 3;
-  positions.push(0, height + baseYOffset, 0);
+  const tipEndDirection = -Math.PI * 0.20;
+  positions.push(
+    Math.cos(tipEndDirection) * radius * 0.10,
+    height * 1.08 + baseYOffset,
+    Math.sin(tipEndDirection) * radius * 0.10
+  );
   for (let i = 0; i < radialSegments; i++) {
     const next = (i + 1) % radialSegments;
     indices.push(bottomCenter, next, i, topCenter, topStart + i, topStart + next);

@@ -354,6 +354,43 @@ describe('edge decoration placement', () => {
     expect(ringMesh8.count).toBe(8);
   });
 
+  it('preserves the whipped-cream base while defining a continuous upper spiral fold', async () => {
+    const { buildWhippedCreamRosetteUnitGeometry } = await import('./pipingTips');
+
+    const geometry = buildWhippedCreamRosetteUnitGeometry();
+    const positions = geometry.getAttribute('position');
+    const radialSegments = 48;
+    expect(positions.count).toBeGreaterThan(2000);
+    expect(geometry.getAttribute('normal')).toBeDefined();
+    geometry.computeBoundingBox();
+    expect(geometry.boundingBox.max.y - geometry.boundingBox.min.y).toBeCloseTo(0.648, 3);
+
+    const radialRangeAtRow = (row) => {
+      const radii = [];
+      for (let i = 0; i < radialSegments; i++) {
+        const index = row * radialSegments + i;
+        radii.push(Math.hypot(positions.getX(index), positions.getZ(index)));
+      }
+      return Math.max(...radii) - Math.min(...radii);
+    };
+
+    // The accepted lower-half open-star relief remains unchanged.
+    expect(radialRangeAtRow(22)).toBeCloseTo(0.0715, 3);
+    // The upper fold must be directional rather than concentric, and the
+    // release point must lean away from the center like a real piping finish.
+    expect(radialRangeAtRow(33)).toBeGreaterThan(0.05);
+    const topRowStart = 44 * radialSegments;
+    let topCenterX = 0;
+    let topCenterZ = 0;
+    for (let i = 0; i < radialSegments; i++) {
+      topCenterX += positions.getX(topRowStart + i);
+      topCenterZ += positions.getZ(topRowStart + i);
+    }
+    topCenterX /= radialSegments;
+    topCenterZ /= radialSegments;
+    expect(Math.hypot(topCenterX, topCenterZ)).toBeGreaterThan(0.035);
+  });
+
   it('generates alternating dollop variations with dual-material groups, correct counts, and zero overhang', async () => {
     const { buildPipingRing } = await import('./pipingTips');
     const THREE = await import('three');
