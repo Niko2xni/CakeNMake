@@ -1886,20 +1886,21 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
   const cleanTip = typeof tip === 'string' ? tip.replace('Cherry', '') : tip;
   const secMat = secondaryMaterial || (isAlt ? new THREE.MeshStandardMaterial({ color: '#D6293E', roughness: 0.38, metalness: 0 }) : null);
 
-  const maybeAddCherries = (mesh, count, dollopScale, scaleY, baseCherryScale, peakRatio) => {
+  const UNIFORM_CHERRY_SCALE = 0.85;
+  const maybeAddCherries = (mesh, count, dollopScale, scaleY, _baseCherryScale, peakRatio) => {
     if (!withCherry) return mesh;
     const dollopScaleY = scaleY !== null && scaleY !== undefined ? scaleY : dollopScale;
     const peakYOffset = peakRatio * dollopScaleY;
-    const cherryScale = baseCherryScale * (scale / 3);
-    // Sink the cherry ~55% of its scaled body radius into the dollop so the
-    // lower half is embedded in the soft buttercream -- giving a realistic
+    // Uniform, realistic cherry size across all border options (matching standalone toppings/cherry.js)
+    // Scale 0.85 corresponds to ~0.71" (18mm) diameter maraschino cherries on an 8" cake.
+    const cherryScale = UNIFORM_CHERRY_SCALE * (scale / 3);
+    // Sink the cherry ~45% of its scaled body radius into the dollop so the
+    // lower third is nestled in the soft buttercream -- giving a realistic
     // 'settled into cream' look rather than perched on the tip.
     // Cherry body base radius ~0.38 world units before cherryScale is applied.
-    const sinkAmount = cherryScale * 0.38 * 0.55;
-    // Compress the cherry slightly on Y to simulate soft cream squishing up
-    // around the sides -- the weight of the fruit dents the dollop and the
-    // cream rises slightly on the equatorial band.
-    const cherryScaleY = cherryScale * 0.88;
+    const sinkAmount = cherryScale * 0.38 * 0.45;
+    // Compress the cherry slightly on Y (0.92) to simulate soft cream cradling the fruit
+    const cherryScaleY = cherryScale * 0.92;
     return wrapWithCherries(mesh, { count, radius, y, rand, cherryScale, cherryScaleY, peakYOffset, sinkAmount, maxLeanRad: 0.14 });
   };
 
