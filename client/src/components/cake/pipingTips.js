@@ -445,8 +445,8 @@ export function buildWhippedCreamRosetteUnitGeometry({ radius = 0.40, height = 0
 /** Tall, ridged star-tip dollop based on a continuous buttercream squeeze:
  * broad, grounded base that flares smoothly into the belly and narrows into a pointed release at the top. */
 export function buildStarDollopUnitGeometry({ radius = 0.28, height = 0.46, points = 12 } = {}) {
-  const radialSegments = points * 4;
-  const heightSegments = 32;
+  const radialSegments = points * 10; // 120 segments: 10 smooth segments per flute to turn straight zigzag faceting into smooth curves
+  const heightSegments = 48;
   const positions = [];
   const indices = [];
 
@@ -482,12 +482,21 @@ export function buildStarDollopUnitGeometry({ radius = 0.28, height = 0.46, poin
     const t = y / heightSegments;
     const taper = bodyTaper(t);
     const ridgeStrength = 0.16 - t * 0.035;
+    const swirlAngle = t <= 0.22 ? 0 : Math.pow((t - 0.22) / 0.78, 1.2) * 0.42;
     const currentY = t * height + baseYOffset;
     for (let i = 0; i < radialSegments; i++) {
       const angle = (i / radialSegments) * Math.PI * 2;
-      const radialVariation = 1 + Math.cos(points * angle) * ridgeStrength;
+      const phi = points * angle;
+      const cosP = Math.cos(phi);
+      // Smooth curvy wave: broad rounded dome crests and gentle valleys (turns sharp zigzag contact into curvy scallops)
+      const curvyWave = cosP + 0.12 * (Math.cos(2 * phi) - 1);
+      const radialVariation = 1 + curvyWave * ridgeStrength;
       const r = radius * taper * radialVariation;
-      positions.push(Math.cos(angle) * r, currentY, Math.sin(angle) * r);
+      const drawAngle = angle + swirlAngle;
+      // Smooth vertical wave lift along flute lobes with C2 continuity (no clamping kinks)
+      const smoothLift = 0.5 + 0.5 * cosP;
+      const lobeLift = height * 0.012 * Math.sin(t * Math.PI) * (smoothLift * smoothLift);
+      positions.push(Math.cos(drawAngle) * r, currentY + lobeLift, Math.sin(drawAngle) * r);
     }
   }
 
@@ -518,6 +527,8 @@ export function buildStarDollopUnitGeometry({ radius = 0.28, height = 0.46, poin
   geometry.computeVertexNormals();
   return geometry;
 }
+
+
 
 /**
  * Smooth, plump plain round-tip dollop based on authentic bakery piping (matching reference photo):
@@ -1843,6 +1854,7 @@ function wrapWithCherries(dollopMesh, { count, radius, y, rand, cherryScale, che
     }
     // Add a gentle random lean on each axis independently to simulate
     // hand-placed placement — cherries never sit perfectly upright in real life.
+    cherry.rotation.y = angle + (rand() - 0.5) * 0.45;
     cherry.rotation.x += (rand() - 0.5) * 2 * maxLeanRad;
     cherry.rotation.z += (rand() - 0.5) * 2 * maxLeanRad;
     group.add(cherry);
@@ -1933,17 +1945,17 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
     if (withCherry) {
       const dollopScaleY = scaleY !== null && scaleY !== undefined ? scaleY : dollopScale;
       const peakYOffset = peakRatio * dollopScaleY;
-      const cherryScale = UNIFORM_CHERRY_SCALE * (scale / 3);
-      const sinkAmount = cherryScale * 0.38 * 0.45;
+      const cherryScale = (opts.cherryScale !== undefined ? opts.cherryScale : UNIFORM_CHERRY_SCALE) * (scale / 3);
+      const sinkAmount = opts.sinkAmount !== undefined ? opts.sinkAmount : cherryScale * 0.38 * 0.45;
       const cherryScaleY = cherryScale * 0.92;
-      return wrapWithCherries(mesh, { count, radius, y, rand, cherryScale, cherryScaleY, peakYOffset, sinkAmount, maxLeanRad: 0.14, ...opts });
+      return wrapWithCherries(mesh, { count, radius, y, rand, cherryScale, cherryScaleY, peakYOffset, sinkAmount, maxLeanRad: opts.maxLeanRad !== undefined ? opts.maxLeanRad : 0.14, ...opts });
     }
     if (withStrawberry) {
       const dollopScaleY = scaleY !== null && scaleY !== undefined ? scaleY : dollopScale;
       const peakYOffset = peakRatio * dollopScaleY;
-      const strawberryScale = UNIFORM_STRAWBERRY_SCALE * (scale / 3);
-      const sinkAmount = strawberryScale * 0.12;
-      return wrapWithStrawberries(mesh, { count, radius, y, rand, strawberryScale, peakYOffset, sinkAmount, maxLeanRad: 0.12, ...opts });
+      const strawberryScale = (opts.strawberryScale !== undefined ? opts.strawberryScale : UNIFORM_STRAWBERRY_SCALE) * (scale / 3);
+      const sinkAmount = opts.sinkAmount !== undefined ? opts.sinkAmount : strawberryScale * 0.12;
+      return wrapWithStrawberries(mesh, { count, radius, y, rand, strawberryScale, peakYOffset, sinkAmount, maxLeanRad: opts.maxLeanRad !== undefined ? opts.maxLeanRad : 0.12, ...opts });
     }
     return mesh;
   };
@@ -2015,39 +2027,39 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
       const count = Math.max(8, Math.round((radius * Math.PI * 2) / (0.5760 * scale)));
       const dScale = scale * 0.70;
       const mesh = instanceAroundRing(getUnitGeometry('starDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale });
-      return maybeAddCherries(mesh, count, dScale, null, 0.48, 0.47);
+      return maybeAddCherries(mesh, count, dScale, null, 0.48, 0.39);
     }
     case 'starDollopAlt': {
       const count = Math.max(8, Math.round((radius * Math.PI * 2) / (0.5760 * scale)));
       const dScale = scale * 0.70;
       const mesh = instanceAroundRing(getUnitGeometry('starDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale, secondaryMaterial: secMat });
-      return maybeAddCherries(mesh, count, dScale, null, 0.48, 0.47);
+      return maybeAddCherries(mesh, count, dScale, null, 0.48, 0.39);
     }
     case 'starDollopSparse': {
       const count = Math.max(6, Math.round((radius * Math.PI * 2) / (0.8482 * scale)));
       const dScale = scale * 0.75;
       const mesh = instanceAroundRing(getUnitGeometry('starDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale });
-      return maybeAddCherries(mesh, count, dScale, null, 0.52, 0.47);
+      return maybeAddCherries(mesh, count, dScale, null, 0.52, 0.39);
     }
     case 'starDollopSparseAlt': {
       const count = Math.max(6, Math.round((radius * Math.PI * 2) / (0.8482 * scale)));
       const dScale = scale * 0.75;
       const mesh = instanceAroundRing(getUnitGeometry('starDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale, secondaryMaterial: secMat });
-      return maybeAddCherries(mesh, count, dScale, null, 0.52, 0.47);
+      return maybeAddCherries(mesh, count, dScale, null, 0.52, 0.39);
     }
     case 'starDollopContinuous': {
       const rawCount = Math.round((radius * Math.PI * 2) / (0.3560 * scale));
       const count = Math.max(12, (withCherry || withStrawberry) ? (rawCount % 2 === 0 ? rawCount : rawCount + 1) : rawCount);
       const dScale = scale * 0.6457;
       const mesh = instanceAroundRing(getUnitGeometry('starDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale });
-      return maybeAddCherries(mesh, count, dScale, null, 0.45, 0.47, { step: 2 });
+      return maybeAddCherries(mesh, count, dScale, null, 0.45, 0.39, { step: 2 });
     }
     case 'starDollopContinuousAlt': {
       const rawCount = Math.round((radius * Math.PI * 2) / (0.3560 * scale));
       const count = Math.max(12, (withCherry || withStrawberry) ? (rawCount % 2 === 0 ? rawCount : rawCount + 1) : rawCount);
       const dScale = scale * 0.6457;
       const mesh = instanceAroundRing(getUnitGeometry('starDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale, secondaryMaterial: secMat });
-      return maybeAddCherries(mesh, count, dScale, null, 0.45, 0.47, { step: 2 });
+      return maybeAddCherries(mesh, count, dScale, null, 0.45, 0.39, { step: 2 });
     }
     case 'roundDollop': {
       const rawCount = Math.round((radius * Math.PI * 2) / (0.3645 * scale));

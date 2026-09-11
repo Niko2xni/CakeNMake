@@ -354,6 +354,41 @@ describe('edge decoration placement', () => {
     expect(ringMesh8.count).toBe(8);
   });
 
+  it('generates star dollop fruit rings with sunken cherries at peakRatio 0.39', async () => {
+    const { buildPipingRing } = await import('./pipingTips');
+    const THREE = await import('three');
+    const mat = new THREE.MeshBasicMaterial();
+
+    // 1. Continuous Star Dollop with Cherry (20 dollops, 10 alternating cherries)
+    const ring20 = buildPipingRing('starDollopContinuousCherry', mat, { radius: 3.40, y: 1.0, scale: 3 });
+    expect(ring20).toBeDefined();
+    expect(ring20.isGroup).toBe(true);
+    expect(ring20.children[0].isInstancedMesh).toBe(true);
+    expect(ring20.children[0].count).toBe(20);
+    const cherries20 = ring20.children.slice(1);
+    expect(cherries20.length).toBe(10);
+    cherries20.forEach((c) => {
+      expect(c.isGroup).toBe(true);
+      expect(c.position.y).toBeGreaterThan(1.0);
+    });
+
+    // 2. Medium Star Dollop with Cherry (12 dollops, 12 cherries)
+    const ring12 = buildPipingRing('starDollopCherry', mat, { radius: 3.30, y: 1.0, scale: 3 });
+    expect(ring12).toBeDefined();
+    expect(ring12.isGroup).toBe(true);
+    expect(ring12.children[0].isInstancedMesh).toBe(true);
+    expect(ring12.children[0].count).toBe(12);
+    expect(ring12.children.slice(1).length).toBe(12);
+
+    // 3. Sparse Star Dollop with Cherry (8 dollops, 8 cherries)
+    const ring8 = buildPipingRing('starDollopSparseCherry', mat, { radius: 3.24, y: 1.0, scale: 3 });
+    expect(ring8).toBeDefined();
+    expect(ring8.isGroup).toBe(true);
+    expect(ring8.children[0].isInstancedMesh).toBe(true);
+    expect(ring8.children[0].count).toBe(8);
+    expect(ring8.children.slice(1).length).toBe(8);
+  });
+
   it('preserves the whipped-cream base while defining a continuous upper spiral fold', async () => {
     const { buildWhippedCreamRosetteUnitGeometry } = await import('./pipingTips');
 
