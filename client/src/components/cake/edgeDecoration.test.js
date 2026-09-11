@@ -915,6 +915,278 @@ describe('edge decoration placement', () => {
     expect(screen.getByTitle('Whipped Cream Rosettes with Cherry (12 pc)')).toBeInTheDocument();
     expect(screen.getByTitle('Sparse Whipped Cream Rosettes with Cherry (8 pc)')).toBeInTheDocument();
   });
+
+  it('generates fruit & confection rims with zero overhang and valid 3D groups', async () => {
+    const {
+      buildStrawberryRimRing,
+      buildHersheysKissRimRing,
+      buildFerreroRocherRimRing,
+    } = await import('./DecorationSets');
+
+    // 1. Placement verification for Strawberry Rim
+    expect(computeEdgeTrimY(1.0, 4.0, 'strawberryRim', 'fullyFrosted', false)).toBeCloseTo(0.96, 2);
+    expect(computeEdgeTrimY(0.0, 4.0, 'strawberryRim', 'fullyFrosted', true)).toBeCloseTo(0.0, 2);
+    expect(computeEdgeTrimRadius(4.0, 'strawberryRim', 'fullyFrosted', false)).toBeCloseTo(3.64, 2);
+    expect(computeEdgeTrimRadius(4.0, 'strawberryRim', 'fullyFrosted', true)).toBeCloseTo(4.14, 2);
+
+    // 2. Placement verification for Hershey's Kisses Rim
+    expect(computeEdgeTrimY(1.0, 4.0, 'hersheysKissRim', 'fullyFrosted', false)).toBeCloseTo(1.0, 2);
+    expect(computeEdgeTrimY(0.0, 4.0, 'hersheysKissRim', 'fullyFrosted', true)).toBeCloseTo(0.0, 2);
+    expect(computeEdgeTrimRadius(4.0, 'hersheysKissRim', 'fullyFrosted', false)).toBeCloseTo(3.58, 2);
+    expect(computeEdgeTrimRadius(4.0, 'hersheysKissRim', 'fullyFrosted', true)).toBeCloseTo(4.14, 2);
+
+    // 3. Placement verification for Ferrero Rocher Rim
+    expect(computeEdgeTrimY(1.0, 4.0, 'ferreroRocherRim', 'fullyFrosted', false)).toBeCloseTo(1.0, 2);
+    expect(computeEdgeTrimY(0.0, 4.0, 'ferreroRocherRim', 'fullyFrosted', true)).toBeCloseTo(0.0, 2);
+    expect(computeEdgeTrimRadius(4.0, 'ferreroRocherRim', 'fullyFrosted', false)).toBeCloseTo(3.41, 2);
+    expect(computeEdgeTrimRadius(4.0, 'ferreroRocherRim', 'fullyFrosted', true)).toBeCloseTo(4.14, 2);
+
+    // 4. Geometry verification: Strawberry rim ring
+    const strawberryRing = buildStrawberryRimRing(3.64, 0.96);
+    expect(strawberryRing).toBeDefined();
+    expect(strawberryRing.isGroup).toBe(true);
+    expect(strawberryRing.children.length).toBeGreaterThanOrEqual(10);
+    strawberryRing.children.forEach((berry) => {
+      expect(berry.isGroup).toBe(true);
+    });
+
+    // 5. Geometry verification: Hershey's Kiss rim ring
+    const kissRing = buildHersheysKissRimRing(3.58, 1.0);
+    expect(kissRing).toBeDefined();
+    expect(kissRing.isGroup).toBe(true);
+    expect(kissRing.children.length).toBeGreaterThanOrEqual(12);
+    kissRing.children.forEach((kiss) => {
+      expect(kiss.isMesh).toBe(true);
+    });
+
+    // 6. Geometry verification: Ferrero Rocher rim ring
+    const ferreroRing = buildFerreroRocherRimRing(3.41, 1.0);
+    expect(ferreroRing).toBeDefined();
+    expect(ferreroRing.isGroup).toBe(true);
+    expect(ferreroRing.children.length).toBeGreaterThanOrEqual(8);
+    ferreroRing.children.forEach((truffle) => {
+      expect(truffle.isMesh).toBe(true);
+    });
+  });
+
+  it('renders Fruit & Confections Rim section and buttons in EdgeSection', () => {
+    render(
+      React.createElement(EdgeSection, {
+        edge: {
+          mode: 'both',
+          both: {
+            decorations: { setId: null, colorId: 'vanilla' },
+            piping: { tip: 'strawberryRim', colorId: 'vanilla' },
+          },
+          top: { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
+          bottom: { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
+          middle: { piping: { tip: null, colorId: 'vanilla' } },
+        },
+        onChange: () => { },
+        sugarColor: {},
+        onSugarColorChange: () => { },
+      })
+    );
+
+    expect(screen.getByText('Fruit & Confections Rim 🍓🍫')).toBeInTheDocument();
+    expect(screen.getByTitle('Fresh Strawberries Rim 🍓')).toBeInTheDocument();
+    expect(screen.getByTitle("Hershey's Kisses Rim 🍫")).toBeInTheDocument();
+    expect(screen.getByTitle('Ferrero Rocher Rim 🌰')).toBeInTheDocument();
+  });
+
+  it('generates strawberry dollop variations with correct strawberry counts, heights, and zero overhang', async () => {
+    const { buildPipingRing } = await import('./pipingTips');
+    const THREE = await import('three');
+
+    // Verify radial calculation maintains zero overhang for all strawberry variations
+    expect(computeEdgeTrimRadius(4.0, 'starDollopContinuousStrawberry', 'fullyFrosted')).toBeCloseTo(3.40, 2);
+    expect(computeEdgeTrimRadius(4.0, 'starDollopStrawberry', 'fullyFrosted')).toBeCloseTo(3.30, 2);
+    expect(computeEdgeTrimRadius(4.0, 'starDollopSparseStrawberry', 'fullyFrosted')).toBeCloseTo(3.24, 2);
+    expect(computeEdgeTrimRadius(4.0, 'roundDollopStrawberry', 'fullyFrosted')).toBeCloseTo(3.48, 2);
+    expect(computeEdgeTrimRadius(4.0, 'roundDollopMediumStrawberry', 'fullyFrosted')).toBeCloseTo(3.30, 2);
+    expect(computeEdgeTrimRadius(4.0, 'roundDollopSparseStrawberry', 'fullyFrosted')).toBeCloseTo(3.24, 2);
+    expect(computeEdgeTrimRadius(4.0, 'kissDollopStrawberry', 'fullyFrosted')).toBeCloseTo(3.48, 2);
+    expect(computeEdgeTrimRadius(4.0, 'kissDollopMediumStrawberry', 'fullyFrosted')).toBeCloseTo(3.30, 2);
+    expect(computeEdgeTrimRadius(4.0, 'kissDollopSparseStrawberry', 'fullyFrosted')).toBeCloseTo(3.24, 2);
+
+    expect(computeEdgeTrimRadius(4.0, 'starDollopContinuousAltStrawberry', 'fullyFrosted')).toBeCloseTo(3.40, 2);
+    expect(computeEdgeTrimRadius(4.0, 'starDollopAltStrawberry', 'fullyFrosted')).toBeCloseTo(3.30, 2);
+    expect(computeEdgeTrimRadius(4.0, 'starDollopSparseAltStrawberry', 'fullyFrosted')).toBeCloseTo(3.24, 2);
+    expect(computeEdgeTrimRadius(4.0, 'roundDollopAltStrawberry', 'fullyFrosted')).toBeCloseTo(3.48, 2);
+    expect(computeEdgeTrimRadius(4.0, 'roundDollopMediumAltStrawberry', 'fullyFrosted')).toBeCloseTo(3.30, 2);
+    expect(computeEdgeTrimRadius(4.0, 'roundDollopSparseAltStrawberry', 'fullyFrosted')).toBeCloseTo(3.24, 2);
+    expect(computeEdgeTrimRadius(4.0, 'kissDollopAltStrawberry', 'fullyFrosted')).toBeCloseTo(3.48, 2);
+    expect(computeEdgeTrimRadius(4.0, 'kissDollopMediumAltStrawberry', 'fullyFrosted')).toBeCloseTo(3.30, 2);
+    expect(computeEdgeTrimRadius(4.0, 'kissDollopSparseAltStrawberry', 'fullyFrosted')).toBeCloseTo(3.24, 2);
+
+    const matA = new THREE.MeshBasicMaterial({ color: '#FFF' });
+    const matB = new THREE.MeshBasicMaterial({ color: '#D6293E' });
+
+    // 1. Continuous Star Dollop with Strawberry (20 dollops + 20 strawberries)
+    const starStraw20 = buildPipingRing('starDollopContinuousStrawberry', matA, { radius: 3.40, y: 1.0, scale: 3 });
+    expect(starStraw20).toBeDefined();
+    expect(starStraw20.isGroup).toBe(true);
+    expect(starStraw20.children[0].isInstancedMesh).toBe(true);
+    expect(starStraw20.children[0].count).toBe(20);
+    const straw20 = starStraw20.children.slice(1);
+    expect(straw20.length).toBe(20);
+    straw20.forEach((s) => {
+      expect(s.isGroup).toBe(true);
+      expect(s.position.y).toBeGreaterThan(1.0); // Seated on top of dollop peak
+    });
+
+    // 2. Star Dollop with Strawberry (12 dollops + 12 strawberries)
+    const starStraw12 = buildPipingRing('starDollopStrawberry', matA, { radius: 3.30, y: 1.0, scale: 3 });
+    expect(starStraw12.children[0].count).toBe(12);
+    expect(starStraw12.children.slice(1).length).toBe(12);
+
+    // 3. Sparse Star Dollop with Strawberry (8 dollops + 8 strawberries)
+    const starStraw8 = buildPipingRing('starDollopSparseStrawberry', matA, { radius: 3.24, y: 1.0, scale: 3 });
+    expect(starStraw8.children[0].count).toBe(8);
+    expect(starStraw8.children.slice(1).length).toBe(8);
+
+    // 4. Alternating Continuous Star Dollop with Strawberry (10+10 dual material + 20 strawberries)
+    const starStraw20Alt = buildPipingRing('starDollopContinuousAltStrawberry', matA, {
+      radius: 3.40,
+      y: 1.0,
+      scale: 3,
+      secondaryMaterial: matB,
+    });
+    expect(starStraw20Alt.isGroup).toBe(true);
+    const altDollopGroup = starStraw20Alt.children[0];
+    expect(altDollopGroup.isGroup).toBe(true);
+    expect(altDollopGroup.children.length).toBe(2);
+    expect(altDollopGroup.children[0].count).toBe(10);
+    expect(altDollopGroup.children[1].count).toBe(10);
+    expect(starStraw20Alt.children.slice(1).length).toBe(20);
+
+    // 5. Alternating Round Tip Dollop with Strawberry (6+6 dual material + 12 strawberries)
+    const roundStraw12Alt = buildPipingRing('roundDollopMediumAltStrawberry', matA, {
+      radius: 3.30,
+      y: 1.0,
+      scale: 3,
+      secondaryMaterial: matB,
+    });
+    expect(roundStraw12Alt.children[0].children[0].count).toBe(6);
+    expect(roundStraw12Alt.children[0].children[1].count).toBe(6);
+    expect(roundStraw12Alt.children.slice(1).length).toBe(12);
+
+    // 6. Alternating Kiss Dollop with Strawberry (4+4 dual material + 8 strawberries)
+    const kissStraw8Alt = buildPipingRing('kissDollopSparseAltStrawberry', matA, {
+      radius: 3.24,
+      y: 1.0,
+      scale: 3,
+      secondaryMaterial: matB,
+    });
+    expect(kissStraw8Alt.children[0].children[0].count).toBe(4);
+    expect(kissStraw8Alt.children[0].children[1].count).toBe(4);
+    expect(kissStraw8Alt.children.slice(1).length).toBe(8);
+  });
+
+  it('renders all 6 dollop sub-rows in EdgeSection including strawberry and cherry options', () => {
+    render(
+      React.createElement(EdgeSection, {
+        edge: {
+          mode: 'both',
+          both: {
+            decorations: { setId: null, colorId: 'vanilla' },
+            piping: { tip: 'starDollopContinuousStrawberry', colorId: 'vanilla', secondaryColorId: 'red' },
+          },
+          top: { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
+          bottom: { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
+          middle: { piping: { tip: null, colorId: 'vanilla' } },
+        },
+        onChange: () => { },
+        sugarColor: {},
+        onSugarColorChange: () => { },
+      })
+    );
+
+    const dollopsHeader = screen.getByText('Dollops');
+    const dollopsContainer = dollopsHeader.closest('div');
+    const dollopsWithin = within(dollopsContainer);
+
+    expect(dollopsWithin.getByText('Solid')).toBeInTheDocument();
+    expect(dollopsWithin.getByText('Solid with Cherries 🍒')).toBeInTheDocument();
+    expect(dollopsWithin.getByText('Solid with Strawberries 🍓')).toBeInTheDocument();
+    expect(dollopsWithin.getByText('Alternating (2 Colors)')).toBeInTheDocument();
+    expect(dollopsWithin.getByText('Alternating with Cherries 🍒')).toBeInTheDocument();
+    expect(dollopsWithin.getByText('Alternating with Strawberries 🍓')).toBeInTheDocument();
+  });
+
+  it('generates strawberry whipped cream rosette variations with correct counts, nested strawberries, and zero overhang', async () => {
+    const { buildPipingRing } = await import('./pipingTips');
+    const THREE = await import('three');
+    const mat = new THREE.MeshBasicMaterial({ color: '#FFF' });
+
+    // Radial placement
+    expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteContinuousStrawberry', 'fullyFrosted')).toBeCloseTo(3.34, 2);
+    expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteStrawberry', 'fullyFrosted')).toBeCloseTo(3.24, 2);
+    expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteSparseStrawberry', 'fullyFrosted')).toBeCloseTo(3.12, 2);
+
+    // 1. Continuous with Strawberry (~20 rosettes + ~20 strawberries)
+    const ring20Straw = buildPipingRing('whippedCreamRosetteContinuousStrawberry', mat, { radius: 3.34, y: 1.0, scale: 3 });
+    expect(ring20Straw).toBeDefined();
+    expect(ring20Straw.isGroup).toBe(true);
+    expect(ring20Straw.children[0].isInstancedMesh).toBe(true);
+    const count20 = ring20Straw.children[0].count;
+    expect(count20).toBeGreaterThanOrEqual(18);
+    expect(count20).toBeLessThanOrEqual(22);
+    const straw20 = ring20Straw.children.slice(1);
+    expect(straw20.length).toBe(count20);
+    straw20.forEach((s) => {
+      expect(s.isGroup).toBe(true);
+      expect(s.position.y).toBeGreaterThan(1.0); // Seated on top of rosette peak
+    });
+
+    // 2. Standard with Strawberry (12 rosettes + 12 strawberries)
+    const ring12Straw = buildPipingRing('whippedCreamRosetteStrawberry', mat, { radius: 3.24, y: 1.0, scale: 3 });
+    expect(ring12Straw).toBeDefined();
+    expect(ring12Straw.isGroup).toBe(true);
+    expect(ring12Straw.children[0].isInstancedMesh).toBe(true);
+    expect(ring12Straw.children[0].count).toBe(12);
+    expect(ring12Straw.children.slice(1).length).toBe(12);
+
+    // 3. Sparse with Strawberry (8 rosettes + 8 strawberries)
+    const ring8Straw = buildPipingRing('whippedCreamRosetteSparseStrawberry', mat, { radius: 3.12, y: 1.0, scale: 3 });
+    expect(ring8Straw).toBeDefined();
+    expect(ring8Straw.isGroup).toBe(true);
+    expect(ring8Straw.children[0].isInstancedMesh).toBe(true);
+    expect(ring8Straw.children[0].count).toBe(8);
+    expect(ring8Straw.children.slice(1).length).toBe(8);
+  });
+
+  it('renders solid, cherry, and strawberry sub-rows in EdgeSection under Whipped Cream', () => {
+    render(
+      React.createElement(EdgeSection, {
+        edge: {
+          mode: 'both',
+          both: {
+            decorations: { setId: null, colorId: 'vanilla' },
+            piping: { tip: 'whippedCreamRosetteContinuousStrawberry', colorId: 'vanilla', secondaryColorId: 'red' },
+          },
+          top: { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
+          bottom: { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
+          middle: { piping: { tip: null, colorId: 'vanilla' } },
+        },
+        onChange: () => { },
+        sugarColor: {},
+        onSugarColorChange: () => { },
+      })
+    );
+
+    const wcHeader = screen.getByText('Whipped Cream 🍦');
+    const wcContainer = wcHeader.closest('div');
+    const wcWithin = within(wcContainer);
+
+    expect(wcWithin.getByText('Solid')).toBeInTheDocument();
+    expect(wcWithin.getByText('Solid with Cherries 🍒')).toBeInTheDocument();
+    expect(wcWithin.getByText('Solid with Strawberries 🍓')).toBeInTheDocument();
+    expect(screen.getByTitle('Whipped Cream Rosettes with Strawberry (Continuous ~20 pc)')).toBeInTheDocument();
+    expect(screen.getByTitle('Whipped Cream Rosettes with Strawberry (12 pc)')).toBeInTheDocument();
+    expect(screen.getByTitle('Sparse Whipped Cream Rosettes with Strawberry (8 pc)')).toBeInTheDocument();
+  });
 });
+
 
 

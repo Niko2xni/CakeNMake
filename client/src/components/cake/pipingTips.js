@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { buildCherryMesh } from './toppings/cherry';
+import { buildSlicedStrawberryMesh } from './toppings/strawberry';
 
 // ─── Piping Tip Geometry Engine ──────────────────────────────────────────
 // Real, physically-motivated geometry for piped icing — not the metal
@@ -1832,6 +1833,28 @@ function wrapWithCherries(dollopMesh, { count, radius, y, rand, cherryScale, che
   return group;
 }
 
+/**
+ * Places one halved/sliced strawberry per dollop around the ring, nestling each fresh
+ * berry slice into the dollop peak with the cut face facing outward and tilted gently
+ * back into the cream fold.
+ */
+function wrapWithStrawberries(dollopMesh, { count, radius, y, rand, strawberryScale, peakYOffset, sinkAmount = 0, maxLeanRad = 0.12 }) {
+  const group = new THREE.Group();
+  group.add(dollopMesh);
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2;
+    const cx = Math.sin(angle) * radius;
+    const cz = Math.cos(angle) * radius;
+    const cy = y + peakYOffset - sinkAmount;
+    const strawberry = buildSlicedStrawberryMesh(cx, cy, cz, strawberryScale, rand);
+    strawberry.rotation.y = angle + (rand() - 0.5) * 0.15;
+    strawberry.rotation.x = -0.32 + (rand() - 0.5) * 2 * maxLeanRad;
+    strawberry.rotation.z += (rand() - 0.5) * 2 * maxLeanRad;
+    group.add(strawberry);
+  }
+  return group;
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────
 
 // Cached unit geometries — built once total, reused across every flavor
@@ -1883,25 +1906,29 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
 
   const isAlt = typeof tip === 'string' && tip.includes('Alt');
   const withCherry = typeof tip === 'string' && tip.includes('Cherry');
-  const cleanTip = typeof tip === 'string' ? tip.replace('Cherry', '') : tip;
+  const withStrawberry = typeof tip === 'string' && tip.includes('Strawberry');
+  const cleanTip = typeof tip === 'string' ? tip.replace('Cherry', '').replace('Strawberry', '') : tip;
   const secMat = secondaryMaterial || (isAlt ? new THREE.MeshStandardMaterial({ color: '#D6293E', roughness: 0.38, metalness: 0 }) : null);
 
   const UNIFORM_CHERRY_SCALE = 0.85;
+  const UNIFORM_STRAWBERRY_SCALE = 0.80;
   const maybeAddCherries = (mesh, count, dollopScale, scaleY, _baseCherryScale, peakRatio) => {
-    if (!withCherry) return mesh;
-    const dollopScaleY = scaleY !== null && scaleY !== undefined ? scaleY : dollopScale;
-    const peakYOffset = peakRatio * dollopScaleY;
-    // Uniform, realistic cherry size across all border options (matching standalone toppings/cherry.js)
-    // Scale 0.85 corresponds to ~0.71" (18mm) diameter maraschino cherries on an 8" cake.
-    const cherryScale = UNIFORM_CHERRY_SCALE * (scale / 3);
-    // Sink the cherry ~45% of its scaled body radius into the dollop so the
-    // lower third is nestled in the soft buttercream -- giving a realistic
-    // 'settled into cream' look rather than perched on the tip.
-    // Cherry body base radius ~0.38 world units before cherryScale is applied.
-    const sinkAmount = cherryScale * 0.38 * 0.45;
-    // Compress the cherry slightly on Y (0.92) to simulate soft cream cradling the fruit
-    const cherryScaleY = cherryScale * 0.92;
-    return wrapWithCherries(mesh, { count, radius, y, rand, cherryScale, cherryScaleY, peakYOffset, sinkAmount, maxLeanRad: 0.14 });
+    if (withCherry) {
+      const dollopScaleY = scaleY !== null && scaleY !== undefined ? scaleY : dollopScale;
+      const peakYOffset = peakRatio * dollopScaleY;
+      const cherryScale = UNIFORM_CHERRY_SCALE * (scale / 3);
+      const sinkAmount = cherryScale * 0.38 * 0.45;
+      const cherryScaleY = cherryScale * 0.92;
+      return wrapWithCherries(mesh, { count, radius, y, rand, cherryScale, cherryScaleY, peakYOffset, sinkAmount, maxLeanRad: 0.14 });
+    }
+    if (withStrawberry) {
+      const dollopScaleY = scaleY !== null && scaleY !== undefined ? scaleY : dollopScale;
+      const peakYOffset = peakRatio * dollopScaleY;
+      const strawberryScale = UNIFORM_STRAWBERRY_SCALE * (scale / 3);
+      const sinkAmount = strawberryScale * 0.12;
+      return wrapWithStrawberries(mesh, { count, radius, y, rand, strawberryScale, peakYOffset, sinkAmount, maxLeanRad: 0.12 });
+    }
+    return mesh;
   };
 
   switch (cleanTip) {

@@ -6,6 +6,7 @@ import {
   getSharedCherryBodyGeometry,
   getSharedCherryBodyMaterial,
   buildStrawberryMesh,
+  buildSlicedStrawberryMesh,
   addStrawberry,
   getSharedStrawberryBodyGeometry,
   getSharedStrawberryTextures,
@@ -14,6 +15,11 @@ import {
   getSharedFloralRosetteGeometry,
   getSharedFloralRosetteMaterial,
 } from './toppings';
+import {
+  getSharedSlicedStrawberryTextures,
+  getSharedSlicedStrawberryFaceGeometry,
+  getSharedSlicedStrawberryBodyGeometry,
+} from './toppings/strawberry';
 
 describe('High-Fidelity Toppings Upgrade', () => {
   describe('Cherry Module', () => {
@@ -91,6 +97,42 @@ describe('High-Fidelity Toppings Upgrade', () => {
       const res = addStrawberry(group, 0, 0, 0);
       expect(group.children.length).toBe(1);
       expect(group.children[0]).toBe(res);
+    });
+
+    it('creates a sliced (halved) strawberry mesh with outer body, flat cut face, and calyx leaves', () => {
+      const sliced = buildSlicedStrawberryMesh(1, 2, 3, 0.82);
+      expect(sliced).toBeInstanceOf(THREE.Group);
+      expect(sliced.position.x).toBe(1);
+      expect(sliced.position.y).toBe(2);
+      expect(sliced.position.z).toBe(3);
+
+      const meshes = sliced.children.filter((c) => c.isMesh);
+      // Must contain outer curved body mesh and flat cut face mesh
+      expect(meshes.length).toBe(2);
+      const faceMesh = meshes[1];
+      expect(faceMesh.material.map).toBeDefined();
+
+      // Calyx group framing the top crown
+      const calyxGroup = sliced.children.find((c) => c.isGroup);
+      expect(calyxGroup).toBeDefined();
+      expect(calyxGroup.children.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it('caches sliced strawberry body, cut face geometry, and procedural textures', () => {
+      const bodyGeo1 = getSharedSlicedStrawberryBodyGeometry();
+      const bodyGeo2 = getSharedSlicedStrawberryBodyGeometry();
+      expect(bodyGeo1).toBe(bodyGeo2);
+      expect(bodyGeo1.userData.sharedCache).toBe(true);
+
+      const faceGeo1 = getSharedSlicedStrawberryFaceGeometry();
+      const faceGeo2 = getSharedSlicedStrawberryFaceGeometry();
+      expect(faceGeo1).toBe(faceGeo2);
+      expect(faceGeo1.userData.sharedCache).toBe(true);
+
+      const textures = getSharedSlicedStrawberryTextures();
+      expect(textures.colorTexture).toBeDefined();
+      expect(textures.bumpTexture).toBeDefined();
+      expect(textures.colorTexture.userData.sharedCache).toBe(true);
     });
   });
 

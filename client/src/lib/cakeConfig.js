@@ -325,6 +325,30 @@ export const PIPING_TIPS = [
   { id: 'whippedCreamRosetteContinuousCherry', label: 'Whipped Cream Rosettes with Cherry (Continuous)' },
   { id: 'whippedCreamRosetteCherry', label: 'Whipped Cream Rosettes with Cherry (12 pc)' },
   { id: 'whippedCreamRosetteSparseCherry', label: 'Sparse Whipped Cream Rosettes with Cherry (8 pc)' },
+  { id: 'whippedCreamRosetteContinuousStrawberry', label: 'Whipped Cream Rosettes with Strawberry (Continuous)' },
+  { id: 'whippedCreamRosetteStrawberry', label: 'Whipped Cream Rosettes with Strawberry (12 pc)' },
+  { id: 'whippedCreamRosetteSparseStrawberry', label: 'Sparse Whipped Cream Rosettes with Strawberry (8 pc)' },
+  { id: 'starDollopContinuousStrawberry', label: 'Continuous Star Dollop (20 pc) with Strawberry' },
+  { id: 'starDollopStrawberry', label: 'Star Dollop (12 pc) with Strawberry' },
+  { id: 'starDollopSparseStrawberry', label: 'Sparse Star Dollop (8 pc) with Strawberry' },
+  { id: 'roundDollopStrawberry', label: 'Continuous Round Tip Dollop (20 pc) with Strawberry' },
+  { id: 'roundDollopMediumStrawberry', label: 'Round Tip Dollop (12 pc) with Strawberry' },
+  { id: 'roundDollopSparseStrawberry', label: 'Sparse Round Tip Dollop (8 pc) with Strawberry' },
+  { id: 'kissDollopStrawberry', label: 'Continuous Kisses Dollop (20 pc) with Strawberry' },
+  { id: 'kissDollopMediumStrawberry', label: 'Kisses Dollop (12 pc) with Strawberry' },
+  { id: 'kissDollopSparseStrawberry', label: 'Sparse Kisses Dollop (8 pc) with Strawberry' },
+  { id: 'starDollopContinuousAltStrawberry', label: 'Continuous Star Dollop (20 pc) - Alternating with Strawberry' },
+  { id: 'starDollopAltStrawberry', label: 'Star Dollop (12 pc) - Alternating with Strawberry' },
+  { id: 'starDollopSparseAltStrawberry', label: 'Sparse Star Dollop (8 pc) - Alternating with Strawberry' },
+  { id: 'roundDollopAltStrawberry', label: 'Continuous Round Tip Dollop (20 pc) - Alternating with Strawberry' },
+  { id: 'roundDollopMediumAltStrawberry', label: 'Round Tip Dollop (12 pc) - Alternating with Strawberry' },
+  { id: 'roundDollopSparseAltStrawberry', label: 'Sparse Round Tip Dollop (8 pc) - Alternating with Strawberry' },
+  { id: 'kissDollopAltStrawberry', label: 'Continuous Kisses Dollop (20 pc) - Alternating with Strawberry' },
+  { id: 'kissDollopMediumAltStrawberry', label: 'Kisses Dollop (12 pc) - Alternating with Strawberry' },
+  { id: 'kissDollopSparseAltStrawberry', label: 'Sparse Kisses Dollop (8 pc) - Alternating with Strawberry' },
+  { id: 'strawberryRim', label: 'Fresh Strawberries Rim 🍓' },
+  { id: 'hersheysKissRim', label: "Hershey's Kisses Rim 🍫" },
+  { id: 'ferreroRocherRim', label: 'Ferrero Rocher Rim 🌰' },
 ];
 
 // ─── Filling Piping Designs — Filling's own piping vocabulary, split out
@@ -571,9 +595,16 @@ export const WHIPPED_CREAM_CHERRY_VARIATIONS = [
   { id: 'whippedCreamRosetteSparseCherry', label: 'Sparse Whipped Cream Rosettes with Cherry (8 pc)' },
 ];
 
+export const WHIPPED_CREAM_STRAWBERRY_VARIATIONS = [
+  { id: 'whippedCreamRosetteContinuousStrawberry', label: 'Whipped Cream Rosettes with Strawberry (Continuous ~20 pc)' },
+  { id: 'whippedCreamRosetteStrawberry', label: 'Whipped Cream Rosettes with Strawberry (12 pc)' },
+  { id: 'whippedCreamRosetteSparseStrawberry', label: 'Sparse Whipped Cream Rosettes with Strawberry (8 pc)' },
+];
+
 export const WHIPPED_CREAM_VARIATIONS = [
   ...WHIPPED_CREAM_SOLID_VARIATIONS,
   ...WHIPPED_CREAM_CHERRY_VARIATIONS,
+  ...WHIPPED_CREAM_STRAWBERRY_VARIATIONS,
 ];
 
 export const BRACELET_BEADS_VARIATIONS = [
@@ -589,6 +620,12 @@ export const BRACELET_BEADS_VARIATIONS = [
   // the smallest."
   { id: 'beadedTrimTrio', label: 'Trio Beaded Trim' },
   { id: 'beadedTrimPetite', label: 'Petite Beaded Trim' },
+];
+
+export const FRUIT_CONFECTION_RIM_OPTIONS = [
+  { id: 'strawberryRim', label: 'Fresh Strawberries Rim 🍓' },
+  { id: 'hersheysKissRim', label: "Hershey's Kisses Rim 🍫" },
+  { id: 'ferreroRocherRim', label: 'Ferrero Rocher Rim 🌰' },
 ];
 
 export const DOLLOPS_SOLID_VARIATIONS = [
@@ -615,6 +652,18 @@ export const DOLLOPS_SOLID_CHERRY_VARIATIONS = [
   { id: 'kissDollopSparseCherry', label: 'Sparse Kisses Dollop (8 pc) with Cherry' },
 ];
 
+export const DOLLOPS_SOLID_STRAWBERRY_VARIATIONS = [
+  { id: 'starDollopContinuousStrawberry', label: 'Continuous Star Dollop (20 pc) with Strawberry' },
+  { id: 'starDollopStrawberry', label: 'Star Dollop (12 pc) with Strawberry' },
+  { id: 'starDollopSparseStrawberry', label: 'Sparse Star Dollop (8 pc) with Strawberry' },
+  { id: 'roundDollopStrawberry', label: 'Continuous Round Tip Dollop (20 pc) with Strawberry' },
+  { id: 'roundDollopMediumStrawberry', label: 'Round Tip Dollop (12 pc) with Strawberry' },
+  { id: 'roundDollopSparseStrawberry', label: 'Sparse Round Tip Dollop (8 pc) with Strawberry' },
+  { id: 'kissDollopStrawberry', label: 'Continuous Kisses Dollop (20 pc) with Strawberry' },
+  { id: 'kissDollopMediumStrawberry', label: 'Kisses Dollop (12 pc) with Strawberry' },
+  { id: 'kissDollopSparseStrawberry', label: 'Sparse Kisses Dollop (8 pc) with Strawberry' },
+];
+
 export const DOLLOPS_ALTERNATING_VARIATIONS = [
   { id: 'starDollopContinuousAlt', label: 'Continuous Star Dollop (20 pc) - Alternating' },
   { id: 'starDollopAlt', label: 'Star Dollop (12 pc) - Alternating' },
@@ -639,11 +688,25 @@ export const DOLLOPS_ALTERNATING_CHERRY_VARIATIONS = [
   { id: 'kissDollopSparseAltCherry', label: 'Sparse Kisses Dollop (8 pc) - Alternating with Cherry' },
 ];
 
+export const DOLLOPS_ALTERNATING_STRAWBERRY_VARIATIONS = [
+  { id: 'starDollopContinuousAltStrawberry', label: 'Continuous Star Dollop (20 pc) - Alternating with Strawberry' },
+  { id: 'starDollopAltStrawberry', label: 'Star Dollop (12 pc) - Alternating with Strawberry' },
+  { id: 'starDollopSparseAltStrawberry', label: 'Sparse Star Dollop (8 pc) - Alternating with Strawberry' },
+  { id: 'roundDollopAltStrawberry', label: 'Continuous Round Tip Dollop (20 pc) - Alternating with Strawberry' },
+  { id: 'roundDollopMediumAltStrawberry', label: 'Round Tip Dollop (12 pc) - Alternating with Strawberry' },
+  { id: 'roundDollopSparseAltStrawberry', label: 'Sparse Round Tip Dollop (8 pc) - Alternating with Strawberry' },
+  { id: 'kissDollopAltStrawberry', label: 'Continuous Kisses Dollop (20 pc) - Alternating with Strawberry' },
+  { id: 'kissDollopMediumAltStrawberry', label: 'Kisses Dollop (12 pc) - Alternating with Strawberry' },
+  { id: 'kissDollopSparseAltStrawberry', label: 'Sparse Kisses Dollop (8 pc) - Alternating with Strawberry' },
+];
+
 export const DOLLOPS_VARIATIONS = [
   ...DOLLOPS_SOLID_VARIATIONS,
   ...DOLLOPS_SOLID_CHERRY_VARIATIONS,
+  ...DOLLOPS_SOLID_STRAWBERRY_VARIATIONS,
   ...DOLLOPS_ALTERNATING_VARIATIONS,
   ...DOLLOPS_ALTERNATING_CHERRY_VARIATIONS,
+  ...DOLLOPS_ALTERNATING_STRAWBERRY_VARIATIONS,
 ];
 
 export const SCALLOPS_VARIATIONS = [
@@ -690,6 +753,7 @@ export const STANDALONE_EDGE_PIPING_OPTIONS = PIPING_TIPS
 export const EDGE_DECORATION_SETS = [
   { id: 'curtain', label: 'Curtain' },
   ...BRACELET_BEADS_VARIATIONS,
+  ...FRUIT_CONFECTION_RIM_OPTIONS,
 ];
 
 export const EDGE_PIPING_OPTIONS = [...EDGE_DECORATION_SETS, ...PIPING_TIPS]

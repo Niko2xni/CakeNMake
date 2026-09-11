@@ -9,6 +9,9 @@ import { buildPipingRing } from './pipingTips';
 import {
   buildDripRing,
   buildBeadedTrimRing,
+  buildStrawberryRimRing,
+  buildHersheysKissRimRing,
+  buildFerreroRocherRimRing,
   buildCheckerSideSquares,
   buildTriangleSideShapes,
   buildScatterPearlsRing,
@@ -1332,7 +1335,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           unitGroup.position.set(x, y, z);
           targetGroup.add(unitGroup);
         } else if (setId === 'ferreroRocher') {
-          const rocherScale = 0.28 * scaleFactor;
+          const rocherScale = 0.45 * scaleFactor;
           const rocherMesh = buildFerreroRocherMesh(x, y, z, rocherScale);
           targetGroup.add(rocherMesh);
         } else if (setId === 'hersheysKisses') {
@@ -1456,7 +1459,9 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         edgeMode === 'both' ? [{ slot: edgeBoth, y: topY, radius: topRadius, isBottom: false }, { slot: edgeBoth, y: 0, radius: BASE_RADIUS, isBottom: true }]
           : [{ slot: edgeTop, y: topY, radius: topRadius, isBottom: false }, { slot: edgeBottom, y: 0, radius: BASE_RADIUS, isBottom: true }];
       for (const { slot, y, radius: edgeRadius, isBottom } of edgeSlotsToRender) {
-        const baseTip = typeof slot?.pipingTip === 'string' ? slot.pipingTip.replace(/Cherry$/, '').replace(/Alt$/, '') : '';
+        const baseTip = typeof slot?.pipingTip === 'string'
+          ? slot.pipingTip.replace(/Cherry$/, '').replace(/Strawberry$/, '').replace(/Alt$/, '')
+          : '';
         const isDollop = baseTip.toLowerCase().includes('dollop');
         const isWhippedCreamEdge = baseTip.startsWith('whippedCreamRosette');
         const isShell = ['shell', 'reverseShell'].includes(baseTip);
@@ -1465,9 +1470,14 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         const isWavePiping = baseTip === 'wavePiping';
         const isRopeTwist = ['ropeTwist', 'ropeTwistClassic'].includes(baseTip);
         const beadedTrimPattern = BEADED_TRIM_PATTERNS[slot?.pipingTip];
+        const isStrawberryRim = slot?.pipingTip === 'strawberryRim';
+        const isHersheysKissRim = slot?.pipingTip === 'hersheysKissRim';
+        const isFerreroRocherRim = slot?.pipingTip === 'ferreroRocherRim';
+        const isFruitConfectionRim = isStrawberryRim || isHersheysKissRim || isFerreroRocherRim;
+
         const decorationKind = beadedTrimPattern
           ? 'beadedTrim'
-          : (isWhippedCreamEdge ? baseTip : (isDollop ? baseTip : (isShell ? baseTip : (isBead ? 'bead' : (isZigzag ? 'zigzag' : (isWavePiping ? 'wavePiping' : (isRopeTwist ? baseTip : 'piping')))))));
+          : (isFruitConfectionRim ? slot.pipingTip : (isWhippedCreamEdge ? baseTip : (isDollop ? baseTip : (isShell ? baseTip : (isBead ? 'bead' : (isZigzag ? 'zigzag' : (isWavePiping ? 'wavePiping' : (isRopeTwist ? baseTip : 'piping'))))))));
         const edgeTrimId = beadedTrimPattern ? slot.pipingTip : slot?.decorationSetId;
         const edgeTrimY = computeEdgeTrimY(y, edgeRadius, decorationKind, exteriorFinishStyle, isBottom);
         const edgeTrimRadius = computeEdgeTrimRadius(edgeRadius, decorationKind, exteriorFinishStyle, isBottom);
@@ -1475,8 +1485,16 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           const trim = buildBeadedTrimRing(edgeTrimRadius, slot?.decorationColor || lastFrostColor, rand, { pattern: beadedTrimPattern });
           trim.position.y = edgeTrimY;
           group.add(trim);
-        }
-        if (slot?.pipingTip) {
+        } else if (isStrawberryRim) {
+          const trim = buildStrawberryRimRing(edgeTrimRadius, edgeTrimY, rand);
+          group.add(trim);
+        } else if (isHersheysKissRim) {
+          const trim = buildHersheysKissRimRing(edgeTrimRadius, edgeTrimY, rand);
+          group.add(trim);
+        } else if (isFerreroRocherRim) {
+          const trim = buildFerreroRocherRimRing(edgeTrimRadius, edgeTrimY, rand);
+          group.add(trim);
+        } else if (slot?.pipingTip) {
           const isAltTip = typeof slot.pipingTip === 'string' && slot.pipingTip.includes('Alt');
           const pipingMat = getFillingMaterial(slot?.pipingColor || lastFrostColor);
           const secondaryMat = isAltTip

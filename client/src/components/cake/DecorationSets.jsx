@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { buildSlicedStrawberryMesh } from './toppings/strawberry';
+import { buildHersheysKissMesh } from './toppings/hersheysKiss';
+import { buildFerreroRocherMesh } from './toppings/ferreroRocher';
 
 // ─── Decoration Set Geometry — first working example per category ─────────
 // Per instruction: keep every placeholder Set button in the UI (don't
@@ -64,13 +67,21 @@ export function computeEdgeTrimY(topSurfaceY, radius, decorationType = 'piping',
   const isDollopType = decorationType === 'dollops'
     || (typeof decorationType === 'string' && decorationType.startsWith('whippedCreamRosette'))
     || (typeof decorationType === 'string' && decorationType.toLowerCase().includes('dollop'));
+  const isFruitRim = ['strawberryRim', 'hersheysKissRim', 'ferreroRocherRim'].includes(decorationType);
+
   if (isBottom) {
+    if (isFruitRim) {
+      return 0.0;
+    }
     // Bottom edge decorations rest on top of the cake board / plate plane
     // rather than subtracting top-surface recess depths.
     if (isDollopType) {
       return -0.02; // Dollop base sits directly on top of the cake board
     }
     return -0.05;
+  }
+  if (isFruitRim) {
+    return decorationType === 'strawberryRim' ? topSurfaceY - 0.04 : topSurfaceY;
   }
   if (exteriorFinishStyle === 'naked') {
     // compactDepth + extraInset below (0.10–0.16 depending on cake size
@@ -130,7 +141,9 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
   const isWhippedCream = typeof decorationType === 'string' && decorationType.startsWith('whippedCreamRosette');
   const isDollopType = isWhippedCream || decorationType === 'dollops' || (typeof decorationType === 'string' && decorationType.toLowerCase().includes('dollop'));
 
-  const baseTip = typeof decorationType === 'string' ? decorationType.replace(/Cherry$/, '').replace(/Alt$/, '') : decorationType;
+  const baseTip = typeof decorationType === 'string'
+    ? decorationType.replace(/Cherry$/, '').replace(/Strawberry$/, '').replace(/Alt$/, '')
+    : decorationType;
   let topDollopInset = 0.76;
   if (baseTip === 'starDollopContinuous') {
     topDollopInset = 0.66; // R = 4.06 - 0.66 = 3.40 -> outer edge: 3.40 + 0.625 = 4.025 (right by edge, strictly <= 4.06)
@@ -152,8 +165,21 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
   }
 
   const radialInset = isBottom
-    ? (baseTip === 'beadedTrim' ? -0.10 : (isWhippedCream ? -0.02 : (isDollopType ? -0.06 : (['shell', 'reverseShell', 'bead', 'zigzag', 'wavePiping', 'ropeTwist', 'ropeTwistClassic'].includes(baseTip) ? -0.04 : -0.14))))
-    : (baseTip === 'beadedTrim' ? 0.22 : (isDollopType ? topDollopInset : (['shell', 'reverseShell'].includes(baseTip) ? 0.40 : (baseTip === 'bead' ? 0.38 : (baseTip === 'zigzag' ? 0.40 : (baseTip === 'wavePiping' ? 0.40 : (['ropeTwist', 'ropeTwistClassic'].includes(baseTip) ? 0.40 : 0.26)))))));
+    ? (baseTip === 'beadedTrim' ? -0.10
+      : (['strawberryRim', 'hersheysKissRim', 'ferreroRocherRim'].includes(baseTip) ? -0.08
+      : (isWhippedCream ? -0.02
+      : (isDollopType ? -0.06
+      : (['shell', 'reverseShell', 'bead', 'zigzag', 'wavePiping', 'ropeTwist', 'ropeTwistClassic'].includes(baseTip) ? -0.04 : -0.14)))))
+    : (baseTip === 'beadedTrim' ? 0.22
+      : (baseTip === 'strawberryRim' ? 0.42
+      : (baseTip === 'hersheysKissRim' ? 0.48
+      : (baseTip === 'ferreroRocherRim' ? 0.65
+      : (isDollopType ? topDollopInset
+      : (['shell', 'reverseShell'].includes(baseTip) ? 0.40
+      : (baseTip === 'bead' ? 0.38
+      : (baseTip === 'zigzag' ? 0.40
+      : (baseTip === 'wavePiping' ? 0.40
+      : (['ropeTwist', 'ropeTwistClassic'].includes(baseTip) ? 0.40 : 0.26))))))))));
   return Math.max(0.15, surfaceRadius - radialInset);
 
 }
@@ -198,6 +224,64 @@ export function buildBeadedTrimRing(radius, colorHex, rand, opts = {}) {
   mesh.instanceMatrix.needsUpdate = true;
   mesh.castShadow = true;
   return mesh;
+}
+
+/**
+ * Fresh Sliced Strawberry Border — a handcrafted ring of ripe halved strawberries
+ * sitting directly along the cake edge, with the glistening cut cross-section
+ * facing outward to showcase the fresh ruby and white interior.
+ */
+export function buildStrawberryRimRing(radius, y, rand = Math.random, opts = {}) {
+  const count = opts.count ?? Math.max(10, Math.round((radius * Math.PI * 2) / 1.45));
+  const scale = opts.scale ?? 0.82;
+  const group = new THREE.Group();
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2;
+    const cx = Math.sin(angle) * radius;
+    const cz = Math.cos(angle) * radius;
+    const strawberry = buildSlicedStrawberryMesh(cx, y, cz, scale, rand);
+    strawberry.rotation.y = angle;
+    strawberry.rotation.x = -0.38 + (rand() - 0.5) * 0.08;
+    strawberry.rotation.z += (rand() - 0.5) * 0.08;
+    group.add(strawberry);
+  }
+  return group;
+}
+
+/**
+ * Hershey's Kisses Chocolate Rim — upright chocolate kisses lining the cake rim.
+ */
+export function buildHersheysKissRimRing(radius, y, rand = Math.random, opts = {}) {
+  const count = opts.count ?? Math.max(12, Math.round((radius * Math.PI * 2) / 1.35));
+  const scale = opts.scale ?? 0.36;
+  const group = new THREE.Group();
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2;
+    const cx = Math.sin(angle) * radius;
+    const cz = Math.cos(angle) * radius;
+    const rotY = angle + (rand() - 0.5) * 0.3;
+    const kiss = buildHersheysKissMesh(cx, y, cz, scale, rotY);
+    group.add(kiss);
+  }
+  return group;
+}
+
+/**
+ * Ferrero Rocher Truffle Rim — textured hazelnut chocolate truffles lining the cake rim.
+ */
+export function buildFerreroRocherRimRing(radius, y, rand = Math.random, opts = {}) {
+  const count = opts.count ?? Math.max(8, Math.round((radius * Math.PI * 2) / 2.15));
+  const scale = opts.scale ?? 0.45;
+  const group = new THREE.Group();
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2;
+    const cx = Math.sin(angle) * radius;
+    const cz = Math.cos(angle) * radius;
+    const truffle = buildFerreroRocherMesh(cx, y, cz, scale);
+    truffle.rotation.y = rand() * Math.PI * 2;
+    group.add(truffle);
+  }
+  return group;
 }
 
 /**

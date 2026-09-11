@@ -25,7 +25,11 @@ export function getSharedFerreroNormalTexture() {
   const normalCanvas = document.createElement('canvas');
   normalCanvas.width = size;
   normalCanvas.height = size;
-  const nCtx = normalCanvas.getContext('2d');
+  const nCtx = normalCanvas.getContext ? normalCanvas.getContext('2d') : null;
+  if (!nCtx) {
+    _sharedFerreroNormalTexture = null;
+    return null;
+  }
   const nImgData = nCtx.createImageData(size, size);
   const nData = nImgData.data;
 
@@ -219,7 +223,7 @@ export function getSharedFerreroMaterial() {
   return mat;
 }
 
-export function buildFerreroRocherMesh(x, y, z, scale = 0.28) {
+export function buildFerreroRocherMesh(x, y, z, scale = 0.45) {
   const geo = getSharedFerreroGeometry();
   const mat = getSharedFerreroMaterial();
   const mesh = new THREE.Mesh(geo, mat);
