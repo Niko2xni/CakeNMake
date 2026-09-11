@@ -2066,40 +2066,40 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
       const count = Math.max(12, (withCherry || withStrawberry) ? (rawCount % 2 === 0 ? rawCount : rawCount + 1) : rawCount);
       const dScale = scale * 0.5637;
       const mesh = instanceAroundRing(getUnitGeometry('roundDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale });
-      return maybeAddCherries(mesh, count, dScale, null, 0.48, 0.48, { step: 2 });
+      return maybeAddCherries(mesh, count, dScale, null, 0.48, 0.44, { step: 2, cherryScale: 0.80, strawberryScale: 0.76, maxLeanRad: 0.18 });
     }
     case 'roundDollopAlt': {
       const rawCount = Math.round((radius * Math.PI * 2) / (0.3645 * scale));
       const count = Math.max(12, (withCherry || withStrawberry) ? (rawCount % 2 === 0 ? rawCount : rawCount + 1) : rawCount);
       const dScale = scale * 0.5637;
       const mesh = instanceAroundRing(getUnitGeometry('roundDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale, secondaryMaterial: secMat });
-      return maybeAddCherries(mesh, count, dScale, null, 0.48, 0.48, { step: 2 });
+      return maybeAddCherries(mesh, count, dScale, null, 0.48, 0.44, { step: 2, cherryScale: 0.80, strawberryScale: 0.76, maxLeanRad: 0.18 });
     }
     case 'roundDollopMedium': {
       const count = Math.max(6, Math.round((radius * Math.PI * 2) / (0.5760 * scale)));
       const dScale = scale * 0.7505;
       const mesh = instanceAroundRing(getUnitGeometry('roundDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale });
-      return maybeAddCherries(mesh, count, dScale, null, 0.50, 0.48);
+      return maybeAddCherries(mesh, count, dScale, null, 0.50, 0.44, { cherryScale: 0.85, strawberryScale: 0.80, maxLeanRad: 0.18 });
     }
     case 'roundDollopMediumAlt': {
       const count = Math.max(6, Math.round((radius * Math.PI * 2) / (0.5760 * scale)));
       const dScale = scale * 0.7505;
       const mesh = instanceAroundRing(getUnitGeometry('roundDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale, secondaryMaterial: secMat });
-      return maybeAddCherries(mesh, count, dScale, null, 0.50, 0.48);
+      return maybeAddCherries(mesh, count, dScale, null, 0.50, 0.44, { cherryScale: 0.85, strawberryScale: 0.80, maxLeanRad: 0.18 });
     }
     case 'roundDollopSparse': {
       const count = Math.max(4, Math.round((radius * Math.PI * 2) / (0.8482 * scale)));
       const dScale = scale * 0.74;
       const dScaleY = scale * 0.82;
       const mesh = instanceAroundRing(getUnitGeometry('roundDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale, scaleY: dScaleY });
-      return maybeAddCherries(mesh, count, dScale, dScaleY, 0.54, 0.48);
+      return maybeAddCherries(mesh, count, dScale, dScaleY, 0.54, 0.44, { cherryScale: 0.90, strawberryScale: 0.85, maxLeanRad: 0.18 });
     }
     case 'roundDollopSparseAlt': {
       const count = Math.max(4, Math.round((radius * Math.PI * 2) / (0.8482 * scale)));
       const dScale = scale * 0.74;
       const dScaleY = scale * 0.82;
       const mesh = instanceAroundRing(getUnitGeometry('roundDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale, scaleY: dScaleY, secondaryMaterial: secMat });
-      return maybeAddCherries(mesh, count, dScale, dScaleY, 0.54, 0.48);
+      return maybeAddCherries(mesh, count, dScale, dScaleY, 0.54, 0.44, { cherryScale: 0.90, strawberryScale: 0.85, maxLeanRad: 0.18 });
     }
     case 'kissDollop': {
       const rawCount = Math.round((radius * Math.PI * 2) / (0.3644 * scale));
