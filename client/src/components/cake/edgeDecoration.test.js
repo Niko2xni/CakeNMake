@@ -755,15 +755,15 @@ describe('edge decoration placement', () => {
     const matA = new THREE.MeshBasicMaterial({ color: '#FFF' });
     const matB = new THREE.MeshBasicMaterial({ color: '#D6293E' });
 
-    // 1. Continuous Star Dollop with Cherry (20 dollops + 20 cherries)
+    // 1. Continuous Star Dollop with Cherry (20 dollops + 10 cherries, alternating)
     const starCherry20 = buildPipingRing('starDollopContinuousCherry', matA, { radius: 3.40, y: 1.0, scale: 3 });
     expect(starCherry20).toBeDefined();
     expect(starCherry20.isGroup).toBe(true);
-    // child 0: dollop instanced mesh (20 pc), children 1..20: 20 cherries
+    // child 0: dollop instanced mesh (20 pc), children 1..10: 10 cherries
     expect(starCherry20.children[0].isInstancedMesh).toBe(true);
     expect(starCherry20.children[0].count).toBe(20);
     const cherries20 = starCherry20.children.slice(1);
-    expect(cherries20.length).toBe(20);
+    expect(cherries20.length).toBe(10);
     cherries20.forEach((c) => {
       expect(c.isGroup).toBe(true);
       expect(c.position.y).toBeGreaterThan(1.0); // Seated on top of dollop peak
@@ -779,7 +779,7 @@ describe('edge decoration placement', () => {
     expect(starCherry8.children[0].count).toBe(8);
     expect(starCherry8.children.slice(1).length).toBe(8);
 
-    // 4. Alternating Continuous Star Dollop with Cherry (10+10 dual material + 20 cherries)
+    // 4. Alternating Continuous Star Dollop with Cherry (10+10 dual material + 10 cherries)
     const starCherry20Alt = buildPipingRing('starDollopContinuousAltCherry', matA, {
       radius: 3.40,
       y: 1.0,
@@ -792,7 +792,7 @@ describe('edge decoration placement', () => {
     expect(altDollopGroup.children.length).toBe(2);
     expect(altDollopGroup.children[0].count).toBe(10);
     expect(altDollopGroup.children[1].count).toBe(10);
-    expect(starCherry20Alt.children.slice(1).length).toBe(20);
+    expect(starCherry20Alt.children.slice(1).length).toBe(10);
 
     // 5. Alternating Round Tip Dollop with Cherry (6+6 dual material + 12 cherries)
     const roundCherry12Alt = buildPipingRing('roundDollopMediumAltCherry', matA, {
@@ -815,6 +815,16 @@ describe('edge decoration placement', () => {
     expect(kissCherry8Alt.children[0].children[0].count).toBe(4);
     expect(kissCherry8Alt.children[0].children[1].count).toBe(4);
     expect(kissCherry8Alt.children.slice(1).length).toBe(8);
+
+    // 7. Continuous Round Tip Dollop with Cherry (20 dollops + 10 cherries, alternating)
+    const roundCherry20 = buildPipingRing('roundDollopCherry', matA, { radius: 3.48, y: 1.0, scale: 3 });
+    expect(roundCherry20.children[0].count).toBe(20);
+    expect(roundCherry20.children.slice(1).length).toBe(10);
+
+    // 8. Continuous Kisses Dollop with Cherry (20 dollops + 10 cherries, alternating)
+    const kissCherry20 = buildPipingRing('kissDollopCherry', matA, { radius: 3.48, y: 1.0, scale: 3 });
+    expect(kissCherry20.children[0].count).toBe(20);
+    expect(kissCherry20.children.slice(1).length).toBe(10);
   });
 
   it('renders all 4 dollop sub-rows in EdgeSection including cherry options', () => {
@@ -851,7 +861,7 @@ describe('edge decoration placement', () => {
     const THREE = await import('three');
     const mat = new THREE.MeshBasicMaterial({ color: '#FFF' });
 
-    // 1. Continuous with Cherry (~20 rosettes + ~20 cherries)
+    // 1. Continuous with Cherry (~20 rosettes + 10 alternating cherries)
     const ring20Cherry = buildPipingRing('whippedCreamRosetteContinuousCherry', mat, { radius: 3.34, y: 1.0, scale: 3 });
     expect(ring20Cherry).toBeDefined();
     expect(ring20Cherry.isGroup).toBe(true);
@@ -859,8 +869,9 @@ describe('edge decoration placement', () => {
     const count20 = ring20Cherry.children[0].count;
     expect(count20).toBeGreaterThanOrEqual(18);
     expect(count20).toBeLessThanOrEqual(22);
+    expect(count20 % 2).toBe(0);
     const cherries20 = ring20Cherry.children.slice(1);
-    expect(cherries20.length).toBe(count20);
+    expect(cherries20.length).toBe(count20 / 2);
     cherries20.forEach((c) => {
       expect(c.isGroup).toBe(true);
       expect(c.position.y).toBeGreaterThan(1.0); // Seated on top of rosette peak
@@ -1022,14 +1033,14 @@ describe('edge decoration placement', () => {
     const matA = new THREE.MeshBasicMaterial({ color: '#FFF' });
     const matB = new THREE.MeshBasicMaterial({ color: '#D6293E' });
 
-    // 1. Continuous Star Dollop with Strawberry (20 dollops + 20 strawberries)
+    // 1. Continuous Star Dollop with Strawberry (20 dollops + 10 strawberries, alternating)
     const starStraw20 = buildPipingRing('starDollopContinuousStrawberry', matA, { radius: 3.40, y: 1.0, scale: 3 });
     expect(starStraw20).toBeDefined();
     expect(starStraw20.isGroup).toBe(true);
     expect(starStraw20.children[0].isInstancedMesh).toBe(true);
     expect(starStraw20.children[0].count).toBe(20);
     const straw20 = starStraw20.children.slice(1);
-    expect(straw20.length).toBe(20);
+    expect(straw20.length).toBe(10);
     straw20.forEach((s) => {
       expect(s.isGroup).toBe(true);
       expect(s.position.y).toBeGreaterThan(1.0); // Seated on top of dollop peak
@@ -1045,7 +1056,7 @@ describe('edge decoration placement', () => {
     expect(starStraw8.children[0].count).toBe(8);
     expect(starStraw8.children.slice(1).length).toBe(8);
 
-    // 4. Alternating Continuous Star Dollop with Strawberry (10+10 dual material + 20 strawberries)
+    // 4. Alternating Continuous Star Dollop with Strawberry (10+10 dual material + 10 strawberries)
     const starStraw20Alt = buildPipingRing('starDollopContinuousAltStrawberry', matA, {
       radius: 3.40,
       y: 1.0,
@@ -1058,7 +1069,7 @@ describe('edge decoration placement', () => {
     expect(altDollopGroup.children.length).toBe(2);
     expect(altDollopGroup.children[0].count).toBe(10);
     expect(altDollopGroup.children[1].count).toBe(10);
-    expect(starStraw20Alt.children.slice(1).length).toBe(20);
+    expect(starStraw20Alt.children.slice(1).length).toBe(10);
 
     // 5. Alternating Round Tip Dollop with Strawberry (6+6 dual material + 12 strawberries)
     const roundStraw12Alt = buildPipingRing('roundDollopMediumAltStrawberry', matA, {
@@ -1081,6 +1092,16 @@ describe('edge decoration placement', () => {
     expect(kissStraw8Alt.children[0].children[0].count).toBe(4);
     expect(kissStraw8Alt.children[0].children[1].count).toBe(4);
     expect(kissStraw8Alt.children.slice(1).length).toBe(8);
+
+    // 7. Continuous Round Tip Dollop with Strawberry (20 dollops + 10 strawberries, alternating)
+    const roundStraw20 = buildPipingRing('roundDollopStrawberry', matA, { radius: 3.48, y: 1.0, scale: 3 });
+    expect(roundStraw20.children[0].count).toBe(20);
+    expect(roundStraw20.children.slice(1).length).toBe(10);
+
+    // 8. Continuous Kisses Dollop with Strawberry (20 dollops + 10 strawberries, alternating)
+    const kissStraw20 = buildPipingRing('kissDollopStrawberry', matA, { radius: 3.48, y: 1.0, scale: 3 });
+    expect(kissStraw20.children[0].count).toBe(20);
+    expect(kissStraw20.children.slice(1).length).toBe(10);
   });
 
   it('renders all 6 dollop sub-rows in EdgeSection including strawberry and cherry options', () => {
@@ -1124,7 +1145,7 @@ describe('edge decoration placement', () => {
     expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteStrawberry', 'fullyFrosted')).toBeCloseTo(3.24, 2);
     expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteSparseStrawberry', 'fullyFrosted')).toBeCloseTo(3.12, 2);
 
-    // 1. Continuous with Strawberry (~20 rosettes + ~20 strawberries)
+    // 1. Continuous with Strawberry (~20 rosettes + 10 alternating strawberries)
     const ring20Straw = buildPipingRing('whippedCreamRosetteContinuousStrawberry', mat, { radius: 3.34, y: 1.0, scale: 3 });
     expect(ring20Straw).toBeDefined();
     expect(ring20Straw.isGroup).toBe(true);
@@ -1132,8 +1153,9 @@ describe('edge decoration placement', () => {
     const count20 = ring20Straw.children[0].count;
     expect(count20).toBeGreaterThanOrEqual(18);
     expect(count20).toBeLessThanOrEqual(22);
+    expect(count20 % 2).toBe(0);
     const straw20 = ring20Straw.children.slice(1);
-    expect(straw20.length).toBe(count20);
+    expect(straw20.length).toBe(count20 / 2);
     straw20.forEach((s) => {
       expect(s.isGroup).toBe(true);
       expect(s.position.y).toBeGreaterThan(1.0); // Seated on top of rosette peak
