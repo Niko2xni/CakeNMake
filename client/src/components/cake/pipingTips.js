@@ -1510,8 +1510,9 @@ export function buildRopeTwistClassicRingGeometry(ringRadius) {
  */
 export function buildReverseShellUnitGeometries(ringRadius) {
   const circumference = ringRadius * Math.PI * 2;
-  // Enforce an even count so the left/right alternation closes seamlessly around the 360-degree loop
-  const rawN = Math.round(circumference / 0.58);
+  // Enforce an even count so the left/right alternation closes seamlessly around the 360-degree loop.
+  // Divisor 0.96 yields ~24 shells on an 8" cake (12 left, 12 right), matching authentic Wilton #21/#32 piping.
+  const rawN = Math.round(circumference / 0.96);
   const N = Math.max(12, rawN % 2 === 0 ? rawN : rawN + 1);
   const deltaTheta = (Math.PI * 2) / N;
   const overlapFactor = 1.38;
@@ -1520,9 +1521,9 @@ export function buildReverseShellUnitGeometries(ringRadius) {
   const tubularSegments = 24;
   const starPoints = 8;
   const numProfilePts = 64; // 8 samples per star flute ensures sharp, non-blurred ridges
-  const rMid = 0.130;
+  const rMid = 0.205; // ~0.62" peak bulb width, scaling up from previous micro 0.130"
   const fluteDepth = 0.32; // Wilton open-star fluting
-  const camber = 0.085; // lateral crescent arch displacement
+  const camber = 0.110; // lateral crescent arch displacement
 
   // Build crisp 8-point fluted star profile in local 2D space
   const baseProfile = [];
@@ -1547,8 +1548,8 @@ export function buildReverseShellUnitGeometries(ringRadius) {
     const rOffset = side * camber * Math.sin(Math.PI * Math.pow(clampedT, 0.85));
     const r = ringRadius + rOffset;
 
-    // Height profile: firmly grounded head (-0.015) -> bulb peak (0.165) at t=0.22 -> grounded tail (-0.015)
-    const y = -0.015 + 0.165 * Math.pow(Math.sin(Math.PI * Math.pow(clampedT, 0.65)), 0.90);
+    // Height profile: firmly grounded head (-0.015) -> bulb peak (0.285) at t=0.22 -> grounded tail (-0.015)
+    const y = -0.015 + 0.285 * Math.pow(Math.sin(Math.PI * Math.pow(clampedT, 0.65)), 0.90);
 
     return new THREE.Vector3(Math.sin(theta) * r, y, Math.cos(theta) * r);
   }
@@ -1623,7 +1624,7 @@ export function buildReverseShellUnitGeometries(ringRadius) {
       getCurvePoint(k, dt),
       getCurvePoint(k, 0)
     ).normalize();
-    const headDomeCenter = startCenter.clone().addScaledVector(tangent0, -0.03);
+    const headDomeCenter = startCenter.clone().addScaledVector(tangent0, -0.045);
     const startCapIdx = positions.length / 3;
     positions.push(headDomeCenter.x, headDomeCenter.y, headDomeCenter.z);
     for (let j = 0; j < numProfilePts; j++) {
@@ -1637,7 +1638,7 @@ export function buildReverseShellUnitGeometries(ringRadius) {
       getCurvePoint(k, 1),
       getCurvePoint(k, 1 - dt)
     ).normalize();
-    const tailTipCenter = endCenter.clone().addScaledVector(tangent1, 0.02);
+    const tailTipCenter = endCenter.clone().addScaledVector(tangent1, 0.035);
     const endCapIdx = positions.length / 3;
     positions.push(tailTipCenter.x, tailTipCenter.y, tailTipCenter.z);
     const lastRowOffset = tubularSegments * numProfilePts;
