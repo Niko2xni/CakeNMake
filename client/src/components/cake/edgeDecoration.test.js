@@ -24,31 +24,31 @@ describe('edge decoration placement', () => {
     expect(computeEdgeTrimRadius(4.0, 'kissDollopMedium', 'fullyFrosted')).toBeCloseTo(3.30, 2);
     expect(computeEdgeTrimRadius(4.0, 'kissDollopSparse', 'fullyFrosted')).toBeCloseTo(3.24, 2);
     expect(computeEdgeTrimY(0, 4.0, 'dollops', 'fullyFrosted', true)).toBeCloseTo(-0.02, 2);
-    expect(computeEdgeTrimRadius(4.0, 'dollops', 'fullyFrosted', true)).toBeCloseTo(4.12, 2);
+    expect(computeEdgeTrimRadius(4.0, 'dollops', 'fullyFrosted', true)).toBeCloseTo(4.74, 2);
     expect(computeEdgeTrimRadius(4.0, 'shell', 'fullyFrosted')).toBeCloseTo(3.66, 2);
-    expect(computeEdgeTrimRadius(4.0, 'shell', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
+    expect(computeEdgeTrimRadius(4.0, 'shell', 'fullyFrosted', true)).toBeCloseTo(4.28, 2);
     expect(computeEdgeTrimRadius(4.0, 'shellAlt', 'fullyFrosted')).toBeCloseTo(3.66, 2);
-    expect(computeEdgeTrimRadius(4.0, 'shellAlt', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
+    expect(computeEdgeTrimRadius(4.0, 'shellAlt', 'fullyFrosted', true)).toBeCloseTo(4.28, 2);
     expect(computeEdgeTrimRadius(4.0, 'reverseShell', 'fullyFrosted')).toBeCloseTo(3.66, 2);
-    expect(computeEdgeTrimRadius(4.0, 'reverseShell', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
+    expect(computeEdgeTrimRadius(4.0, 'reverseShell', 'fullyFrosted', true)).toBeCloseTo(4.30, 2);
     expect(computeEdgeTrimRadius(4.0, 'reverseShellAlt', 'fullyFrosted')).toBeCloseTo(3.66, 2);
-    expect(computeEdgeTrimRadius(4.0, 'reverseShellAlt', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
+    expect(computeEdgeTrimRadius(4.0, 'reverseShellAlt', 'fullyFrosted', true)).toBeCloseTo(4.30, 2);
     expect(computeEdgeTrimRadius(4.0, 'bead', 'fullyFrosted')).toBeCloseTo(3.68, 2);
-    expect(computeEdgeTrimRadius(4.0, 'bead', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
+    expect(computeEdgeTrimRadius(4.0, 'bead', 'fullyFrosted', true)).toBeCloseTo(4.40, 2);
     expect(computeEdgeTrimRadius(4.0, 'beadAlt', 'fullyFrosted')).toBeCloseTo(3.68, 2);
-    expect(computeEdgeTrimRadius(4.0, 'beadAlt', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
+    expect(computeEdgeTrimRadius(4.0, 'beadAlt', 'fullyFrosted', true)).toBeCloseTo(4.40, 2);
     expect(computeEdgeTrimRadius(4.0, 'zigzag', 'fullyFrosted')).toBeCloseTo(3.66, 2);
-    expect(computeEdgeTrimRadius(4.0, 'zigzag', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
+    expect(computeEdgeTrimRadius(4.0, 'zigzag', 'fullyFrosted', true)).toBeCloseTo(4.27, 2);
     expect(computeEdgeTrimRadius(4.0, 'wavePiping', 'fullyFrosted')).toBeCloseTo(3.66, 2);
-    expect(computeEdgeTrimRadius(4.0, 'wavePiping', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
+    expect(computeEdgeTrimRadius(4.0, 'wavePiping', 'fullyFrosted', true)).toBeCloseTo(4.27, 2);
     expect(computeEdgeTrimRadius(4.0, 'ropeTwist', 'fullyFrosted')).toBeCloseTo(3.66, 2);
-    expect(computeEdgeTrimRadius(4.0, 'ropeTwist', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
+    expect(computeEdgeTrimRadius(4.0, 'ropeTwist', 'fullyFrosted', true)).toBeCloseTo(4.27, 2);
     expect(computeEdgeTrimRadius(4.0, 'ropeTwistAlt', 'fullyFrosted')).toBeCloseTo(3.66, 2);
-    expect(computeEdgeTrimRadius(4.0, 'ropeTwistAlt', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
+    expect(computeEdgeTrimRadius(4.0, 'ropeTwistAlt', 'fullyFrosted', true)).toBeCloseTo(4.27, 2);
     expect(computeEdgeTrimRadius(4.0, 'ropeTwistClassic', 'fullyFrosted')).toBeCloseTo(3.66, 2);
-    expect(computeEdgeTrimRadius(4.0, 'ropeTwistClassic', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
+    expect(computeEdgeTrimRadius(4.0, 'ropeTwistClassic', 'fullyFrosted', true)).toBeCloseTo(4.27, 2);
     expect(computeEdgeTrimRadius(4.0, 'ropeTwistClassicAlt', 'fullyFrosted')).toBeCloseTo(3.66, 2);
-    expect(computeEdgeTrimRadius(4.0, 'ropeTwistClassicAlt', 'fullyFrosted', true)).toBeCloseTo(4.10, 2);
+    expect(computeEdgeTrimRadius(4.0, 'ropeTwistClassicAlt', 'fullyFrosted', true)).toBeCloseTo(4.27, 2);
   });
 
   it('does not render the generic None option in the edge picker and uses dedicated design rows', () => {
@@ -401,10 +401,10 @@ describe('edge decoration placement', () => {
     // Sparse (8 pc): topDollopInset=0.94 → ring R = 4.06 - 0.94 = 3.12
     expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteSparse', 'fullyFrosted')).toBeCloseTo(3.12, 2);
 
-    // Bottom edge: isWhippedCream radialInset=-0.02 → ring R = 4.06 - (-0.02) = 4.08
-    expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteContinuous', 'fullyFrosted', true)).toBeCloseTo(4.08, 2);
-    expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosette', 'fullyFrosted', true)).toBeCloseTo(4.08, 2);
-    expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteSparse', 'fullyFrosted', true)).toBeCloseTo(4.08, 2);
+    // Bottom edge: rosettes sit proud outside the cake cylinder flush against the frosting wall
+    expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteContinuous', 'fullyFrosted', true)).toBeCloseTo(4.69, 2);
+    expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosette', 'fullyFrosted', true)).toBeCloseTo(4.80, 2);
+    expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteSparse', 'fullyFrosted', true)).toBeCloseTo(4.91, 2);
 
     // Bottom edge Y: whipped cream is dollop-type, so sits at y=-0.02 (on cake board)
     expect(computeEdgeTrimY(0, 4.0, 'whippedCreamRosetteContinuous', 'fullyFrosted', true)).toBeCloseTo(-0.02, 2);
@@ -415,9 +415,9 @@ describe('edge decoration placement', () => {
     expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteContinuousCherry', 'fullyFrosted')).toBeCloseTo(3.34, 2);
     expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteCherry', 'fullyFrosted')).toBeCloseTo(3.24, 2);
     expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteSparseCherry', 'fullyFrosted')).toBeCloseTo(3.12, 2);
-    expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteContinuousCherry', 'fullyFrosted', true)).toBeCloseTo(4.08, 2);
-    expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteCherry', 'fullyFrosted', true)).toBeCloseTo(4.08, 2);
-    expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteSparseCherry', 'fullyFrosted', true)).toBeCloseTo(4.08, 2);
+    expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteContinuousCherry', 'fullyFrosted', true)).toBeCloseTo(4.69, 2);
+    expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteCherry', 'fullyFrosted', true)).toBeCloseTo(4.80, 2);
+    expect(computeEdgeTrimRadius(4.0, 'whippedCreamRosetteSparseCherry', 'fullyFrosted', true)).toBeCloseTo(4.91, 2);
     expect(computeEdgeTrimY(0, 4.0, 'whippedCreamRosetteContinuousCherry', 'fullyFrosted', true)).toBeCloseTo(-0.02, 2);
     expect(computeEdgeTrimY(0, 4.0, 'whippedCreamRosetteCherry', 'fullyFrosted', true)).toBeCloseTo(-0.02, 2);
     expect(computeEdgeTrimY(0, 4.0, 'whippedCreamRosetteSparseCherry', 'fullyFrosted', true)).toBeCloseTo(-0.02, 2);
@@ -927,19 +927,19 @@ describe('edge decoration placement', () => {
     expect(computeEdgeTrimY(1.0, 4.0, 'strawberryRim', 'fullyFrosted', false)).toBeCloseTo(0.96, 2);
     expect(computeEdgeTrimY(0.0, 4.0, 'strawberryRim', 'fullyFrosted', true)).toBeCloseTo(0.0, 2);
     expect(computeEdgeTrimRadius(4.0, 'strawberryRim', 'fullyFrosted', false)).toBeCloseTo(3.64, 2);
-    expect(computeEdgeTrimRadius(4.0, 'strawberryRim', 'fullyFrosted', true)).toBeCloseTo(4.14, 2);
+    expect(computeEdgeTrimRadius(4.0, 'strawberryRim', 'fullyFrosted', true)).toBeCloseTo(4.37, 2);
 
     // 2. Placement verification for Hershey's Kisses Rim
     expect(computeEdgeTrimY(1.0, 4.0, 'hersheysKissRim', 'fullyFrosted', false)).toBeCloseTo(1.0, 2);
     expect(computeEdgeTrimY(0.0, 4.0, 'hersheysKissRim', 'fullyFrosted', true)).toBeCloseTo(0.0, 2);
     expect(computeEdgeTrimRadius(4.0, 'hersheysKissRim', 'fullyFrosted', false)).toBeCloseTo(3.58, 2);
-    expect(computeEdgeTrimRadius(4.0, 'hersheysKissRim', 'fullyFrosted', true)).toBeCloseTo(4.14, 2);
+    expect(computeEdgeTrimRadius(4.0, 'hersheysKissRim', 'fullyFrosted', true)).toBeCloseTo(4.47, 2);
 
     // 3. Placement verification for Ferrero Rocher Rim
     expect(computeEdgeTrimY(1.0, 4.0, 'ferreroRocherRim', 'fullyFrosted', false)).toBeCloseTo(1.0, 2);
     expect(computeEdgeTrimY(0.0, 4.0, 'ferreroRocherRim', 'fullyFrosted', true)).toBeCloseTo(0.0, 2);
     expect(computeEdgeTrimRadius(4.0, 'ferreroRocherRim', 'fullyFrosted', false)).toBeCloseTo(3.41, 2);
-    expect(computeEdgeTrimRadius(4.0, 'ferreroRocherRim', 'fullyFrosted', true)).toBeCloseTo(4.14, 2);
+    expect(computeEdgeTrimRadius(4.0, 'ferreroRocherRim', 'fullyFrosted', true)).toBeCloseTo(4.67, 2);
 
     // 4. Geometry verification: Strawberry rim ring
     const strawberryRing = buildStrawberryRimRing(3.64, 0.96);

@@ -164,12 +164,45 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
     topDollopInset = 0.94;
   }
 
+  let bottomRadialInset = -0.25;
+  if (baseTip === 'beadedTrim') {
+    bottomRadialInset = -0.10;
+  } else if (baseTip === 'whippedCreamRosetteContinuous') {
+    bottomRadialInset = -0.63;
+  } else if (baseTip === 'whippedCreamRosette') {
+    bottomRadialInset = -0.74;
+  } else if (baseTip === 'whippedCreamRosetteSparse') {
+    bottomRadialInset = -0.85;
+  } else if (baseTip === 'starDollopContinuous' || baseTip === 'roundDollopContinuous' || baseTip === 'kissDollopContinuous') {
+    bottomRadialInset = -0.58;
+  } else if (baseTip === 'starDollop' || baseTip === 'roundDollopMedium' || baseTip === 'kissDollopMedium' || baseTip === 'dollops') {
+    bottomRadialInset = -0.68;
+  } else if (baseTip === 'starDollopSparse' || baseTip === 'roundDollopSparse' || baseTip === 'kissDollopSparse') {
+    bottomRadialInset = -0.74;
+  } else if (baseTip === 'roundDollop' || baseTip === 'kissDollop') {
+    bottomRadialInset = -0.50;
+  } else if (baseTip === 'ferreroRocherRim') {
+    bottomRadialInset = -0.61;
+  } else if (baseTip === 'hersheysKissRim') {
+    bottomRadialInset = -0.41;
+  } else if (baseTip === 'strawberryRim') {
+    bottomRadialInset = -0.31;
+  } else if (baseTip === 'bead') {
+    bottomRadialInset = -0.34;
+  } else if (baseTip === 'reverseShell') {
+    bottomRadialInset = -0.24;
+  } else if (baseTip === 'shell') {
+    bottomRadialInset = -0.22;
+  } else if (['zigzag', 'wavePiping', 'ropeTwist', 'ropeTwistClassic'].includes(baseTip)) {
+    bottomRadialInset = -0.21;
+  } else if (isWhippedCream) {
+    bottomRadialInset = -0.74;
+  } else if (isDollopType) {
+    bottomRadialInset = -0.68;
+  }
+
   const radialInset = isBottom
-    ? (baseTip === 'beadedTrim' ? -0.10
-      : (['strawberryRim', 'hersheysKissRim', 'ferreroRocherRim'].includes(baseTip) ? -0.08
-      : (isWhippedCream ? -0.02
-      : (isDollopType ? -0.06
-      : (['shell', 'reverseShell', 'bead', 'zigzag', 'wavePiping', 'ropeTwist', 'ropeTwistClassic'].includes(baseTip) ? -0.04 : -0.14)))))
+    ? bottomRadialInset
     : (baseTip === 'beadedTrim' ? 0.22
       : (baseTip === 'strawberryRim' ? 0.42
       : (baseTip === 'hersheysKissRim' ? 0.48
