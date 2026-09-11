@@ -331,7 +331,7 @@ describe('edge decoration placement', () => {
     const baseDiameter = bb.max.x - bb.min.x;
     const baseHeight = bb.max.y - bb.min.y;
     expect(baseDiameter).toBeCloseTo(0.6453, 3);
-    expect(baseHeight).toBeCloseTo(0.50, 2);
+    expect(baseHeight).toBeCloseTo(0.46, 2);
 
     const mat = new THREE.MeshBasicMaterial();
     // 8x5 cake top rim: placement radii tailored so outer edges sit right by the edge (4.025"–4.028") without exceeding 4.06"

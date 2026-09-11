@@ -444,7 +444,7 @@ export function buildWhippedCreamRosetteUnitGeometry({ radius = 0.40, height = 0
 
 /** Tall, ridged star-tip dollop based on a continuous buttercream squeeze:
  * broad, grounded base that flares smoothly into the belly and narrows into a pointed release at the top. */
-export function buildStarDollopUnitGeometry({ radius = 0.28, height = 0.5, points = 12 } = {}) {
+export function buildStarDollopUnitGeometry({ radius = 0.28, height = 0.46, points = 12 } = {}) {
   const radialSegments = points * 4;
   const heightSegments = 32;
   const positions = [];
@@ -520,32 +520,48 @@ export function buildStarDollopUnitGeometry({ radius = 0.28, height = 0.5, point
 }
 
 /**
- * Smooth, plump plain round-tip dollop based on a large round nozzle squeeze:
- * broad seated base embedded slightly into surface, generous spherical belly that flares to full width,
- * and narrows smoothly into an organic pointed kiss peak at the top.
+ * Smooth, plump plain round-tip dollop based on authentic bakery piping (matching reference photo):
+ * full spherical puff body sitting stably on the cake surface, curving smoothly through a round belly
+ * and easing into a delicate, soft pull-off pip at the very apex.
  */
-export function buildRoundDollopUnitGeometry({ radius = 0.322, height = 0.53 } = {}) {
+export function buildRoundDollopUnitGeometry({ radius = 0.322, height = 0.52 } = {}) {
   const radialSegments = 36;
   const heightSegments = 36;
   const positions = [];
   const indices = [];
 
-  const bodyTaper = (t) => {
-    // Plump spherical belly from base up to shoulder (t = 0.74),
-    // then graceful pinch into an organic kiss tip at the top (t = 1.0).
-    const shoulderT = 0.74;
-    const centerY = 0.35;
-    const semiY = 0.46;
-    if (t < shoulderT) {
-      const dy = (t - centerY) / semiY;
-      return Math.sqrt(Math.max(0.05, 1 - dy * dy));
-    }
-    const u = (t - shoulderT) / (1 - shoulderT);
-    const shoulderR = Math.sqrt(Math.max(0.05, 1 - Math.pow((shoulderT - centerY) / semiY, 2)));
-    return shoulderR * Math.pow(1 - u, 1.6);
+  const y_c = 0.38;
+  const semiY = 0.52;
+  const tipStartT = 0.82;
+  const S1 = -1.1;
+
+  const rSphere = (t) => {
+    const dy = (t - y_c) / semiY;
+    return Math.sqrt(Math.max(0.01, 1 - dy * dy));
+  };
+  const dSphereDt = (t) => {
+    const dy = (t - y_c) / semiY;
+    const r = Math.sqrt(Math.max(0.01, 1 - dy * dy));
+    return -dy / (semiY * r);
   };
 
-  const baseYOffset = -0.06 * height;
+  const r0 = rSphere(tipStartT);
+  const slope0 = dSphereDt(tipStartT);
+  const dt = 1 - tipStartT;
+
+  const bodyTaper = (t) => {
+    if (t <= tipStartT) {
+      return rSphere(t);
+    }
+    const u = (t - tipStartT) / dt;
+    const h00 = 2 * u * u * u - 3 * u * u + 1;
+    const h10 = u * u * u - 2 * u * u + u;
+    const h01 = -2 * u * u * u + 3 * u * u;
+    const h11 = u * u * u - u * u;
+    return Math.max(0, h00 * r0 + h10 * slope0 * dt + h01 * 0 + h11 * S1 * dt);
+  };
+
+  const baseYOffset = -0.08 * height;
 
   for (let y = 0; y <= heightSegments; y++) {
     const t = y / heightSegments;
@@ -1997,29 +2013,27 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
     }
     case 'starDollop': {
       const count = Math.max(8, Math.round((radius * Math.PI * 2) / (0.5760 * scale)));
-      const dScale = scale * 0.7490;
+      const dScale = scale * 0.70;
       const mesh = instanceAroundRing(getUnitGeometry('starDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale });
-      return maybeAddCherries(mesh, count, dScale, null, 0.52, 0.47);
+      return maybeAddCherries(mesh, count, dScale, null, 0.48, 0.47);
     }
     case 'starDollopAlt': {
       const count = Math.max(8, Math.round((radius * Math.PI * 2) / (0.5760 * scale)));
-      const dScale = scale * 0.7490;
+      const dScale = scale * 0.70;
       const mesh = instanceAroundRing(getUnitGeometry('starDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale, secondaryMaterial: secMat });
-      return maybeAddCherries(mesh, count, dScale, null, 0.52, 0.47);
+      return maybeAddCherries(mesh, count, dScale, null, 0.48, 0.47);
     }
     case 'starDollopSparse': {
       const count = Math.max(6, Math.round((radius * Math.PI * 2) / (0.8482 * scale)));
-      const dScale = scale * 0.8136;
-      const dScaleY = scale * 0.912;
-      const mesh = instanceAroundRing(getUnitGeometry('starDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale, scaleY: dScaleY });
-      return maybeAddCherries(mesh, count, dScale, dScaleY, 0.58, 0.47);
+      const dScale = scale * 0.75;
+      const mesh = instanceAroundRing(getUnitGeometry('starDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale });
+      return maybeAddCherries(mesh, count, dScale, null, 0.52, 0.47);
     }
     case 'starDollopSparseAlt': {
       const count = Math.max(6, Math.round((radius * Math.PI * 2) / (0.8482 * scale)));
-      const dScale = scale * 0.8136;
-      const dScaleY = scale * 0.912;
-      const mesh = instanceAroundRing(getUnitGeometry('starDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale, scaleY: dScaleY, secondaryMaterial: secMat });
-      return maybeAddCherries(mesh, count, dScale, dScaleY, 0.58, 0.47);
+      const dScale = scale * 0.75;
+      const mesh = instanceAroundRing(getUnitGeometry('starDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale, secondaryMaterial: secMat });
+      return maybeAddCherries(mesh, count, dScale, null, 0.52, 0.47);
     }
     case 'starDollopContinuous': {
       const rawCount = Math.round((radius * Math.PI * 2) / (0.3560 * scale));
@@ -2040,40 +2054,40 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
       const count = Math.max(12, (withCherry || withStrawberry) ? (rawCount % 2 === 0 ? rawCount : rawCount + 1) : rawCount);
       const dScale = scale * 0.5637;
       const mesh = instanceAroundRing(getUnitGeometry('roundDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale });
-      return maybeAddCherries(mesh, count, dScale, null, 0.42, 0.50, { step: 2 });
+      return maybeAddCherries(mesh, count, dScale, null, 0.48, 0.48, { step: 2 });
     }
     case 'roundDollopAlt': {
       const rawCount = Math.round((radius * Math.PI * 2) / (0.3645 * scale));
       const count = Math.max(12, (withCherry || withStrawberry) ? (rawCount % 2 === 0 ? rawCount : rawCount + 1) : rawCount);
       const dScale = scale * 0.5637;
       const mesh = instanceAroundRing(getUnitGeometry('roundDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale, secondaryMaterial: secMat });
-      return maybeAddCherries(mesh, count, dScale, null, 0.42, 0.50, { step: 2 });
+      return maybeAddCherries(mesh, count, dScale, null, 0.48, 0.48, { step: 2 });
     }
     case 'roundDollopMedium': {
       const count = Math.max(6, Math.round((radius * Math.PI * 2) / (0.5760 * scale)));
       const dScale = scale * 0.7505;
       const mesh = instanceAroundRing(getUnitGeometry('roundDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale });
-      return maybeAddCherries(mesh, count, dScale, null, 0.50, 0.50);
+      return maybeAddCherries(mesh, count, dScale, null, 0.50, 0.48);
     }
     case 'roundDollopMediumAlt': {
       const count = Math.max(6, Math.round((radius * Math.PI * 2) / (0.5760 * scale)));
       const dScale = scale * 0.7505;
       const mesh = instanceAroundRing(getUnitGeometry('roundDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale, secondaryMaterial: secMat });
-      return maybeAddCherries(mesh, count, dScale, null, 0.50, 0.50);
+      return maybeAddCherries(mesh, count, dScale, null, 0.50, 0.48);
     }
     case 'roundDollopSparse': {
       const count = Math.max(4, Math.round((radius * Math.PI * 2) / (0.8482 * scale)));
-      const dScale = scale * 0.8152;
-      const dScaleY = scale * 0.912;
+      const dScale = scale * 0.74;
+      const dScaleY = scale * 0.82;
       const mesh = instanceAroundRing(getUnitGeometry('roundDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale, scaleY: dScaleY });
-      return maybeAddCherries(mesh, count, dScale, dScaleY, 0.56, 0.50);
+      return maybeAddCherries(mesh, count, dScale, dScaleY, 0.54, 0.48);
     }
     case 'roundDollopSparseAlt': {
       const count = Math.max(4, Math.round((radius * Math.PI * 2) / (0.8482 * scale)));
-      const dScale = scale * 0.8152;
-      const dScaleY = scale * 0.912;
+      const dScale = scale * 0.74;
+      const dScaleY = scale * 0.82;
       const mesh = instanceAroundRing(getUnitGeometry('roundDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale, scaleY: dScaleY, secondaryMaterial: secMat });
-      return maybeAddCherries(mesh, count, dScale, dScaleY, 0.56, 0.50);
+      return maybeAddCherries(mesh, count, dScale, dScaleY, 0.54, 0.48);
     }
     case 'kissDollop': {
       const rawCount = Math.round((radius * Math.PI * 2) / (0.3644 * scale));
