@@ -24,7 +24,16 @@ describe('edge decoration placement', () => {
     expect(computeEdgeTrimRadius(4.0, 'kissDollopMedium', 'fullyFrosted')).toBeCloseTo(3.30, 2);
     expect(computeEdgeTrimRadius(4.0, 'kissDollopSparse', 'fullyFrosted')).toBeCloseTo(3.24, 2);
     expect(computeEdgeTrimY(0, 4.0, 'dollops', 'fullyFrosted', true)).toBeCloseTo(-0.02, 2);
-    expect(computeEdgeTrimRadius(4.0, 'dollops', 'fullyFrosted', true)).toBeCloseTo(4.74, 2);
+    expect(computeEdgeTrimRadius(4.0, 'dollops', 'fullyFrosted', true)).toBeCloseTo(4.60, 2);
+    expect(computeEdgeTrimRadius(4.0, 'starDollopContinuous', 'fullyFrosted', true)).toBeCloseTo(4.52, 2);
+    expect(computeEdgeTrimRadius(4.0, 'starDollop', 'fullyFrosted', true)).toBeCloseTo(4.60, 2);
+    expect(computeEdgeTrimRadius(4.0, 'starDollopSparse', 'fullyFrosted', true)).toBeCloseTo(4.65, 2);
+    expect(computeEdgeTrimRadius(4.0, 'roundDollop', 'fullyFrosted', true)).toBeCloseTo(4.46, 2);
+    expect(computeEdgeTrimRadius(4.0, 'roundDollopMedium', 'fullyFrosted', true)).toBeCloseTo(4.60, 2);
+    expect(computeEdgeTrimRadius(4.0, 'roundDollopSparse', 'fullyFrosted', true)).toBeCloseTo(4.65, 2);
+    expect(computeEdgeTrimRadius(4.0, 'kissDollop', 'fullyFrosted', true)).toBeCloseTo(4.46, 2);
+    expect(computeEdgeTrimRadius(4.0, 'kissDollopMedium', 'fullyFrosted', true)).toBeCloseTo(4.60, 2);
+    expect(computeEdgeTrimRadius(4.0, 'kissDollopSparse', 'fullyFrosted', true)).toBeCloseTo(4.65, 2);
     expect(computeEdgeTrimRadius(4.0, 'shell', 'fullyFrosted')).toBeCloseTo(3.66, 2);
     expect(computeEdgeTrimRadius(4.0, 'shell', 'fullyFrosted', true)).toBeCloseTo(4.28, 2);
     expect(computeEdgeTrimRadius(4.0, 'shellAlt', 'fullyFrosted')).toBeCloseTo(3.66, 2);

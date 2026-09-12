@@ -174,13 +174,13 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
   } else if (baseTip === 'whippedCreamRosetteSparse') {
     bottomRadialInset = -0.85;
   } else if (baseTip === 'starDollopContinuous' || baseTip === 'roundDollopContinuous' || baseTip === 'kissDollopContinuous') {
-    bottomRadialInset = -0.58;
+    bottomRadialInset = -0.464;
   } else if (baseTip === 'starDollop' || baseTip === 'roundDollopMedium' || baseTip === 'kissDollopMedium' || baseTip === 'dollops') {
-    bottomRadialInset = -0.68;
+    bottomRadialInset = -0.544;
   } else if (baseTip === 'starDollopSparse' || baseTip === 'roundDollopSparse' || baseTip === 'kissDollopSparse') {
-    bottomRadialInset = -0.74;
+    bottomRadialInset = -0.592;
   } else if (baseTip === 'roundDollop' || baseTip === 'kissDollop') {
-    bottomRadialInset = -0.50;
+    bottomRadialInset = -0.40;
   } else if (baseTip === 'ferreroRocherRim') {
     bottomRadialInset = -0.61;
   } else if (baseTip === 'hersheysKissRim') {
@@ -198,7 +198,7 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
   } else if (isWhippedCream) {
     bottomRadialInset = -0.74;
   } else if (isDollopType) {
-    bottomRadialInset = -0.68;
+    bottomRadialInset = -0.544;
   }
 
   const radialInset = isBottom
