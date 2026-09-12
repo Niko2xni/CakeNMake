@@ -2102,44 +2102,36 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
       return maybeAddCherries(mesh, count, dScale, dScaleY, 0.54, 0.44, { cherryScale: 0.90, strawberryScale: 0.85, maxLeanRad: 0.18 });
     }
     case 'kissDollop': {
-      const rawCount = Math.round((radius * Math.PI * 2) / (0.3644 * scale));
-      const count = Math.max(12, (withCherry || withStrawberry) ? (rawCount % 2 === 0 ? rawCount : rawCount + 1) : rawCount);
+      const count = Math.max(12, Math.round((radius * Math.PI * 2) / (0.3644 * scale)));
       const dScale = scale * 0.4775;
-      const mesh = instanceAroundRing(getUnitGeometry('kissDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale });
-      return maybeAddCherries(mesh, count, dScale, null, 0.38, 0.66, { step: 2 });
+      return instanceAroundRing(getUnitGeometry('kissDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale });
     }
     case 'kissDollopAlt': {
-      const rawCount = Math.round((radius * Math.PI * 2) / (0.3644 * scale));
-      const count = Math.max(12, (withCherry || withStrawberry) ? (rawCount % 2 === 0 ? rawCount : rawCount + 1) : rawCount);
+      const count = Math.max(12, Math.round((radius * Math.PI * 2) / (0.3644 * scale)));
       const dScale = scale * 0.4775;
-      const mesh = instanceAroundRing(getUnitGeometry('kissDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale, secondaryMaterial: secMat });
-      return maybeAddCherries(mesh, count, dScale, null, 0.38, 0.66, { step: 2 });
+      return instanceAroundRing(getUnitGeometry('kissDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale, secondaryMaterial: secMat });
     }
     case 'kissDollopMedium': {
       const count = Math.max(6, Math.round((radius * Math.PI * 2) / (0.5760 * scale)));
       const dScale = scale * 0.60;
-      const mesh = instanceAroundRing(getUnitGeometry('kissDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale });
-      return maybeAddCherries(mesh, count, dScale, null, 0.46, 0.66);
+      return instanceAroundRing(getUnitGeometry('kissDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale });
     }
     case 'kissDollopMediumAlt': {
       const count = Math.max(6, Math.round((radius * Math.PI * 2) / (0.5760 * scale)));
       const dScale = scale * 0.60;
-      const mesh = instanceAroundRing(getUnitGeometry('kissDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale, secondaryMaterial: secMat });
-      return maybeAddCherries(mesh, count, dScale, null, 0.46, 0.66);
+      return instanceAroundRing(getUnitGeometry('kissDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale, secondaryMaterial: secMat });
     }
     case 'kissDollopSparse': {
       const count = Math.max(4, Math.round((radius * Math.PI * 2) / (0.8482 * scale)));
       const dScale = scale * 0.64;
       const dScaleY = scale * 0.60;
-      const mesh = instanceAroundRing(getUnitGeometry('kissDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale, scaleY: dScaleY });
-      return maybeAddCherries(mesh, count, dScale, dScaleY, 0.52, 0.66);
+      return instanceAroundRing(getUnitGeometry('kissDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale, scaleY: dScaleY });
     }
     case 'kissDollopSparseAlt': {
       const count = Math.max(4, Math.round((radius * Math.PI * 2) / (0.8482 * scale)));
       const dScale = scale * 0.64;
       const dScaleY = scale * 0.60;
-      const mesh = instanceAroundRing(getUnitGeometry('kissDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale, scaleY: dScaleY, secondaryMaterial: secMat });
-      return maybeAddCherries(mesh, count, dScale, dScaleY, 0.52, 0.66);
+      return instanceAroundRing(getUnitGeometry('kissDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale, scaleY: dScaleY, secondaryMaterial: secMat });
     }
     case 'starScallop': {
       const N = Math.max(8, Math.round((radius * Math.PI * 2) / 2.0));

@@ -773,9 +773,6 @@ describe('edge decoration placement', () => {
     expect(computeEdgeTrimRadius(4.0, 'roundDollopCherry', 'fullyFrosted')).toBeCloseTo(3.48, 2);
     expect(computeEdgeTrimRadius(4.0, 'roundDollopMediumCherry', 'fullyFrosted')).toBeCloseTo(3.30, 2);
     expect(computeEdgeTrimRadius(4.0, 'roundDollopSparseCherry', 'fullyFrosted')).toBeCloseTo(3.24, 2);
-    expect(computeEdgeTrimRadius(4.0, 'kissDollopCherry', 'fullyFrosted')).toBeCloseTo(3.48, 2);
-    expect(computeEdgeTrimRadius(4.0, 'kissDollopMediumCherry', 'fullyFrosted')).toBeCloseTo(3.30, 2);
-    expect(computeEdgeTrimRadius(4.0, 'kissDollopSparseCherry', 'fullyFrosted')).toBeCloseTo(3.24, 2);
 
     expect(computeEdgeTrimRadius(4.0, 'starDollopContinuousAltCherry', 'fullyFrosted')).toBeCloseTo(3.40, 2);
     expect(computeEdgeTrimRadius(4.0, 'starDollopAltCherry', 'fullyFrosted')).toBeCloseTo(3.30, 2);
@@ -783,9 +780,6 @@ describe('edge decoration placement', () => {
     expect(computeEdgeTrimRadius(4.0, 'roundDollopAltCherry', 'fullyFrosted')).toBeCloseTo(3.48, 2);
     expect(computeEdgeTrimRadius(4.0, 'roundDollopMediumAltCherry', 'fullyFrosted')).toBeCloseTo(3.30, 2);
     expect(computeEdgeTrimRadius(4.0, 'roundDollopSparseAltCherry', 'fullyFrosted')).toBeCloseTo(3.24, 2);
-    expect(computeEdgeTrimRadius(4.0, 'kissDollopAltCherry', 'fullyFrosted')).toBeCloseTo(3.48, 2);
-    expect(computeEdgeTrimRadius(4.0, 'kissDollopMediumAltCherry', 'fullyFrosted')).toBeCloseTo(3.30, 2);
-    expect(computeEdgeTrimRadius(4.0, 'kissDollopSparseAltCherry', 'fullyFrosted')).toBeCloseTo(3.24, 2);
 
     const matA = new THREE.MeshBasicMaterial({ color: '#FFF' });
     const matB = new THREE.MeshBasicMaterial({ color: '#D6293E' });
@@ -840,26 +834,10 @@ describe('edge decoration placement', () => {
     expect(roundCherry12Alt.children[0].children[1].count).toBe(6);
     expect(roundCherry12Alt.children.slice(1).length).toBe(12);
 
-    // 6. Alternating Kiss Dollop with Cherry (4+4 dual material + 8 cherries)
-    const kissCherry8Alt = buildPipingRing('kissDollopSparseAltCherry', matA, {
-      radius: 3.24,
-      y: 1.0,
-      scale: 3,
-      secondaryMaterial: matB,
-    });
-    expect(kissCherry8Alt.children[0].children[0].count).toBe(4);
-    expect(kissCherry8Alt.children[0].children[1].count).toBe(4);
-    expect(kissCherry8Alt.children.slice(1).length).toBe(8);
-
-    // 7. Continuous Round Tip Dollop with Cherry (20 dollops + 10 cherries, alternating)
+    // 6. Continuous Round Tip Dollop with Cherry (20 dollops + 10 cherries, alternating)
     const roundCherry20 = buildPipingRing('roundDollopCherry', matA, { radius: 3.48, y: 1.0, scale: 3 });
     expect(roundCherry20.children[0].count).toBe(20);
     expect(roundCherry20.children.slice(1).length).toBe(10);
-
-    // 8. Continuous Kisses Dollop with Cherry (20 dollops + 10 cherries, alternating)
-    const kissCherry20 = buildPipingRing('kissDollopCherry', matA, { radius: 3.48, y: 1.0, scale: 3 });
-    expect(kissCherry20.children[0].count).toBe(20);
-    expect(kissCherry20.children.slice(1).length).toBe(10);
   });
 
   it('renders all 4 dollop sub-rows in EdgeSection including cherry options', () => {
@@ -1051,9 +1029,6 @@ describe('edge decoration placement', () => {
     expect(computeEdgeTrimRadius(4.0, 'roundDollopStrawberry', 'fullyFrosted')).toBeCloseTo(3.48, 2);
     expect(computeEdgeTrimRadius(4.0, 'roundDollopMediumStrawberry', 'fullyFrosted')).toBeCloseTo(3.30, 2);
     expect(computeEdgeTrimRadius(4.0, 'roundDollopSparseStrawberry', 'fullyFrosted')).toBeCloseTo(3.24, 2);
-    expect(computeEdgeTrimRadius(4.0, 'kissDollopStrawberry', 'fullyFrosted')).toBeCloseTo(3.48, 2);
-    expect(computeEdgeTrimRadius(4.0, 'kissDollopMediumStrawberry', 'fullyFrosted')).toBeCloseTo(3.30, 2);
-    expect(computeEdgeTrimRadius(4.0, 'kissDollopSparseStrawberry', 'fullyFrosted')).toBeCloseTo(3.24, 2);
 
     expect(computeEdgeTrimRadius(4.0, 'starDollopContinuousAltStrawberry', 'fullyFrosted')).toBeCloseTo(3.40, 2);
     expect(computeEdgeTrimRadius(4.0, 'starDollopAltStrawberry', 'fullyFrosted')).toBeCloseTo(3.30, 2);
@@ -1061,9 +1036,6 @@ describe('edge decoration placement', () => {
     expect(computeEdgeTrimRadius(4.0, 'roundDollopAltStrawberry', 'fullyFrosted')).toBeCloseTo(3.48, 2);
     expect(computeEdgeTrimRadius(4.0, 'roundDollopMediumAltStrawberry', 'fullyFrosted')).toBeCloseTo(3.30, 2);
     expect(computeEdgeTrimRadius(4.0, 'roundDollopSparseAltStrawberry', 'fullyFrosted')).toBeCloseTo(3.24, 2);
-    expect(computeEdgeTrimRadius(4.0, 'kissDollopAltStrawberry', 'fullyFrosted')).toBeCloseTo(3.48, 2);
-    expect(computeEdgeTrimRadius(4.0, 'kissDollopMediumAltStrawberry', 'fullyFrosted')).toBeCloseTo(3.30, 2);
-    expect(computeEdgeTrimRadius(4.0, 'kissDollopSparseAltStrawberry', 'fullyFrosted')).toBeCloseTo(3.24, 2);
 
     const matA = new THREE.MeshBasicMaterial({ color: '#FFF' });
     const matB = new THREE.MeshBasicMaterial({ color: '#D6293E' });
@@ -1117,26 +1089,10 @@ describe('edge decoration placement', () => {
     expect(roundStraw12Alt.children[0].children[1].count).toBe(6);
     expect(roundStraw12Alt.children.slice(1).length).toBe(12);
 
-    // 6. Alternating Kiss Dollop with Strawberry (4+4 dual material + 8 strawberries)
-    const kissStraw8Alt = buildPipingRing('kissDollopSparseAltStrawberry', matA, {
-      radius: 3.24,
-      y: 1.0,
-      scale: 3,
-      secondaryMaterial: matB,
-    });
-    expect(kissStraw8Alt.children[0].children[0].count).toBe(4);
-    expect(kissStraw8Alt.children[0].children[1].count).toBe(4);
-    expect(kissStraw8Alt.children.slice(1).length).toBe(8);
-
-    // 7. Continuous Round Tip Dollop with Strawberry (20 dollops + 10 strawberries, alternating)
+    // 6. Continuous Round Tip Dollop with Strawberry (20 dollops + 10 strawberries, alternating)
     const roundStraw20 = buildPipingRing('roundDollopStrawberry', matA, { radius: 3.48, y: 1.0, scale: 3 });
     expect(roundStraw20.children[0].count).toBe(20);
     expect(roundStraw20.children.slice(1).length).toBe(10);
-
-    // 8. Continuous Kisses Dollop with Strawberry (20 dollops + 10 strawberries, alternating)
-    const kissStraw20 = buildPipingRing('kissDollopStrawberry', matA, { radius: 3.48, y: 1.0, scale: 3 });
-    expect(kissStraw20.children[0].count).toBe(20);
-    expect(kissStraw20.children.slice(1).length).toBe(10);
   });
 
   it('renders all 6 dollop sub-rows in EdgeSection including strawberry and cherry options', () => {
