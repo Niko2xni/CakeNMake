@@ -1130,10 +1130,12 @@ describe('edge decoration placement', () => {
       buildHersheysKissRimRing,
       buildFerreroRocherRimRing,
       buildOreoRimRing,
+      buildCherryRimRing,
       buildBasketballRimRing,
       buildSoccerBallRimRing,
     } = await import('./DecorationSets');
     const { getSharedStrawberryBodyGeometry } = await import('./toppings/strawberry');
+    const { getSharedCherryBodyGeometry } = await import('./toppings/cherry');
 
     // 1. Placement verification for Strawberry Rim
     expect(computeEdgeTrimY(1.0, 4.0, 'strawberryRim', 'fullyFrosted', false)).toBeCloseTo(0.96, 2);
@@ -1159,7 +1161,13 @@ describe('edge decoration placement', () => {
     expect(computeEdgeTrimRadius(4.0, 'oreoRim', 'fullyFrosted', false)).toBeCloseTo(3.84, 2);
     expect(computeEdgeTrimRadius(4.0, 'oreoRim', 'fullyFrosted', true)).toBeCloseTo(4.26, 2);
 
-    // 5. Placement verification for Basketball and Soccer Ball rims
+    // 5. Placement verification for Cherry Rim
+    expect(computeEdgeTrimY(1.0, 4.0, 'cherryRim', 'fullyFrosted', false)).toBeCloseTo(1.0, 2);
+    expect(computeEdgeTrimY(0.0, 4.0, 'cherryRim', 'fullyFrosted', true)).toBeCloseTo(0.0, 2);
+    expect(computeEdgeTrimRadius(4.0, 'cherryRim', 'fullyFrosted', false)).toBeCloseTo(3.70, 2);
+    expect(computeEdgeTrimRadius(4.0, 'cherryRim', 'fullyFrosted', true)).toBeCloseTo(4.42, 2);
+
+    // 6. Placement verification for Basketball and Soccer Ball rims
     for (const rimId of ['basketballRim', 'soccerBallRim']) {
       expect(computeEdgeTrimY(1.0, 4.0, rimId, 'fullyFrosted', false)).toBeCloseTo(1.0, 2);
       expect(computeEdgeTrimY(0.0, 4.0, rimId, 'fullyFrosted', true)).toBeCloseTo(0.0, 2);
@@ -1167,7 +1175,7 @@ describe('edge decoration placement', () => {
       expect(computeEdgeTrimRadius(4.0, rimId, 'fullyFrosted', true)).toBeCloseTo(4.56, 2);
     }
 
-    // 6. Geometry verification: Strawberry rim ring
+    // 7. Geometry verification: Strawberry rim ring
     const strawberryRing = buildStrawberryRimRing(3.64, 0.96);
     expect(strawberryRing).toBeDefined();
     expect(strawberryRing.isGroup).toBe(true);
@@ -1180,7 +1188,7 @@ describe('edge decoration placement', () => {
       expect(berry.children.some((child) => child.isGroup)).toBe(true);
     });
 
-    // 7. Geometry verification: Hershey's Kiss rim ring
+    // 8. Geometry verification: Hershey's Kiss rim ring
     const kissRing = buildHersheysKissRimRing(3.58, 1.0);
     expect(kissRing).toBeDefined();
     expect(kissRing.isGroup).toBe(true);
@@ -1189,7 +1197,7 @@ describe('edge decoration placement', () => {
       expect(kiss.isMesh).toBe(true);
     });
 
-    // 8. Geometry verification: Ferrero Rocher rim ring
+    // 9. Geometry verification: Ferrero Rocher rim ring
     const ferreroRing = buildFerreroRocherRimRing(3.41, 1.0);
     expect(ferreroRing).toBeDefined();
     expect(ferreroRing.isGroup).toBe(true);
@@ -1198,7 +1206,16 @@ describe('edge decoration placement', () => {
       expect(truffle.isMesh).toBe(true);
     });
 
-    // 9. Geometry verification: Oreo and ball rim rings
+    // 10. Geometry verification: Cherry, Oreo, and ball rim rings
+    const cherryRing = buildCherryRimRing(3.70, 1.0, () => 0.5);
+    expect(cherryRing.isGroup).toBe(true);
+    expect(cherryRing.children.length).toBeGreaterThanOrEqual(12);
+    cherryRing.children.forEach((cherry) => {
+      expect(cherry.isGroup).toBe(true);
+      expect(cherry.children[0].isMesh).toBe(true);
+      expect(cherry.children[0].geometry).toBe(getSharedCherryBodyGeometry());
+    });
+
     const canvasContext = {
       fillStyle: '',
       strokeStyle: '',
@@ -1294,7 +1311,7 @@ describe('edge decoration placement', () => {
       'Fresh Strawberries Rim 🍓',
       "Hershey's Kisses Rim 🍫",
       'Ferrero Rocher Rim 🌰',
-      'Oreo Rim 🍪',
+      'Cherry Rim 🍒',
       'Basketball Rim 🏀',
       'Soccer Ball Rim ⚽',
     ].forEach((title, index) => {
@@ -1302,6 +1319,7 @@ describe('edge decoration placement', () => {
       expect(button).toHaveTextContent(String(index + 1));
       expect(button).toHaveClass('w-9', 'h-9', 'rounded-full');
     });
+    expect(screen.queryByTitle('Oreo Rim 🍪')).not.toBeInTheDocument();
   });
 
   it('generates strawberry dollop variations with correct strawberry counts, heights, and zero overhang', async () => {

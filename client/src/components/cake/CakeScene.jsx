@@ -13,6 +13,7 @@ import {
   buildHersheysKissRimRing,
   buildFerreroRocherRimRing,
   buildOreoRimRing,
+  buildCherryRimRing,
   buildBasketballRimRing,
   buildSoccerBallRimRing,
   buildCheckerSideSquares,
@@ -1631,12 +1632,14 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         const isHersheysKissRim = slot?.pipingTip === 'hersheysKissRim';
         const isFerreroRocherRim = slot?.pipingTip === 'ferreroRocherRim';
         const isOreoRim = slot?.pipingTip === 'oreoRim';
+        const isCherryRim = slot?.pipingTip === 'cherryRim';
         const isBasketballRim = slot?.pipingTip === 'basketballRim';
         const isSoccerBallRim = slot?.pipingTip === 'soccerBallRim';
         const isFruitConfectionRim = isStrawberryRim
           || isHersheysKissRim
           || isFerreroRocherRim
           || isOreoRim
+          || isCherryRim
           || isBasketballRim
           || isSoccerBallRim;
 
@@ -1661,6 +1664,9 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           group.add(trim);
         } else if (isOreoRim) {
           const trim = buildOreoRimRing(edgeTrimRadius, edgeTrimY, rand, { isBottom });
+          group.add(trim);
+        } else if (isCherryRim) {
+          const trim = buildCherryRimRing(edgeTrimRadius, edgeTrimY, rand);
           group.add(trim);
         } else if (isBasketballRim) {
           const trim = buildBasketballRimRing(edgeTrimRadius, edgeTrimY, rand);

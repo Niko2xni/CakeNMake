@@ -3,6 +3,7 @@ import { buildStrawberryMesh } from './toppings/strawberry';
 import { buildHersheysKissMesh } from './toppings/hersheysKiss';
 import { buildFerreroRocherMesh } from './toppings/ferreroRocher';
 import { buildOreoMesh } from './toppings/oreo';
+import { buildCherryMesh } from './toppings/cherry';
 import { buildBasketballMesh } from './toppings/basketball';
 import { buildSoccerBallMesh } from './toppings/soccerBall';
 
@@ -75,6 +76,7 @@ export function computeEdgeTrimY(topSurfaceY, radius, decorationType = 'piping',
     'hersheysKissRim',
     'ferreroRocherRim',
     'oreoRim',
+    'cherryRim',
     'basketballRim',
     'soccerBallRim',
   ].includes(decorationType);
@@ -226,6 +228,8 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
     bottomRadialInset = -0.31;
   } else if (baseTip === 'oreoRim') {
     bottomRadialInset = -0.20;
+  } else if (baseTip === 'cherryRim') {
+    bottomRadialInset = -0.36;
   } else if (baseTip === 'basketballRim' || baseTip === 'soccerBallRim') {
     bottomRadialInset = -0.50;
   } else if (baseTip === 'bead') {
@@ -247,6 +251,7 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
     hersheysKissRim: 0.48,
     ferreroRocherRim: 0.65,
     oreoRim: 0.22,
+    cherryRim: 0.36,
     basketballRim: 0.50,
     soccerBallRim: 0.50,
   }[baseTip];
@@ -480,6 +485,24 @@ export function buildOreoRimRing(radius, y, rand = Math.random, opts = {}) {
     );
     cookie.rotation.z += (rand() - 0.5) * 0.08;
     group.add(cookie);
+  }
+  return group;
+}
+
+/** Cherry Rim — complete glossy cherries nestled along the cake edge. */
+export function buildCherryRimRing(radius, y, rand = Math.random, opts = {}) {
+  const count = opts.count ?? Math.max(12, Math.round((radius * Math.PI * 2) / 0.95));
+  const scale = opts.scale ?? 0.85;
+  const group = new THREE.Group();
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2;
+    const cx = Math.sin(angle) * radius;
+    const cz = Math.cos(angle) * radius;
+    const cherry = buildCherryMesh(cx, y, cz, scale, rand);
+    cherry.rotation.y = angle + (rand() - 0.5) * 0.3;
+    cherry.rotation.x = (rand() - 0.5) * 0.06;
+    cherry.rotation.z = (rand() - 0.5) * 0.06;
+    group.add(cherry);
   }
   return group;
 }
