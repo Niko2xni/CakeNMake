@@ -87,6 +87,7 @@ describe('edge decoration placement', () => {
     expect(screen.getByTitle('Rope Twist')).toBeInTheDocument();
     expect(screen.getByTitle('Rope Twist (Classic)')).toBeInTheDocument();
     expect(screen.getByTitle('Wave Border')).toBeInTheDocument();
+    expect(screen.getByTitle('Rope Border')).toBeInTheDocument();
     expect(screen.queryByTitle('Shell Border - Alternating')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Reverse Shell - Alternating')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Bead Piping - Alternating')).not.toBeInTheDocument();
@@ -95,7 +96,7 @@ describe('edge decoration placement', () => {
     expect(screen.queryByText('Zigzag Piping')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Zigzag Piping')).not.toBeInTheDocument();
     const borderPiping = within(screen.getByText('Border Piping').closest('div'));
-    expect(borderPiping.getAllByRole('button')).toHaveLength(6);
+    expect(borderPiping.getAllByRole('button')).toHaveLength(7);
     expect(screen.queryByText('Scallops')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Star Scallop')).not.toBeInTheDocument();
     expect(screen.queryByText('Rope')).not.toBeInTheDocument();
@@ -261,6 +262,30 @@ describe('edge decoration placement', () => {
     // Top surface radius is 4.06 — maximum vertex radius must strictly not exceed this (zero overhang!)
     expect(maxR).toBeLessThanOrEqual(4.06);
     expect(maxR).toBeGreaterThan(3.66); // Proud enough to form a visible outer border
+  });
+
+  it('generates the update-project rope border geometry with zero top-edge overhang', async () => {
+    const { buildPipingRing } = await import('./pipingTips');
+    const THREE = await import('three');
+    const radius = computeEdgeTrimRadius(4.0, 'piping', 'fullyFrosted');
+    const mesh = buildPipingRing('rope', new THREE.MeshBasicMaterial(), {
+      radius,
+      y: 1.0,
+      scale: 3,
+    });
+
+    expect(mesh).toBeDefined();
+    expect(mesh.isMesh).toBe(true);
+    expect(mesh.geometry.getAttribute('position').count).toBeGreaterThan(1000);
+
+    const pos = mesh.geometry.getAttribute('position');
+    let maxR = 0;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const z = pos.getZ(i);
+      maxR = Math.max(maxR, Math.sqrt(x * x + z * z));
+    }
+    expect(maxR).toBeLessThanOrEqual(4.06);
   });
 
   it('generates classic rope twist geometry variation with zero overhang', async () => {

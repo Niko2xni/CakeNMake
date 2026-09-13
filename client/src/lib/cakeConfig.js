@@ -751,6 +751,7 @@ export const BORDER_PIPING_SOLID_VARIATIONS = [
   { id: 'ropeTwist', label: 'Rope Twist' },
   { id: 'ropeTwistClassic', label: 'Rope Twist (Classic)' },
   { id: 'wavePiping', label: 'Wave Border' },
+  { id: 'rope', label: 'Rope Border' },
 ];
 
 export const BORDER_PIPING_ALTERNATING_VARIATIONS = [
