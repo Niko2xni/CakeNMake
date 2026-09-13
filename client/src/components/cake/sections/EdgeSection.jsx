@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   BORDER_PIPING_SOLID_VARIATIONS,
@@ -42,21 +42,53 @@ export default function EdgeSection({
     edge.mode === 'topBottomSeparate' ? 'top' : 'both'
   );
 
-  const mode = edge.mode; // 'topBottomSeparate' | 'both'
+  const mode = edge.mode || 'both'; // 'topBottomSeparate' | 'both'
 
-  // Mutually exclusive — genuine delete, not disable-preserve (spec §4b).
-  // Switching modes clears the other mode's stored values immediately.
-  // Note: edge.middle is preserved across mode switches because it is an independent shelf.
-  const switchToBoth = () => {
-    onChange({ ...edge, mode: 'both', top: EMPTY_SLOT(), bottom: EMPTY_SLOT() });
-    setActiveSlot('both');
-    onActiveSlotChange?.('both');
-  };
+  useEffect(() => {
+    if (edge.mode === 'both') {
+      setActiveSlot('both');
+    } else if (activeSlot === 'both') {
+      setActiveSlot('top');
+    }
+  }, [edge.mode]);
 
-  const switchToSeparate = () => {
-    onChange({ ...edge, mode: 'topBottomSeparate', both: EMPTY_SLOT() });
-    setActiveSlot('top');
-    onActiveSlotChange?.('top');
+  const currentPlacement = mode === 'both' ? 'both' : activeSlot;
+
+  const handlePlacementChange = (targetPlacement) => {
+    if (targetPlacement === 'both') {
+      if (mode === 'both') return;
+      const currentActiveDesign = (activeSlot === 'bottom' ? edge.bottom : edge.top) || EMPTY_SLOT();
+      const inheritedDesign = edge.both?.piping?.tip
+        ? edge.both
+        : (currentActiveDesign.piping?.tip ? { ...currentActiveDesign } : (edge.both || EMPTY_SLOT()));
+
+      onChange({
+        ...edge,
+        mode: 'both',
+        both: inheritedDesign,
+      });
+      setActiveSlot('both');
+      onActiveSlotChange?.('both');
+    } else {
+      if (mode === 'topBottomSeparate' && activeSlot === targetPlacement) return;
+
+      let newTop = edge.top || EMPTY_SLOT();
+      let newBottom = edge.bottom || EMPTY_SLOT();
+
+      if (mode === 'both' && edge.both?.piping?.tip) {
+        if (!newTop.piping?.tip) newTop = { ...edge.both };
+        if (!newBottom.piping?.tip) newBottom = { ...edge.both };
+      }
+
+      onChange({
+        ...edge,
+        mode: 'topBottomSeparate',
+        top: newTop,
+        bottom: newBottom,
+      });
+      setActiveSlot(targetPlacement);
+      onActiveSlotChange?.(targetPlacement);
+    }
   };
 
   const currentSlotKey = mode === 'both' ? 'both' : activeSlot;
@@ -101,57 +133,38 @@ export default function EdgeSection({
 
   return (
     <div className="space-y-4">
-      <div>
-        <span className="text-xs text-muted-foreground mb-2 block">
-          Both, or Top/Bottom separately — picking one clears the other.
+      {/* Edge Placement */}
+      <div className="space-y-1.5">
+        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide block">
+          Placement
         </span>
-        <div className="flex gap-1 bg-muted/40 rounded-xl p-1">
-          <button
-            type="button"
-            onClick={switchToSeparate}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
-              mode === 'topBottomSeparate'
-                ? 'bg-card shadow text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Top / Bottom
-          </button>
-          <button
-            type="button"
-            onClick={switchToBoth}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
-              mode === 'both'
-                ? 'bg-card shadow text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Both
-          </button>
+        <div className="grid grid-cols-3 gap-1 bg-muted/40 rounded-xl p-1">
+          {[
+            { id: 'top', label: 'Top Edge', hasDot: mode === 'topBottomSeparate' && !!edge.top?.piping?.tip },
+            { id: 'bottom', label: 'Bottom Edge', hasDot: mode === 'topBottomSeparate' && !!edge.bottom?.piping?.tip },
+            { id: 'both', label: 'Both', hasDot: mode === 'both' && !!edge.both?.piping?.tip },
+          ].map((tab) => {
+            const isSelected = currentPlacement === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => handlePlacementChange(tab.id)}
+                className={`py-2 px-1 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer flex items-center justify-center gap-1.5 ${
+                  isSelected
+                    ? 'bg-card shadow-sm text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <span className="truncate">{tab.label}</span>
+                {tab.hasDot && !isSelected && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
-
-      {mode === 'topBottomSeparate' && (
-        <div className="flex gap-1 bg-muted/40 rounded-xl p-1">
-          {['top', 'bottom'].map((slot) => (
-            <button
-              key={slot}
-              type="button"
-              onClick={() => {
-                setActiveSlot(slot);
-                onActiveSlotChange?.(slot);
-              }}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all duration-150 ${
-                activeSlot === slot
-                  ? 'bg-card shadow text-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {slot} Edge
-            </button>
-          ))}
-        </div>
-      )}
 
       <div className="space-y-4">
         <div className="text-center mb-2">

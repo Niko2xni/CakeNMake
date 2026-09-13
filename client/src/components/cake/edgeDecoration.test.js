@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import EdgeSection from './sections/EdgeSection';
 import { computeEdgeTrimRadius, computeEdgeTrimY } from './DecorationSets';
@@ -123,6 +123,42 @@ describe('edge decoration placement', () => {
     expect(screen.getByTitle('Continuous Kisses Dollop (20 pc) - Alternating')).toBeInTheDocument();
     expect(screen.getByTitle('Kisses Dollop (12 pc) - Alternating')).toBeInTheDocument();
     expect(screen.getByTitle('Sparse Kisses Dollop (8 pc) - Alternating')).toBeInTheDocument();
+  });
+
+  it('allows selecting Top Edge, Bottom Edge, and Both via unified placement bar with design preservation', () => {
+    function StatefulEdgeSection() {
+      const [edge, setEdge] = React.useState({
+        mode: 'both',
+        top: { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
+        bottom: { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
+        both: { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
+        middle: { piping: { tip: null, colorId: 'vanilla' } },
+      });
+      return React.createElement(EdgeSection, {
+        edge,
+        onChange: setEdge,
+        sugarColor: {},
+        onSugarColorChange: () => {},
+      });
+    }
+
+    render(React.createElement(StatefulEdgeSection));
+    expect(screen.getByText('Placement')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Top Edge' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Bottom Edge' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Both' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTitle('Shell Border'));
+    expect(screen.getByTitle('Shell Border')).toHaveClass('bg-primary');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Top Edge' }));
+    expect(screen.getByTitle('Shell Border')).toHaveClass('bg-primary');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Bottom Edge' }));
+    expect(screen.getByTitle('Shell Border')).toHaveClass('bg-primary');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Both' }));
+    expect(screen.getByTitle('Shell Border')).toHaveClass('bg-primary');
   });
 
   it('generates dense accordion-pleated zigzag geometry with zero overhang', async () => {
@@ -679,12 +715,12 @@ describe('edge decoration placement', () => {
     expect(screen.getByText('Primary Color (Color 1)')).toBeInTheDocument();
   });
 
-  it('keeps flavor color selected when color override is active and resolves color override in adapter', async () => {
+  it('hides flavor color while color override is active and resolves the override in the adapter', async () => {
     const { default: SugarColorSection } = await import('./sections/SugarColorSection');
     const { adaptConfigToLegacy } = await import('@/lib/configAdapter');
 
     // 1. Render SugarColorSection in colorOverride mode with flavorColorId='chocolate' and overrideColorId='red'
-    const { rerender } = render(
+    render(
       React.createElement(SugarColorSection, {
         sugarColor: {
           mode: 'colorOverride',
@@ -697,21 +733,18 @@ describe('edge decoration placement', () => {
       })
     );
 
-    // Both "Flavor Color" and "Color Override" are visible
-    expect(screen.getByText('Flavor Color')).toBeInTheDocument();
+    // Flavor Color belongs to Default mode and is hidden during Color Override.
+    expect(screen.queryByText('Flavor Color')).not.toBeInTheDocument();
     expect(screen.getAllByText('Color Override').length).toBeGreaterThanOrEqual(1);
 
-    // Chocolate must remain selected (has bg-primary class)
-    const chocBtn = screen.getByTitle('Chocolate');
-    expect(chocBtn.className).toContain('bg-primary');
+    // The saved flavor remains in state but its picker is not rendered.
+    expect(screen.queryByTitle('Chocolate')).not.toBeInTheDocument();
 
     // Red in Color Override must be selected (has bg-primary class)
     const redBtn = screen.getByTitle('Red');
     expect(redBtn.className).toContain('bg-primary');
 
-    // Vanilla should NOT be selected
-    const vanillaBtn = screen.getByTitle('Vanilla');
-    expect(vanillaBtn.className).not.toContain('bg-primary');
+    expect(screen.queryByTitle('Vanilla')).not.toBeInTheDocument();
 
     // 2. Verify adaptConfigToLegacy applies the color override when mode='colorOverride'
     const legacyOverride = adaptConfigToLegacy({
