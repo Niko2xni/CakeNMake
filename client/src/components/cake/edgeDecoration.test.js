@@ -968,11 +968,12 @@ describe('edge decoration placement', () => {
       })
     );
 
-    const wcHeader = screen.getByText('Whipped Cream 🍦');
+    const wcHeader = screen.getByText('Whipped Cream');
     const wcContainer = wcHeader.closest('div');
     const wcWithin = within(wcContainer);
 
-    expect(wcWithin.getByText('Solid')).toBeInTheDocument();
+    expect(screen.queryByText('Whipped Cream 🍦')).not.toBeInTheDocument();
+    expect(wcWithin.queryByText('Solid')).not.toBeInTheDocument();
     expect(wcWithin.queryByText('Solid with Cherries 🍒')).not.toBeInTheDocument();
     [
       'Whipped Cream Rosettes (Continuous ~20 pc)',
@@ -985,11 +986,7 @@ describe('edge decoration placement', () => {
       const button = wcWithin.getByTitle(title);
       expect(button).toHaveTextContent(String(index + 1));
       expect(button).toHaveClass('w-9', 'h-9', 'rounded-full');
-      if (index >= 3) {
-        expect(button).toHaveTextContent('🍒');
-      } else {
-        expect(button).not.toHaveTextContent('🍒');
-      }
+      expect(button).not.toHaveTextContent('🍒');
     });
   });
 
@@ -1331,11 +1328,11 @@ describe('edge decoration placement', () => {
       })
     );
 
-    const wcHeader = screen.getByText('Whipped Cream 🍦');
+    const wcHeader = screen.getByText('Whipped Cream');
     const wcContainer = wcHeader.closest('div');
     const wcWithin = within(wcContainer);
 
-    expect(wcWithin.getByText('Solid')).toBeInTheDocument();
+    expect(wcWithin.queryByText('Solid')).not.toBeInTheDocument();
     expect(wcWithin.queryByText('Solid with Cherries 🍒')).not.toBeInTheDocument();
     expect(wcWithin.queryByText('Solid with Strawberries 🍓')).not.toBeInTheDocument();
     expect(wcWithin.queryByTitle('Whipped Cream Rosettes with Strawberry (Continuous ~20 pc)')).not.toBeInTheDocument();
