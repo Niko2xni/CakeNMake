@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { buildSlicedStrawberryMesh } from './toppings/strawberry';
+import { buildStrawberryMesh } from './toppings/strawberry';
 import { buildHersheysKissMesh } from './toppings/hersheysKiss';
 import { buildFerreroRocherMesh } from './toppings/ferreroRocher';
 
@@ -287,9 +287,8 @@ export function buildBeadedTrimRing(radius, colorHex, rand, opts = {}) {
 }
 
 /**
- * Fresh Sliced Strawberry Border — a handcrafted ring of ripe halved strawberries
- * sitting directly along the cake edge, with the glistening cut cross-section
- * facing outward to showcase the fresh ruby and white interior.
+ * Fresh Strawberries Rim — a handcrafted ring of complete ripe strawberries
+ * sitting directly along the cake edge.
  */
 export function buildStrawberryRimRing(radius, y, rand = Math.random, opts = {}) {
   const count = opts.count ?? Math.max(10, Math.round((radius * Math.PI * 2) / 1.45));
@@ -299,7 +298,7 @@ export function buildStrawberryRimRing(radius, y, rand = Math.random, opts = {})
     const angle = (i / count) * Math.PI * 2;
     const cx = Math.sin(angle) * radius;
     const cz = Math.cos(angle) * radius;
-    const strawberry = buildSlicedStrawberryMesh(cx, y, cz, scale, rand);
+    const strawberry = buildStrawberryMesh(cx, y, cz, scale, rand);
     strawberry.rotation.y = angle;
     strawberry.rotation.x = -0.38 + (rand() - 0.5) * 0.08;
     strawberry.rotation.z += (rand() - 0.5) * 0.08;

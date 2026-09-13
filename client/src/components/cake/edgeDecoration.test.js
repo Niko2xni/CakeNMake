@@ -988,6 +988,7 @@ describe('edge decoration placement', () => {
       buildHersheysKissRimRing,
       buildFerreroRocherRimRing,
     } = await import('./DecorationSets');
+    const { getSharedStrawberryBodyGeometry } = await import('./toppings/strawberry');
 
     // 1. Placement verification for Strawberry Rim
     expect(computeEdgeTrimY(1.0, 4.0, 'strawberryRim', 'fullyFrosted', false)).toBeCloseTo(0.96, 2);
@@ -1014,6 +1015,10 @@ describe('edge decoration placement', () => {
     expect(strawberryRing.children.length).toBeGreaterThanOrEqual(10);
     strawberryRing.children.forEach((berry) => {
       expect(berry.isGroup).toBe(true);
+      const bodyMeshes = berry.children.filter((child) => child.isMesh);
+      expect(bodyMeshes).toHaveLength(1);
+      expect(bodyMeshes[0].geometry).toBe(getSharedStrawberryBodyGeometry());
+      expect(berry.children.some((child) => child.isGroup)).toBe(true);
     });
 
     // 5. Geometry verification: Hershey's Kiss rim ring
