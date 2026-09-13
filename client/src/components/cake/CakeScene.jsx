@@ -609,8 +609,8 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
     const renderDims = getRenderDimensions(cakeSize);
     const BASE_RADIUS = renderDims.diameter / 2;  // Half of diameter
     const RADIUS_STEP = 0.5;   // 1" per tier in radius = 0.5 display units
-    const PLATE_RADIUS = BASE_RADIUS + 1.8;
-    const PLATE_RIM = BASE_RADIUS + 2.05;
+    const PLATE_RADIUS = BASE_RADIUS + 1.2;
+    const PLATE_RIM = BASE_RADIUS + 1.4;
 
     // Layer geometry dimensions based on render height
     const LAYER_H = renderDims.height;  // Each layer has full height (10 units)
@@ -2332,9 +2332,8 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       ) : null}
       <div
         ref={mountRef}
-        className={`w-full h-full ${
-          isFreeformArmed ? 'cursor-none' : activeTool ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing'
-        }`}
+        className={`w-full h-full ${isFreeformArmed ? 'cursor-none' : activeTool ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing'
+          }`}
       />
     </div>
   );
