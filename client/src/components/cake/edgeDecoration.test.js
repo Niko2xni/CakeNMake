@@ -86,6 +86,7 @@ describe('edge decoration placement', () => {
     expect(screen.getByTitle('Bead Piping')).toBeInTheDocument();
     expect(screen.getByTitle('Rope Twist')).toBeInTheDocument();
     expect(screen.getByTitle('Rope Twist (Classic)')).toBeInTheDocument();
+    expect(screen.getByTitle('Wave Border')).toBeInTheDocument();
     expect(screen.queryByTitle('Shell Border - Alternating')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Reverse Shell - Alternating')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Bead Piping - Alternating')).not.toBeInTheDocument();
@@ -93,8 +94,8 @@ describe('edge decoration placement', () => {
     expect(screen.queryByTitle('Rope Twist (Classic) - Alternating')).not.toBeInTheDocument();
     expect(screen.queryByText('Zigzag Piping')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Zigzag Piping')).not.toBeInTheDocument();
-    expect(screen.queryByText('Wave Piping')).not.toBeInTheDocument();
-    expect(screen.queryByTitle('Wave Piping')).not.toBeInTheDocument();
+    const borderPiping = within(screen.getByText('Border Piping').closest('div'));
+    expect(borderPiping.getAllByRole('button')).toHaveLength(6);
     expect(screen.queryByText('Scallops')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Star Scallop')).not.toBeInTheDocument();
     expect(screen.queryByText('Rope')).not.toBeInTheDocument();
