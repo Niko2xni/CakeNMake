@@ -31,9 +31,6 @@ function getProfilePoints() {
   return _cachedProfilePoints;
 }
 
-// ─── Outer Skin Textures (Whole & Back Skin) ──────────────────────────────
-// Features rich deep ruby-red skin gradient and organic Fibonacci (golden spiral)
-// phyllotaxis achene pits with recessed golden-amber seeds — zero grid artifacts!
 let _sharedStrawberryTextures = null;
 export function getSharedStrawberryTextures() {
   if (_sharedStrawberryTextures) return _sharedStrawberryTextures;
@@ -42,41 +39,46 @@ export function getSharedStrawberryTextures() {
   const cData = new Uint8ClampedArray(size * size * 4);
   const bData = new Uint8ClampedArray(size * size * 4);
 
-  // 1. Base strawberry red gradient — rich ruby and deep crimson
+  // 1. Fill base strawberry color gradient and skin pores
   for (let py = 0; py < size; py++) {
-    const v = 1.0 - py / (size - 1); // 0 at tip, 1 at crown
+    const v = 1.0 - py / (size - 1); // 0 at tip, 1 at top crown
     for (let px = 0; px < size; px++) {
       const idx = (py * size + px) * 4;
 
+      // Base ripe strawberry red gradient - rich ruby and deep crimson (no peach/pink tones)
       let r, g, b;
       if (v > 0.85) {
+        // Deep berry crimson under the calyx crown with natural slight darkening
         const crownT = (v - 0.85) / 0.15;
-        r = Math.round(210 * (1 - crownT) + 165 * crownT);
-        g = Math.round(14 * (1 - crownT) + 8 * crownT);
-        b = Math.round(24 * (1 - crownT) + 16 * crownT);
+        r = Math.round(230 * (1 - crownT) + 195 * crownT);
+        g = Math.round(18 * (1 - crownT) + 10 * crownT);
+        b = Math.round(32 * (1 - crownT) + 22 * crownT);
       } else if (v < 0.15) {
+        // Slightly deeper crimson at the apex tip
         const tipT = v / 0.15;
-        r = Math.round(165 * (1 - tipT) + 215 * tipT);
-        g = Math.round(8 * (1 - tipT) + 14 * tipT);
-        b = Math.round(18 * (1 - tipT) + 24 * tipT);
+        r = Math.round(175 * (1 - tipT) + 225 * tipT);
+        g = Math.round(8 * (1 - tipT) + 16 * tipT);
+        b = Math.round(20 * (1 - tipT) + 28 * tipT);
       } else {
+        // Main juicy strawberry body - vibrant, saturated ruby red
         const bodyT = (v - 0.15) / 0.70;
-        r = Math.round(215 + 14 * Math.sin(bodyT * Math.PI));
-        g = Math.round(14 + 4 * Math.sin(bodyT * Math.PI));
-        b = Math.round(24 + 5 * Math.sin(bodyT * Math.PI));
+        r = Math.round(225 + 15 * Math.sin(bodyT * Math.PI));
+        g = Math.round(16 + 4 * Math.sin(bodyT * Math.PI));
+        b = Math.round(28 + 6 * Math.sin(bodyT * Math.PI));
       }
 
       // Subtle organic skin pore variation
-      const poreNoise = (Math.sin(px * 0.45) * Math.cos(py * 0.45) + Math.sin(px * 0.9 + py * 0.7)) * 3.5;
+      const poreNoise = (Math.sin(px * 0.45) * Math.cos(py * 0.45) + Math.sin(px * 0.9 + py * 0.7)) * 4.0;
       r = Math.min(255, Math.max(0, r + poreNoise));
-      g = Math.min(255, Math.max(0, g + poreNoise * 0.12));
-      b = Math.min(255, Math.max(0, b + poreNoise * 0.15));
+      g = Math.min(255, Math.max(0, g + poreNoise * 0.15));
+      b = Math.min(255, Math.max(0, b + poreNoise * 0.2));
 
       cData[idx] = Math.floor(r);
       cData[idx + 1] = Math.floor(g);
       cData[idx + 2] = Math.floor(b);
       cData[idx + 3] = 255;
 
+      // Neutral bump base
       bData[idx] = 128;
       bData[idx + 1] = 128;
       bData[idx + 2] = 128;
@@ -84,50 +86,72 @@ export function getSharedStrawberryTextures() {
     }
   }
 
-  // 2. Fibonacci spiral achenes (golden spiral phyllotaxis distribution)
-  const numAchenes = 160;
-  const goldenAngle = 2.39996323; // 137.507764 degrees in radians
-  for (let n = 1; n <= numAchenes; n++) {
-    const t = n / numAchenes;
-    const v = 0.08 + t * 0.84; // height along berry
+  // 2. Draw phyllotactic seed pits (achenes) with golden seeds
+  const numRows = 16;
+  for (let row = 1; row < numRows; row++) {
+    const rowFrac = row / numRows;
+    const v = 0.08 + rowFrac * 0.82; // vertical position on berry
     const py = Math.floor((1.0 - v) * (size - 1));
 
-    const u = (n * goldenAngle / (Math.PI * 2)) % 1.0;
-    const px = Math.floor(u * (size - 1));
+    // Seeds per row varies with berry circumference
+    const circumferenceFactor = Math.sin(rowFrac * Math.PI * 0.88 + 0.12);
+    const seedsInRow = Math.max(8, Math.round(circumferenceFactor * 24));
+    const rowOffset = (row % 2) * 0.5;
 
-    // Circumference factor determines natural pit size
-    const circumFactor = Math.sin(t * Math.PI * 0.88 + 0.12);
-    const pitRadiusX = Math.max(3, Math.round(circumFactor * 4.5));
-    const pitRadiusY = Math.max(4, Math.round(circumFactor * 6.5));
+    for (let s = 0; s < seedsInRow; s++) {
+      const u = ((s + rowOffset) / seedsInRow) % 1.0;
+      const px = Math.floor(u * (size - 1));
 
-    for (let dy = -pitRadiusY; dy <= pitRadiusY; dy++) {
-      for (let dx = -pitRadiusX; dx <= pitRadiusX; dx++) {
-        const targetX = (px + dx + size) % size;
-        const targetY = py + dy;
-        if (targetY < 0 || targetY >= size) continue;
+      // Draw pit depression + seed
+      const pitRadiusX = Math.max(4, Math.round(circumferenceFactor * 7));
+      const pitRadiusY = Math.max(6, Math.round(circumferenceFactor * 10));
 
-        const normX = dx / pitRadiusX;
-        const normY = dy / pitRadiusY;
-        const distSq = normX * normX + normY * normY;
+      for (let dy = -pitRadiusY; dy <= pitRadiusY; dy++) {
+        for (let dx = -pitRadiusX; dx <= pitRadiusX; dx++) {
+          const targetX = (px + dx + size) % size;
+          const targetY = py + dy;
+          if (targetY < 0 || targetY >= size) continue;
 
-        if (distSq <= 1.0) {
-          const falloff = 1.0 - distSq;
-          const pIdx = (targetY * size + targetX) * 4;
+          const normX = dx / pitRadiusX;
+          const normY = dy / pitRadiusY;
+          const distSq = normX * normX + normY * normY;
 
-          if (distSq < 0.32) {
-            // Golden-amber achene seed grain inside pit
-            const seedHighlight = (normY < -0.1 && normX < 0.1) ? 1.20 : 1.0;
-            cData[pIdx] = Math.min(255, Math.floor(215 * seedHighlight));
-            cData[pIdx + 1] = Math.min(255, Math.floor(168 * seedHighlight));
-            cData[pIdx + 2] = Math.floor(62 * seedHighlight);
-            bData[pIdx] = Math.min(255, Math.floor(128 + 35 * (1.0 - distSq / 0.32)));
-          } else {
-            // Teardrop pit cavity shadow
-            const shadowFactor = 0.50 + 0.50 * (1.0 - falloff * 0.80);
-            cData[pIdx] = Math.floor(cData[pIdx] * shadowFactor);
-            cData[pIdx + 1] = Math.floor(cData[pIdx + 1] * shadowFactor);
-            cData[pIdx + 2] = Math.floor(cData[pIdx + 2] * shadowFactor);
-            bData[pIdx] = Math.max(40, Math.floor(128 - 65 * falloff));
+          if (distSq <= 1.0) {
+            const t = 1.0 - distSq;
+            const pIdx = (targetY * size + targetX) * 4;
+
+            // Seed pit cavity shadow
+            const shadowFactor = 0.45 + 0.55 * (1.0 - t * 0.85);
+
+            if (distSq < 0.35) {
+              // Golden seed grain in the pit center
+              const seedHighlight = (normY < -0.1 && normX < 0.1) ? 1.25 : 1.0;
+              const seedR = Math.min(255, Math.floor(235 * seedHighlight));
+              const seedG = Math.min(255, Math.floor(190 * seedHighlight));
+              const seedB = Math.floor(65 * seedHighlight);
+
+              cData[pIdx] = seedR;
+              cData[pIdx + 1] = seedG;
+              cData[pIdx + 2] = seedB;
+
+              // Protruding seed inside the pit
+              bData[pIdx] = Math.min(255, Math.floor(128 + 45 * (1.0 - distSq / 0.35)));
+            } else {
+              // Pit perimeter shadow and rim highlight
+              const isUpperRim = normY < -0.6;
+              if (isUpperRim) {
+                // Soft specular highlight crescent on upper lip
+                cData[pIdx] = Math.min(255, cData[pIdx] + 35);
+                cData[pIdx + 1] = Math.min(255, cData[pIdx + 1] + 15);
+                cData[pIdx + 2] = Math.min(255, cData[pIdx + 2] + 20);
+                bData[pIdx] = 155;
+              } else {
+                cData[pIdx] = Math.floor(cData[pIdx] * shadowFactor);
+                cData[pIdx + 1] = Math.floor(cData[pIdx + 1] * shadowFactor);
+                cData[pIdx + 2] = Math.floor(cData[pIdx + 2] * shadowFactor);
+                bData[pIdx] = Math.max(30, Math.floor(128 - 75 * t));
+              }
+            }
           }
         }
       }
@@ -160,9 +184,23 @@ let _sharedStrawberryBodyGeo = null;
 export function getSharedStrawberryBodyGeometry() {
   if (_sharedStrawberryBodyGeo) return _sharedStrawberryBodyGeo;
 
-  const points = getProfilePoints();
+  // Revolved profile curve: conical-ovoid berry silhouette
+  const points = [
+    new THREE.Vector2(0.00, 0.00),   // Bottom apex tip
+    new THREE.Vector2(0.08, 0.05),
+    new THREE.Vector2(0.18, 0.15),
+    new THREE.Vector2(0.28, 0.30),
+    new THREE.Vector2(0.36, 0.48),
+    new THREE.Vector2(0.41, 0.68),   // Widest rounded shoulder
+    new THREE.Vector2(0.39, 0.85),
+    new THREE.Vector2(0.32, 0.96),
+    new THREE.Vector2(0.20, 1.02),
+    new THREE.Vector2(0.00, 1.04),   // Top crown attachment
+  ];
+
   const geo = new THREE.LatheGeometry(points, 48);
-  geo.translate(0, -0.15, 0);
+  // Shift geometry so the bottom tip is embedded into the frosting
+  geo.translate(0, -0.22, 0);
   geo.computeVertexNormals();
   geo.userData.sharedCache = true;
   _sharedStrawberryBodyGeo = geo;
@@ -178,12 +216,12 @@ export function getSharedStrawberryBodyMaterial() {
   const mat = new THREE.MeshPhysicalMaterial({
     map: colorTexture,
     bumpMap: bumpTexture,
-    bumpScale: 0.028,
-    roughness: 0.24,
+    bumpScale: 0.032,
+    roughness: 0.28,
     metalness: 0.02,
-    clearcoat: 0.95,
-    clearcoatRoughness: 0.08,
-    sheen: 0.35,
+    clearcoat: 0.85,
+    clearcoatRoughness: 0.12,
+    sheen: 0.40,
     sheenColor: new THREE.Color('#990011'),
   });
 
@@ -196,12 +234,13 @@ let _sharedCalyxLeafGeo = null;
 export function getSharedCalyxLeafGeometry() {
   if (_sharedCalyxLeafGeo) return _sharedCalyxLeafGeo;
 
+  // Modeled curved leaf sepal with central vein curvature
   const leafShape = new THREE.Shape();
   leafShape.moveTo(0, 0);
-  leafShape.bezierCurveTo(-0.05, 0.08, -0.08, 0.20, -0.01, 0.34);
-  leafShape.lineTo(0, 0.38);
+  leafShape.bezierCurveTo(-0.06, 0.08, -0.09, 0.20, -0.01, 0.34);
+  leafShape.lineTo(0, 0.38); // Pointed tip
   leafShape.lineTo(0.01, 0.34);
-  leafShape.bezierCurveTo(0.08, 0.20, 0.05, 0.08, 0, 0);
+  leafShape.bezierCurveTo(0.09, 0.20, 0.06, 0.08, 0, 0);
 
   const extrudeSettings = {
     depth: 0.012,
@@ -213,6 +252,7 @@ export function getSharedCalyxLeafGeometry() {
   };
 
   const geo = new THREE.ExtrudeGeometry(leafShape, extrudeSettings);
+  // Curve leaf downward so it hugs the berry shoulder
   const pos = geo.attributes.position;
   for (let i = 0; i < pos.count; i++) {
     const y = pos.getY(i);
@@ -244,7 +284,7 @@ let _sharedPedicelGeo = null;
 let _sharedPedicelMat = null;
 export function getSharedPedicelGeometry() {
   if (_sharedPedicelGeo) return _sharedPedicelGeo;
-  const geo = new THREE.CylinderGeometry(0.028, 0.036, 0.12, 8);
+  const geo = new THREE.CylinderGeometry(0.032, 0.040, 0.14, 8);
   geo.userData.sharedCache = true;
   _sharedPedicelGeo = geo;
   return geo;
@@ -263,7 +303,14 @@ export function getSharedPedicelMaterial() {
 }
 
 /**
- * Builds a whole Strawberry mesh group (for centerpieces / single item toppings).
+ * Builds a high-fidelity Strawberry mesh/group.
+ * Features:
+ * - Conical-ovoid berry silhouette
+ * - High-res procedural texture with phyllotactic seed pits (achenes) and golden seeds
+ * - 3D tactile normal/bump depth
+ * - Lush 6-leaf calyx crown curling naturally over the shoulders
+ * - Trimmed center pedicel stem stub
+ * - Embedded base sitting naturally nestled in cake frosting
  */
 export function buildStrawberryMesh(x = 0, y = 0, z = 0, scale = 1.0, rand = Math.random) {
   const root = new THREE.Group();
@@ -275,33 +322,40 @@ export function buildStrawberryMesh(x = 0, y = 0, z = 0, scale = 1.0, rand = Mat
   const pedicelGeo = getSharedPedicelGeometry();
   const pedicelMat = getSharedPedicelMaterial();
 
+  // Strawberry Fruit Body
   const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
   bodyMesh.castShadow = true;
   bodyMesh.receiveShadow = true;
   root.add(bodyMesh);
 
+  // Calyx Crown (6 organic curling sepals) sitting on top of embedded berry
   const calyxGroup = new THREE.Group();
-  calyxGroup.position.set(0, 0.87, 0);
+  calyxGroup.position.set(0, 0.80, 0);
 
   const numLeaves = 6;
   const baseRotationOffset = rand() * Math.PI * 2;
   for (let i = 0; i < numLeaves; i++) {
     const angle = baseRotationOffset + (i / numLeaves) * Math.PI * 2;
     const leafMesh = new THREE.Mesh(calyxLeafGeo, calyxMat);
+
+    // Rotate and lay outward/downward along shoulder
     leafMesh.rotation.y = -angle + Math.PI / 2;
     leafMesh.rotation.x = Math.PI / 2 + 0.35 + (rand() * 0.1 - 0.05);
     leafMesh.rotation.z = (rand() * 0.15 - 0.075);
+
     leafMesh.position.set(
       Math.cos(angle) * 0.04,
       0.01,
       Math.sin(angle) * 0.04
     );
+
     leafMesh.castShadow = true;
     calyxGroup.add(leafMesh);
   }
 
+  // Center Pedicel Stub
   const pedicelMesh = new THREE.Mesh(pedicelGeo, pedicelMat);
-  pedicelMesh.position.set(0, 0.06, 0);
+  pedicelMesh.position.set(0, 0.07, 0);
   pedicelMesh.rotation.z = (rand() * 0.2 - 0.1);
   pedicelMesh.rotation.x = (rand() * 0.2 - 0.1);
   pedicelMesh.castShadow = true;
@@ -314,6 +368,9 @@ export function buildStrawberryMesh(x = 0, y = 0, z = 0, scale = 1.0, rand = Mat
   return root;
 }
 
+/**
+ * Drop-in backwards-compatible replacement for addStrawberry
+ */
 export function addStrawberry(group, x, y, z, rand = Math.random) {
   const strawberry = buildStrawberryMesh(x, y, z, 0.85, rand);
   group.add(strawberry);
