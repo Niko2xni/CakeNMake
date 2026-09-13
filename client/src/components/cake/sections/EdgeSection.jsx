@@ -7,10 +7,6 @@ import {
   FRUIT_CONFECTION_RIM_OPTIONS,
   DOLLOPS_SOLID_VARIATIONS,
   DOLLOPS_SOLID_CHERRY_VARIATIONS,
-  DOLLOPS_SOLID_STRAWBERRY_VARIATIONS,
-  DOLLOPS_ALTERNATING_VARIATIONS,
-  DOLLOPS_ALTERNATING_CHERRY_VARIATIONS,
-  DOLLOPS_ALTERNATING_STRAWBERRY_VARIATIONS,
   WHIPPED_CREAM_SOLID_VARIATIONS,
   WHIPPED_CREAM_CHERRY_VARIATIONS,
   STANDALONE_EDGE_PIPING_OPTIONS,
@@ -32,10 +28,6 @@ const DOLLOP_ROW_DEFINITIONS = [
       ...DOLLOPS_SOLID_CHERRY_VARIATIONS.map((option) => ({ ...option, badge: '🍒' })),
     ],
   },
-  { label: 'Solid with Strawberries 🍓', options: DOLLOPS_SOLID_STRAWBERRY_VARIATIONS, badge: '🍓' },
-  { label: 'Alternating (2 Colors)', options: DOLLOPS_ALTERNATING_VARIATIONS, alternating: true },
-  { label: 'Alternating with Cherries 🍒', options: DOLLOPS_ALTERNATING_CHERRY_VARIATIONS, alternating: true, badge: '🍒' },
-  { label: 'Alternating with Strawberries 🍓', options: DOLLOPS_ALTERNATING_STRAWBERRY_VARIATIONS, alternating: true, badge: '🍓' },
 ];
 
 const DOLLOP_SECTIONS = [

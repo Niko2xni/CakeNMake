@@ -119,15 +119,9 @@ describe('edge decoration placement', () => {
     expect(screen.getByTitle('Continuous Kisses Dollop (20 pc) with Cherry')).toBeInTheDocument();
     expect(screen.getByTitle('Kisses Dollop (12 pc) with Cherry')).toBeInTheDocument();
     expect(screen.getByTitle('Sparse Kisses Dollop (8 pc) with Cherry')).toBeInTheDocument();
-    expect(screen.getByTitle('Continuous Star Dollop (20 pc) - Alternating')).toBeInTheDocument();
-    expect(screen.getByTitle('Star Dollop (12 pc) - Alternating')).toBeInTheDocument();
-    expect(screen.getByTitle('Sparse Star Dollop (8 pc) - Alternating')).toBeInTheDocument();
-    expect(screen.getByTitle('Continuous Round Tip Dollop (20 pc) - Alternating')).toBeInTheDocument();
-    expect(screen.getByTitle('Round Tip Dollop (12 pc) - Alternating')).toBeInTheDocument();
-    expect(screen.getByTitle('Sparse Round Tip Dollop (8 pc) - Alternating')).toBeInTheDocument();
-    expect(screen.getByTitle('Continuous Kisses Dollop (20 pc) - Alternating')).toBeInTheDocument();
-    expect(screen.getByTitle('Kisses Dollop (12 pc) - Alternating')).toBeInTheDocument();
-    expect(screen.getByTitle('Sparse Kisses Dollop (8 pc) - Alternating')).toBeInTheDocument();
+    expect(screen.queryByTitle('Continuous Star Dollop (20 pc) - Alternating')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Continuous Round Tip Dollop (20 pc) - Alternating')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Continuous Kisses Dollop (20 pc) - Alternating')).not.toBeInTheDocument();
   });
 
   it('allows selecting Top Edge, Bottom Edge, and Both via unified placement bar with design preservation', () => {
@@ -1283,7 +1277,7 @@ describe('edge decoration placement', () => {
     expect(roundStraw20.children.slice(1).length).toBe(10);
   });
 
-  it('retains the applicable strawberry and alternating rows within each dollop shape section', () => {
+  it('shows only the six solid and cherry controls in every dollop shape section', () => {
     render(
       React.createElement(EdgeSection, {
         edge: {
@@ -1302,21 +1296,15 @@ describe('edge decoration placement', () => {
       })
     );
 
-    ['Star Dollop', 'Round Tip Dollop'].forEach((sectionTitle) => {
+    ['Star Dollop', 'Round Tip Dollop', 'Kiss-shaped Dollop'].forEach((sectionTitle) => {
       const section = within(screen.getByText(sectionTitle).closest('div'));
       expect(section.getByText('Solid')).toBeInTheDocument();
-      expect(section.getByText('Solid with Strawberries 🍓')).toBeInTheDocument();
-      expect(section.getByText('Alternating (2 Colors)')).toBeInTheDocument();
-      expect(section.getByText('Alternating with Cherries 🍒')).toBeInTheDocument();
-      expect(section.getByText('Alternating with Strawberries 🍓')).toBeInTheDocument();
+      expect(section.getAllByRole('button')).toHaveLength(6);
+      expect(section.queryByText('Solid with Strawberries 🍓')).not.toBeInTheDocument();
+      expect(section.queryByText('Alternating (2 Colors)')).not.toBeInTheDocument();
+      expect(section.queryByText('Alternating with Cherries 🍒')).not.toBeInTheDocument();
+      expect(section.queryByText('Alternating with Strawberries 🍓')).not.toBeInTheDocument();
     });
-
-    const kissSection = within(screen.getByText('Kiss-shaped Dollop').closest('div'));
-    expect(kissSection.getByText('Solid')).toBeInTheDocument();
-    expect(kissSection.getByText('Alternating (2 Colors)')).toBeInTheDocument();
-    expect(kissSection.queryByText('Solid with Strawberries 🍓')).not.toBeInTheDocument();
-    expect(kissSection.queryByText('Alternating with Cherries 🍒')).not.toBeInTheDocument();
-    expect(kissSection.queryByText('Alternating with Strawberries 🍓')).not.toBeInTheDocument();
   });
 
   it('generates strawberry whipped cream rosette variations with correct counts, nested strawberries, and zero overhang', async () => {
