@@ -25,6 +25,8 @@ const FRUIT_CONFECTION_ICONS = {
   hersheysKissRim: '🍫',
   ferreroRocherRim: '🌰',
   oreoRim: '🍪',
+  basketballRim: '🏀',
+  soccerBallRim: '⚽',
 };
 
 const EMPTY_SLOT = () => ({
@@ -297,7 +299,7 @@ export default function EdgeSection({
           {/* Fruit & Confections Rim — direct non-piping borders */}
           <div>
             <span className="text-xs font-semibold text-foreground/80 mb-1.5 block">
-              Fruit & Confections Rim 🍓🍫🍪
+              Fruit & Confections Rim 🍓🍫🍪🏀⚽
             </span>
             <div className="flex flex-wrap gap-2">
               {FRUIT_CONFECTION_RIM_OPTIONS.map((variant) => {
@@ -322,7 +324,7 @@ export default function EdgeSection({
                     }`}
                   >
                     <span>{icon}</span>
-                    <span>{variant.label.replace(/ [🍓🍫🌰🍪]/, '')}</span>
+                    <span>{variant.label.replace(/ [🍓🍫🌰🍪🏀⚽]/, '')}</span>
                   </button>
                 );
               })}

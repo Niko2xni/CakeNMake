@@ -988,6 +988,8 @@ describe('edge decoration placement', () => {
       buildHersheysKissRimRing,
       buildFerreroRocherRimRing,
       buildOreoRimRing,
+      buildBasketballRimRing,
+      buildSoccerBallRimRing,
     } = await import('./DecorationSets');
     const { getSharedStrawberryBodyGeometry } = await import('./toppings/strawberry');
 
@@ -1015,7 +1017,15 @@ describe('edge decoration placement', () => {
     expect(computeEdgeTrimRadius(4.0, 'oreoRim', 'fullyFrosted', false)).toBeCloseTo(3.84, 2);
     expect(computeEdgeTrimRadius(4.0, 'oreoRim', 'fullyFrosted', true)).toBeCloseTo(4.26, 2);
 
-    // 5. Geometry verification: Strawberry rim ring
+    // 5. Placement verification for Basketball and Soccer Ball rims
+    for (const rimId of ['basketballRim', 'soccerBallRim']) {
+      expect(computeEdgeTrimY(1.0, 4.0, rimId, 'fullyFrosted', false)).toBeCloseTo(1.0, 2);
+      expect(computeEdgeTrimY(0.0, 4.0, rimId, 'fullyFrosted', true)).toBeCloseTo(0.0, 2);
+      expect(computeEdgeTrimRadius(4.0, rimId, 'fullyFrosted', false)).toBeCloseTo(3.56, 2);
+      expect(computeEdgeTrimRadius(4.0, rimId, 'fullyFrosted', true)).toBeCloseTo(4.56, 2);
+    }
+
+    // 6. Geometry verification: Strawberry rim ring
     const strawberryRing = buildStrawberryRimRing(3.64, 0.96);
     expect(strawberryRing).toBeDefined();
     expect(strawberryRing.isGroup).toBe(true);
@@ -1028,7 +1038,7 @@ describe('edge decoration placement', () => {
       expect(berry.children.some((child) => child.isGroup)).toBe(true);
     });
 
-    // 6. Geometry verification: Hershey's Kiss rim ring
+    // 7. Geometry verification: Hershey's Kiss rim ring
     const kissRing = buildHersheysKissRimRing(3.58, 1.0);
     expect(kissRing).toBeDefined();
     expect(kissRing.isGroup).toBe(true);
@@ -1037,7 +1047,7 @@ describe('edge decoration placement', () => {
       expect(kiss.isMesh).toBe(true);
     });
 
-    // 7. Geometry verification: Ferrero Rocher rim ring
+    // 8. Geometry verification: Ferrero Rocher rim ring
     const ferreroRing = buildFerreroRocherRimRing(3.41, 1.0);
     expect(ferreroRing).toBeDefined();
     expect(ferreroRing.isGroup).toBe(true);
@@ -1046,7 +1056,7 @@ describe('edge decoration placement', () => {
       expect(truffle.isMesh).toBe(true);
     });
 
-    // 8. Geometry verification: Oreo rim ring
+    // 9. Geometry verification: Oreo and ball rim rings
     const canvasContext = {
       fillStyle: '',
       strokeStyle: '',
@@ -1078,6 +1088,8 @@ describe('edge decoration placement', () => {
       .spyOn(HTMLCanvasElement.prototype, 'getContext')
       .mockReturnValue(canvasContext);
     const oreoRing = buildOreoRimRing(3.84, 1.0, () => 0.5);
+    const basketballRing = buildBasketballRimRing(3.56, 1.0, () => 0.5);
+    const soccerBallRing = buildSoccerBallRimRing(3.56, 1.0, () => 0.5);
     getContextSpy.mockRestore();
     expect(oreoRing).toBeDefined();
     expect(oreoRing.isGroup).toBe(true);
@@ -1086,6 +1098,20 @@ describe('edge decoration placement', () => {
       expect(cookie.isGroup).toBe(true);
       expect(cookie.children).toHaveLength(3);
       expect(cookie.children.every((part) => part.isMesh)).toBe(true);
+    });
+    expect(basketballRing.isGroup).toBe(true);
+    expect(basketballRing.children.length).toBeGreaterThanOrEqual(10);
+    basketballRing.children.forEach((ball) => {
+      expect(ball.isGroup).toBe(true);
+      expect(ball.children).toHaveLength(1);
+      expect(ball.children[0].isMesh).toBe(true);
+    });
+    expect(soccerBallRing.isGroup).toBe(true);
+    expect(soccerBallRing.children.length).toBeGreaterThanOrEqual(10);
+    soccerBallRing.children.forEach((ball) => {
+      expect(ball.isGroup).toBe(true);
+      expect(ball.children).toHaveLength(1);
+      expect(ball.children[0].isGroup).toBe(true);
     });
   });
 
@@ -1108,11 +1134,13 @@ describe('edge decoration placement', () => {
       })
     );
 
-    expect(screen.getByText('Fruit & Confections Rim 🍓🍫🍪')).toBeInTheDocument();
+    expect(screen.getByText('Fruit & Confections Rim 🍓🍫🍪🏀⚽')).toBeInTheDocument();
     expect(screen.getByTitle('Fresh Strawberries Rim 🍓')).toBeInTheDocument();
     expect(screen.getByTitle("Hershey's Kisses Rim 🍫")).toBeInTheDocument();
     expect(screen.getByTitle('Ferrero Rocher Rim 🌰')).toBeInTheDocument();
     expect(screen.getByTitle('Oreo Rim 🍪')).toBeInTheDocument();
+    expect(screen.getByTitle('Basketball Rim 🏀')).toBeInTheDocument();
+    expect(screen.getByTitle('Soccer Ball Rim ⚽')).toBeInTheDocument();
   });
 
   it('generates strawberry dollop variations with correct strawberry counts, heights, and zero overhang', async () => {

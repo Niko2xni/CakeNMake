@@ -3,6 +3,8 @@ import { buildStrawberryMesh } from './toppings/strawberry';
 import { buildHersheysKissMesh } from './toppings/hersheysKiss';
 import { buildFerreroRocherMesh } from './toppings/ferreroRocher';
 import { buildOreoMesh } from './toppings/oreo';
+import { buildBasketballMesh } from './toppings/basketball';
+import { buildSoccerBallMesh } from './toppings/soccerBall';
 
 // ─── Decoration Set Geometry — first working example per category ─────────
 // Per instruction: keep every placeholder Set button in the UI (don't
@@ -68,7 +70,14 @@ export function computeEdgeTrimY(topSurfaceY, radius, decorationType = 'piping',
   const isDollopType = decorationType === 'dollops'
     || (typeof decorationType === 'string' && decorationType.startsWith('whippedCreamRosette'))
     || (typeof decorationType === 'string' && decorationType.toLowerCase().includes('dollop'));
-  const isFruitRim = ['strawberryRim', 'hersheysKissRim', 'ferreroRocherRim', 'oreoRim'].includes(decorationType);
+  const isFruitRim = [
+    'strawberryRim',
+    'hersheysKissRim',
+    'ferreroRocherRim',
+    'oreoRim',
+    'basketballRim',
+    'soccerBallRim',
+  ].includes(decorationType);
 
   if (isBottom) {
     if (isFruitRim) {
@@ -217,6 +226,8 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
     bottomRadialInset = -0.31;
   } else if (baseTip === 'oreoRim') {
     bottomRadialInset = -0.20;
+  } else if (baseTip === 'basketballRim' || baseTip === 'soccerBallRim') {
+    bottomRadialInset = -0.50;
   } else if (baseTip === 'bead') {
     bottomRadialInset = -0.34;
   } else if (baseTip === 'reverseShell') {
@@ -231,19 +242,23 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
     bottomRadialInset = -0.544;
   }
 
+  const topFruitRimInset = {
+    strawberryRim: 0.42,
+    hersheysKissRim: 0.48,
+    ferreroRocherRim: 0.65,
+    oreoRim: 0.22,
+    basketballRim: 0.50,
+    soccerBallRim: 0.50,
+  }[baseTip];
   const radialInset = isBottom
     ? bottomRadialInset
-    : (baseTip === 'beadedTrim' ? 0.22
-      : (baseTip === 'strawberryRim' ? 0.42
-      : (baseTip === 'hersheysKissRim' ? 0.48
-      : (baseTip === 'ferreroRocherRim' ? 0.65
-      : (baseTip === 'oreoRim' ? 0.22
+    : (topFruitRimInset ?? (baseTip === 'beadedTrim' ? 0.22
       : (isDollopType ? topDollopInset
       : (['shell', 'reverseShell'].includes(baseTip) ? 0.40
       : (baseTip === 'bead' ? 0.38
       : (baseTip === 'zigzag' ? 0.40
       : (baseTip === 'wavePiping' ? 0.40
-      : (['ropeTwist', 'ropeTwistClassic'].includes(baseTip) ? 0.40 : 0.26)))))))))));
+      : (['ropeTwist', 'ropeTwistClassic'].includes(baseTip) ? 0.40 : 0.26))))))));
   return Math.max(0.15, surfaceRadius - radialInset);
 
 }
@@ -366,6 +381,32 @@ export function buildOreoRimRing(radius, y, rand = Math.random, opts = {}) {
     group.add(cookie);
   }
   return group;
+}
+
+function buildBallRimRing(buildBall, radius, y, rand, opts) {
+  const count = opts.count ?? Math.max(10, Math.round((radius * Math.PI * 2) / 1.1));
+  const scale = opts.scale ?? 0.18;
+  const surfaceLift = 0.50 * scale;
+  const group = new THREE.Group();
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2;
+    const cx = Math.sin(angle) * radius;
+    const cz = Math.cos(angle) * radius;
+    const ball = buildBall(cx, y + surfaceLift, cz, scale);
+    ball.rotation.y = angle + rand() * Math.PI * 2;
+    group.add(ball);
+  }
+  return group;
+}
+
+/** Basketball Rim — complete textured basketballs lining the cake edge. */
+export function buildBasketballRimRing(radius, y, rand = Math.random, opts = {}) {
+  return buildBallRimRing(buildBasketballMesh, radius, y, rand, opts);
+}
+
+/** Soccer Ball Rim — complete paneled soccer balls lining the cake edge. */
+export function buildSoccerBallRimRing(radius, y, rand = Math.random, opts = {}) {
+  return buildBallRimRing(buildSoccerBallMesh, radius, y, rand, opts);
 }
 
 /**
