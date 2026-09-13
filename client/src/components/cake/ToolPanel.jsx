@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Cake, Palette, Sparkles, RotateCcw, Layers, Building2, Wand2, ChevronDown, ChevronUp, Eye, EyeOff, Bot } from 'lucide-react';
+import { Cake, Palette, Sparkles, RotateCcw, Layers, Building2, Wand2, ChevronDown, ChevronUp, Eye, EyeOff, Bot, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -54,17 +54,46 @@ export default function ToolPanel({
     surfaceTreatment: true,
   });
 
+  const isIndividual = config.structure?.layerDesign === 'individual' && config.structure?.layers > 1;
+  const activeExteriorStyle = isIndividual
+    ? (config.exteriorFinish?.layerStyles || [])[activeLayer]
+    : config.exteriorFinish?.style;
+
+  // Sponge Flavor AND Filling both stay locked shut until Exterior
+  // Finish's style is 'naked' — falls back to 'naked' (DEFAULT_CONFIG's
+  // own default) when nothing's been chosen yet, so both sections start
+  // open on a fresh cake rather than locked before the person has
+  // touched anything. Both sections share this same gate (rather than
+  // each getting its own flag) since the rule — and its Exterior Finish
+  // dependency — is identical for the two of them.
+  const effectiveExteriorStyle = activeExteriorStyle || 'naked';
+  const nakedGatedLocked = effectiveExteriorStyle !== 'naked';
+  const NAKED_GATED_SECTIONS = ['sponge', 'filling'];
+
   const toggleSection = (section) => {
+    // Sponge Flavor and Filling can't be toggled open (or closed, but
+    // they're already closed) while locked — Naked is the only Exterior
+    // Finish style that unlocks them, see nakedGatedLocked above.
+    if (NAKED_GATED_SECTIONS.includes(section) && nakedGatedLocked) return;
     setExpandedSections(prev => ({
       ...prev,
       [section]: !prev[section]
     }));
   };
 
-  const isIndividual = config.structure?.layerDesign === 'individual' && config.structure?.layers > 1;
-  const activeExteriorStyle = isIndividual
-    ? (config.exteriorFinish?.layerStyles || [])[activeLayer]
-    : config.exteriorFinish?.style;
+  // If Exterior Finish moves off Naked while Sponge Flavor and/or
+  // Filling happen to be open, force them closed rather than leaving
+  // stale expanded state that toggleSection's guard above would then
+  // refuse to ever open again from.
+  useEffect(() => {
+    if (nakedGatedLocked) {
+      setExpandedSections(prev => (
+        (prev.sponge || prev.filling)
+          ? { ...prev, sponge: false, filling: false }
+          : prev
+      ));
+    }
+  }, [nakedGatedLocked]);
 
   // The shared layer strip (extracted from what used to be duplicated
   // inline markup in Sponge/Filling/Exterior Finish) only actually
@@ -258,24 +287,40 @@ export default function ToolPanel({
 
                   <Separator className="opacity-50" />
 
-                  {/* 2. Sponge Flavor */}
+                  {/* 2. Sponge Flavor — locked shut (and locked from
+                      opening) until Exterior Finish's style is Naked, see
+                      nakedGatedLocked above. Trigger is a real disabled
+                      <button>, not just a styling change, so it can't be
+                      opened via keyboard/click while locked either. */}
                   <Collapsible
-                    open={expandedSections.sponge}
+                    open={expandedSections.sponge && !nakedGatedLocked}
                     onOpenChange={() => toggleSection('sponge')}
                   >
-                    <CollapsibleTrigger className="flex items-center justify-between w-full">
+                    <CollapsibleTrigger
+                      disabled={nakedGatedLocked}
+                      className={`flex items-center justify-between w-full ${
+                        nakedGatedLocked ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                    >
                       <div className="flex items-center gap-2">
                         <Cake className="w-4 h-4 text-primary/60" />
                         <span className="text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">
                           Sponge Flavor
                         </span>
                       </div>
-                      {expandedSections.sponge ? (
+                      {nakedGatedLocked ? (
+                        <Lock className="w-3.5 h-3.5 text-muted-foreground" />
+                      ) : expandedSections.sponge ? (
                         <ChevronUp className="w-4 h-4 text-muted-foreground" />
                       ) : (
                         <ChevronDown className="w-4 h-4 text-muted-foreground" />
                       )}
                     </CollapsibleTrigger>
+                    {nakedGatedLocked && (
+                      <p className="text-[10px] text-muted-foreground mt-1.5">
+                        Set Exterior Finish to Naked to unlock Sponge Flavor.
+                      </p>
+                    )}
                     <CollapsibleContent className="mt-3">
                       <SpongeFlavorSection
                         sponge={config.sponge || DEFAULT_CONFIG.sponge}
@@ -301,24 +346,38 @@ export default function ToolPanel({
 
                   <Separator className="opacity-50" />
 
-                  {/* 3. Filling */}
+                  {/* 3. Filling — locked shut (and locked from opening)
+                      until Exterior Finish's style is Naked, same
+                      nakedGatedLocked gate as Sponge Flavor above. */}
                   <Collapsible
-                    open={expandedSections.filling}
+                    open={expandedSections.filling && !nakedGatedLocked}
                     onOpenChange={() => toggleSection('filling')}
                   >
-                    <CollapsibleTrigger className="flex items-center justify-between w-full">
+                    <CollapsibleTrigger
+                      disabled={nakedGatedLocked}
+                      className={`flex items-center justify-between w-full ${
+                        nakedGatedLocked ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                    >
                       <div className="flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-primary/60" />
                         <span className="text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">
                           Filling
                         </span>
                       </div>
-                      {expandedSections.filling ? (
+                      {nakedGatedLocked ? (
+                        <Lock className="w-3.5 h-3.5 text-muted-foreground" />
+                      ) : expandedSections.filling ? (
                         <ChevronUp className="w-4 h-4 text-muted-foreground" />
                       ) : (
                         <ChevronDown className="w-4 h-4 text-muted-foreground" />
                       )}
                     </CollapsibleTrigger>
+                    {nakedGatedLocked && (
+                      <p className="text-[10px] text-muted-foreground mt-1.5">
+                        Set Exterior Finish to Naked to unlock Filling.
+                      </p>
+                    )}
                     <CollapsibleContent className="mt-3">
                       <FillingSection
                         filling={config.filling || DEFAULT_CONFIG.filling}
@@ -439,6 +498,8 @@ export default function ToolPanel({
                     onChange={(newCenter) => onChange({ ...config, center: newCenter })}
                     activeTool={activeTool}
                     onSelectTool={onSelectTool}
+                    placedItems={config.place?.items || []}
+                    onPlacedItemsChange={onPlaceChange}
                     sugarColor={config.sugarColorOverrides?.center || DEFAULT_CONFIG.sugarColor}
                     onSugarColorChange={(newSugarColor) => onChange({
                       ...config,

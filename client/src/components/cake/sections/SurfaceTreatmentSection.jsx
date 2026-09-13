@@ -52,10 +52,6 @@ export default function SurfaceTreatmentSection({ surfaceTreatment, onChange }) 
             </span>
           )}
         </button>
-        <p className="text-[10px] text-muted-foreground mt-1.5">
-          Optional — layers over whichever Exterior Finish style is
-          selected above (Naked, Fully Frosted, or Textured Buttercream).
-        </p>
       </div>
 
       {/* Pattern — how far the poured coat reaches down and how that reach

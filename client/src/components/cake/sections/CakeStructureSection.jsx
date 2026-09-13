@@ -46,7 +46,7 @@ export default function CakeStructureSection({ structure, realSize, onChange }) 
 
       {/* Cake Layers */}
       <div>
-        <span className="text-xs text-muted-foreground mb-2 block">Cake Layers</span>
+        <span className="text-xs text-muted-foreground mb-2 block">Cake Tiers</span>
         <div className="grid grid-cols-2 gap-2">
           {LAYER_OPTIONS.map((option) => (
             <button

@@ -469,7 +469,22 @@ export function getSharedOreoCremeMaterial() {
   return mat;
 }
 
-export function buildOreoMesh(x, y, z, scale = 0.20, rotX = 1.38, rotY = -0.20, rotZ = 0.08) {
+// Default stand: exactly 90° about X, no yaw (rotY) or roll (rotZ) --
+// a straight, upright cookie-on-edge. Previously defaulted to rotX=1.38
+// (~79°) plus a small rotY/rotZ lean, which read as "slightly tipped
+// over" rather than standing straight up.
+//
+// The 1.55*scale vertical lift below was tuned against that old ~79°
+// lean, not this exact 90° stand -- at a full 90° tilt the disc's lowest
+// rim point drops further below its own center than it did at the
+// shallower old angle (more of the disc's radius, rather than some of its
+// thickness, ends up facing straight down). It hasn't been recalculated
+// here since this fix is specifically about the rotation, not the resting
+// height -- if the standing Oreo now looks like it's sitting a little low
+// / embedded deeper than before, that constant is the next thing to
+// adjust, most likely upward from 1.55 toward something nearer the
+// wafer's own radius (2.25).
+export function buildOreoMesh(x, y, z, scale = 0.20, rotX = Math.PI / 2, rotY = 0, rotZ = 0) {
   const oreoGroup = new THREE.Group();
   const waferGeo = getSharedOreoWaferGeometry();
   const cremeGeo = getSharedOreoCremeGeometry();
@@ -498,5 +513,51 @@ export function buildOreoMesh(x, y, z, scale = 0.20, rotX = 1.38, rotY = -0.20, 
   oreoGroup.scale.set(scale, scale, scale);
   oreoGroup.rotation.set(rotX, rotY, rotZ);
   oreoGroup.position.set(x, y + 1.55 * scale, z);
+  return oreoGroup;
+}
+
+// Same three-mesh stack as buildOreoMesh (top wafer / creme / bottom wafer,
+// sharing the same cached geometry+materials so this doesn't cost any extra
+// GPU memory), but laid flat instead of stood on edge — for "lying around"
+// scatter layouts rather than the standing/leaning look.
+//
+// Cylinder geometry's axis already runs along Y, so leaving rotX/rotZ at 0
+// *is* "lying flat, face up" — no tilt needed. Only rotY (a per-item spin)
+// varies, so a field of them doesn't look copy-pasted.
+//
+// The vertical lift is different from buildOreoMesh's 1.55*scale on purpose:
+// that value accounts for how far a *tilted* disc's lowest edge drops below
+// its center. Flat, the group only needs to clear half the unscaled stack
+// height (0.35 wafer offset + 0.175 half-thickness = 0.525) so the bottom
+// face rests on the surface instead of sinking into it.
+export function buildOreoMeshFlat(x, y, z, scale = 0.20, spin = 0) {
+  const oreoGroup = new THREE.Group();
+  const waferGeo = getSharedOreoWaferGeometry();
+  const cremeGeo = getSharedOreoCremeGeometry();
+  const waferMat = getSharedOreoWaferMaterial();
+  const cremeMat = getSharedOreoCremeMaterial();
+
+  const topWafer = new THREE.Mesh(waferGeo, waferMat);
+  topWafer.position.set(0, 0.35, 0);
+  topWafer.castShadow = true;
+  topWafer.receiveShadow = true;
+  oreoGroup.add(topWafer);
+
+  const cremeMesh = new THREE.Mesh(cremeGeo, cremeMat);
+  cremeMesh.position.set(0, 0, 0);
+  cremeMesh.castShadow = true;
+  cremeMesh.receiveShadow = true;
+  oreoGroup.add(cremeMesh);
+
+  const bottomWafer = new THREE.Mesh(waferGeo, waferMat);
+  bottomWafer.position.set(0, -0.35, 0);
+  bottomWafer.rotation.x = Math.PI;
+  bottomWafer.castShadow = true;
+  bottomWafer.receiveShadow = true;
+  oreoGroup.add(bottomWafer);
+
+  oreoGroup.scale.set(scale, scale, scale);
+  oreoGroup.rotation.set(0, spin, 0);
+  oreoGroup.position.set(x, y + 0.525 * scale, z);
   return oreoGroup;
 }

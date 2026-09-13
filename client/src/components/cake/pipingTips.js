@@ -1753,6 +1753,27 @@ function buildLambethRingGeometry(ringRadius) {
   return mergeGeometries(geometries);
 }
 
+/**
+ * Continuous Star Dollop — the same star-dollop character as the
+ * instanced 'starDollop'/'starDollopSparse' tips, but as one unbroken
+ * wrapped strip with no gaps between dollops, rather than discrete
+ * instanced pieces with visible spacing.
+ */
+function buildContinuousStarDollopRingGeometry(ringRadius) {
+  const circumference = ringRadius * Math.PI * 2;
+  const dollopWaves = Math.max(24, Math.round(circumference / 0.22));
+  const curve = new WaveStripCurve(circumference, 0.05, dollopWaves);
+  const geo = sweepProfileAlongCurve(starProfilePoints(8, 0.09, 0.045), curve, {
+    segments: Math.max(200, dollopWaves * 5),
+    // Full-size at every dollop peak, pinched at every valley -- unlike
+    // Shell/Reverse Shell's gentle 0.8-1.0 taper, this dips close to 0 so
+    // each dollop still reads as its own rounded bump even while fused
+    // into one continuous strip.
+    taper: (t) => 0.15 + 0.85 * Math.pow(Math.abs(Math.sin(t * Math.PI * 2 * dollopWaves)), 0.6),
+  });
+  return wrapStripAroundRing(geo, ringRadius);
+}
+
 // ─── Instancing helper ────────────────────────────────────────────────────
 
 function instanceAroundRing(geometry, material, {

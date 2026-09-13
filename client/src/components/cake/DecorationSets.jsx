@@ -107,6 +107,33 @@ export function computeEdgeTrimY(topSurfaceY, radius, decorationType = 'piping',
   return topSurfaceY - (compactDepth + extraInset + finishDepth);
 }
 
+// Per-decoration-type radial inset from the finish-adjusted surface
+// radius, split by whether the trim sits at the top rim (tucked back,
+// positive inset) or the bottom (pushed proud of the wall, negative
+// inset — see the reasoning below computeEdgeTrimRadius' own comment).
+// One shared table now covers every Edge design instead of a single
+// generic vs. beadedTrim branch, since the newer Edge designs (Shell
+// Border's two variants, Bead Piping, Dollops, Zigzag, Wave Piping, the
+// two Rope Twist variants) each read at meaningfully different sizes —
+// Dollops in particular sits much further in (0.54) than anything else,
+// since its wide piped blobs need more clearance from the true edge than
+// a thin piped line does. Anything not listed here (plain 'piping',
+// star/round/leaf/petal/dropFlower/scallop/rope/lambeth, and any future
+// tip not yet given its own tuned figures) falls through to the existing
+// generic default, unchanged.
+const EDGE_TRIM_RADIAL_INSETS = {
+  beadedTrim: { top: 0.22, bottom: -0.10 },
+  dollops: { top: 0.54, bottom: -0.06 },
+  bead: { top: 0.38, bottom: -0.04 },
+  shell: { top: 0.40, bottom: -0.04 },
+  reverseShell: { top: 0.40, bottom: -0.04 },
+  zigzag: { top: 0.40, bottom: -0.04 },
+  wavePiping: { top: 0.40, bottom: -0.04 },
+  ropeTwist: { top: 0.40, bottom: -0.04 },
+  ropeTwistClassic: { top: 0.40, bottom: -0.04 },
+};
+const DEFAULT_EDGE_TRIM_RADIAL_INSET = { top: 0.26, bottom: -0.14 };
+
 export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', exteriorFinishStyle = 'fullyFrosted', isBottom = false) {
   // `edgeRadius` (topRadius/BASE_RADIUS in CakeScene.jsx) is the raw
   // sponge radius, identical for every finish — unlike topSurfaceY above,

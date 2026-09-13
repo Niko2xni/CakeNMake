@@ -1,23 +1,15 @@
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { 
-  PLACEABLE_DECORATIONS, 
-  SLOT_RINGS, 
-  TOP_SURFACE_SLOTS, 
+import {
+  PLACEABLE_DECORATIONS,
   SUGAR_COLORS,
-  getSlotById, 
-  computeSlotPosition 
+  getSlotById,
 } from '@/lib/cakeConfig';
-import { 
-  Sparkles, 
-  Trash2, 
-  Layers, 
-  CheckCircle2, 
-  PlusCircle, 
-  Info,
+import {
+  Trash2,
   MapPin,
   Undo2,
-  Redo2
+  Redo2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -40,26 +32,10 @@ export default function PlaceSection({
   canRedo = false,
   activeTool,
   onSelectTool,
-  topRadius = 4,
 }) {
   const items = Array.isArray(place?.items) ? place.items : [];
   const [selectedPattern, setSelectedPattern] = useState('shell');
   const [selectedColorId, setSelectedColorId] = useState('vanilla');
-
-  // Compute ring occupancy stats
-  const ringStats = SLOT_RINGS.map(ring => {
-    const totalSlots = ring.total;
-    const filledCount = items.filter(item => {
-      const slot = getSlotById(item.slotId);
-      return slot && slot.ring === ring.id;
-    }).length;
-    return {
-      ...ring,
-      filledCount,
-      isFull: filledCount >= totalSlots,
-      isEmpty: filledCount === 0,
-    };
-  });
 
   const handleItemSelect = (itemDef) => {
     if (activeTool === itemDef.id || (typeof activeTool === 'object' && activeTool?.type === itemDef.id)) {
@@ -107,48 +83,16 @@ export default function PlaceSection({
     onChange?.({ ...place, items: [] });
   };
 
-  const handleRemoveItem = (slotId) => {
-    const updated = items.filter(it => it.slotId !== slotId);
+  // Freeform items carry their own generated `id` (see handlePlace in
+  // DesignerWorkSpace.jsx). Older saved cakes may still have items placed
+  // the previous slot-grid way, which only ever had `slotId` -- falling
+  // back to that keeps removal working for those without needing a
+  // migration pass over existing saved designs.
+  const keyFor = (item, idx) => item.id || item.slotId || `item-${idx}`;
+
+  const handleRemoveItem = (key) => {
+    const updated = items.filter((it, idx) => keyFor(it, idx) !== key);
     onChange?.({ ...place, items: updated });
-  };
-
-  // Auto-fill an entire ring with the currently active decoration (or cherry by default)
-  const handleAutoFillRing = (ringId) => {
-    const itemType = typeof activeTool === 'object' ? activeTool?.type : (activeTool || 'cherry');
-    const ringSlots = TOP_SURFACE_SLOTS.filter(s => s.ring === ringId);
-
-    // Keep items from other rings, replace or fill items in target ring
-    const itemsInOtherRings = items.filter(it => {
-      const s = getSlotById(it.slotId);
-      return s && s.ring !== ringId;
-    });
-
-    const newRingItems = ringSlots.map(slot => {
-      const pos = computeSlotPosition(slot, topRadius);
-      return {
-        id: slot.id,
-        slotId: slot.id,
-        type: itemType,
-        position: { x: pos.x, y: 0, z: pos.z },
-        rotation: { x: 0, y: slot.angle, z: 0 },
-        flavor: selectedColorId,
-        pattern: selectedPattern,
-        colorId: selectedColorId,
-      };
-    });
-
-    onChange?.({
-      ...place,
-      items: [...itemsInOtherRings, ...newRingItems],
-    });
-  };
-
-  const handleClearRing = (ringId) => {
-    const remaining = items.filter(it => {
-      const s = getSlotById(it.slotId);
-      return s && s.ring !== ringId;
-    });
-    onChange?.({ ...place, items: remaining });
   };
 
   const activeItemKey = typeof activeTool === 'object' ? activeTool?.type : activeTool;
@@ -161,7 +105,7 @@ export default function PlaceSection({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 font-semibold text-foreground">
             <MapPin className="w-3.5 h-3.5 text-primary" />
-            <span>Top-Surface Predefined Slots</span>
+            <span>Place Decorations</span>
           </div>
           <div className="flex items-center gap-0.5">
             <Button
@@ -187,7 +131,7 @@ export default function PlaceSection({
           </div>
         </div>
         <p className="text-muted-foreground leading-relaxed">
-          Select a decoration below, then click any glowing circular slot on the cake to place it.
+          Select a decoration below, then click anywhere on the cake's top surface to place it. You can place items as close together as they'll physically fit — a spot that's too tight will just decline the drop.
         </p>
       </div>
 
@@ -293,92 +237,37 @@ export default function PlaceSection({
         </div>
       )}
 
-      <Separator />
-
-      {/* Ring Slot Layout & Quick Actions */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            2. Ring Slots & Quick Fill
-          </span>
-          {items.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleClearAll}
-              className="h-6 px-2 text-[11px] text-destructive hover:text-destructive hover:bg-destructive/10 gap-1"
-            >
-              <Trash2 className="w-3 h-3" />
-              Clear All ({items.length})
-            </Button>
-          )}
-        </div>
-
-        <div className="space-y-1.5">
-          {ringStats.map((ring) => {
-            return (
-              <div
-                key={ring.id}
-                className="flex items-center justify-between p-2 rounded-xl bg-card border border-border text-xs"
-              >
-                <div className="flex items-center gap-2">
-                  <span className={cn(
-                    'w-2 h-2 rounded-full',
-                    ring.isFull ? 'bg-green-500' : ring.filledCount > 0 ? 'bg-amber-500' : 'bg-muted-foreground/30'
-                  )} />
-                  <span className="font-medium">{ring.label}</span>
-                  <span className="text-muted-foreground text-[11px]">
-                    ({ring.filledCount}/{ring.total})
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleAutoFillRing(ring.id)}
-                    className="h-6 px-2 text-[10px] gap-1 hover:bg-primary hover:text-primary-foreground transition-colors"
-                    title={`Fill all ${ring.total} slots in ${ring.label} with ${activeItemDef?.label || 'Cherries'}`}
-                  >
-                    <PlusCircle className="w-2.5 h-2.5" />
-                    Fill Ring
-                  </Button>
-
-                  {ring.filledCount > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleClearRing(ring.id)}
-                      className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                      title={`Clear ${ring.label}`}
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
       {/* Currently Placed Items Summary List */}
       {items.length > 0 && (
         <>
           <Separator />
           <div className="space-y-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              3. Placed Items ({items.length})
-            </span>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                2. Placed Items ({items.length})
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearAll}
+                className="h-6 px-2 text-[11px] text-destructive hover:text-destructive hover:bg-destructive/10 gap-1"
+              >
+                <Trash2 className="w-3 h-3" />
+                Clear All
+              </Button>
+            </div>
             <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
               {items.map((item, idx) => {
                 const dec = PLACEABLE_DECORATIONS.find(d => d.id === item.type);
-                const slot = getSlotById(item.slotId);
-                const label = slot ? `${slot.ringLabel} #${slot.index + 1}` : `Item #${idx + 1}`;
+                // Legacy items placed the old slot-grid way still show which
+                // ring they landed in; freeform items just show the item name.
+                const slot = item.slotId ? getSlotById(item.slotId) : null;
+                const label = slot ? `${slot.ringLabel} #${slot.index + 1}` : `On cake`;
+                const key = keyFor(item, idx);
 
                 return (
                   <div
-                    key={item.slotId || idx}
+                    key={key}
                     className="flex items-center justify-between px-2.5 py-1.5 bg-muted/30 border border-border/50 rounded-lg text-xs"
                   >
                     <div className="flex items-center gap-2">
@@ -389,7 +278,7 @@ export default function PlaceSection({
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => handleRemoveItem(item.slotId)}
+                      onClick={() => handleRemoveItem(key)}
                       className="h-5 w-5 text-muted-foreground hover:text-destructive"
                     >
                       <Trash2 className="w-3 h-3" />

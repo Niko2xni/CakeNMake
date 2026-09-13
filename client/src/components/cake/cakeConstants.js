@@ -5,15 +5,36 @@ import * as THREE from 'three';
 // ---------------------------------------------------------------------------
 export const CAKE_SCALE = 2;
 
+// Real bakery dimensions per cake size, per tier. Tier 0 is always the
+// base/bottom tier; tier 1 (if present) is the smaller second tier
+// stacked on top for a 2-layer cake. 1 3D scene unit == 1 real inch for
+// radius/height throughout this file -- confirmed by REFERENCE_TOP_RADIUS
+// in CakeScene.jsx, which is tuned against tier 0 of 'big' (8x5)
+// specifically: BASE_RADIUS = diameter/2 = 4 units for an 8in cake.
 export const REAL_DIMENSIONS = {
-  small: { diameter: 6, height: 5 },
-  big: { diameter: 8, height: 5 }
+  small: {
+    tiers: [
+      { diameter: 6, height: 5 }, // 6x5 base tier
+      { diameter: 4, height: 4 }, // 4x4 second tier
+    ],
+  },
+  big: {
+    tiers: [
+      { diameter: 8, height: 5 }, // 8x5 base tier
+      { diameter: 6, height: 4 }, // 6x4 second tier
+    ],
+  },
 };
 
-export const getRenderDimensions = (cakeSize) => ({
-  diameter: REAL_DIMENSIONS[cakeSize].diameter,  // Big: 8 units, Small: 6 units
-  height: REAL_DIMENSIONS[cakeSize].height  // Each layer is 5 units tall (real height)
-});
+// tierIndex defaults to 0 (base tier), so the existing single-arg call
+// pattern (getRenderDimensions(cakeSize)) is unchanged. Out-of-range
+// tierIndex clamps to the last defined tier rather than throwing.
+export const getRenderDimensions = (cakeSize, tierIndex = 0) => {
+  const tiers = REAL_DIMENSIONS[cakeSize].tiers;
+  const clampedIndex = Math.max(0, Math.min(tierIndex, tiers.length - 1));
+  const tier = tiers[clampedIndex];
+  return { diameter: tier.diameter, height: tier.height };
+};
 
 export const FROSTING_COLORS = {
   vanilla: '#FFF8E7',
@@ -53,8 +74,15 @@ export const INTERIOR_PREVIEW_CLIP_PLANES = [
 
 // The six GLAZE_PATTERNS variants (see cakeConfig.js), expressed as
 // buildGlazeGeometry's `opts.carve` shape.
+//
+// longGaps ("Long Drips") is the one pattern deep enough (deepFrac: 1.0,
+// reaching the geometry's own local floor) that its longest fingers touch
+// the plate rather than stopping partway down the cake's side. CakeScene.jsx
+// also adds a separate flat puddle mesh (buildGlazePoolGeometry) around the
+// base whenever this pattern is selected, so the base reads as fully
+// covered regardless of which specific angles the fingers reach.
 export const GLAZE_PATTERN_CARVES = {
-  longGaps: { deepFrac: 0.95, shortFrac: 0.18, lobeSpacing: 1.0 },
+  longGaps: { deepFrac: 1.0, shortFrac: 0.18, lobeSpacing: 1.0 },
   longShortAlt: { cyclePattern: [0.95, 0.18, 0.55, 0.18], lobeSpacing: 1.0 },
   shortDrips: { deepFrac: 0.55, shortFrac: 0.18, lobeSpacing: 1.0 },
   longWave: { wave: true, baseFrac: 0.86, ampFrac: 0.05, lobeCount: 11 },

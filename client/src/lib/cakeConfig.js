@@ -153,8 +153,8 @@ export const DEFAULT_CONFIG = {
   // (genuine delete, not disable-preserve — see spec §4b): picking one
   // clears the other's stored value. `mode` tracks which is active.
   center: {
-    mode: null, // 'decorations' | 'text' | null
-    decorations: { setId: null, variation: 'outerRing', colorId: 'vanilla' },
+    mode: 'decorations', // 'decorations' | 'text' | null -- starts on Decorations, but with nothing armed (that's activeTool, separate state, starts null regardless)
+    decorations: { colorId: 'vanilla' },
     text: { top: '', middle: '', bottom: '', font: 'script' },
   },
 
@@ -243,8 +243,8 @@ export const SIZE_OPTIONS = [
 
 // Layer options
 export const LAYER_OPTIONS = [
-  { id: 1, label: '1 Layer' },
-  { id: 2, label: '2 Layers' },
+  { id: 1, label: '1 Tier' },
+  { id: 2, label: '2 Tiers' },
 ];
 
 // Filling layer options
@@ -445,6 +445,10 @@ export const SUGAR_COLORS = [
     id: 'watercolorPastel', label: 'Watercolor Pastel Mix', hex: '#EAD9EA', price: 100, implemented: false,
     swatchCss: 'linear-gradient(120deg, #F5A9C0 0%, #A6D8EA 35%, #FAEEDA 70%, #C7EAD8 100%)',
   },
+  {
+    id: 'redWhiteGradient', label: 'Red-White Gradient', hex: '#FF8080', price: 100, implemented: true,
+    swatchCss: 'linear-gradient(180deg, #FAFAFA 0%, #E2D2D4 20%, #D4A1A7 40%, #CD6974 60%, #C92E40 80%, #A01828 100%)', // evenly-stepped luminance (~L28-42 per 20%) so the wash reads as one continuous fade instead of a white->pink jump, a flat plateau, then pink->red jump
+  },
 ];
 
 // ─── Sugar Color modes — Fundamentals' "what does the coating look like" ──
@@ -540,35 +544,24 @@ export const TRIANGLE_PATTERN_SETS = [
   { id: 'parallelInner', label: 'Parallel Lines — Inner', price: 100 },
 ];
 
-// ─── Starter Set rosters (PLACEHOLDER CONTENT) ─────────────────────────────
-// These are NOT final designs — no actual named Sets beyond illustrative
-// examples ("Curtain," etc.) were ever specified. This is a minimal,
-// clearly-flagged starting roster so each SetPicker has something to
-// render and the data flow can be built/tested end-to-end. Real Set
-// geometry (see pipingTips.js for the level of care each one needs) is
-// follow-on content work, not part of this pass.
-
-export const CENTER_DECORATION_SETS = [
-  { id: 'floralCluster', label: 'Floral Rosette' },
-  { id: 'strawberry', label: 'Strawberry' },
-  { id: 'cherry', label: 'Cherry' },
-  { id: 'ferreroRocher', label: 'Ferrero Rocher' },
-  { id: 'hersheysKisses', label: "Hershey's Kisses" },
-  { id: 'oreo', label: 'Oreo' },
-  { id: 'chocolateBear', label: 'Chocolate Bear' },
-  { id: 'basketball', label: 'Basketball' },
-  { id: 'soccerball', label: 'Soccer Ball' },
-];
-
-export const SINGLE_ITEM_DECORATION_SETS = CENTER_DECORATION_SETS;
-
-export const CENTER_DECORATION_VARIATIONS = [
-  { id: 'fullFill', label: 'Full Surface Fill' },
-  { id: 'outerRing', label: 'Outer Ring' },
-  { id: 'single', label: 'Single Centerpiece' },
-  { id: 'crescent', label: 'Crescent Arc' },
-  { id: 'cluster', label: 'Offset Cluster' },
-  { id: 'diagonal', label: 'Diagonal Stripe' },
+// Click-and-drop palette for the Center tab: each entry is one physically
+// placeable item. Most designs only sit one way; Oreo has two (Standing,
+// Lying Flat), so it contributes two separate palette entries rather than
+// one design with a pose picker -- every entry here is a single click-to-arm
+// button, full stop. toolId is what gets armed via onSelectTool and is the
+// exact 'center-{designId}-{orientation}' format CakeScene.jsx's placedItems
+// loop parses back apart when rendering (see buildAndAddDecoration call
+// there) -- designId itself must never contain '-'.
+export const CENTER_PLACEABLE_DESIGNS = [
+  { designId: 'floralCluster', orientation: null, label: 'Floral Rosette', toolId: 'center-floralCluster-default' },
+  { designId: 'strawberry', orientation: null, label: 'Strawberry', toolId: 'center-strawberry-default' },
+  { designId: 'cherry', orientation: null, label: 'Cherry', toolId: 'center-cherry-default' },
+  { designId: 'ferreroRocher', orientation: null, label: 'Ferrero Rocher', toolId: 'center-ferreroRocher-default' },
+  { designId: 'hersheysKisses', orientation: null, label: "Hershey's Kiss", toolId: 'center-hersheysKisses-default' },
+  { designId: 'oreo', orientation: 'standing', label: 'Oreo', toolId: 'center-oreo-standing' },
+  { designId: 'chocolateBear', orientation: null, label: 'Chocolate Bear', toolId: 'center-chocolateBear-default' },
+  { designId: 'basketball', orientation: null, label: 'Basketball', toolId: 'center-basketball-default' },
+  { designId: 'soccerball', orientation: null, label: 'Soccer Ball', toolId: 'center-soccerball-default' },
 ];
 
 export const WHIPPED_CREAM_SOLID_VARIATIONS = [
@@ -594,6 +587,43 @@ export const WHIPPED_CREAM_VARIATIONS = [
   ...WHIPPED_CREAM_CHERRY_VARIATIONS,
   ...WHIPPED_CREAM_STRAWBERRY_VARIATIONS,
 ];
+// Buttercream Text: individual hardened-buttercream letters, placed one at
+// a time exactly like any other Center design above (same 'center-{id}-
+// default' toolId format, same click-to-arm flow, same freeform placement
+// + collision system in CakeScene.jsx). This is deliberately a *different*
+// feature from Piping Text (center.text's Top/Middle/Bottom fixed lines,
+// still built with TextGeometry curved to follow the dome) -- Piping Text
+// stays fast to type but confined to three curved lines; Buttercream Text
+// trades that speed for full freeform placement, letter by letter, mixed
+// in with any other decoration since it's on the same collision map.
+//
+// Uppercase and Lowercase are two separate, explicitly-labeled design
+// lists rather than one 'letter' set relying on the font's own glyph for
+// whichever case gets typed -- Pacifico (the script font these are built
+// with, see buildAndAddDecoration's letter branch in CakeScene.jsx) draws
+// some capitals as essentially the same shape as their lowercase form
+// (A, N, Z) while others are clearly distinct block capitals (B, D), so a
+// single set mixing both cases looked like a random jumble of
+// upper/lowercase rather than a deliberate choice. Splitting them lets the
+// person explicitly pick "the capital B" vs "the lowercase b" instead of
+// getting whatever the font happens to draw for a bare "B".
+//
+// designId is `letterUpper`/`letterLower` + the base letter (e.g.
+// 'letterUpperA', 'letterLowerA') -- never contains a '-', same
+// constraint as every other designId here. `char` is what's actually
+// passed into TextGeometry (see CakeScene.jsx), so it carries the real
+// case; `label` mirrors it for the button text.
+function makeLetterEntry(baseChar, isUpper) {
+  const designId = isUpper ? `letterUpper${baseChar}` : `letterLower${baseChar}`;
+  const char = isUpper ? baseChar : baseChar.toLowerCase();
+  return { designId, char, label: char, toolId: `center-${designId}-default` };
+}
+export const BUTTERCREAM_LETTERS_UPPER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((ch) => makeLetterEntry(ch, true));
+export const BUTTERCREAM_LETTERS_LOWER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((ch) => makeLetterEntry(ch, false));
+// Combined list -- convenient for lookups that don't care which case a
+// toolId belongs to (e.g. CenterSection.jsx resolving whatever's
+// currently armed back to its design entry for the preview/label).
+export const BUTTERCREAM_LETTERS = [...BUTTERCREAM_LETTERS_UPPER, ...BUTTERCREAM_LETTERS_LOWER];
 
 export const BRACELET_BEADS_VARIATIONS = [
   { id: 'beadedTrim', label: 'Beaded Trim' },
@@ -846,6 +876,23 @@ export const PLACEABLE_DECORATIONS = [
   { id: 'rosette', label: 'Rosette', emoji: '🌹', price: 5, description: 'Piped buttercream flower' },
   { id: 'piping', label: 'Piping Stamp', emoji: '🌀', price: 5, description: 'Decoratively piped swirl accent' },
 ];
+
+// Footprint radius (local cake-group units, 1 unit = 2 real inches) for each
+// Place-tab item — the freeform-placement analog of centerItemRadii/
+// DECORATION_SPACING in CakeScene.jsx. Used to reject a drop that would
+// overlap an already-placed item, instead of forcing every item onto one
+// of the old fixed TOP_SURFACE_SLOTS ring positions. This is the single
+// source of truth for these numbers — CakeScene.jsx (collision + ghost
+// preview) and PlaceSection.jsx (UI hints) both read from here rather than
+// keeping their own copies.
+export const PLACE_ITEM_RADII = {
+  cherry: 0.50,
+  strawberry: 0.62,
+  candle: 0.38,
+  chocolateChip: 0.30,
+  rosette: 0.75,
+  piping: 0.70,
+};
 
 export function getSlotById(slotId) {
   return TOP_SURFACE_SLOTS.find(s => s.id === slotId) || null;

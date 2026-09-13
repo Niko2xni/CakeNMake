@@ -20,6 +20,11 @@ function resolveColor(colorId) {
   return entry ? entry.hex : SUGAR_COLORS[0].hex; // fall back to vanilla
 }
 
+function resolveColorWithId(colorId) {
+  const entry = SUGAR_COLORS.find((c) => c.id === colorId);
+  return entry ? { hex: entry.hex, id: entry.id } : { hex: SUGAR_COLORS[0].hex, id: SUGAR_COLORS[0].id };
+}
+
 // Sugar Color's "colorOverride" mode is the only mode today that resolves
 // to a real hex — null means "no override," a meaningfully different state
 // from "some resolved color," unlike resolveColor() above (which always
@@ -63,6 +68,18 @@ export function adaptConfigToLegacy(newConfig) {
       return resolveColor(flavorId);
     }
     return resolveSugarColorHex(value?.mode || 'default', value?.colorId, value?.overrideColorId);
+  };
+
+  const resolveContextSugarColorWithId = (context, index = null, allowDefault = false) => {
+    const value = sugarColorOverrides[index === null ? context : `${context}-${index}`] || sugarColorOverrides[context];
+    console.log('Resolving sugar color with ID - context:', context, 'index:', index, 'value:', value);
+    if (allowDefault && value?.mode === 'default' && value.colorId) return resolveColorWithId(value.colorId);
+    if (value?.mode === 'colorOverride' && value?.colorId) {
+      const result = resolveColorWithId(value.colorId);
+      console.log('Resolved color override:', result);
+      return result;
+    }
+    return null;
   };
 
   // Map structure
@@ -133,12 +150,35 @@ export function adaptConfigToLegacy(newConfig) {
   // not just Fully Frosted alone.
   const regionsHidden = exteriorFinish.style === 'fullyFrosted' || exteriorFinish.style === 'texturedButtercream';
   const fillingPipingTip = (fillingEnabled && piping.tip && !regionsHidden) ? piping.tip : null;
-  const usesFlavorColor = piping.tip === 'mashedCircles' || piping.tip === 'mashedSwirls';
-  const fillingSugarColorHex = resolveContextSugarColor('filling');
+  const fillingSugarColorData = resolveContextSugarColorWithId('filling');
+  const fillingSugarColorHex = fillingSugarColorData?.hex || null;
+  const fillingSugarColorId = fillingSugarColorData?.id || null;
   const layerFillingSugarColors = Array.from({ length: layers }, (_, index) => resolveContextSugarColor('filling', index));
-  const fillingPipingColor = fillingSugarColorHex || (usesFlavorColor
-    ? resolveColor(fillingColor)
-    : resolveColor(piping.colorId));
+  // Mirrors layerSurfaceFrostingColorIds below for 'exterior' — the id
+  // half of layerFillingSugarColors, needed so CakeScene can look up
+  // pattern/gradient/metallic SUGAR_COLORS (Marble, Ombré, Rainbow Swirl,
+  // Gold Shimmer, Watercolor Pastel Mix, Red-White Gradient) instead of
+  // falling back to their flat hex — see fillingPipingColorId below.
+  const layerFillingSugarColorIds = Array.from({ length: layers }, (_, index) => resolveContextSugarColorWithId('filling', index)?.id || null);
+  // Piping color always follows the Filling Flavor's own Sugar Color —
+  // the override hex when Color Override is set, otherwise the flavor's
+  // natural color — for every Piping Design state, not just Mashed
+  // Circles/Mashed Swirls. It used to fall back to the independent,
+  // UI-unreachable piping.colorId (permanently 'vanilla') whenever tip
+  // wasn't one of those two, so picking a Default color for Mashed
+  // Circles/Swirls never carried over to the None state — this keeps all
+  // states in sync with a single source of truth.
+  const fillingPipingColor = fillingSugarColorHex || resolveColor(fillingColor);
+  // Id counterpart of fillingPipingColor, same reasoning as
+  // surfaceFrostingColorId for 'exterior' — getFrostingMaterial needs the
+  // SUGAR_COLORS id (not just its flat hex fallback) to build the actual
+  // pattern/gradient/metallic material for Marble/Ombré/Rainbow Swirl/Gold
+  // Shimmer/Watercolor Pastel Mix/Red-White Gradient; without it those six
+  // silently degrade to a flat swatch. In Default mode there's no override
+  // id, but fillingColor (the flavor id, e.g. 'chocolate') IS itself a
+  // valid SUGAR_COLORS id — see the flavor-mirror comment on SUGAR_COLORS
+  // in cakeConfig.js — so it doubles as the id here with no extra lookup.
+  const fillingPipingColorId = fillingSugarColorId || fillingColor || null;
 
   // Map exterior finish
   // Only apply frosting if a style has been selected
@@ -171,8 +211,11 @@ export function adaptConfigToLegacy(newConfig) {
   // exactly what CakeScene.jsx already reads for the frosting-color
   // blend — no renderer changes needed for this part of the move.
   const sugarColorMode = sugarColor.mode || 'default';
-  const surfaceFrostingColorHex = resolveContextSugarColor('exterior');
+  const sugarColorData = resolveContextSugarColorWithId('exterior');
+  const surfaceFrostingColorHex = sugarColorData?.hex || null;
+  const surfaceFrostingColorId = sugarColorData?.id || null;
   const layerSurfaceFrostingColors = Array.from({ length: layers }, (_, index) => resolveContextSugarColor('exterior', index));
+  const layerSurfaceFrostingColorIds = Array.from({ length: layers }, (_, index) => resolveContextSugarColorWithId('exterior', index)?.id || null);
   // Passed through separately (not yet read by CakeScene) so the person's
   // chosen color for a future Color Override variant isn't lost — same
   // "implemented: false but data-preserved" pattern as the unbuilt
@@ -208,8 +251,6 @@ export function adaptConfigToLegacy(newConfig) {
     : null;
   const surfaceTreatmentPattern = surfaceTreatment.pattern || 'longGaps';
 
-  const centerDecorationSetId = center.decorations?.setId || null;
-  const centerDecorationVariation = center.decorations?.variation || 'outerRing';
   const centerSugarColorHex = resolveContextSugarColor('center', null, true);
   const centerDecorationColor = centerSugarColorHex || resolveColor(center.decorations?.colorId);
   const rawTop = center.text?.top ?? '';
@@ -321,6 +362,8 @@ export function adaptConfigToLegacy(newConfig) {
     x: item.position?.x !== undefined ? item.position.x : (item.x || 0),
     z: item.position?.z !== undefined ? item.position.z : (item.z || 0),
     rotation: item.rotation?.y !== undefined ? item.rotation.y : (item.rotation || 0),
+    tiltX: item.tiltX || 0,
+    stackLevel: item.stackLevel || 1,
     flavor: item.flavor || 'vanilla',
     pattern: item.pattern || 'shell',
     colorId: item.colorId || 'vanilla',
@@ -351,7 +394,9 @@ export function adaptConfigToLegacy(newConfig) {
     fillingLayers,
     fillingPipingTip,
     fillingPipingColor,
+    fillingPipingColorId,
     layerFillingSugarColors,
+    layerFillingSugarColorIds,
     
     // Exterior finish style (needed for rendering logic)
     exteriorFinishStyle: exteriorFinish.style || 'fullyFrosted',
@@ -371,7 +416,9 @@ export function adaptConfigToLegacy(newConfig) {
     // sugarColorHex is passed through regardless so a future non-override
     // use of it isn't lost.
     surfaceFrostingColorHex,
+    surfaceFrostingColorId,
     layerSurfaceFrostingColors,
+    layerSurfaceFrostingColorIds,
     sugarColorMode,
     sugarColorHex,
 
@@ -385,8 +432,6 @@ export function adaptConfigToLegacy(newConfig) {
     surfaceTreatmentPattern,
 
     // Center
-    centerDecorationSetId,
-    centerDecorationVariation,
     centerDecorationColor,
     centerText,
     centerTextTop,

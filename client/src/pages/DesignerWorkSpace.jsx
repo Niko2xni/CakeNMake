@@ -10,7 +10,7 @@ import { Cake, Menu, X, Send, MessageCircle, Palette, Cloud, CloudOff, Loader2, 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { designApi } from '@/services/api';
-import { DEFAULT_CONFIG, TOP_SURFACE_SLOTS } from '@/lib/cakeConfig';
+import { DEFAULT_CONFIG } from '@/lib/cakeConfig';
 import { adaptConfigToLegacy, adaptConfigFromLegacy } from '@/lib/configAdapter';
 
 // Mirrors PricingPanel price logic
@@ -337,31 +337,28 @@ export default function DesignerWorkSpace() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handlePlaceUndo, handlePlaceRedo]);
 
-  // Footprint radii (in local cake-group units) for each placeable item type.
-  // Used to reject placements that would intersect an already-placed item.
-  // Scale: 1 unit = 2 real inches. Radii ~2.5× the old values.
-  const ITEM_RADIUS = {
-    cherry:        0.50,
-    strawberry:    0.62,
-    candle:        0.38,
-    chocolateChip: 0.30,
-    rosette:       0.75,
-    piping:        0.70,
-  };
-
   const handlePlace = useCallback((item) => {
-    // Only permit placement into predefined slots
-    if (!item?.slotId) return;
-
     setPlaceItems(prevItems => {
-      const alreadyInSlot = prevItems.find(it => it.slotId === item.slotId);
-      if (alreadyInSlot) {
-        return prevItems.map(it => 
-          it.slotId === item.slotId ? { ...it, ...item, id: it.id || item.slotId } : it
-        );
-      } else {
+      if (item?.slotId) {
+        // Slot-based placement (Place tab items, doodles): one item per
+        // slot, dropping into an already-occupied slot replaces it.
+        const alreadyInSlot = prevItems.find(it => it.slotId === item.slotId);
+        if (alreadyInSlot) {
+          return prevItems.map(it =>
+            it.slotId === item.slotId ? { ...it, ...item, id: it.id || item.slotId } : it
+          );
+        }
         return [...prevItems, { ...item, id: item.slotId }];
       }
+
+      // Freeform placement (Center tab's click-and-drop): there's no slot
+      // to key off of, so every drop needs its own generated id -- keying
+      // by item.slotId here would give every Center item the same
+      // (undefined) id, making the 2nd placement look like "already in
+      // slot undefined" and silently overwrite the 1st instead of adding
+      // alongside it.
+      const id = `${item.type || 'item'}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      return [...prevItems, { ...item, id }];
     });
   }, [setPlaceItems]);
 
@@ -498,6 +495,7 @@ export default function DesignerWorkSpace() {
             cakeConfig={adaptConfigToLegacy(config)}
             activeTool={activeTool}
             onPlace={handlePlace}
+            onSelectTool={setActiveTool}
           />
 
           <Button

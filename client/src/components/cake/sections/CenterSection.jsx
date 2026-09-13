@@ -1,9 +1,8 @@
 import React from 'react';
-import { CENTER_DECORATION_SETS, CENTER_DECORATION_VARIATIONS } from '@/lib/cakeConfig';
-import SetPicker from '../SetPicker';
+import { RotateCw, RotateCcw, ChevronUp, ChevronDown } from 'lucide-react';
+import { CENTER_PLACEABLE_DESIGNS, BUTTERCREAM_LETTERS, BUTTERCREAM_LETTERS_UPPER, BUTTERCREAM_LETTERS_LOWER } from '@/lib/cakeConfig';
+import DecorationPreview from './DecorationPreview';
 import SugarColorSection from './SugarColorSection';
-import { PREMADE_DOODLES } from '../sets/premadeDoodles';
-import { Grid, Circle, Dot, Moon, Sparkles, SlidersHorizontal } from 'lucide-react';
 
 const FONTS = [
   { id: 'script', label: 'Script' },
@@ -16,23 +15,138 @@ const TEXT_SLOT_CONFIGS = [
   { id: 'bottom', label: 'Bottom Line', maxLength: 18, placeholder: 'Sophia!' },
 ];
 
-const VARIATION_ICONS = {
-  fullFill: Grid,
-  outerRing: Circle,
-  single: Dot,
-  crescent: Moon,
-  cluster: Sparkles,
-  diagonal: SlidersHorizontal,
-};
+// A letter's toolId is 'center-letter{CHAR}-default' -- same format as any
+// other Center design, just distinguished by the 'letter' designId prefix
+// so Decorations' and Buttercream Text's own "placed"/"Clear All" counts
+// can each filter to their own items despite sharing one placedItems
+// bucket and one collision system.
+function isLetterToolType(type) {
+  return typeof type === 'string' && type.startsWith('center-letter');
+}
+
+// Shared by Decorations and Buttercream Text -- both arm a 'center-'
+// tool the same way (see armDecorationTool/armLetterTool below) and so
+// both get the exact same preview + spin/tilt controls for free. Kept as
+// one component instead of duplicated JSX so the two tabs can't drift out
+// of sync with each other.
+function ArmedItemControls({ armedDesign, armedRotation, armedTilt, setArmedRotation, setArmedTilt }) {
+  if (!armedDesign) return null;
+  return (
+    <>
+      <div>
+        <span className="text-xs text-muted-foreground mb-1.5 block">
+          Preview — this is what you're about to place
+        </span>
+        <DecorationPreview
+          designId={armedDesign.designId}
+          orientation={armedDesign.orientation}
+          rotationY={(armedRotation * Math.PI) / 180}
+          rotationX={(armedTilt * Math.PI) / 180}
+        />
+      </div>
+
+      <div className="rounded-xl bg-muted/60 px-3 py-2.5 space-y-3">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">Rotation (spin)</span>
+            <span className="text-xs font-semibold text-foreground">{Math.round(armedRotation)}°</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setArmedRotation(armedRotation - 15)}
+              title="Rotate left 15°"
+              className="w-7 h-7 shrink-0 rounded-full bg-muted text-foreground hover:bg-muted/80 flex items-center justify-center"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+            <input
+              type="range"
+              min={0}
+              max={360}
+              step={1}
+              value={armedRotation}
+              onChange={(e) => setArmedRotation(Number(e.target.value))}
+              className="flex-1 accent-primary"
+              aria-label="Rotation angle"
+            />
+            <button
+              type="button"
+              onClick={() => setArmedRotation(armedRotation + 15)}
+              title="Rotate right 15°"
+              className="w-7 h-7 shrink-0 rounded-full bg-muted text-foreground hover:bg-muted/80 flex items-center justify-center"
+            >
+              <RotateCw className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">Tilt (up/down)</span>
+            <span className="text-xs font-semibold text-foreground">{Math.round(armedTilt)}°</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setArmedTilt(armedTilt - 15)}
+              title="Tilt down 15°"
+              className="w-7 h-7 shrink-0 rounded-full bg-muted text-foreground hover:bg-muted/80 flex items-center justify-center"
+            >
+              <ChevronDown className="w-3.5 h-3.5" />
+            </button>
+            <input
+              type="range"
+              min={0}
+              max={360}
+              step={1}
+              value={armedTilt}
+              onChange={(e) => setArmedTilt(Number(e.target.value))}
+              className="flex-1 accent-primary"
+              aria-label="Tilt angle"
+            />
+            <button
+              type="button"
+              onClick={() => setArmedTilt(armedTilt + 15)}
+              title="Tilt up 15°"
+              className="w-7 h-7 shrink-0 rounded-full bg-muted text-foreground hover:bg-muted/80 flex items-center justify-center"
+            >
+              <ChevronUp className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        <p className="text-[10px] text-muted-foreground flex items-center gap-1 flex-wrap">
+          Tip: while a design is selected —
+          <kbd className="px-1.5 py-0.5 rounded bg-card border border-border/70 font-mono text-[10px]">←</kbd>
+          <kbd className="px-1.5 py-0.5 rounded bg-card border border-border/70 font-mono text-[10px]">→</kbd>
+          <span className="text-muted-foreground/70">or</span>
+          <kbd className="px-1.5 py-0.5 rounded bg-card border border-border/70 font-mono text-[10px]">A</kbd>
+          <kbd className="px-1.5 py-0.5 rounded bg-card border border-border/70 font-mono text-[10px]">D</kbd>
+          spin,
+          <kbd className="px-1.5 py-0.5 rounded bg-card border border-border/70 font-mono text-[10px]">↑</kbd>
+          <kbd className="px-1.5 py-0.5 rounded bg-card border border-border/70 font-mono text-[10px]">↓</kbd>
+          <span className="text-muted-foreground/70">or</span>
+          <kbd className="px-1.5 py-0.5 rounded bg-card border border-border/70 font-mono text-[10px]">W</kbd>
+          <kbd className="px-1.5 py-0.5 rounded bg-card border border-border/70 font-mono text-[10px]">S</kbd>
+          tilt
+        </p>
+      </div>
+    </>
+  );
+}
 
 // NOTE: single whole-top setting for now, not per-tier — see SurfaceSection
 // for the same caveat. Center's "reset on layer count change" rule (spec §2)
 // implies per-tier awareness eventually; not wired into this pass.
-export default function CenterSection({ center, onChange, activeTool, onSelectTool, sugarColor, onSugarColorChange }) {
-  const mode = center.mode; // 'decorations' | 'text' | 'doodles' | null
+export default function CenterSection({ center, onChange, activeTool, onSelectTool, placedItems = [], onPlacedItemsChange, sugarColor, onSugarColorChange }) {
+  const mode = center.mode; // 'decorations' | 'text' | null
+  const textCategory = center.textCategory || 'piping'; // 'piping' | 'buttercream' -- only meaningful when mode === 'text'
+  const letterCase = center.letterCase || 'upper'; // 'upper' | 'lower' -- only meaningful when textCategory === 'buttercream'
 
-  // Mutually exclusive — genuine delete, not disable-preserve (spec §4b).
-  // Switching tabs clears the other mode's stored value immediately.
+  // Mutually exclusive tabs -- switching just changes which editor shows
+  // and what's armed by default; it doesn't delete the other mode's stored
+  // value (center.text survives switching to Decorations and back).
   const switchToDecorations = () => {
     onSelectTool?.(null);
     onChange({ ...center, mode: 'decorations' });
@@ -43,40 +157,98 @@ export default function CenterSection({ center, onChange, activeTool, onSelectTo
     onChange({ ...center, mode: 'text' });
   };
 
-  // Doodle colorId is now a fixed placeholder, not a user choice — Sugar
-  // Color drives the actual rendered color instead (see addPremadeDoodle
-  // in CakeScene.jsx). Kept in the config/tool-id string purely because
-  // the click-to-place tool-id format ('doodle-{shape}-{color}') and the
-  // placedItems parsing that reads it back apart still expect three
-  // dash-separated parts — changing that shared format is out of scope
-  // here, so the color segment stays present but inert.
-  const DOODLE_COLOR_PLACEHOLDER = 'red';
-
-  const switchToDoodles = () => {
-    const config = center.doodleConfig || { shapeId: 'heart', colorId: DOODLE_COLOR_PLACEHOLDER };
-    onSelectTool?.(`doodle-${config.shapeId}-${config.colorId}`);
-    onChange({ ...center, mode: 'doodles', doodleConfig: config });
+  const setTextCategory = (category) => {
+    onSelectTool?.(null);
+    onChange({ ...center, mode: 'text', textCategory: category });
   };
 
-  const selectDecorationSet = (setId) => {
-    onChange({
-      ...center,
-      decorations: {
-        ...center.decorations,
-        setId,
-        variation: center.decorations?.variation || 'outerRing',
-      },
-    });
+  const setLetterCase = (caseId) => {
+    onSelectTool?.(null);
+    onChange({ ...center, letterCase: caseId });
   };
 
-  const selectVariation = (variation) => {
-    onChange({
-      ...center,
-      decorations: {
-        ...center.decorations,
-        variation,
-      },
-    });
+  // Click-to-arm: picking a palette item doesn't place anything by
+  // itself, it arms activeTool (shared with Place/Doodles) so the next
+  // click on the cake surface drops it there -- see CakeScene.jsx's
+  // tryPlace/evaluateCenterDrop for the actual boundary + collision
+  // enforcement ("exclusive space" is a placement rule, not a separate
+  // item list -- Center items live in the same placedItems array as
+  // Place-tab/doodle items, tagged with a 'center-' prefixed type).
+  // Buttercream Text letters are armed exactly the same way (see
+  // armLetterTool below) and use this same activeTool/armedDesign
+  // machinery, since a letter is just another 'center-' design as far as
+  // CakeScene.jsx's placement/collision code is concerned.
+  //
+  // activeTool is an object here ({ type, rotationY, rotationX }), not a
+  // bare string -- same shape already used elsewhere for rosette/piping
+  // tools -- so pending rotation (Sims-style, set before the actual drop)
+  // can travel with it. rotationY is yaw (spin left/right, around the
+  // vertical axis), rotationX is pitch (tilt up/down, around the
+  // horizontal axis) -- two independent axes. Re-arming a design always
+  // resets both to 0, same as picking a fresh item off a shelf.
+  const armedCenterType = activeTool && typeof activeTool === 'object' && activeTool.type?.startsWith('center-')
+    ? activeTool.type
+    : null;
+  const armedDesign = armedCenterType
+    ? (CENTER_PLACEABLE_DESIGNS.find((d) => d.toolId === armedCenterType)
+      || BUTTERCREAM_LETTERS.find((d) => d.toolId === armedCenterType))
+    : null;
+  const armedRotation = armedCenterType ? (activeTool.rotationY || 0) : 0;
+  const armedTilt = armedCenterType ? (activeTool.rotationX || 0) : 0;
+
+  const armDecorationTool = (toolId) => {
+    const isSameArmed = armedCenterType === toolId;
+    onSelectTool?.(isSameArmed ? null : { type: toolId, rotationY: 0, rotationX: 0 });
+    onChange({ ...center, mode: 'decorations' });
+  };
+
+  const armLetterTool = (toolId) => {
+    const isSameArmed = armedCenterType === toolId;
+    onSelectTool?.(isSameArmed ? null : { type: toolId, rotationY: 0, rotationX: 0 });
+    onChange({ ...center, mode: 'text', textCategory: 'buttercream' });
+  };
+
+  // Right-click deselect: only clears the armed tool (activeTool), same as
+  // clicking the already-armed button again would -- doesn't touch
+  // center.mode, so this never affects the Decorations/Text switcher
+  // itself, only whichever design is currently selected.
+  const deselectArmedTool = (e) => {
+    e.preventDefault();
+    if (armedCenterType) onSelectTool?.(null);
+  };
+
+  // Full 0-360deg range, not stepped -- the sliders below drive these
+  // directly with whatever value the person drags to.
+  const setArmedRotation = (degrees) => {
+    if (!armedCenterType) return;
+    const normalized = ((degrees % 360) + 360) % 360;
+    onSelectTool?.({ type: armedCenterType, rotationY: normalized, rotationX: armedTilt });
+  };
+
+  const setArmedTilt = (degrees) => {
+    if (!armedCenterType) return;
+    const normalized = ((degrees % 360) + 360) % 360;
+    onSelectTool?.({ type: armedCenterType, rotationY: armedRotation, rotationX: normalized });
+  };
+
+  // Decorations and Buttercream Text share one placedItems bucket (both
+  // are 'center-' tagged, both go through the same collision system in
+  // CakeScene.jsx) but get their own separate "N placed / Clear All" here
+  // -- clearing a typed word on the Buttercream Text tab shouldn't also
+  // wipe out a chocolate bear placed on the Decorations tab, and vice
+  // versa, even though under the hood they're neighbors in the same array
+  // and DO collide with each other on the cake.
+  const placedDecorationItems = placedItems.filter((item) => item.type && item.type.startsWith('center-') && !isLetterToolType(item.type));
+  const placedLetterItems = placedItems.filter((item) => isLetterToolType(item.type));
+
+  const clearDecorationItems = () => {
+    onSelectTool?.(null);
+    onPlacedItemsChange?.(placedItems.filter((item) => !(item.type && item.type.startsWith('center-') && !isLetterToolType(item.type))));
+  };
+
+  const clearLetterItems = () => {
+    onSelectTool?.(null);
+    onPlacedItemsChange?.(placedItems.filter((item) => !isLetterToolType(item.type)));
   };
 
   const updateTextSlot = (slot, value) => {
@@ -92,27 +264,15 @@ export default function CenterSection({ center, onChange, activeTool, onSelectTo
     });
   };
 
-  const updateText = (value) => {
-    updateTextSlot("middle", value);
-  };
-
   const updateFont = (font) => {
     onChange({ ...center, text: { ...center.text, font } });
   };
-
-  const updateDoodleShape = (shapeId) => {
-    const config = { ...center.doodleConfig, shapeId, colorId: DOODLE_COLOR_PLACEHOLDER };
-    onSelectTool?.(`doodle-${config.shapeId}-${config.colorId}`);
-    onChange({ ...center, doodleConfig: config });
-  };
-
-  const activeVariation = center.decorations?.variation || 'outerRing';
 
   return (
     <div className="space-y-4">
       <div>
         <span className="text-xs text-muted-foreground mb-2 block">
-          Decorations, Text, or Doodles — picking one clears the others.
+          Decorations or Text — picking one clears the other.
         </span>
         <div className="flex gap-1 bg-muted/40 rounded-xl p-1">
           <button
@@ -131,49 +291,203 @@ export default function CenterSection({ center, onChange, activeTool, onSelectTo
           >
             Text
           </button>
-          <button
-            onClick={switchToDoodles}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
-              mode === 'doodles' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Stickers
-          </button>
         </div>
       </div>
 
       {mode === 'decorations' && (
         <div className="space-y-4">
-          <div>
-            <span className="text-xs text-muted-foreground mb-2 block">1. Choose Decoration Item</span>
-            <SetPicker
-              sets={CENTER_DECORATION_SETS}
-              activeSetId={center.decorations?.setId}
-              onSelectSet={selectDecorationSet}
-              showColorPicker={false}
-            />
+          <span className="text-xs text-muted-foreground block">
+            Tap a design, then tap a spot on the cake's top to place it. Items can't be dropped past the edge treatment or on top of each other.
+          </span>
+
+          <ArmedItemControls
+            armedDesign={armedDesign}
+            armedRotation={armedRotation}
+            armedTilt={armedTilt}
+            setArmedRotation={setArmedRotation}
+            setArmedTilt={setArmedTilt}
+          />
+
+          {placedDecorationItems.length > 0 && (
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-xs text-muted-foreground">
+                {placedDecorationItems.length} placed
+              </span>
+              <button
+                type="button"
+                onClick={clearDecorationItems}
+                className="text-xs font-semibold text-destructive hover:underline"
+              >
+                Clear All
+              </button>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-2">
+            {CENTER_PLACEABLE_DESIGNS.map((design) => {
+              const isArmed = armedCenterType === design.toolId;
+              return (
+                <button
+                  key={design.toolId}
+                  type="button"
+                  onClick={() => armDecorationTool(design.toolId)}
+                  onContextMenu={deselectArmedTool}
+                  title={design.label}
+                  className={`flex flex-col items-center gap-1.5 rounded-xl p-3 text-center transition-all duration-200 border-2 ${
+                    isArmed
+                      ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-[1.02]'
+                      : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  <span className="text-xs font-semibold">{design.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {mode === 'text' && (
+        <div className="space-y-4">
+          <div className="flex gap-1 bg-muted/40 rounded-xl p-1">
+            <button
+              onClick={() => setTextCategory('piping')}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
+                textCategory === 'piping' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Piping Text
+            </button>
+            <button
+              onClick={() => setTextCategory('buttercream')}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
+                textCategory === 'buttercream' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Buttercream Text
+            </button>
           </div>
 
-          {center.decorations?.setId && (
-            <div className="space-y-2 pt-1 border-t border-border/40">
-              <span className="text-xs font-medium text-foreground block">2. Placement Variation</span>
-              <div className="grid grid-cols-2 gap-1.5">
-                {CENTER_DECORATION_VARIATIONS.map((v) => {
-                  const Icon = VARIATION_ICONS[v.id] || Circle;
-                  const isActive = activeVariation === v.id;
-                  return (
+          {textCategory === 'piping' && (
+            <div className="space-y-3">
+              <span className="text-xs text-muted-foreground block">
+                Fixed lines that follow the cake's curve automatically — fastest way to get a name or message on in one go.
+              </span>
+
+              {TEXT_SLOT_CONFIGS.map((slot) => {
+                const val = center.text?.[slot.id] !== undefined
+                  ? (center.text[slot.id] || '')
+                  : (slot.id === 'middle' ? (center.text?.value || '') : '');
+                return (
+                  <div key={slot.id}>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs font-medium text-foreground">{slot.label}</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {val.length}/{slot.maxLength}
+                      </span>
+                    </div>
+                    <input
+                      type="text"
+                      value={val}
+                      onChange={(e) => updateTextSlot(slot.id, e.target.value)}
+                      maxLength={slot.maxLength}
+                      placeholder={slot.placeholder}
+                      className="w-full px-3 py-1.5 rounded-xl bg-muted text-sm text-foreground placeholder:text-muted-foreground border-2 border-transparent focus:border-primary/40 outline-none"
+                    />
+                  </div>
+                );
+              })}
+
+              <div className="pt-1">
+                <span className="text-xs text-muted-foreground mb-1.5 block">Font</span>
+                <div className="flex gap-1">
+                  {FONTS.map((f) => (
                     <button
-                      key={v.id}
-                      type="button"
-                      onClick={() => selectVariation(v.id)}
-                      className={`flex items-center gap-2 p-2 rounded-xl text-xs font-semibold transition-all duration-150 text-left ${
-                        isActive
-                          ? 'bg-primary text-primary-foreground shadow-sm'
-                          : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground'
+                      key={f.id}
+                      onClick={() => updateFont(f.id)}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
+                        (center.text?.font || 'script') === f.id
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
                       }`}
                     >
-                      <Icon className="w-3.5 h-3.5 shrink-0" />
-                      <span className="truncate">{v.label}</span>
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Laid flat on the top surface for now — stick/candle-mounted text
+                is a future addition, not yet built.
+              </p>
+            </div>
+          )}
+
+          {textCategory === 'buttercream' && (
+            <div className="space-y-4">
+              <span className="text-xs text-muted-foreground block">
+                Tap a letter, then tap a spot on the cake to place it — one at a time, like any other decoration. Slower to spell out than Piping Text, but each letter can go anywhere and won't clip into other decorations.
+              </span>
+
+              <ArmedItemControls
+                armedDesign={armedDesign}
+                armedRotation={armedRotation}
+                armedTilt={armedTilt}
+                setArmedRotation={setArmedRotation}
+                setArmedTilt={setArmedTilt}
+              />
+
+              {placedLetterItems.length > 0 && (
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-xs text-muted-foreground">
+                    {placedLetterItems.length} placed
+                  </span>
+                  <button
+                    type="button"
+                    onClick={clearLetterItems}
+                    className="text-xs font-semibold text-destructive hover:underline"
+                  >
+                    Clear All
+                  </button>
+                </div>
+              )}
+
+              <div className="flex gap-1 bg-muted/40 rounded-xl p-1">
+                <button
+                  onClick={() => setLetterCase('upper')}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
+                    letterCase === 'upper' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Uppercase
+                </button>
+                <button
+                  onClick={() => setLetterCase('lower')}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
+                    letterCase === 'lower' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Lowercase
+                </button>
+              </div>
+
+              <div className="grid grid-cols-6 gap-1.5">
+                {(letterCase === 'upper' ? BUTTERCREAM_LETTERS_UPPER : BUTTERCREAM_LETTERS_LOWER).map((letter) => {
+                  const isArmed = armedCenterType === letter.toolId;
+                  return (
+                    <button
+                      key={letter.toolId}
+                      type="button"
+                      onClick={() => armLetterTool(letter.toolId)}
+                      onContextMenu={deselectArmedTool}
+                      title={letter.label}
+                      className={`aspect-square rounded-lg text-sm font-bold transition-all duration-150 border-2 ${
+                        isArmed
+                          ? 'bg-primary text-primary-foreground border-primary shadow-md scale-[1.05]'
+                          : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
+                      }`}
+                    >
+                      {letter.label}
                     </button>
                   );
                 })}
@@ -183,88 +497,11 @@ export default function CenterSection({ center, onChange, activeTool, onSelectTo
         </div>
       )}
 
-      {mode === 'text' && (
-        <div className="space-y-3">
-          {TEXT_SLOT_CONFIGS.map((slot) => {
-            const val = center.text?.[slot.id] !== undefined
-              ? (center.text[slot.id] || '')
-              : (slot.id === 'middle' ? (center.text?.value || '') : '');
-            return (
-              <div key={slot.id}>
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-xs font-medium text-foreground">{slot.label}</span>
-                  <span className="text-[10px] text-muted-foreground">
-                    {val.length}/{slot.maxLength}
-                  </span>
-                </div>
-                <input
-                  type="text"
-                  value={val}
-                  onChange={(e) => updateTextSlot(slot.id, e.target.value)}
-                  maxLength={slot.maxLength}
-                  placeholder={slot.placeholder}
-                  className="w-full px-3 py-1.5 rounded-xl bg-muted text-sm text-foreground placeholder:text-muted-foreground border-2 border-transparent focus:border-primary/40 outline-none"
-                />
-              </div>
-            );
-          })}
-
-          <div className="pt-1">
-            <span className="text-xs text-muted-foreground mb-1.5 block">Font</span>
-            <div className="flex gap-1">
-              {FONTS.map((f) => (
-                <button
-                  key={f.id}
-                  onClick={() => updateFont(f.id)}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
-                    (center.text?.font || 'script') === f.id
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <p className="text-[10px] text-muted-foreground">
-            Laid flat on the top surface for now — stick/candle-mounted text
-            is a future addition, not yet built.
-          </p>
-        </div>
-      )}
-
-      {mode === 'doodles' && (
-        <div className="space-y-4">
-          <div>
-            <span className="text-xs text-muted-foreground mb-2 block">Sticker Shape</span>
-            <div className="flex gap-1">
-              {PREMADE_DOODLES.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => updateDoodleShape(s.id)}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
-                    (center.doodleConfig?.shapeId || 'heart') === s.id
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  }`}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <p className="text-[10px] text-muted-foreground">
-            Click anywhere on the top of the cake to place your chosen sticker!
-          </p>
-        </div>
-      )}
-
       {!mode && (
         <p className="text-xs text-muted-foreground">Pick Decorations or Text above to get started.</p>
       )}
 
-      {mode && mode !== 'decorations' && (
+      {mode === 'text' && textCategory === 'piping' && (
         <SugarColorSection
           sugarColor={sugarColor}
           onChange={onSugarColorChange}

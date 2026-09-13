@@ -30,6 +30,18 @@ import { SUGAR_COLORS } from '@/lib/cakeConfig';
  * getting a "—" and the sets numbering from "1". Off by default so
  * Center/Edge/Side's existing numbering doesn't shift for every picker
  * just because one picker (Filling's Piping Design) wanted None counted.
+ *
+ * `shape` (default 'circle', opt-in per instance) is a purely visual
+ * switch — the None/Set selection logic above is identical either way.
+ * 'circle' is the original small round numbered-button row Center/Edge/
+ * Side rely on. 'box' renders the same options as the larger rounded-xl
+ * bordered cards Filling Flavor/Sponge Flavor/Exterior Finish's flavor
+ * grids use (grid-cols-2, shadow+scale on the active card), including
+ * the same badge-above-label layout — a small circle sits above the
+ * label the same way Filling Flavor's color swatch does, just filled
+ * with the set's `icon`/number instead of a flavor color, since a Piping
+ * Design has no color of its own. Used by Filling's Piping Design picker
+ * only, so it isn't a separate component to keep in sync with this one.
  */
 export default function SetPicker({
   sets,
@@ -43,8 +55,10 @@ export default function SetPicker({
   showColorPicker = true,
   numberFromNone = false,
   showNoneButton = true,
+  shape = 'circle',
 }) {
   const showColors = !!activeSetId && showColorPicker;
+  const isBox = shape === 'box';
 
   return (
     <div className="space-y-3">
@@ -52,22 +66,43 @@ export default function SetPicker({
         <span className="text-xs text-muted-foreground block">{label}</span>
       )}
 
-      <div className={`flex flex-wrap gap-2 ${disabled ? 'opacity-40' : ''}`}>
+      <div className={isBox
+        ? `grid grid-cols-2 gap-2 ${disabled ? 'opacity-40' : ''}`
+        : `flex flex-wrap gap-2 ${disabled ? 'opacity-40' : ''}`
+      }>
         {showNoneButton && (
           <button
             type="button"
             disabled={disabled}
             onClick={() => onSelectSet(null)}
             title="None"
-            className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
-              disabled ? 'cursor-not-allowed' : ''
-            } ${
-              !activeSetId
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
-            }`}
+            className={isBox
+              ? `flex flex-col items-center gap-1.5 rounded-xl p-3 text-xs font-semibold transition-all duration-200 border-2 ${
+                  disabled ? 'cursor-not-allowed' : ''
+                } ${
+                  !activeSetId
+                    ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-[1.02]'
+                    : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
+                }`
+              : `w-10 h-10 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
+                  disabled ? 'cursor-not-allowed' : ''
+                } ${
+                  !activeSetId
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
+                }`
+            }
           >
-            {numberFromNone ? 1 : '—'}
+            {isBox ? (
+              <>
+                <span className="w-8 h-8 rounded-full border-2 border-current/20 bg-current/5 flex items-center justify-center text-xs font-semibold">
+                  {numberFromNone ? 1 : '—'}
+                </span>
+                <span className="text-center leading-tight">None</span>
+              </>
+            ) : (
+              numberFromNone ? 1 : '—'
+            )}
           </button>
         )}
         {sets.map((set, i) => {
@@ -79,21 +114,39 @@ export default function SetPicker({
               disabled={disabled}
               onClick={() => onSelectSet(set.id)}
               title={set.label}
-              className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
-                disabled ? 'cursor-not-allowed' : ''
-              } ${
-                active
-                  ? 'bg-primary text-primary-foreground border-primary shadow-md'
-                  : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
-              }`}
+              className={isBox
+                ? `flex flex-col items-center gap-1.5 rounded-xl p-3 text-xs font-semibold transition-all duration-200 border-2 ${
+                    disabled ? 'cursor-not-allowed' : ''
+                  } ${
+                    active
+                      ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-[1.02]'
+                      : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
+                  }`
+                : `w-10 h-10 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
+                    disabled ? 'cursor-not-allowed' : ''
+                  } ${
+                    active
+                      ? 'bg-primary text-primary-foreground border-primary shadow-md'
+                      : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
+                  }`
+              }
             >
-              {set.icon ?? i + (numberFromNone ? 2 : 1)}
+              {isBox ? (
+                <>
+                  <span className="w-8 h-8 rounded-full border-2 border-current/20 bg-current/5 flex items-center justify-center text-xs font-semibold">
+                    {set.icon ?? i + (numberFromNone ? 2 : 1)}
+                  </span>
+                  <span className="text-center leading-tight">{set.label}</span>
+                </>
+              ) : (
+                set.icon ?? i + (numberFromNone ? 2 : 1)
+              )}
             </button>
           );
         })}
       </div>
 
-      {sets.find((s) => s.id === activeSetId) && (
+      {!isBox && sets.find((s) => s.id === activeSetId) && (
         <p className="text-[10px] text-muted-foreground -mt-1">
           {sets.find((s) => s.id === activeSetId).label}
         </p>

@@ -176,17 +176,6 @@ export default function ExteriorFinishSection({ exterior, structure, activeLayer
         </>
       )}
 
-      {/* Naked notice */}
-      {!showFrostingOptions && (
-        <div className="flex items-start gap-2 rounded-lg px-2.5 py-2 bg-muted/50 border border-border">
-          <div className="text-muted-foreground text-[10px] leading-tight">
-            <p className="font-semibold">No frosting options</p>
-            <p className="mt-0.5">
-              Naked cakes have no exterior frosting.
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

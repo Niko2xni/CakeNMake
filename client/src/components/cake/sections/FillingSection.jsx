@@ -10,11 +10,6 @@ export default function FillingSection({ filling, structure, exteriorFinish, int
   const isIndividual = structure.layerDesign === 'individual' && structure.layers > 1;
   const piping = filling.piping || DEFAULT_PIPING;
 
-  // Full Frosting covers the filling edge entirely, so piping is hidden.
-  // Either way, this only ever controls whether the picker below is *disabled*,
-  // never whether the person's chosen tip/color gets cleared — see updatePiping.
-  const pipingHidden = exteriorFinish?.style === 'fullyFrosted';
-
   const updateLayers = (layers) => {
     onChange({ 
       ...filling, 
@@ -40,26 +35,27 @@ export default function FillingSection({ filling, structure, exteriorFinish, int
     return filling.flavor || 'vanilla';
   };
 
-  // Clicking always sets the value, even while the picker is visually
-  // disabled — but the UI prevents clicks from reaching here while
-  // pipingHidden is true, so the stored value only ever changes on purpose.
   const updatePiping = (changes) => {
     onChange({ ...filling, piping: { ...piping, ...changes } });
   };
 
   return (
     <div className="space-y-4">
-      {/* Filling Layers Selection - includes "None" option */}
+      {/* Filling Layers Selection - includes "None" option. Same card
+          styling as Filling Flavor below (rounded-xl, border-2, p-3,
+          shadow-lg + scale on the active box) instead of the old thin
+          pill buttons — purely a visual match, the None/1/2/3 selection
+          logic in updateLayers is unchanged. */}
       <div>
         <span className="text-xs text-muted-foreground mb-2 block">Filling Layers</span>
-        <div className="flex gap-1">
+        <div className="grid grid-cols-4 gap-2">
           {/* None option */}
           <button
             onClick={() => updateLayers(0)}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
+            className={`flex flex-col items-center justify-center gap-1 rounded-xl p-3 text-xs font-semibold transition-all duration-200 border-2 ${
               !filling.enabled
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-[1.02]'
+                : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
             }`}
           >
             None
@@ -69,10 +65,10 @@ export default function FillingSection({ filling, structure, exteriorFinish, int
             <button
               key={option.id}
               onClick={() => updateLayers(option.id)}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
+              className={`flex flex-col items-center justify-center gap-1 rounded-xl p-3 text-xs font-semibold transition-all duration-200 border-2 ${
                 filling.enabled && filling.layers === option.id
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-[1.02]'
+                  : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
               }`}
             >
               {option.label}
@@ -87,44 +83,34 @@ export default function FillingSection({ filling, structure, exteriorFinish, int
           {/* Piping — how the exposed filling edge between layers is
               piped, using Filling's own design vocabulary (not Edge/Side's
               nozzle-tip list — see FILLING_PIPING_DESIGNS in cakeConfig.js).
-              Shown BEFORE Filling Flavor below: Mashed Circles/Mashed
-              Swirls are piped in the Filling Flavor's own color instead of
-              an independently-chosen Piping Color, so picking the design
-              first makes clear up front that flavor is about to double as
-              color — not just a leftover ordering.
+              Shown BEFORE Filling Flavor below: every design here is
+              piped in the Filling Flavor's own color rather than an
+              independently-chosen one (real buttercream piped from the
+              filling would naturally match it), so picking the design
+              first makes clear up front that flavor below sets the color
+              — no separate Piping Color to pick, so that prop is dropped
+              here entirely (see fillingPipingColor in configAdapter.js,
+              which now resolves the same way for every tip state,
+              including None — previously None alone fell back to an
+              independent, UI-unreachable colorId stuck on vanilla).
               numberFromNone: None reads as "1", Mashed Circles as "2",
               Mashed Swirls as "3" — opted in just for this picker (see
               SetPicker's docstring for why it's not the shared default).
-              Piping Color is suppressed for Mashed Circles AND Mashed
-              Swirls specifically: both designs are piped in the Filling
-              Flavor's own color (real buttercream piped from the filling
-              itself would naturally match it) rather than an
-              independently-chosen decorative color — see
-              fillingPipingColor/usesFlavorColor in configAdapter.js.
-              Disabled (not removed) when Full Frosting hides the filling
-              edge, so switching exterior styles to compare looks never
-              costs the person their piping choice. */}
+              No longer disabled based on Exterior Finish style — always
+              clickable regardless of Naked/Fully Frosted/Textured
+              Buttercream. */}
           <SetPicker
             label="Piping Design"
-            colorLabel="Piping Color"
             sets={FILLING_PIPING_DESIGNS}
             activeSetId={piping.tip}
             onSelectSet={(tip) => updatePiping({ tip })}
-            colorId={piping.colorId}
-            onSelectColor={(colorId) => updatePiping({ colorId })}
-            disabled={pipingHidden}
             numberFromNone
-            showColorPicker={piping.tip !== 'mashedCircles' && piping.tip !== 'mashedSwirls'}
+            showColorPicker={false}
+            shape="box"
           />
-          {(piping.tip === 'mashedCircles' || piping.tip === 'mashedSwirls') && !pipingHidden && (
+          {(piping.tip === 'mashedCircles' || piping.tip === 'mashedSwirls') && (
             <p className="text-[10px] text-muted-foreground -mt-2">
               Piped in your Filling Flavor's own color — {isIndividual ? `Layer ${activeLayer + 1}'s` : 'the'} flavor below sets the color, no separate pick needed.
-            </p>
-          )}
-          {pipingHidden && (
-            <p className="text-xs text-muted-foreground/80 -mt-2 flex items-start gap-1">
-              <span aria-hidden="true">⚠</span>
-              <span>Hidden because Full Frosting covers the filling edge. Your selection is kept — switch to Naked, or turn on Interior Preview, to see it again.</span>
             </p>
           )}
 

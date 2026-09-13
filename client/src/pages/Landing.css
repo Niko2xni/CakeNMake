@@ -1,17 +1,79 @@
-.landing-page { 
+/* Update Landing Page Wrapper */
+.landing-page {
   /* Pink Theme Palette */
-  --landing-cream: #fff0f3; 
-  --landing-cream-2: #ffe4e8; 
-  --landing-brown: #590d22; /* Replaced dark brown with deep dark rose */
-  --landing-soft: #a4133c; /* Replaced soft brown with medium berry pink */
-  --landing-pink: #ff4d6d; /* Primary bright pink */
-  --landing-pink-dark: #c9184a; /* Hover/Accent deep pink */
-  --landing-white: #ffffff; 
-  
-  background: var(--landing-cream); 
-  color: var(--landing-brown); 
-  font-family: 'DM Sans', sans-serif; 
-  overflow: hidden; 
+  --landing-cream: #fff0f3;
+  --landing-cream-2: #ffe4e8;
+  --landing-brown: #590d22;
+  --landing-soft: #a4133c;
+  --landing-pink: #ff4d6d;
+  --landing-pink-dark: #c9184a;
+  --landing-white: #ffffff;
+
+  background: var(--landing-cream);
+  color: var(--landing-brown);
+  font-family: 'DM Sans', sans-serif;
+  overflow-x: hidden; /* Changed from overflow: hidden to allow absolute Y animations */
+}
+
+/* --- Story Section Full-Width Glaze Setup --- */
+.story {
+  position: relative;
+  padding: 180px 0 130px;
+  overflow: visible; /* Changed from hidden so top drip animation is visible */
+}
+
+/* Full-Width Glaze Positioning */
+.full-width-glaze {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%; /* Changed from 100vw to prevent horizontal scrollbar offsets */
+  height: auto;
+  min-height: 220px;
+  z-index: 5;
+  pointer-events: none;
+
+  /* Initial off-screen position above viewport */
+  transform: translateY(-100%);
+  opacity: 0;
+}
+
+/* Triggered on Scroll */
+.full-width-glaze.is-dripping {
+  animation: fullWidthDrip 1.5s cubic-bezier(0.22, 1.25, 0.36, 1) forwards;
+}
+
+.full-width-glaze.is-retracting {
+  animation: fullWidthRetract 1s cubic-bezier(0.36, 0, 0.22, 1) forwards;
+}
+
+@keyframes fullWidthRetract {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+}
+
+@keyframes fullWidthDrip {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  65% {
+    transform: translateY(12px);
+    opacity: 1;
+  }
+  82% {
+    transform: translateY(-4px);
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .landing-page * { box-sizing: border-box; }
@@ -217,7 +279,7 @@
 .cta-title { position: relative; z-index: 2; max-width: 800px; margin: 23px auto 0; font-size: clamp(48px,6vw,78px); }
 .cta-card p { position: relative; z-index: 2; max-width: 520px; margin: 22px auto 0; color: rgba(255,255,255,.8); font-size: 15px; line-height: 1.7; }
 .cta-button { position: relative; z-index: 2; margin-top: 31px; padding: 17px 28px; }
-.cta-button svg { margin-left: 2px; } 
+.cta-button svg { margin-left: 2px; }
 footer { padding: 42px 0; background: var(--landing-brown); color: rgba(255,255,255,.7); }
 .footer-inner { display: flex; align-items: center; justify-content: space-between; gap: 30px; }
 .footer-brand { color: white; font-size: 25px; }
@@ -232,3 +294,120 @@ footer { padding: 42px 0; background: var(--landing-brown); color: rgba(255,255,
 @media (max-width: 760px) { .landing-container { width: min(calc(100% - 36px),1280px); }.landing-nav { padding: 18px 0; }.nav-inner { display: flex; justify-content: space-between; }.brand-name { font-size: 28px; }.brand-tagline { font-size: 9px; }.nav-links { position: absolute; top: 76px; right: 18px; left: 18px; display: none; flex-direction: column; align-items: stretch; gap: 8px; padding: 18px; border: 1px solid rgba(255,182,193,.4); border-radius: 20px; background: var(--landing-white); box-shadow: 0 18px 45px rgba(164,19,60,.12); }.nav-links.is-open { display: flex; }.nav-links a { padding: 10px; }.mobile-login { display: block; border-top: 1px solid rgba(255,182,193,.4); margin-top: 4px; padding-top: 18px !important; }.nav-cta { display: none; }.mobile-toggle { display: grid; place-items: center; padding: 8px; border: 0; background: transparent; color: var(--landing-brown); }.landing-hero { min-height: 780px; background-position: 68% center; background-image: linear-gradient(180deg, rgba(255,240,243,.94) 0%, rgba(255,240,243,.78) 45%, rgba(255,240,243,.16) 100%), var(--hero-image); }.hero-grid { padding-top: 125px; }.hero-title { font-size: clamp(54px,16vw,80px); }.hero-description { font-size: 15px; }.hero-actions { flex-direction: column; }.cake-area { min-height: 440px; margin-top: 20px; }.feature-bar { grid-template-columns: 1fr; border-radius: 24px; }.feature,.feature:nth-child(2) { border-right: 0; border-bottom: 1px solid rgba(255,182,193,.3); }.feature:last-child { border-bottom: 0; }.story { padding: 95px 0; }.story-grid { grid-template-columns: 1fr; }.story-copy { text-align: center; }.story-text { margin-right: auto; margin-left: auto; }.story-link { justify-content: center; }.story-visual { min-height: 350px; }.visual-card { min-height: 350px; }.process,.final-cta { padding: 90px 0; }.steps { grid-template-columns: 1fr; }.cta-card { padding: 70px 25px; }.footer-inner { flex-direction: column; text-align: center; }.footer-links { flex-wrap: wrap; justify-content: center; } }
 @keyframes gentle-float-small { 0%,100% { transform: scale(.83) translateY(0); } 50% { transform: scale(.83) translateY(-8px); } }
 @media (prefers-reduced-motion: reduce) { .cake-placeholder { animation: none; } }
+
+
+/* --- Frosting Glaze Drip Animation --- */
+
+.video-wrapper.drip-animated-target {
+  /* Apply the SVG clip path */
+  clip-path: url(#frosting-clip);
+
+  /* Initial state: Hidden off-screen above the wrapper */
+  transform: translateY(-100%);
+  opacity: 0;
+}
+
+/* Class added by Intersection Observer on Scroll */
+.frosting-drip-card.is-dripping .drip-animated-target {
+  /* Runs once for 1.3s and freezes in place with 'forwards' */
+  animation: dripGlazeDown 1.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes dripGlazeDown {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  65% {
+    /* Liquid overshoot: pulls slightly past its mark */
+    transform: translateY(14px);
+    opacity: 1;
+  }
+  82% {
+    /* Slight liquid bounce back */
+    transform: translateY(-4px);
+  }
+  100% {
+    /* Settles permanently at standard position */
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+
+/* --- Standalone Frosting Stage --- */
+
+.frosting-stage {
+  width: 100%;
+  max-width: 580px;
+  height: 420px;
+  position: relative;
+  border-radius: 36px;
+  background: linear-gradient(135deg, #ffe4e8 0%, #fff0f3 100%);
+  border: 1px solid rgba(255, 182, 193, 0.6);
+  box-shadow: 0 24px 60px rgba(164, 19, 60, 0.08);
+  overflow: hidden;
+}
+
+.frosting-canvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.standalone-frosting-drip {
+  width: 100%;
+  height: auto;
+  position: absolute;
+  top: 0;
+  left: 0;
+
+  /* Initial off-screen state */
+  transform: translateY(-100%);
+  opacity: 0;
+}
+
+/* Triggered via Intersection Observer */
+.frosting-stage.is-dripping .standalone-frosting-drip {
+  animation: dripGlazeDrop 1.4s cubic-bezier(0.25, 1.4, 0.45, 1) forwards;
+}
+
+@keyframes dripGlazeDrop {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  65% {
+    /* Liquid overshoot past the target height */
+    transform: translateY(18px);
+    opacity: 1;
+  }
+  82% {
+    /* Slight liquid recoil upwards */
+    transform: translateY(-6px);
+  }
+  100% {
+    /* Locks in place permanently */
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.frosting-label {
+  position: absolute;
+  bottom: 30px;
+  left: 30px;
+  display: flex;
+  flex-direction: column;
+}
+
+.frosting-label strong {
+  font-family: 'Playfair Display', serif;
+  font-size: 24px;
+  color: var(--landing-brown);
+}
+
+.frosting-label span {
+  font-size: 13px;
+  color: var(--landing-soft);
+}

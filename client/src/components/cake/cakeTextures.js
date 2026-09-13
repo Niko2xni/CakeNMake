@@ -276,3 +276,40 @@ export function buildTopTexture(colors, profile = {}) {
 
   return new THREE.CanvasTexture(canvas);
 }
+
+/**
+ * Build a vertical gradient texture from color stops
+ * @param {Array} colorStops - Array of {color: hex, position: 0-1} objects
+ * @param {number} width - Texture width (default 512)
+ * @param {number} height - Texture height (default 512)
+ * @returns {THREE.CanvasTexture}
+ */
+export function buildGradientTexture(colorStops, width = 512, height = 512) {
+  console.log('Building gradient texture with stops:', colorStops);
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+
+  // Sort color stops by position
+  const sortedStops = [...colorStops].sort((a, b) => a.position - b.position);
+  console.log('Sorted stops:', sortedStops);
+
+  // Create linear gradient from top to bottom
+  const gradient = ctx.createLinearGradient(0, 0, 0, height);
+  sortedStops.forEach(stop => {
+    gradient.addColorStop(stop.position, stop.color);
+  });
+
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, width, height);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.repeat.set(1, 1);
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  console.log('Gradient texture created successfully with improved settings');
+  return texture;
+}

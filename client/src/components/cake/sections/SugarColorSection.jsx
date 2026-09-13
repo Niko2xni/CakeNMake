@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Droplet } from 'lucide-react';
 import { SUGAR_COLOR_MODES, SUGAR_COLORS } from '@/lib/cakeConfig';
 
 // Sugar Color answers "what does the coating look like" — independent of
@@ -128,7 +128,17 @@ export default function SugarColorSection({
 
       {/* 2. Sugar Color Mode Switcher */}
       <div>
-        <span className="text-xs text-muted-foreground mb-2 block">Sugar Color</span>
+        {/* Icon + label, same treatment ToolPanel gives its own top-level
+            section titles (Cake for Sponge Flavor, Sparkles for Filling,
+            Palette for Exterior Finish, etc.) — Sugar Color is rendered
+            inline inside those sections rather than as its own Collapsible,
+            but it drives the coating color for all of them, so it gets the
+            same icon-plus-label treatment to read as an equally important
+            choice rather than a plain sub-label. */}
+        <span className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
+          <Droplet className="w-3.5 h-3.5 text-primary/60" />
+          Sugar Color
+        </span>
         <div className="grid grid-cols-2 gap-2">
           {SUGAR_COLOR_MODES.map((m) => {
             const active = mode === m.id;

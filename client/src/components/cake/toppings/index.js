@@ -5,9 +5,8 @@ export { buildStrawberryMesh, buildSlicedStrawberryMesh, getSharedStrawberryBody
 export { buildFloralRosetteMesh, getSharedFloralRosetteGeometry, getSharedFloralRosetteMaterial } from './floralRosette';
 export { buildFerreroRocherMesh, getSharedFerreroGeometry, getSharedFerreroMaterial, getSharedFerreroNormalTexture } from './ferreroRocher';
 export { buildHersheysKissMesh, getSharedHersheysKissGeometry, getSharedHersheysKissMaterial } from './hersheysKiss';
-export { buildOreoMesh, getSharedOreoTextures, getSharedOreoWaferGeometry, getSharedOreoCremeGeometry, getSharedOreoWaferMaterial, getSharedOreoCremeMaterial } from './oreo';
+export { buildOreoMesh, buildOreoMeshFlat, getSharedOreoTextures, getSharedOreoWaferGeometry, getSharedOreoCremeGeometry, getSharedOreoWaferMaterial, getSharedOreoCremeMaterial } from './oreo';
 export { buildChocolateBearMesh, getOrBuildChocolateBearGroup } from './chocolateBear';
 export { buildBasketballMesh, buildBasketballCollar, buildBasketballWhippedCreamDollop } from './basketball';
 export { buildSoccerBallMesh, getOrBuildSoccerPanelGeos } from './soccerBall';
 export { addPipingPattern } from './pipingPattern';
-

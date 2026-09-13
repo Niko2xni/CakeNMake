@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { GLAZE_PATTERN_CARVES } from './cakeConstants';
 
 /**
  * Builds a continuous frosting shell with soft, beveled edges at the top and
@@ -41,8 +40,26 @@ export function buildOrganicFrostingGeometry(radius, height, topDomeHeight = 0) 
   // Generate LatheGeometry (48 radial segments)
   const geo = new THREE.LatheGeometry(path.getPoints(8), 48);
 
-  // Apply subtle organic wobble to the outer vertices
+  // Fix UV coordinates for proper vertical gradient mapping
+  const uvAttribute = geo.attributes.uv;
   const posAttribute = geo.attributes.position;
+
+  // Calculate min and max Y values for normalization
+  let minY = Infinity, maxY = -Infinity;
+  for (let i = 0; i < posAttribute.count; i++) {
+    const y = posAttribute.getY(i);
+    minY = Math.min(minY, y);
+    maxY = Math.max(maxY, y);
+  }
+
+  // Remap V coordinates based on actual height (bottom = 0, top = 1)
+  for (let i = 0; i < uvAttribute.count; i++) {
+    const y = posAttribute.getY(i);
+    const normalizedY = (y - minY) / (maxY - minY);
+    uvAttribute.setY(i, normalizedY);
+  }
+
+  // Apply subtle organic wobble to the outer vertices
   const vertex = new THREE.Vector3();
 
   for (let i = 0; i < posAttribute.count; i++) {
@@ -108,12 +125,41 @@ export function computeRidgeCount(height, ridgeSpacing, minRidgeCount) {
 
 export function buildGlazeGeometry(radius, height, topDomeHeight, rand, opts = {}) {
   const {
-    coatThickness = 0.06,
+    // How far the glaze's OUTER (visible) surface puffs out past the
+    // frosting underneath — unchanged in meaning from before.
+    coatThickness = 0.16,
     ridgeProfileFn = null,
     capLift = 0.05,
     sideSamples = 48,
     ridgeHugStrength = 1,
     edgeFadeDist = 0.4,
+    // How much of that gap is actually solid glaze, measured in from the
+    // outer surface. Previously buildGlazeGeometry only ever built the
+    // outer surface (a single, zero-thickness lathed membrane): fine where
+    // it stays fully closed, but at every carved drip edge — the whole
+    // point of the Pattern picker — that membrane just stopped, with no
+    // cross-section at all, reading as paper-thin no matter how big
+    // coatThickness was. Defaults to HALF of coatThickness rather than the
+    // full gap — unlike the Textured Buttercream variants below (which are
+    // the cake's own frosting body, solid by construction), Glaze is a
+    // poured coat *on top of* another finish, so its drip edge should read
+    // as a thinner applied layer rather than matching the full puffed-out
+    // offset. Pass something closer to coatThickness if a future look
+    // wants the coat solid the whole way in to the frosting instead.
+    wallThickness = coatThickness / 2,
+    // Continues the deepest columns' own geometry outward/down to lie flat
+    // and reach the plate — a genuine extension of the same continuous
+    // surface, not a separate mesh, so a long finger reads as one
+    // unbroken pour: down the cake, then flat across the plate. Off by
+    // default (poolOuterRadius null). Only columns whose depth is within
+    // poolThreshold of the ring's deepest point get this extension
+    // (weighted smoothly in via poolWeight, a per-COLUMN value); shallower
+    // columns' extra rows just collapse back onto their existing
+    // endpoint, so nothing needs to be stitched by hand.
+    poolOuterRadius = null,
+    poolFloorY = 0,
+    poolThreshold = 0.85,
+    poolSamples = 14,
   } = opts;
 
   const bevelSize = 0.15;
@@ -178,7 +224,8 @@ export function buildGlazeGeometry(radius, height, topDomeHeight, rand, opts = {
   const angularSamplesPerCycle = 16;
   const segments = Math.max(96, Math.min(256, angularCycles * angularSamplesPerCycle));
 
-  const rowsPerColumn = topProfileLen + sideSamples;
+  const poolActive = poolOuterRadius != null;
+  const rowsPerColumn = topProfileLen + sideSamples + (poolActive ? poolSamples : 0);
   const positions = [];
   const uvs = [];
   const indices = [];
@@ -228,12 +275,31 @@ export function buildGlazeGeometry(radius, height, topDomeHeight, rand, opts = {
 
       positions.push(r * cosA, y, r * sinA);
       uvs.push(uCoord, (H - y) / H);
+
+      if (poolActive && s === sideSamples) {
+        // Picks up exactly where the hugged wall left off (r ≈ radius,
+        // y ≈ globalBottomY for a genuinely deep column) and continues
+        // outward/down toward the plate — the "then falls flat and hugs
+        // the plate" half of the same continuous pour.
+        const poolWeight = maxCarveFrac > 0
+          ? smoothstep(poolThreshold, 1, carveFrac / maxCarveFrac)
+          : 0;
+        for (let p = 1; p <= poolSamples; p++) {
+          const tp = smoothstep(0, 1, p / poolSamples);
+          const spread = poolWeight * tp;
+          const rp = r + (poolOuterRadius - r) * spread;
+          const yp = y + (poolFloorY - y) * spread;
+          positions.push(rp * cosA, yp, rp * sinA);
+          uvs.push(uCoord, (H - yp) / H);
+        }
+      }
     }
   }
 
+  const outerBase = 0;
   for (let i = 0; i < segments; i++) {
-    const col0 = i * rowsPerColumn;
-    const col1 = (i + 1) * rowsPerColumn;
+    const col0 = outerBase + i * rowsPerColumn;
+    const col1 = outerBase + (i + 1) * rowsPerColumn;
     for (let r = 0; r < rowsPerColumn - 1; r++) {
       const a = col0 + r;
       const b = col1 + r;
@@ -241,6 +307,208 @@ export function buildGlazeGeometry(radius, height, topDomeHeight, rand, opts = {
       const d = col1 + r + 1;
       indices.push(a, b, c);
       indices.push(b, d, c);
+    }
+  }
+
+  // --- Inner wall -----------------------------------------------------
+  // A second copy of the same lathed surface, pulled in by wallThickness
+  // and with no ridge-hugging (it sits flush against the frosting, where
+  // that surface texture wouldn't read through anyway). Same row/column
+  // layout as the outer wall so the two line up exactly at every angle,
+  // including each column's own carved bottom edge.
+  const innerRadiusOffset = Math.max(0, coatThickness - wallThickness);
+  const innerCapRadius = radius + innerRadiusOffset;
+  const outerToInnerScale = capRadius > 0 ? innerCapRadius / capRadius : 1;
+  const innerBase = positions.length / 3;
+
+  for (let i = 0; i <= segments; i++) {
+    const angle = (i / segments) * Math.PI * 2;
+    const cosA = Math.cos(angle);
+    const sinA = Math.sin(angle);
+    const uCoord = i / segments;
+
+    for (let j = 0; j < topProfileLen; j++) {
+      const p = topProfile[j];
+      const r = p.x * outerToInnerScale;
+      positions.push(r * cosA, p.y, r * sinA);
+      uvs.push(uCoord, (H - p.y) / H);
+    }
+
+    const carveFrac = carveYFracAt(angle);
+    const bottomY = A.y * (1 - carveFrac);
+
+    for (let s = 1; s <= sideSamples; s++) {
+      const t = s / sideSamples;
+      const yGlobal = A.y - (A.y - globalBottomY) * t;
+      const y = Math.max(yGlobal, bottomY);
+
+      const r = innerCapRadius;
+
+      positions.push(r * cosA, y, r * sinA);
+      uvs.push(uCoord, (H - y) / H);
+
+      if (poolActive && s === sideSamples) {
+        // Same continuation as the outer wall, converging to the SAME
+        // target (poolOuterRadius, poolFloorY) so the coat tapers to zero
+        // thickness right at the plate's edge too, same principle as the
+        // tip-hug convergence just above it.
+        const poolWeight = maxCarveFrac > 0
+          ? smoothstep(poolThreshold, 1, carveFrac / maxCarveFrac)
+          : 0;
+        for (let p = 1; p <= poolSamples; p++) {
+          const tp = smoothstep(0, 1, p / poolSamples);
+          const spread = poolWeight * tp;
+          const rp = r + (poolOuterRadius - r) * spread;
+          const yp = y + (poolFloorY - y) * spread;
+          positions.push(rp * cosA, yp, rp * sinA);
+          uvs.push(uCoord, (H - yp) / H);
+        }
+      }
+    }
+  }
+
+  // Reversed winding relative to the outer wall so the inner wall's
+  // normals face into the coat (toward the frosting) instead of out.
+  for (let i = 0; i < segments; i++) {
+    const col0 = innerBase + i * rowsPerColumn;
+    const col1 = innerBase + (i + 1) * rowsPerColumn;
+    for (let r = 0; r < rowsPerColumn - 1; r++) {
+      const a = col0 + r;
+      const b = col1 + r;
+      const c = col0 + r + 1;
+      const d = col1 + r + 1;
+      indices.push(a, c, b);
+      indices.push(b, c, d);
+    }
+  }
+
+  // --- Rim: stitch outer to inner along each column's carved bottom edge
+  // so the drip actually has a visible cross-section there instead of
+  // ending in a zero-thickness edge.
+  const lastRow = rowsPerColumn - 1;
+  for (let i = 0; i < segments; i++) {
+    const outerA = outerBase + i * rowsPerColumn + lastRow;
+    const outerB = outerBase + (i + 1) * rowsPerColumn + lastRow;
+    const innerA = innerBase + i * rowsPerColumn + lastRow;
+    const innerB = innerBase + (i + 1) * rowsPerColumn + lastRow;
+    indices.push(outerA, outerB, innerA);
+    indices.push(outerB, innerB, innerA);
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/**
+ * A flat body of glaze lying on the plate around the base of the cake —
+ * independent of buildGlazeGeometry's drip wall/carve entirely. Long
+ * Drips' own fingers are left exactly as buildGlazeGeometry already
+ * builds them (some touching the plate, some not, per the carve pattern);
+ * this is a second, separate mesh meant to sit right under/around them so
+ * the whole base reads as "the glaze spread out and covered the plate",
+ * regardless of which specific angles the drip fingers happen to reach.
+ *
+ * Built with the same TOP + BOTTOM dual-surface construction
+ * buildGlazeGeometry's own wall uses (outer/inner there), rather than a
+ * single one-sided sheet — a lone top surface has no actual cross-section
+ * to it, so even a very solid-looking `thickness` still read as a thin
+ * floating shell with nothing under it. The bottom surface sits flush at
+ * y=0 (resting directly on the plate) across the whole radius; the top
+ * holds at `thickness` for most of the disc, then feathers down to 0 by
+ * outerRadius — which is exactly where the flat bottom already is, so the
+ * two surfaces meet there on their own with no separate rim needed.
+ * `startFeatherFrac` controls how much of the radius is spent on that
+ * outer feather. The disc's own outer radius always matches `outerRadius`
+ * exactly — no independent organic variation of its own — since it's
+ * meant to sit precisely on the plate (see CakeScene.jsx's call site,
+ * which passes PLATE_RADIUS directly), not wander to a size/shape that
+ * doesn't actually correspond to the plate underneath it.
+ */
+export function buildGlazePoolGeometry(outerRadius, thickness = 0.05, rand = Math.random, opts = {}) {
+  const {
+    radialSamples = 28,
+    angularSegments = 128,
+    startFeatherFrac = 0.72,
+  } = opts;
+
+  const smoothstep = (edge0, edge1, t) => {
+    const x = Math.min(1, Math.max(0, (t - edge0) / (edge1 - edge0)));
+    return x * x * (3 - 2 * x);
+  };
+
+  const positions = [];
+  const uvs = [];
+  const indices = [];
+
+  const rowsPerColumn = radialSamples + 1;
+  const topBase = 0;
+
+  for (let i = 0; i <= angularSegments; i++) {
+    const angle = (i / angularSegments) * Math.PI * 2;
+    const cosA = Math.cos(angle);
+    const sinA = Math.sin(angle);
+    const uCoord = i / angularSegments;
+
+    for (let s = 0; s <= radialSamples; s++) {
+      const t = s / radialSamples;
+      const r = outerRadius * t;
+      const height = thickness * (1 - smoothstep(startFeatherFrac, 1, t));
+      positions.push(r * cosA, height, r * sinA);
+      uvs.push(uCoord, t);
+    }
+  }
+
+  for (let i = 0; i < angularSegments; i++) {
+    const col0 = topBase + i * rowsPerColumn;
+    const col1 = topBase + (i + 1) * rowsPerColumn;
+    for (let r = 0; r < rowsPerColumn - 1; r++) {
+      const a = col0 + r;
+      const b = col1 + r;
+      const c = col0 + r + 1;
+      const d = col1 + r + 1;
+      indices.push(a, b, c);
+      indices.push(b, d, c);
+    }
+  }
+
+  // --- Bottom surface ---------------------------------------------------
+  // Flush at y=0 across the whole radius (it's resting directly on the
+  // plate), using the SAME outerRadius as the top so the two surfaces'
+  // outer edges land on exactly the same (x, y, z) at t=1 — that's what
+  // closes the shape there with no visible seam or hollow rim.
+  const bottomBase = positions.length / 3;
+
+  for (let i = 0; i <= angularSegments; i++) {
+    const angle = (i / angularSegments) * Math.PI * 2;
+    const cosA = Math.cos(angle);
+    const sinA = Math.sin(angle);
+    const uCoord = i / angularSegments;
+
+    for (let s = 0; s <= radialSamples; s++) {
+      const t = s / radialSamples;
+      const r = outerRadius * t;
+      positions.push(r * cosA, 0, r * sinA);
+      uvs.push(uCoord, t);
+    }
+  }
+
+  // Reversed winding relative to the top surface, so its normals face
+  // downward (toward the plate) instead of up — same convention
+  // buildGlazeGeometry's inner wall uses relative to its outer wall.
+  for (let i = 0; i < angularSegments; i++) {
+    const col0 = bottomBase + i * rowsPerColumn;
+    const col1 = bottomBase + (i + 1) * rowsPerColumn;
+    for (let r = 0; r < rowsPerColumn - 1; r++) {
+      const a = col0 + r;
+      const b = col1 + r;
+      const c = col0 + r + 1;
+      const d = col1 + r + 1;
+      indices.push(a, c, b);
+      indices.push(b, c, d);
     }
   }
 
