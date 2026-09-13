@@ -453,20 +453,31 @@ export function buildFerreroRocherRimRing(radius, y, rand = Math.random, opts = 
 }
 
 /**
- * Oreo Rim — complete embossed sandwich cookies standing upright and tangent
- * to the cake edge. The lift compensates for buildOreoMesh's intentional
- * frosting embed so rim cookies rest directly on the supplied surface.
+ * Oreo Rim — complete embossed sandwich cookies standing tangent to the cake
+ * edge. Top cookies are sunk slightly into the frosting so they look planted
+ * rather than balanced above it. Bottom cookies rest on the board and lean
+ * radially inward so their upper edges meet the cake wall.
  */
 export function buildOreoRimRing(radius, y, rand = Math.random, opts = {}) {
   const count = opts.count ?? Math.max(10, Math.round((radius * Math.PI * 2) / 1.8));
   const scale = opts.scale ?? 0.3889;
-  const surfaceLift = 0.70 * scale;
+  const isBottom = opts.isBottom ?? false;
+  const inwardLean = isBottom ? 0.22 : 0;
+  const surfaceOffset = (isBottom ? -0.04 : -0.18) * scale;
   const group = new THREE.Group();
   for (let i = 0; i < count; i++) {
     const angle = (i / count) * Math.PI * 2;
     const cx = Math.sin(angle) * radius;
     const cz = Math.cos(angle) * radius;
-    const cookie = buildOreoMesh(cx, y + surfaceLift, cz, scale, Math.PI / 2, angle, 0);
+    const cookie = buildOreoMesh(
+      cx,
+      y + surfaceOffset,
+      cz,
+      scale,
+      Math.PI / 2 - inwardLean,
+      angle,
+      0
+    );
     cookie.rotation.z += (rand() - 0.5) * 0.08;
     group.add(cookie);
   }

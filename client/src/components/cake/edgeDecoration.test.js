@@ -1229,7 +1229,9 @@ describe('edge decoration placement', () => {
     const getContextSpy = vi
       .spyOn(HTMLCanvasElement.prototype, 'getContext')
       .mockReturnValue(canvasContext);
-    const oreoRing = buildOreoRimRing(3.84, 1.0, () => 0.5);
+    const oreoScale = 0.3889;
+    const oreoRing = buildOreoRimRing(3.84, 1.0, () => 0.5, { isBottom: false });
+    const bottomOreoRing = buildOreoRimRing(4.26, 0.0, () => 0.5, { isBottom: true });
     const basketballRing = buildBasketballRimRing(3.56, 1.0, () => 0.5);
     const soccerBallRing = buildSoccerBallRimRing(3.56, 1.0, () => 0.5);
     getContextSpy.mockRestore();
@@ -1240,6 +1242,16 @@ describe('edge decoration placement', () => {
       expect(cookie.isGroup).toBe(true);
       expect(cookie.children).toHaveLength(3);
       expect(cookie.children.every((part) => part.isMesh)).toBe(true);
+      expect(cookie.rotation.x).toBeCloseTo(Math.PI / 2, 3);
+      // buildOreoMesh normally grounds an upright cookie at y; the negative
+      // rim offset deliberately pushes its lower edge into the frosting.
+      expect(cookie.position.y - 1.55 * oreoScale).toBeLessThan(1.0);
+    });
+    expect(bottomOreoRing.children.length).toBeGreaterThanOrEqual(10);
+    bottomOreoRing.children.forEach((cookie) => {
+      expect(cookie.rotation.x).toBeCloseTo(Math.PI / 2 - 0.22, 3);
+      expect(cookie.rotation.x).toBeLessThan(Math.PI / 2);
+      expect(cookie.position.y).toBeCloseTo((1.55 - 0.04) * oreoScale, 3);
     });
     expect(basketballRing.isGroup).toBe(true);
     expect(basketballRing.children.length).toBeGreaterThanOrEqual(10);

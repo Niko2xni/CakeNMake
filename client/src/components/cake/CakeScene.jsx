@@ -1660,7 +1660,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           const trim = buildFerreroRocherRimRing(edgeTrimRadius, edgeTrimY, rand);
           group.add(trim);
         } else if (isOreoRim) {
-          const trim = buildOreoRimRing(edgeTrimRadius, edgeTrimY, rand);
+          const trim = buildOreoRimRing(edgeTrimRadius, edgeTrimY, rand, { isBottom });
           group.add(trim);
         } else if (isBasketballRim) {
           const trim = buildBasketballRimRing(edgeTrimRadius, edgeTrimY, rand);
