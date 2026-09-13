@@ -7,9 +7,9 @@ import { SUGAR_COLOR_MODES, SUGAR_COLORS } from '@/lib/cakeConfig';
 // does it taste like"). The picker is rendered contextually after an
 // eligible color-producing choice rather than as its own section.
 //
-// When Color Override is active, the chosen flavor (or flavor color) remains
-// selected and visible as the cake's chosen eating flavor, while the appearance
-// is tinted according to the selected Color Override.
+// Sugar Color is shown first. Flavor Color belongs to Default mode and is
+// hidden while Color Override is active; both selections remain stored so
+// switching modes restores the last color chosen for each mode.
 export default function SugarColorSection({
   sugarColor = {},
   exteriorFinish,
@@ -79,54 +79,7 @@ export default function SugarColorSection({
 
   return (
     <div className="space-y-4">
-      {/* 1. Flavor Color / Flavor Selection — always remains visible and selected */}
-      {showDefaultColorPicker && (
-        <div>
-          <span className="text-xs text-muted-foreground mb-2 block">Flavor Color</span>
-          <div className="grid grid-cols-2 gap-2">
-            {defaultColors.map((c) => {
-              const isActive = activeFlavorColorId === c.id;
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => updateFlavorColor(c.id)}
-                  title={c.label}
-                  className={`flex flex-col items-center gap-1.5 rounded-xl p-3 text-left transition-all duration-200 border-2 ${
-                    isActive
-                      ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-[1.02]'
-                      : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
-                  }`}
-                >
-                  <span className="w-8 h-8 rounded-full border-2 border-black/10" style={{ background: c.hex }} />
-                  <span className="text-xs font-semibold">{c.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {!showDefaultColorPicker && children && (
-        children
-      )}
-
-      {!showDefaultColorPicker && !children && flavorColor && (
-        <div>
-          <span className="text-xs text-muted-foreground mb-2 block">Flavor</span>
-          <div className="flex items-center gap-2">
-            <span
-              className="w-9 h-9 rounded-full border-2 border-black/10 shrink-0"
-              style={{ background: flavorColor.swatchCss || flavorColor.hex }}
-            />
-            <p className="text-[10px] text-muted-foreground">
-              From Frosting Flavor — {flavorColor.label}.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* 2. Sugar Color Mode Switcher */}
+      {/* 1. Sugar Color Mode Switcher */}
       <div>
         {/* Icon + label, same treatment ToolPanel gives its own top-level
             section titles (Cake for Sponge Flavor, Sparkles for Filling,
@@ -174,6 +127,51 @@ export default function SugarColorSection({
           })}
         </div>
       </div>
+
+      {/* 2. Flavor Color / Flavor Selection — available only in Default mode */}
+      {mode === 'default' && showDefaultColorPicker && (
+        <div>
+          <span className="text-xs text-muted-foreground mb-2 block">Flavor Color</span>
+          <div className="grid grid-cols-2 gap-2">
+            {defaultColors.map((c) => {
+              const isActive = activeFlavorColorId === c.id;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => updateFlavorColor(c.id)}
+                  title={c.label}
+                  className={`flex flex-col items-center gap-1.5 rounded-xl p-3 text-left transition-all duration-200 border-2 ${
+                    isActive
+                      ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-[1.02]'
+                      : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  <span className="w-8 h-8 rounded-full border-2 border-black/10" style={{ background: c.hex }} />
+                  <span className="text-xs font-semibold">{c.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {mode === 'default' && !showDefaultColorPicker && children}
+
+      {mode === 'default' && !showDefaultColorPicker && !children && flavorColor && (
+        <div>
+          <span className="text-xs text-muted-foreground mb-2 block">Flavor</span>
+          <div className="flex items-center gap-2">
+            <span
+              className="w-9 h-9 rounded-full border-2 border-black/10 shrink-0"
+              style={{ background: flavorColor.swatchCss || flavorColor.hex }}
+            />
+            <p className="text-[10px] text-muted-foreground">
+              From Frosting Flavor — {flavorColor.label}. Switch to Color Override to choose a different color.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* 3. Color Override Palette (when active) */}
       {usesColor && !colorOverrideDisabled && (
