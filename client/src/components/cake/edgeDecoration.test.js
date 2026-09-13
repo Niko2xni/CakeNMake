@@ -949,7 +949,7 @@ describe('edge decoration placement', () => {
     expect(ring8Cherry.children.slice(1).length).toBe(8);
   });
 
-  it('renders both solid and cherry sub-rows in EdgeSection under Whipped Cream', () => {
+  it('merges solid and cherry whipped cream designs into one six-option row', () => {
     render(
       React.createElement(EdgeSection, {
         edge: {
@@ -973,13 +973,24 @@ describe('edge decoration placement', () => {
     const wcWithin = within(wcContainer);
 
     expect(wcWithin.getByText('Solid')).toBeInTheDocument();
-    expect(wcWithin.getByText('Solid with Cherries 🍒')).toBeInTheDocument();
-    expect(screen.getByTitle('Whipped Cream Rosettes (Continuous ~20 pc)')).toBeInTheDocument();
-    expect(screen.getByTitle('Whipped Cream Rosettes (12 pc)')).toBeInTheDocument();
-    expect(screen.getByTitle('Sparse Whipped Cream Rosettes (8 pc)')).toBeInTheDocument();
-    expect(screen.getByTitle('Whipped Cream Rosettes with Cherry (Continuous ~20 pc)')).toBeInTheDocument();
-    expect(screen.getByTitle('Whipped Cream Rosettes with Cherry (12 pc)')).toBeInTheDocument();
-    expect(screen.getByTitle('Sparse Whipped Cream Rosettes with Cherry (8 pc)')).toBeInTheDocument();
+    expect(wcWithin.queryByText('Solid with Cherries 🍒')).not.toBeInTheDocument();
+    [
+      'Whipped Cream Rosettes (Continuous ~20 pc)',
+      'Whipped Cream Rosettes (12 pc)',
+      'Sparse Whipped Cream Rosettes (8 pc)',
+      'Whipped Cream Rosettes with Cherry (Continuous ~20 pc)',
+      'Whipped Cream Rosettes with Cherry (12 pc)',
+      'Sparse Whipped Cream Rosettes with Cherry (8 pc)',
+    ].forEach((title, index) => {
+      const button = wcWithin.getByTitle(title);
+      expect(button).toHaveTextContent(String(index + 1));
+      expect(button).toHaveClass('w-9', 'h-9', 'rounded-full');
+      if (index >= 3) {
+        expect(button).toHaveTextContent('🍒');
+      } else {
+        expect(button).not.toHaveTextContent('🍒');
+      }
+    });
   });
 
   it('generates fruit & confection rims with zero overhang and valid 3D groups', async () => {
@@ -1301,7 +1312,7 @@ describe('edge decoration placement', () => {
     expect(ring8Straw.children.slice(1).length).toBe(8);
   });
 
-  it('renders solid, cherry, and strawberry sub-rows in EdgeSection under Whipped Cream', () => {
+  it('does not expose strawberry options in the Whipped Cream section', () => {
     render(
       React.createElement(EdgeSection, {
         edge: {
@@ -1325,11 +1336,11 @@ describe('edge decoration placement', () => {
     const wcWithin = within(wcContainer);
 
     expect(wcWithin.getByText('Solid')).toBeInTheDocument();
-    expect(wcWithin.getByText('Solid with Cherries 🍒')).toBeInTheDocument();
-    expect(wcWithin.getByText('Solid with Strawberries 🍓')).toBeInTheDocument();
-    expect(screen.getByTitle('Whipped Cream Rosettes with Strawberry (Continuous ~20 pc)')).toBeInTheDocument();
-    expect(screen.getByTitle('Whipped Cream Rosettes with Strawberry (12 pc)')).toBeInTheDocument();
-    expect(screen.getByTitle('Sparse Whipped Cream Rosettes with Strawberry (8 pc)')).toBeInTheDocument();
+    expect(wcWithin.queryByText('Solid with Cherries 🍒')).not.toBeInTheDocument();
+    expect(wcWithin.queryByText('Solid with Strawberries 🍓')).not.toBeInTheDocument();
+    expect(wcWithin.queryByTitle('Whipped Cream Rosettes with Strawberry (Continuous ~20 pc)')).not.toBeInTheDocument();
+    expect(wcWithin.queryByTitle('Whipped Cream Rosettes with Strawberry (12 pc)')).not.toBeInTheDocument();
+    expect(wcWithin.queryByTitle('Sparse Whipped Cream Rosettes with Strawberry (8 pc)')).not.toBeInTheDocument();
   });
 });
 

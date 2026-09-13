@@ -13,7 +13,6 @@ import {
   DOLLOPS_ALTERNATING_STRAWBERRY_VARIATIONS,
   WHIPPED_CREAM_SOLID_VARIATIONS,
   WHIPPED_CREAM_CHERRY_VARIATIONS,
-  WHIPPED_CREAM_STRAWBERRY_VARIATIONS,
   STANDALONE_EDGE_PIPING_OPTIONS,
   PIPING_TIPS,
   SUGAR_COLORS,
@@ -368,41 +367,13 @@ export default function EdgeSection({
                   Solid
                 </span>
                 <div className="flex flex-wrap gap-2">
-                  {WHIPPED_CREAM_SOLID_VARIATIONS.map((variant, i) => {
+                  {[
+                    ...WHIPPED_CREAM_SOLID_VARIATIONS,
+                    ...WHIPPED_CREAM_CHERRY_VARIATIONS,
+                  ].map((variant, i) => {
                     const active =
                       (currentSlot.piping?.tip || currentSlot.decorations?.setId) === variant.id;
-                    return (
-                      <button
-                        key={variant.id}
-                        type="button"
-                        onClick={() =>
-                          updateSlot({
-                            decorations: { ...currentSlot.decorations, setId: null },
-                            piping: { ...currentSlot.piping, tip: active ? null : variant.id },
-                          })
-                        }
-                        title={variant.label}
-                        className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
-                          active
-                            ? 'bg-primary text-primary-foreground border-primary shadow-md'
-                            : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
-                        }`}
-                      >
-                        {i + 1}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <span className="text-[11px] font-medium text-muted-foreground mb-1 block">
-                  Solid with Cherries 🍒
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  {WHIPPED_CREAM_CHERRY_VARIATIONS.map((variant, i) => {
-                    const active =
-                      (currentSlot.piping?.tip || currentSlot.decorations?.setId) === variant.id;
+                    const hasCherry = i >= WHIPPED_CREAM_SOLID_VARIATIONS.length;
                     return (
                       <button
                         key={variant.id}
@@ -421,44 +392,11 @@ export default function EdgeSection({
                         }`}
                       >
                         <span>{i + 1}</span>
-                        <span className="absolute -top-1 -right-1 text-[10px] leading-none pointer-events-none">
-                          🍒
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <span className="text-[11px] font-medium text-muted-foreground mb-1 block">
-                  Solid with Strawberries 🍓
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  {WHIPPED_CREAM_STRAWBERRY_VARIATIONS.map((variant, i) => {
-                    const active =
-                      (currentSlot.piping?.tip || currentSlot.decorations?.setId) === variant.id;
-                    return (
-                      <button
-                        key={variant.id}
-                        type="button"
-                        onClick={() =>
-                          updateSlot({
-                            decorations: { ...currentSlot.decorations, setId: null },
-                            piping: { ...currentSlot.piping, tip: active ? null : variant.id },
-                          })
-                        }
-                        title={variant.label}
-                        className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 relative ${
-                          active
-                            ? 'bg-primary text-primary-foreground border-primary shadow-md'
-                            : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
-                        }`}
-                      >
-                        <span>{i + 1}</span>
-                        <span className="absolute -top-1 -right-1 text-[10px] leading-none pointer-events-none">
-                          🍓
-                        </span>
+                        {hasCherry && (
+                          <span className="absolute -top-1 -right-1 text-[10px] leading-none pointer-events-none">
+                            🍒
+                          </span>
+                        )}
                       </button>
                     );
                   })}
