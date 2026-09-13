@@ -2125,7 +2125,8 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
     case 'kissDollop': {
       const count = Math.max(12, Math.round((radius * Math.PI * 2) / (0.3644 * scale)));
       const dScale = scale * 0.4775;
-      return instanceAroundRing(getUnitGeometry('kissDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale });
+      const mesh = instanceAroundRing(getUnitGeometry('kissDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale });
+      return maybeAddCherries(mesh, count, dScale, null, 0.48, 0.70, { step: 2, cherryScale: 0.80, maxLeanRad: 0.18 });
     }
     case 'kissDollopAlt': {
       const count = Math.max(12, Math.round((radius * Math.PI * 2) / (0.3644 * scale)));
@@ -2135,7 +2136,8 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
     case 'kissDollopMedium': {
       const count = Math.max(6, Math.round((radius * Math.PI * 2) / (0.5760 * scale)));
       const dScale = scale * 0.60;
-      return instanceAroundRing(getUnitGeometry('kissDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale });
+      const mesh = instanceAroundRing(getUnitGeometry('kissDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale });
+      return maybeAddCherries(mesh, count, dScale, null, 0.50, 0.70, { cherryScale: 0.85, maxLeanRad: 0.18 });
     }
     case 'kissDollopMediumAlt': {
       const count = Math.max(6, Math.round((radius * Math.PI * 2) / (0.5760 * scale)));
@@ -2146,7 +2148,8 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
       const count = Math.max(4, Math.round((radius * Math.PI * 2) / (0.8482 * scale)));
       const dScale = scale * 0.64;
       const dScaleY = scale * 0.60;
-      return instanceAroundRing(getUnitGeometry('kissDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale, scaleY: dScaleY });
+      const mesh = instanceAroundRing(getUnitGeometry('kissDollop'), material, { ringRadius: radius, y, count, rand, scale: dScale, scaleY: dScaleY });
+      return maybeAddCherries(mesh, count, dScale, dScaleY, 0.54, 0.70, { cherryScale: 0.90, maxLeanRad: 0.18 });
     }
     case 'kissDollopSparseAlt': {
       const count = Math.max(4, Math.round((radius * Math.PI * 2) / (0.8482 * scale)));

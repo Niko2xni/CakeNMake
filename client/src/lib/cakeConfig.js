@@ -671,6 +671,9 @@ export const DOLLOPS_SOLID_CHERRY_VARIATIONS = [
   { id: 'roundDollopCherry', label: 'Continuous Round Tip Dollop (20 pc) with Cherry' },
   { id: 'roundDollopMediumCherry', label: 'Round Tip Dollop (12 pc) with Cherry' },
   { id: 'roundDollopSparseCherry', label: 'Sparse Round Tip Dollop (8 pc) with Cherry' },
+  { id: 'kissDollopCherry', label: 'Continuous Kisses Dollop (20 pc) with Cherry' },
+  { id: 'kissDollopMediumCherry', label: 'Kisses Dollop (12 pc) with Cherry' },
+  { id: 'kissDollopSparseCherry', label: 'Sparse Kisses Dollop (8 pc) with Cherry' },
 ];
 
 export const DOLLOPS_SOLID_STRAWBERRY_VARIATIONS = [

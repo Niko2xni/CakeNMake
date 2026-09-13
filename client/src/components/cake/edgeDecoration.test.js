@@ -104,7 +104,9 @@ describe('edge decoration placement', () => {
     expect(screen.getByTitle('Beaded Trim')).toBeInTheDocument();
     expect(screen.getByTitle('Trio Beaded Trim')).toBeInTheDocument();
     expect(screen.getByTitle('Petite Beaded Trim')).toBeInTheDocument();
-    expect(screen.getByText('Dollops')).toBeInTheDocument();
+    expect(screen.getByText('Star Dollop')).toBeInTheDocument();
+    expect(screen.getByText('Round Tip Dollop')).toBeInTheDocument();
+    expect(screen.getByText('Kiss-shaped Dollop')).toBeInTheDocument();
     expect(screen.getByTitle('Continuous Star Dollop (20 pc)')).toBeInTheDocument();
     expect(screen.getByTitle('Star Dollop (12 pc)')).toBeInTheDocument();
     expect(screen.getByTitle('Sparse Star Dollop (8 pc)')).toBeInTheDocument();
@@ -114,6 +116,9 @@ describe('edge decoration placement', () => {
     expect(screen.getByTitle('Continuous Kisses Dollop (20 pc)')).toBeInTheDocument();
     expect(screen.getByTitle('Kisses Dollop (12 pc)')).toBeInTheDocument();
     expect(screen.getByTitle('Sparse Kisses Dollop (8 pc)')).toBeInTheDocument();
+    expect(screen.getByTitle('Continuous Kisses Dollop (20 pc) with Cherry')).toBeInTheDocument();
+    expect(screen.getByTitle('Kisses Dollop (12 pc) with Cherry')).toBeInTheDocument();
+    expect(screen.getByTitle('Sparse Kisses Dollop (8 pc) with Cherry')).toBeInTheDocument();
     expect(screen.getByTitle('Continuous Star Dollop (20 pc) - Alternating')).toBeInTheDocument();
     expect(screen.getByTitle('Star Dollop (12 pc) - Alternating')).toBeInTheDocument();
     expect(screen.getByTitle('Sparse Star Dollop (8 pc) - Alternating')).toBeInTheDocument();
@@ -815,6 +820,9 @@ describe('edge decoration placement', () => {
     expect(computeEdgeTrimRadius(4.0, 'roundDollopCherry', 'fullyFrosted')).toBeCloseTo(3.48, 2);
     expect(computeEdgeTrimRadius(4.0, 'roundDollopMediumCherry', 'fullyFrosted')).toBeCloseTo(3.30, 2);
     expect(computeEdgeTrimRadius(4.0, 'roundDollopSparseCherry', 'fullyFrosted')).toBeCloseTo(3.24, 2);
+    expect(computeEdgeTrimRadius(4.0, 'kissDollopCherry', 'fullyFrosted')).toBeCloseTo(3.48, 2);
+    expect(computeEdgeTrimRadius(4.0, 'kissDollopMediumCherry', 'fullyFrosted')).toBeCloseTo(3.30, 2);
+    expect(computeEdgeTrimRadius(4.0, 'kissDollopSparseCherry', 'fullyFrosted')).toBeCloseTo(3.24, 2);
 
     expect(computeEdgeTrimRadius(4.0, 'starDollopContinuousAltCherry', 'fullyFrosted')).toBeCloseTo(3.40, 2);
     expect(computeEdgeTrimRadius(4.0, 'starDollopAltCherry', 'fullyFrosted')).toBeCloseTo(3.30, 2);
@@ -880,9 +888,22 @@ describe('edge decoration placement', () => {
     const roundCherry20 = buildPipingRing('roundDollopCherry', matA, { radius: 3.48, y: 1.0, scale: 3 });
     expect(roundCherry20.children[0].count).toBe(20);
     expect(roundCherry20.children.slice(1).length).toBe(10);
+
+    // 7-9. Kiss-shaped Dollops with Cherry (20/12/8 dollops)
+    const kissCherry20 = buildPipingRing('kissDollopCherry', matA, { radius: 3.48, y: 1.0, scale: 3 });
+    expect(kissCherry20.children[0].count).toBe(20);
+    expect(kissCherry20.children.slice(1).length).toBe(10);
+
+    const kissCherry12 = buildPipingRing('kissDollopMediumCherry', matA, { radius: 3.30, y: 1.0, scale: 3 });
+    expect(kissCherry12.children[0].count).toBe(12);
+    expect(kissCherry12.children.slice(1).length).toBe(12);
+
+    const kissCherry8 = buildPipingRing('kissDollopSparseCherry', matA, { radius: 3.24, y: 1.0, scale: 3 });
+    expect(kissCherry8.children[0].count).toBe(8);
+    expect(kissCherry8.children.slice(1).length).toBe(8);
   });
 
-  it('renders all 4 dollop sub-rows in EdgeSection including cherry options', () => {
+  it('groups dollops by shape with solid options 1-3 and cherry options 4-6', () => {
     render(
       React.createElement(EdgeSection, {
         edge: {
@@ -901,14 +922,41 @@ describe('edge decoration placement', () => {
       })
     );
 
-    const dollopsHeader = screen.getByText('Dollops');
-    const dollopsContainer = dollopsHeader.closest('div');
-    const dollopsWithin = within(dollopsContainer);
+    const expectedTitlesBySection = {
+      'Star Dollop': [
+        'Continuous Star Dollop (20 pc)',
+        'Star Dollop (12 pc)',
+        'Sparse Star Dollop (8 pc)',
+        'Continuous Star Dollop (20 pc) with Cherry',
+        'Star Dollop (12 pc) with Cherry',
+        'Sparse Star Dollop (8 pc) with Cherry',
+      ],
+      'Round Tip Dollop': [
+        'Continuous Round Tip Dollop (20 pc)',
+        'Round Tip Dollop (12 pc)',
+        'Sparse Round Tip Dollop (8 pc)',
+        'Continuous Round Tip Dollop (20 pc) with Cherry',
+        'Round Tip Dollop (12 pc) with Cherry',
+        'Sparse Round Tip Dollop (8 pc) with Cherry',
+      ],
+      'Kiss-shaped Dollop': [
+        'Continuous Kisses Dollop (20 pc)',
+        'Kisses Dollop (12 pc)',
+        'Sparse Kisses Dollop (8 pc)',
+        'Continuous Kisses Dollop (20 pc) with Cherry',
+        'Kisses Dollop (12 pc) with Cherry',
+        'Sparse Kisses Dollop (8 pc) with Cherry',
+      ],
+    };
 
-    expect(dollopsWithin.getByText('Solid with Cherries 🍒')).toBeInTheDocument();
-    expect(dollopsWithin.getByText('Alternating with Cherries 🍒')).toBeInTheDocument();
-    expect(dollopsWithin.getByText('Solid')).toBeInTheDocument();
-    expect(dollopsWithin.getByText('Alternating (2 Colors)')).toBeInTheDocument();
+    Object.entries(expectedTitlesBySection).forEach(([sectionTitle, expectedTitles]) => {
+      const section = within(screen.getByText(sectionTitle).closest('div'));
+      const solidRow = within(section.getByText('Solid').closest('div'));
+      expect(solidRow.getAllByRole('button').map((button) => button.title)).toEqual(expectedTitles);
+      expect(solidRow.getAllByRole('button').map((button) => button.textContent.trim())).toEqual([
+        '1', '2', '3', '4🍒', '5🍒', '6🍒',
+      ]);
+    });
   });
 
   it('generates cherry whipped cream rosette variations with correct counts, nested cherries, and zero overhang', async () => {
@@ -1235,7 +1283,7 @@ describe('edge decoration placement', () => {
     expect(roundStraw20.children.slice(1).length).toBe(10);
   });
 
-  it('renders all 6 dollop sub-rows in EdgeSection including strawberry and cherry options', () => {
+  it('retains the applicable strawberry and alternating rows within each dollop shape section', () => {
     render(
       React.createElement(EdgeSection, {
         edge: {
@@ -1254,16 +1302,21 @@ describe('edge decoration placement', () => {
       })
     );
 
-    const dollopsHeader = screen.getByText('Dollops');
-    const dollopsContainer = dollopsHeader.closest('div');
-    const dollopsWithin = within(dollopsContainer);
+    ['Star Dollop', 'Round Tip Dollop'].forEach((sectionTitle) => {
+      const section = within(screen.getByText(sectionTitle).closest('div'));
+      expect(section.getByText('Solid')).toBeInTheDocument();
+      expect(section.getByText('Solid with Strawberries 🍓')).toBeInTheDocument();
+      expect(section.getByText('Alternating (2 Colors)')).toBeInTheDocument();
+      expect(section.getByText('Alternating with Cherries 🍒')).toBeInTheDocument();
+      expect(section.getByText('Alternating with Strawberries 🍓')).toBeInTheDocument();
+    });
 
-    expect(dollopsWithin.getByText('Solid')).toBeInTheDocument();
-    expect(dollopsWithin.getByText('Solid with Cherries 🍒')).toBeInTheDocument();
-    expect(dollopsWithin.getByText('Solid with Strawberries 🍓')).toBeInTheDocument();
-    expect(dollopsWithin.getByText('Alternating (2 Colors)')).toBeInTheDocument();
-    expect(dollopsWithin.getByText('Alternating with Cherries 🍒')).toBeInTheDocument();
-    expect(dollopsWithin.getByText('Alternating with Strawberries 🍓')).toBeInTheDocument();
+    const kissSection = within(screen.getByText('Kiss-shaped Dollop').closest('div'));
+    expect(kissSection.getByText('Solid')).toBeInTheDocument();
+    expect(kissSection.getByText('Alternating (2 Colors)')).toBeInTheDocument();
+    expect(kissSection.queryByText('Solid with Strawberries 🍓')).not.toBeInTheDocument();
+    expect(kissSection.queryByText('Alternating with Cherries 🍒')).not.toBeInTheDocument();
+    expect(kissSection.queryByText('Alternating with Strawberries 🍓')).not.toBeInTheDocument();
   });
 
   it('generates strawberry whipped cream rosette variations with correct counts, nested strawberries, and zero overhang', async () => {
