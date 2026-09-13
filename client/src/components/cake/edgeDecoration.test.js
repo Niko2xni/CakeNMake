@@ -1271,14 +1271,14 @@ describe('edge decoration placement', () => {
       expect(cookie.position.y).toBeCloseTo((1.55 - 0.04) * oreoScale, 3);
     });
     expect(basketballRing.isGroup).toBe(true);
-    expect(basketballRing.children).toHaveLength(18);
+    expect(basketballRing.children).toHaveLength(16);
     basketballRing.children.forEach((ball) => {
       expect(ball.isGroup).toBe(true);
       expect(ball.children).toHaveLength(1);
       expect(ball.children[0].isMesh).toBe(true);
     });
     expect(soccerBallRing.isGroup).toBe(true);
-    expect(soccerBallRing.children).toHaveLength(18);
+    expect(soccerBallRing.children).toHaveLength(16);
     soccerBallRing.children.forEach((ball) => {
       expect(ball.isGroup).toBe(true);
       expect(ball.children).toHaveLength(1);

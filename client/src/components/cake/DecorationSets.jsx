@@ -508,7 +508,7 @@ export function buildCherryRimRing(radius, y, rand = Math.random, opts = {}) {
 }
 
 function buildBallRimRing(buildBall, radius, y, rand, opts) {
-  const count = opts.count ?? 18;
+  const count = opts.count ?? 16;
   const scale = opts.scale ?? 0.18;
   const surfaceLift = 0.50 * scale;
   const group = new THREE.Group();
