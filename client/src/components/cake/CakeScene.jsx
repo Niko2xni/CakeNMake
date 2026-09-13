@@ -1607,6 +1607,9 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         beadedTrimGraduated: 'graduated',
         beadedTrimSpacer: 'spacer',
         beadedTrimGrand: 'grand',
+        beadedTrimMorseDotDashDot: 'morseDotDashDot',
+        beadedTrimMorseDotDash: 'morseDotDash',
+        beadedTrimMorseDotDotDash: 'morseDotDotDash',
       };
       const edgeSlotsToRender =
         edgeMode === 'both' ? [{ slot: edgeBoth, y: topY, radius: topRadius, isBottom: false }, { slot: edgeBoth, y: 0, radius: BASE_RADIUS, isBottom: true }]
@@ -1617,7 +1620,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           : '';
         const isDollop = baseTip.toLowerCase().includes('dollop');
         const isWhippedCreamEdge = baseTip.startsWith('whippedCreamRosette');
-        const isShell = ['shell', 'reverseShell'].includes(baseTip);
+        const isShell = ['shell', 'reverseShell', 'elongatedShell'].includes(baseTip);
         const isBead = baseTip === 'bead';
         const isPulledDot = baseTip === 'pulledDot';
         const isZigzag = baseTip === 'zigzag';

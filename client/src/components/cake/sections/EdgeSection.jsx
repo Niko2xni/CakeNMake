@@ -18,28 +18,16 @@ const EMPTY_SLOT = () => ({
   piping: { tip: null, colorId: 'vanilla', secondaryColorId: 'red' },
 });
 
-const DOLLOP_ROW_DEFINITIONS = [
-  {
-    label: 'Solid',
-    options: [
-      ...DOLLOPS_SOLID_VARIATIONS.map((option) => ({ ...option })),
-      ...DOLLOPS_SOLID_CHERRY_VARIATIONS.map((option) => ({ ...option, badge: '🍒' })),
-    ],
-  },
-];
-
 const DOLLOP_SECTIONS = [
   { title: 'Star Dollop', prefix: 'starDollop' },
   { title: 'Round Tip Dollop', prefix: 'roundDollop' },
   { title: 'Kiss-shaped Dollop', prefix: 'kissDollop' },
 ].map((section) => ({
   ...section,
-  rows: DOLLOP_ROW_DEFINITIONS
-    .map((row) => ({
-      ...row,
-      options: row.options.filter(({ id }) => id.startsWith(section.prefix)),
-    }))
-    .filter((row) => row.options.length > 0),
+  options: [
+    ...DOLLOPS_SOLID_VARIATIONS.filter(({ id }) => id.startsWith(section.prefix)),
+    ...DOLLOPS_SOLID_CHERRY_VARIATIONS.filter(({ id }) => id.startsWith(section.prefix)),
+  ],
 }));
 
 // NOTE: single whole-cake setting for now, not per-tier — see
@@ -196,36 +184,31 @@ export default function EdgeSection({
             <span className="text-xs font-semibold text-foreground/80 mb-1.5 block">
               Border Piping
             </span>
-            <div>
-              <span className="text-[11px] font-medium text-muted-foreground mb-1 block">
-                Solid
-              </span>
-              <div className="flex flex-wrap gap-2">
-                {BORDER_PIPING_SOLID_VARIATIONS.map((variant, i) => {
-                  const active =
-                    (currentSlot.piping?.tip || currentSlot.decorations?.setId) === variant.id;
-                  return (
-                    <button
-                      key={variant.id}
-                      type="button"
-                      onClick={() =>
-                        updateSlot({
-                          decorations: { ...currentSlot.decorations, setId: null },
-                          piping: { ...currentSlot.piping, tip: active ? null : variant.id },
-                        })
-                      }
-                      title={variant.label}
-                      className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
-                        active
-                          ? 'bg-primary text-primary-foreground border-primary shadow-md'
-                          : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
-                      }`}
-                    >
-                      {i + 1}
-                    </button>
-                  );
-                })}
-              </div>
+            <div className="flex flex-wrap gap-2">
+              {BORDER_PIPING_SOLID_VARIATIONS.map((variant, i) => {
+                const active =
+                  (currentSlot.piping?.tip || currentSlot.decorations?.setId) === variant.id;
+                return (
+                  <button
+                    key={variant.id}
+                    type="button"
+                    onClick={() =>
+                      updateSlot({
+                        decorations: { ...currentSlot.decorations, setId: null },
+                        piping: { ...currentSlot.piping, tip: active ? null : variant.id },
+                      })
+                    }
+                    title={variant.label}
+                    className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
+                      active
+                        ? 'bg-primary text-primary-foreground border-primary shadow-md'
+                        : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
+                    }`}
+                  >
+                    {i + 1}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -267,36 +250,31 @@ export default function EdgeSection({
             <span className="text-xs font-semibold text-foreground/80 mb-1.5 block">
               Fruit & Confections Rim
             </span>
-            <div>
-              <span className="text-[11px] font-medium text-muted-foreground mb-1 block">
-                Designs
-              </span>
-              <div className="flex flex-wrap gap-2">
-                {FRUIT_CONFECTION_RIM_OPTIONS.map((variant, i) => {
-                  const active =
-                    (currentSlot.piping?.tip || currentSlot.decorations?.setId) === variant.id;
-                  return (
-                    <button
-                      key={variant.id}
-                      type="button"
-                      onClick={() =>
-                        updateSlot({
-                          decorations: { ...currentSlot.decorations, setId: null },
-                          piping: { ...currentSlot.piping, tip: active ? null : variant.id },
-                        })
-                      }
-                      title={variant.label}
-                      className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
-                        active
-                          ? 'bg-primary text-primary-foreground border-primary shadow-md'
-                          : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
-                      }`}
-                    >
-                      {i + 1}
-                    </button>
-                  );
-                })}
-              </div>
+            <div className="flex flex-wrap gap-2">
+              {FRUIT_CONFECTION_RIM_OPTIONS.map((variant, i) => {
+                const active =
+                  (currentSlot.piping?.tip || currentSlot.decorations?.setId) === variant.id;
+                return (
+                  <button
+                    key={variant.id}
+                    type="button"
+                    onClick={() =>
+                      updateSlot({
+                        decorations: { ...currentSlot.decorations, setId: null },
+                        piping: { ...currentSlot.piping, tip: active ? null : variant.id },
+                      })
+                    }
+                    title={variant.label}
+                    className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
+                      active
+                        ? 'bg-primary text-primary-foreground border-primary shadow-md'
+                        : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
+                    }`}
+                  >
+                    {i + 1}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -341,57 +319,34 @@ export default function EdgeSection({
               <span className="text-xs font-semibold text-foreground/80 mb-1.5 block">
                 {section.title}
               </span>
-              <div className="space-y-3">
-                {section.rows.map((row) => (
-                  <div key={row.label}>
-                    <span className="text-[11px] font-medium text-muted-foreground mb-1 block">
-                      {row.label}
-                    </span>
-                    <div className="flex flex-wrap gap-2">
-                      {row.options.map((variant, i) => {
-                        const active =
-                          (currentSlot.piping?.tip || currentSlot.decorations?.setId) === variant.id;
-                        return (
-                          <button
-                            key={variant.id}
-                            type="button"
-                            onClick={() =>
-                              updateSlot({
-                                decorations: { ...currentSlot.decorations, setId: null },
-                                piping: {
-                                  ...currentSlot.piping,
-                                  tip: active ? null : variant.id,
-                                  ...(row.alternating
-                                    ? { secondaryColorId: currentSlot.piping?.secondaryColorId || 'red' }
-                                    : {}),
-                                },
-                              })
-                            }
-                            title={variant.label}
-                            className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 relative ${
-                              active
-                                ? 'bg-primary text-primary-foreground border-primary shadow-md'
-                                : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
-                            }`}
-                          >
-                            <span>{i + 1}</span>
-                            {row.alternating && (
-                              <span
-                                className="absolute bottom-1 w-1.5 h-1.5 rounded-full border border-black/20"
-                                style={{ backgroundColor: activeSecondaryColor?.hex || '#D6293E' }}
-                              />
-                            )}
-                            {(variant.badge || row.badge) && (
-                              <span className="absolute -top-1 -right-1 text-[10px] leading-none pointer-events-none">
-                                {variant.badge || row.badge}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
+              <div className="flex flex-wrap gap-2">
+                {section.options.map((variant, i) => {
+                  const active =
+                    (currentSlot.piping?.tip || currentSlot.decorations?.setId) === variant.id;
+                  return (
+                    <button
+                      key={variant.id}
+                      type="button"
+                      onClick={() =>
+                        updateSlot({
+                          decorations: { ...currentSlot.decorations, setId: null },
+                          piping: {
+                            ...currentSlot.piping,
+                            tip: active ? null : variant.id,
+                          },
+                        })
+                      }
+                      title={variant.label}
+                      className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
+                        active
+                          ? 'bg-primary text-primary-foreground border-primary shadow-md'
+                          : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
+                      }`}
+                    >
+                      {i + 1}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ))}

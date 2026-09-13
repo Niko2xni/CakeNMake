@@ -1744,6 +1744,220 @@ export function buildReverseShellRingGeometry(ringRadius) {
   return mergeGeometries(buildReverseShellUnitGeometries(ringRadius));
 }
 
+function buildCurvedShellMesh({
+  ringRadius,
+  startArc,
+  arcLength,
+  maxWidth,
+  maxHeight,
+  isElongated = false,
+  uSegments = 32,
+  thetaSegments = 48,
+  fluteCount = 24,
+  fluteDepth = 0.20,
+}) {
+  const positions = [];
+  const indices = [];
+
+  function getProfile(u) {
+    let wScale, hScale;
+    if (isElongated) {
+      if (u < 0.18) {
+        const t = u / 0.18;
+        const bulb = Math.sqrt(Math.max(0, 1 - (1 - t) * (1 - t)));
+        wScale = 0.35 + 0.65 * bulb;
+        hScale = 0.25 + 0.75 * bulb;
+      } else {
+        const t = (u - 0.18) / 0.82;
+        wScale = 1.0 - 0.68 * Math.pow(t, 0.72);
+        hScale = 1.0 - 0.78 * Math.pow(t, 0.80);
+      }
+    } else {
+      if (u < 0.25) {
+        const t = u / 0.25;
+        const bulb = Math.sqrt(Math.max(0, 1 - (1 - t) * (1 - t)));
+        wScale = 0.35 + 0.65 * bulb;
+        hScale = 0.25 + 0.75 * bulb;
+      } else {
+        const t = (u - 0.25) / 0.75;
+        wScale = 1.0 - 0.75 * Math.pow(t, 0.80);
+        hScale = 1.0 - 0.85 * Math.pow(t, 0.85);
+      }
+    }
+    return { width: maxWidth * wScale, height: maxHeight * hScale };
+  }
+
+  const numCols = thetaSegments + 1;
+
+  for (let i = 0; i <= uSegments; i++) {
+    const u = i / uSegments;
+    const arc = startArc + u * arcLength;
+    const phiRing = arc / ringRadius;
+
+    const cx = Math.sin(phiRing) * ringRadius;
+    const cz = Math.cos(phiRing) * ringRadius;
+    const nx = Math.sin(phiRing);
+    const nz = Math.cos(phiRing);
+
+    const { width, height } = getProfile(u);
+    const halfW = width * 0.5;
+    const ridgeTwist = (1 - u) * 0.18;
+
+    for (let j = 0; j <= thetaSegments; j++) {
+      const theta = (j / thetaSegments) * Math.PI;
+      const sinTheta = Math.sin(theta);
+      const cosTheta = Math.cos(theta);
+
+      const fluteAngle = theta * fluteCount + ridgeTwist;
+      const cosF = Math.cos(fluteAngle);
+      const fluteShape = Math.sign(cosF) * Math.pow(Math.abs(cosF), 0.82);
+      const fluteMod = fluteShape * fluteDepth * Math.pow(sinTheta, 0.4);
+
+      const zLocal = -halfW * cosTheta * (1 + fluteMod * 0.35);
+      const yLocal = Math.max(0, height * sinTheta * (1 + fluteMod));
+
+      const vx = cx + zLocal * nx;
+      const vy = yLocal;
+      const vz = cz + zLocal * nz;
+
+      positions.push(vx, vy, vz);
+    }
+  }
+
+  for (let i = 0; i < uSegments; i++) {
+    for (let j = 0; j < thetaSegments; j++) {
+      const current = i * numCols + j;
+      const currentNext = current + 1;
+      const nextRow = (i + 1) * numCols + j;
+      const nextRowNext = nextRow + 1;
+
+      indices.push(current, currentNext, nextRow);
+      indices.push(currentNext, nextRowNext, nextRow);
+    }
+  }
+
+  // Flat base facing -Y
+  for (let i = 0; i < uSegments; i++) {
+    const leftCurrent = i * numCols;
+    const leftNext = (i + 1) * numCols;
+    const rightCurrent = i * numCols + thetaSegments;
+    const rightNext = (i + 1) * numCols + thetaSegments;
+
+    indices.push(leftCurrent, leftNext, rightCurrent);
+    indices.push(leftNext, rightNext, rightCurrent);
+  }
+
+  // Rounded head cap at u = 0
+  const phiStart = startArc / ringRadius;
+  const txStart = Math.cos(phiStart);
+  const tzStart = -Math.sin(phiStart);
+  const cx0 = Math.sin(phiStart) * ringRadius;
+  const cz0 = Math.cos(phiStart) * ringRadius;
+
+  const headCenterIdx = positions.length / 3;
+  const headDepth = 0.08;
+  const headHeight = 0.04;
+  positions.push(cx0 - txStart * headDepth, headHeight, cz0 - tzStart * headDepth);
+
+  for (let j = 0; j < thetaSegments; j++) {
+    const v0 = j;
+    const v1 = j + 1;
+    indices.push(headCenterIdx, v1, v0);
+  }
+
+  // Tail cap at u = 1
+  const phiEnd = (startArc + arcLength) / ringRadius;
+  const txEnd = Math.cos(phiEnd);
+  const tzEnd = -Math.sin(phiEnd);
+  const cx1 = Math.sin(phiEnd) * ringRadius;
+  const cz1 = Math.cos(phiEnd) * ringRadius;
+
+  const tailCenterIdx = positions.length / 3;
+  positions.push(cx1 + txEnd * 0.04, 0.01, cz1 + tzEnd * 0.04);
+
+  const lastRowOffset = uSegments * numCols;
+  for (let j = 0; j < thetaSegments; j++) {
+    const v0 = lastRowOffset + j;
+    const v1 = lastRowOffset + j + 1;
+    indices.push(tailCenterIdx, v0, v1);
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/**
+ * Elongated Shell Border — rhythmic open-star-tip piping alternating
+ * between an elongated pulled shell (dash) and two nested short shells (dots).
+ * Faithfully follows the circular cake perimeter with continuous fluted star ridges
+ * and grounded, flat base adhesion.
+ */
+export function buildElongatedShellUnitGeometries(ringRadius) {
+  const circumference = ringRadius * Math.PI * 2;
+  const cycleNominal = 2.85;
+  const N = Math.max(4, Math.round(circumference / cycleNominal));
+  const cycleArc = circumference / N;
+  const k = cycleArc / cycleNominal;
+
+  const geometries = [];
+  for (let c = 0; c < N; c++) {
+    const cycleStart = c * cycleArc;
+
+    // 1. Elongated Shell (Dash)
+    const elongGeo = buildCurvedShellMesh({
+      ringRadius,
+      startArc: cycleStart,
+      arcLength: 2.35 * k,
+      maxWidth: 0.68 * k,
+      maxHeight: 0.38 * k,
+      isElongated: true,
+      uSegments: 32,
+      thetaSegments: 48,
+      fluteCount: 24,
+      fluteDepth: 0.22,
+    });
+    geometries.push(elongGeo);
+
+    // 2. Short Shell 1 (Dot 1)
+    const short1Geo = buildCurvedShellMesh({
+      ringRadius,
+      startArc: cycleStart + 1.60 * k,
+      arcLength: 1.05 * k,
+      maxWidth: 0.58 * k,
+      maxHeight: 0.34 * k,
+      isElongated: false,
+      uSegments: 24,
+      thetaSegments: 48,
+      fluteCount: 24,
+      fluteDepth: 0.22,
+    });
+    geometries.push(short1Geo);
+
+    // 3. Short Shell 2 (Dot 2)
+    const short2Geo = buildCurvedShellMesh({
+      ringRadius,
+      startArc: cycleStart + 2.22 * k,
+      arcLength: 1.05 * k,
+      maxWidth: 0.58 * k,
+      maxHeight: 0.34 * k,
+      isElongated: false,
+      uSegments: 24,
+      thetaSegments: 48,
+      fluteCount: 24,
+      fluteDepth: 0.22,
+    });
+    geometries.push(short2Geo);
+  }
+  return geometries;
+}
+
+export function buildElongatedShellRingGeometry(ringRadius) {
+  return mergeGeometries(buildElongatedShellUnitGeometries(ringRadius));
+}
+
 /**
  * Lambeth Method piping — classic draped swags with vertical drop elements,
  * rosettes, coffee beans, and shell border. Creates a three-dimensional,
@@ -2068,6 +2282,31 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
       const group = new THREE.Group();
       const meshA = new THREE.Mesh(geoA, material);
       const meshB = new THREE.Mesh(geoB, secMat);
+      meshA.castShadow = true;
+      meshA.receiveShadow = true;
+      meshB.castShadow = true;
+      meshB.receiveShadow = true;
+      group.add(meshA);
+      group.add(meshB);
+      group.position.y = y;
+      return group;
+    }
+
+    case 'elongatedShell': {
+      const geo = buildElongatedShellRingGeometry(radius);
+      const mesh = new THREE.Mesh(geo, material);
+      mesh.position.y = y;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      return mesh;
+    }
+    case 'elongatedShellAlt': {
+      const geos = buildElongatedShellUnitGeometries(radius);
+      const geoA = mergeGeometries(geos.filter((_, i) => i % 3 === 0));
+      const geoB = mergeGeometries(geos.filter((_, i) => i % 3 !== 0));
+      const group = new THREE.Group();
+      const meshA = new THREE.Mesh(geoA, material);
+      const meshB = new THREE.Mesh(geoB, secMat || material);
       meshA.castShadow = true;
       meshA.receiveShadow = true;
       meshB.castShadow = true;

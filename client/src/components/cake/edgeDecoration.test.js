@@ -46,6 +46,8 @@ describe('edge decoration placement', () => {
     expect(computeEdgeTrimRadius(4.0, 'bead', 'fullyFrosted', true)).toBeCloseTo(4.40, 2);
     expect(computeEdgeTrimRadius(4.0, 'pulledDot', 'fullyFrosted')).toBeCloseTo(3.66, 2);
     expect(computeEdgeTrimRadius(4.0, 'pulledDot', 'fullyFrosted', true)).toBeCloseTo(4.27, 2);
+    expect(computeEdgeTrimRadius(4.0, 'elongatedShell', 'fullyFrosted')).toBeCloseTo(3.66, 2);
+    expect(computeEdgeTrimRadius(4.0, 'elongatedShell', 'fullyFrosted', true)).toBeCloseTo(4.28, 2);
     expect(computeEdgeTrimRadius(4.0, 'beadAlt', 'fullyFrosted')).toBeCloseTo(3.68, 2);
     expect(computeEdgeTrimRadius(4.0, 'beadAlt', 'fullyFrosted', true)).toBeCloseTo(4.40, 2);
     expect(computeEdgeTrimRadius(4.0, 'zigzag', 'fullyFrosted')).toBeCloseTo(3.66, 2);
@@ -88,9 +90,10 @@ describe('edge decoration placement', () => {
     expect(screen.getByTitle('Bead Piping')).toBeInTheDocument();
     expect(screen.getByTitle('Rope Twist')).toBeInTheDocument();
     expect(screen.getByTitle('Rope Twist (Classic)')).toBeInTheDocument();
-    expect(screen.getByTitle('Wave Border')).toBeInTheDocument();
-    expect(screen.getByTitle('Rope Border')).toBeInTheDocument();
-    expect(screen.getByTitle('Pulled Dot Piping')).toBeInTheDocument();
+    expect(screen.getByTitle('Elongated Shell Border')).toBeInTheDocument();
+    expect(screen.queryByTitle('Wave Border')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Rope Border')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Pulled Dot Piping')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Shell Border - Alternating')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Reverse Shell - Alternating')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Bead Piping - Alternating')).not.toBeInTheDocument();
@@ -99,7 +102,7 @@ describe('edge decoration placement', () => {
     expect(screen.queryByText('Zigzag Piping')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Zigzag Piping')).not.toBeInTheDocument();
     const borderPiping = within(screen.getByText('Border Piping').closest('div'));
-    expect(borderPiping.getAllByRole('button')).toHaveLength(8);
+    expect(borderPiping.getAllByRole('button')).toHaveLength(6);
     expect(screen.queryByText('Scallops')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Star Scallop')).not.toBeInTheDocument();
     expect(screen.queryByText('Rope')).not.toBeInTheDocument();
@@ -107,11 +110,11 @@ describe('edge decoration placement', () => {
     expect(screen.queryByText('Drop Flower')).not.toBeInTheDocument();
     expect(screen.getByText('Bracelet Beads')).toBeInTheDocument();
     expect(screen.getByTitle('Beaded Trim')).toBeInTheDocument();
-    expect(screen.getByTitle('Trio Beaded Trim')).toBeInTheDocument();
     expect(screen.getByTitle('Petite Beaded Trim')).toBeInTheDocument();
-    expect(screen.getByTitle('Graduated Beaded Trim')).toBeInTheDocument();
     expect(screen.getByTitle('Spacer Beaded Trim')).toBeInTheDocument();
-    expect(screen.getByTitle('Grand Beaded Trim')).toBeInTheDocument();
+    expect(screen.getByTitle('Morse Dot-Dash-Dot (Bead-Line-Bead)')).toBeInTheDocument();
+    expect(screen.getByTitle('Morse Alternating (Dot-Dash)')).toBeInTheDocument();
+    expect(screen.getByTitle('Morse Double-Dot Dash (2 Beads-Line)')).toBeInTheDocument();
     expect(screen.getByText('Star Dollop')).toBeInTheDocument();
     expect(screen.getByText('Round Tip Dollop')).toBeInTheDocument();
     expect(screen.getByText('Kiss-shaped Dollop')).toBeInTheDocument();
@@ -310,6 +313,43 @@ describe('edge decoration placement', () => {
     expect(ring.isInstancedMesh).toBe(true);
     expect(ring.count).toBe(26);
     expect(radius + bounds.max.z * 3).toBeLessThanOrEqual(4.06);
+  });
+
+  it('generates elongated shell border piping with fluted star strokes, nested short shells, and zero overhang', async () => {
+    const { buildPipingRing, buildElongatedShellRingGeometry, buildElongatedShellUnitGeometries } = await import('./pipingTips');
+    const THREE = await import('three');
+
+    const geos = buildElongatedShellUnitGeometries(3.66);
+    expect(geos.length).toBeGreaterThanOrEqual(12);
+
+    const geo = buildElongatedShellRingGeometry(3.66);
+    expect(geo.getAttribute('position').count).toBeGreaterThan(1500);
+
+    const pos = geo.getAttribute('position');
+    let maxR = 0;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const z = pos.getZ(i);
+      const r = Math.sqrt(x * x + z * z);
+      if (r > maxR) maxR = r;
+    }
+    expect(maxR).toBeLessThanOrEqual(4.06);
+
+    const ring = buildPipingRing('elongatedShell', new THREE.MeshBasicMaterial(), {
+      radius: 3.66,
+      y: 1.0,
+      scale: 3,
+    });
+    expect(ring.isMesh).toBe(true);
+
+    const ringAlt = buildPipingRing('elongatedShellAlt', new THREE.MeshBasicMaterial(), {
+      radius: 3.66,
+      y: 1.0,
+      scale: 3,
+      secondaryMaterial: new THREE.MeshBasicMaterial(),
+    });
+    expect(ringAlt.isGroup).toBe(true);
+    expect(ringAlt.children.length).toBe(2);
   });
 
   it('generates classic rope twist geometry variation with zero overhang', async () => {
@@ -998,10 +1038,9 @@ describe('edge decoration placement', () => {
 
     Object.entries(expectedTitlesBySection).forEach(([sectionTitle, expectedTitles]) => {
       const section = within(screen.getByText(sectionTitle).closest('div'));
-      const solidRow = within(section.getByText('Solid').closest('div'));
-      expect(solidRow.getAllByRole('button').map((button) => button.title)).toEqual(expectedTitles);
-      expect(solidRow.getAllByRole('button').map((button) => button.textContent.trim())).toEqual([
-        '1', '2', '3', '4🍒', '5🍒', '6🍒',
+      expect(section.getAllByRole('button').map((button) => button.title)).toEqual(expectedTitles);
+      expect(section.getAllByRole('button').map((button) => button.textContent.trim())).toEqual([
+        '1', '2', '3', '4', '5', '6',
       ]);
     });
   });
@@ -1238,7 +1277,7 @@ describe('edge decoration placement', () => {
     );
 
     expect(screen.getByText('Fruit & Confections Rim')).toBeInTheDocument();
-    expect(screen.getByText('Designs')).toBeInTheDocument();
+    expect(screen.queryByText('Designs')).not.toBeInTheDocument();
     [
       'Fresh Strawberries Rim 🍓',
       "Hershey's Kisses Rim 🍫",
@@ -1351,7 +1390,7 @@ describe('edge decoration placement', () => {
 
     ['Star Dollop', 'Round Tip Dollop', 'Kiss-shaped Dollop'].forEach((sectionTitle) => {
       const section = within(screen.getByText(sectionTitle).closest('div'));
-      expect(section.getByText('Solid')).toBeInTheDocument();
+      expect(section.queryByText('Solid')).not.toBeInTheDocument();
       expect(section.getAllByRole('button')).toHaveLength(6);
       expect(section.queryByText('Solid with Strawberries 🍓')).not.toBeInTheDocument();
       expect(section.queryByText('Alternating (2 Colors)')).not.toBeInTheDocument();

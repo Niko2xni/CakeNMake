@@ -232,7 +232,7 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
     bottomRadialInset = -0.34;
   } else if (baseTip === 'reverseShell') {
     bottomRadialInset = -0.24;
-  } else if (baseTip === 'shell') {
+  } else if (baseTip === 'shell' || baseTip === 'elongatedShell') {
     bottomRadialInset = -0.22;
   } else if (['zigzag', 'wavePiping', 'ropeTwist', 'ropeTwistClassic', 'pulledDot'].includes(baseTip)) {
     bottomRadialInset = -0.21;
@@ -254,7 +254,7 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
     ? bottomRadialInset
     : (topFruitRimInset ?? (baseTip === 'beadedTrim' ? 0.22
       : (isDollopType ? topDollopInset
-      : (['shell', 'reverseShell'].includes(baseTip) ? 0.40
+      : (['shell', 'reverseShell', 'elongatedShell'].includes(baseTip) ? 0.40
       : (baseTip === 'bead' ? 0.38
       : (baseTip === 'pulledDot' ? 0.40
       : (baseTip === 'zigzag' ? 0.40
@@ -278,6 +278,76 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
  */
 export function buildBeadedTrimRing(radius, colorHex, rand, opts = {}) {
   const pattern = opts.pattern || 'classic';
+  const mat = new THREE.MeshPhysicalMaterial({ color: colorHex, roughness: 0.25, clearcoat: 0.6 });
+
+  if (pattern.startsWith('morse')) {
+    const MORSE_SPECS = {
+      morseDotDashDot: { nominal: 1.84, dots: [0.13, 1.39], dashes: [0.76], dashLen: 0.46 },
+      morseDotDash: { nominal: 1.40, dots: [0.13], dashes: [0.76], dashLen: 0.46 },
+      morseDotDotDash: { nominal: 1.84, dots: [0.13, 0.53], dashes: [1.16], dashLen: 0.46 },
+    };
+    const spec = MORSE_SPECS[pattern] || MORSE_SPECS.morseDotDashDot;
+    const C = Math.PI * 2 * radius;
+    const M = Math.max(4, Math.round(C / spec.nominal));
+    const cycleLen = C / M;
+    const k = cycleLen / spec.nominal;
+
+    const dotAngles = [];
+    const dashAngles = [];
+    for (let c = 0; c < M; c++) {
+      const cycleStartArc = c * cycleLen;
+      for (const dOffset of spec.dots) {
+        dotAngles.push((cycleStartArc + dOffset * k) / radius);
+      }
+      for (const dsOffset of spec.dashes) {
+        dashAngles.push((cycleStartArc + dsOffset * k) / radius);
+      }
+    }
+
+    const group = new THREE.Group();
+    if (dotAngles.length > 0) {
+      const dotGeo = new THREE.SphereGeometry(0.13, 14, 10);
+      const dotMesh = new THREE.InstancedMesh(dotGeo, mat, dotAngles.length);
+      const dummy = new THREE.Object3D();
+      for (let i = 0; i < dotAngles.length; i++) {
+        const angle = dotAngles[i];
+        dummy.position.set(Math.sin(angle) * radius, 0, Math.cos(angle) * radius);
+        const scale = 0.95 + rand() * 0.10;
+        dummy.scale.setScalar(scale);
+        dummy.rotation.set(0, 0, 0);
+        dummy.updateMatrix();
+        dotMesh.setMatrixAt(i, dummy.matrix);
+      }
+      dotMesh.instanceMatrix.needsUpdate = true;
+      dotMesh.castShadow = true;
+      dotMesh.receiveShadow = true;
+      group.add(dotMesh);
+    }
+
+    if (dashAngles.length > 0) {
+      const dashGeo = new THREE.CapsuleGeometry(0.13, spec.dashLen * k, 8, 14);
+      const dashMesh = new THREE.InstancedMesh(dashGeo, mat, dashAngles.length);
+      const dummy = new THREE.Object3D();
+      const upVec = new THREE.Vector3(0, 1, 0);
+      for (let i = 0; i < dashAngles.length; i++) {
+        const angle = dashAngles[i];
+        dummy.position.set(Math.sin(angle) * radius, 0, Math.cos(angle) * radius);
+        const tangent = new THREE.Vector3(Math.cos(angle), 0, -Math.sin(angle));
+        dummy.quaternion.setFromUnitVectors(upVec, tangent);
+        const scale = 0.95 + rand() * 0.10;
+        dummy.scale.setScalar(scale);
+        dummy.updateMatrix();
+        dashMesh.setMatrixAt(i, dummy.matrix);
+      }
+      dashMesh.instanceMatrix.needsUpdate = true;
+      dashMesh.castShadow = true;
+      dashMesh.receiveShadow = true;
+      group.add(dashMesh);
+    }
+
+    return group;
+  }
+
   let count = opts.count;
   if (!count) {
     const rawCount = Math.max(18, Math.round((radius * Math.PI * 2) / 0.28));
@@ -291,7 +361,6 @@ export function buildBeadedTrimRing(radius, colorHex, rand, opts = {}) {
       count = rawCount;
     }
   }
-  const mat = new THREE.MeshPhysicalMaterial({ color: colorHex, roughness: 0.25, clearcoat: 0.6 });
   const geo = new THREE.SphereGeometry(0.13, 14, 10);
   const mesh = new THREE.InstancedMesh(geo, mat, count);
   const dummy = new THREE.Object3D();

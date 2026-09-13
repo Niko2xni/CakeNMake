@@ -264,6 +264,7 @@ export const PIPING_TIPS = [
   { id: 'reverseShell', label: 'Reverse Shell' },
   { id: 'bead', label: 'Bead Piping' },
   { id: 'pulledDot', label: 'Pulled Dot Piping' },
+  { id: 'elongatedShell', label: 'Elongated Shell Border' },
   { id: 'zigzag', label: 'Zigzag Piping' },
   { id: 'wavePiping', label: 'Wave Piping' },
   { id: 'star', label: 'Star' },
@@ -273,6 +274,7 @@ export const PIPING_TIPS = [
   { id: 'shellAlt', label: 'Shell Border - Alternating' },
   { id: 'reverseShellAlt', label: 'Reverse Shell - Alternating' },
   { id: 'beadAlt', label: 'Bead Piping - Alternating' },
+  { id: 'elongatedShellAlt', label: 'Elongated Shell Border - Alternating' },
   { id: 'ropeTwistAlt', label: 'Rope Twist - Alternating' },
   { id: 'ropeTwistClassicAlt', label: 'Rope Twist (Classic) - Alternating' },
   { id: 'round', label: 'Round' },
@@ -631,20 +633,11 @@ export const BUTTERCREAM_LETTERS = [...BUTTERCREAM_LETTERS_UPPER, ...BUTTERCREAM
 
 export const BRACELET_BEADS_VARIATIONS = [
   { id: 'beadedTrim', label: 'Beaded Trim' },
-  // Same underlying geometry as Beaded Trim (buildBeadedTrimRing in
-  // DecorationSets.jsx), just a different bead-size rhythm per design —
-  // see BEADED_TRIM_PATTERNS in CakeScene.jsx for how each id maps to a
-  // pattern. Trio cycles Small → Big → Medium around the ring rather than
-  // a straight Small → Medium → Big ramp — a repeating ascending-size
-  // sequence reads as a lopsided gradient once it wraps all the way
-  // around a circle, not a balanced pattern; breaking the order keeps
-  // the eye from settling into "biggest bead is always three spots after
-  // the smallest."
-  { id: 'beadedTrimTrio', label: 'Trio Beaded Trim' },
   { id: 'beadedTrimPetite', label: 'Petite Beaded Trim' },
-  { id: 'beadedTrimGraduated', label: 'Graduated Beaded Trim' },
   { id: 'beadedTrimSpacer', label: 'Spacer Beaded Trim' },
-  { id: 'beadedTrimGrand', label: 'Grand Beaded Trim' },
+  { id: 'beadedTrimMorseDotDashDot', label: 'Morse Dot-Dash-Dot (Bead-Line-Bead)' },
+  { id: 'beadedTrimMorseDotDash', label: 'Morse Alternating (Dot-Dash)' },
+  { id: 'beadedTrimMorseDotDotDash', label: 'Morse Double-Dot Dash (2 Beads-Line)' },
 ];
 
 export const FRUIT_CONFECTION_RIM_OPTIONS = [
@@ -751,9 +744,7 @@ export const BORDER_PIPING_SOLID_VARIATIONS = [
   { id: 'bead', label: 'Bead Piping' },
   { id: 'ropeTwist', label: 'Rope Twist' },
   { id: 'ropeTwistClassic', label: 'Rope Twist (Classic)' },
-  { id: 'wavePiping', label: 'Wave Border' },
-  { id: 'rope', label: 'Rope Border' },
-  { id: 'pulledDot', label: 'Pulled Dot Piping' },
+  { id: 'elongatedShell', label: 'Elongated Shell Border' },
 ];
 
 export const BORDER_PIPING_ALTERNATING_VARIATIONS = [
@@ -762,6 +753,7 @@ export const BORDER_PIPING_ALTERNATING_VARIATIONS = [
   { id: 'beadAlt', label: 'Bead Piping - Alternating' },
   { id: 'ropeTwistAlt', label: 'Rope Twist - Alternating' },
   { id: 'ropeTwistClassicAlt', label: 'Rope Twist (Classic) - Alternating' },
+  { id: 'elongatedShellAlt', label: 'Elongated Shell Border - Alternating' },
 ];
 
 export const BORDER_PIPING_VARIATIONS = [
