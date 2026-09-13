@@ -104,6 +104,9 @@ describe('edge decoration placement', () => {
     expect(screen.getByTitle('Beaded Trim')).toBeInTheDocument();
     expect(screen.getByTitle('Trio Beaded Trim')).toBeInTheDocument();
     expect(screen.getByTitle('Petite Beaded Trim')).toBeInTheDocument();
+    expect(screen.getByTitle('Graduated Beaded Trim')).toBeInTheDocument();
+    expect(screen.getByTitle('Spacer Beaded Trim')).toBeInTheDocument();
+    expect(screen.getByTitle('Grand Beaded Trim')).toBeInTheDocument();
     expect(screen.getByText('Star Dollop')).toBeInTheDocument();
     expect(screen.getByText('Round Tip Dollop')).toBeInTheDocument();
     expect(screen.getByText('Kiss-shaped Dollop')).toBeInTheDocument();
@@ -1379,6 +1382,57 @@ describe('edge decoration placement', () => {
     expect(wcWithin.queryByTitle('Whipped Cream Rosettes with Strawberry (Continuous ~20 pc)')).not.toBeInTheDocument();
     expect(wcWithin.queryByTitle('Whipped Cream Rosettes with Strawberry (12 pc)')).not.toBeInTheDocument();
     expect(wcWithin.queryByTitle('Sparse Whipped Cream Rosettes with Strawberry (8 pc)')).not.toBeInTheDocument();
+  });
+
+  it('generates all 6 bracelet beads patterns with correct meshes and rhythmic scalings', async () => {
+    const { buildBeadedTrimRing } = await import('./DecorationSets');
+    const THREE = await import('three');
+
+    const patterns = ['classic', 'trio', 'petite', 'graduated', 'spacer', 'grand'];
+    for (const pattern of patterns) {
+      const ring = buildBeadedTrimRing(3.84, '#FFF', () => 0.5, { pattern });
+      expect(ring).toBeDefined();
+      expect(ring.isInstancedMesh).toBe(true);
+      expect(ring.count).toBeGreaterThan(50);
+    }
+
+    // Verify grand beads are uniform bold
+    const grandRing = buildBeadedTrimRing(3.84, '#FFF', () => 0.5, { pattern: 'grand', count: 60 });
+    const dummy = new THREE.Object3D();
+    const grandScales = [];
+    for (let i = 0; i < 6; i++) {
+      grandRing.getMatrixAt(i, dummy.matrix);
+      dummy.matrix.decompose(dummy.position, dummy.quaternion, dummy.scale);
+      grandScales.push(dummy.scale.x);
+    }
+    expect(grandScales.every((s) => Math.abs(s - grandScales[0]) < 0.001)).toBe(true);
+
+    // Verify spacer beads alternate 1 big then 2 small
+    const spacerRing = buildBeadedTrimRing(3.84, '#FFF', () => 0.5, { pattern: 'spacer', count: 60 });
+    const spacerScales = [];
+    for (let i = 0; i < 6; i++) {
+      spacerRing.getMatrixAt(i, dummy.matrix);
+      dummy.matrix.decompose(dummy.position, dummy.quaternion, dummy.scale);
+      spacerScales.push(dummy.scale.x);
+    }
+    expect(spacerScales[0]).toBeGreaterThan(spacerScales[1]);
+    expect(spacerScales[1]).toBeCloseTo(spacerScales[2], 3);
+    expect(spacerScales[3]).toBeCloseTo(spacerScales[0], 3);
+
+    // Verify graduated beads follow a 6-step wave rhythm
+    const gradRing = buildBeadedTrimRing(3.84, '#FFF', () => 0.5, { pattern: 'graduated', count: 60 });
+    const gradScales = [];
+    for (let i = 0; i < 6; i++) {
+      gradRing.getMatrixAt(i, dummy.matrix);
+      dummy.matrix.decompose(dummy.position, dummy.quaternion, dummy.scale);
+      gradScales.push(dummy.scale.x);
+    }
+    // Peak is at index 3 (cyclePos 3)
+    expect(gradScales[3]).toBeGreaterThan(gradScales[0]);
+    expect(gradScales[3]).toBeGreaterThan(gradScales[1]);
+    expect(gradScales[3]).toBeGreaterThan(gradScales[2]);
+    expect(gradScales[1]).toBeCloseTo(gradScales[5], 3);
+    expect(gradScales[2]).toBeCloseTo(gradScales[4], 3);
   });
 });
 

@@ -641,6 +641,9 @@ export const BRACELET_BEADS_VARIATIONS = [
   // the smallest."
   { id: 'beadedTrimTrio', label: 'Trio Beaded Trim' },
   { id: 'beadedTrimPetite', label: 'Petite Beaded Trim' },
+  { id: 'beadedTrimGraduated', label: 'Graduated Beaded Trim' },
+  { id: 'beadedTrimSpacer', label: 'Spacer Beaded Trim' },
+  { id: 'beadedTrimGrand', label: 'Grand Beaded Trim' },
 ];
 
 export const FRUIT_CONFECTION_RIM_OPTIONS = [

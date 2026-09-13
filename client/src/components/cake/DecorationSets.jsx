@@ -277,7 +277,19 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
  */
 export function buildBeadedTrimRing(radius, colorHex, rand, opts = {}) {
   const pattern = opts.pattern || 'classic';
-  const count = opts.count ?? Math.max(18, Math.round((radius * Math.PI * 2) / 0.28));
+  let count = opts.count;
+  if (!count) {
+    const rawCount = Math.max(18, Math.round((radius * Math.PI * 2) / 0.28));
+    if (pattern === 'trio' || pattern === 'spacer') {
+      count = Math.max(18, Math.round(rawCount / 3) * 3);
+    } else if (pattern === 'graduated') {
+      count = Math.max(18, Math.round(rawCount / 6) * 6);
+    } else if (pattern === 'classic') {
+      count = Math.max(18, Math.round(rawCount / 2) * 2);
+    } else {
+      count = rawCount;
+    }
+  }
   const mat = new THREE.MeshPhysicalMaterial({ color: colorHex, roughness: 0.25, clearcoat: 0.6 });
   const geo = new THREE.SphereGeometry(0.13, 14, 10);
   const mesh = new THREE.InstancedMesh(geo, mat, count);
@@ -290,6 +302,14 @@ export function buildBeadedTrimRing(radius, colorHex, rand, opts = {}) {
       baseScale = cyclePos === 0 ? 0.58 : cyclePos === 1 ? 1.05 : 0.82; // Small, Big, Medium
     } else if (pattern === 'petite') {
       baseScale = 0.62;
+    } else if (pattern === 'graduated') {
+      const cyclePos = i % 6;
+      baseScale = [0.55, 0.72, 0.92, 1.06, 0.92, 0.72][cyclePos]; // Wave swell & taper
+    } else if (pattern === 'spacer') {
+      const cyclePos = i % 3;
+      baseScale = cyclePos === 0 ? 1.06 : 0.55; // Big, Small, Small
+    } else if (pattern === 'grand') {
+      baseScale = 1.02; // Uniform bold statement pearls
     } else {
       const big = i % 2 === 0;
       baseScale = big ? 1 : 0.62;

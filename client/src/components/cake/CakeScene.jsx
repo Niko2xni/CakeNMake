@@ -1600,7 +1600,14 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       // original (buildBeadedTrimRing), just a different bead-size
       // pattern — see that function's own doc comment in
       // DecorationSets.jsx for what each pattern name means.
-      const BEADED_TRIM_PATTERNS = { beadedTrim: 'classic', beadedTrimTrio: 'trio', beadedTrimPetite: 'petite' };
+      const BEADED_TRIM_PATTERNS = {
+        beadedTrim: 'classic',
+        beadedTrimTrio: 'trio',
+        beadedTrimPetite: 'petite',
+        beadedTrimGraduated: 'graduated',
+        beadedTrimSpacer: 'spacer',
+        beadedTrimGrand: 'grand',
+      };
       const edgeSlotsToRender =
         edgeMode === 'both' ? [{ slot: edgeBoth, y: topY, radius: topRadius, isBottom: false }, { slot: edgeBoth, y: 0, radius: BASE_RADIUS, isBottom: true }]
           : [{ slot: edgeTop, y: topY, radius: topRadius, isBottom: false }, { slot: edgeBottom, y: 0, radius: BASE_RADIUS, isBottom: true }];
