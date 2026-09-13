@@ -20,15 +20,6 @@ import {
 } from '@/lib/cakeConfig';
 import SugarColorSection from './SugarColorSection';
 
-const FRUIT_CONFECTION_ICONS = {
-  strawberryRim: '🍓',
-  hersheysKissRim: '🍫',
-  ferreroRocherRim: '🌰',
-  oreoRim: '🍪',
-  basketballRim: '🏀',
-  soccerBallRim: '⚽',
-};
-
 const EMPTY_SLOT = () => ({
   decorations: { setId: null, colorId: 'vanilla' },
   piping: { tip: null, colorId: 'vanilla', secondaryColorId: 'red' },
@@ -299,35 +290,38 @@ export default function EdgeSection({
           {/* Fruit & Confections Rim — direct non-piping borders */}
           <div>
             <span className="text-xs font-semibold text-foreground/80 mb-1.5 block">
-              Fruit & Confections Rim 🍓🍫🍪🏀⚽
+              Fruit & Confections Rim
             </span>
-            <div className="flex flex-wrap gap-2">
-              {FRUIT_CONFECTION_RIM_OPTIONS.map((variant) => {
-                const active =
-                  (currentSlot.piping?.tip || currentSlot.decorations?.setId) === variant.id;
-                const icon = FRUIT_CONFECTION_ICONS[variant.id];
-                return (
-                  <button
-                    key={variant.id}
-                    type="button"
-                    onClick={() =>
-                      updateSlot({
-                        decorations: { ...currentSlot.decorations, setId: null },
-                        piping: { ...currentSlot.piping, tip: active ? null : variant.id },
-                      })
-                    }
-                    title={variant.label}
-                    className={`h-9 px-3 rounded-full flex items-center gap-1.5 text-xs font-medium border-2 transition-all duration-150 ${
-                      active
-                        ? 'bg-primary text-primary-foreground border-primary shadow-md'
-                        : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
-                    }`}
-                  >
-                    <span>{icon}</span>
-                    <span>{variant.label.replace(/ [🍓🍫🌰🍪🏀⚽]/, '')}</span>
-                  </button>
-                );
-              })}
+            <div>
+              <span className="text-[11px] font-medium text-muted-foreground mb-1 block">
+                Designs
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {FRUIT_CONFECTION_RIM_OPTIONS.map((variant, i) => {
+                  const active =
+                    (currentSlot.piping?.tip || currentSlot.decorations?.setId) === variant.id;
+                  return (
+                    <button
+                      key={variant.id}
+                      type="button"
+                      onClick={() =>
+                        updateSlot({
+                          decorations: { ...currentSlot.decorations, setId: null },
+                          piping: { ...currentSlot.piping, tip: active ? null : variant.id },
+                        })
+                      }
+                      title={variant.label}
+                      className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
+                        active
+                          ? 'bg-primary text-primary-foreground border-primary shadow-md'
+                          : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
+                      }`}
+                    >
+                      {i + 1}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 

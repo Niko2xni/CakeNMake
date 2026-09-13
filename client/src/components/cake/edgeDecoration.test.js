@@ -1134,13 +1134,20 @@ describe('edge decoration placement', () => {
       })
     );
 
-    expect(screen.getByText('Fruit & Confections Rim 🍓🍫🍪🏀⚽')).toBeInTheDocument();
-    expect(screen.getByTitle('Fresh Strawberries Rim 🍓')).toBeInTheDocument();
-    expect(screen.getByTitle("Hershey's Kisses Rim 🍫")).toBeInTheDocument();
-    expect(screen.getByTitle('Ferrero Rocher Rim 🌰')).toBeInTheDocument();
-    expect(screen.getByTitle('Oreo Rim 🍪')).toBeInTheDocument();
-    expect(screen.getByTitle('Basketball Rim 🏀')).toBeInTheDocument();
-    expect(screen.getByTitle('Soccer Ball Rim ⚽')).toBeInTheDocument();
+    expect(screen.getByText('Fruit & Confections Rim')).toBeInTheDocument();
+    expect(screen.getByText('Designs')).toBeInTheDocument();
+    [
+      'Fresh Strawberries Rim 🍓',
+      "Hershey's Kisses Rim 🍫",
+      'Ferrero Rocher Rim 🌰',
+      'Oreo Rim 🍪',
+      'Basketball Rim 🏀',
+      'Soccer Ball Rim ⚽',
+    ].forEach((title, index) => {
+      const button = screen.getByTitle(title);
+      expect(button).toHaveTextContent(String(index + 1));
+      expect(button).toHaveClass('w-9', 'h-9', 'rounded-full');
+    });
   });
 
   it('generates strawberry dollop variations with correct strawberry counts, heights, and zero overhang', async () => {
