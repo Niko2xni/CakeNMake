@@ -491,7 +491,7 @@ export function buildOreoRimRing(radius, y, rand = Math.random, opts = {}) {
 
 /** Cherry Rim — complete glossy cherries nestled along the cake edge. */
 export function buildCherryRimRing(radius, y, rand = Math.random, opts = {}) {
-  const count = opts.count ?? Math.max(12, Math.round((radius * Math.PI * 2) / 0.95));
+  const count = opts.count ?? 18;
   const scale = opts.scale ?? 0.85;
   const group = new THREE.Group();
   for (let i = 0; i < count; i++) {
@@ -508,7 +508,7 @@ export function buildCherryRimRing(radius, y, rand = Math.random, opts = {}) {
 }
 
 function buildBallRimRing(buildBall, radius, y, rand, opts) {
-  const count = opts.count ?? Math.max(10, Math.round((radius * Math.PI * 2) / 1.1));
+  const count = opts.count ?? 18;
   const scale = opts.scale ?? 0.18;
   const surfaceLift = 0.50 * scale;
   const group = new THREE.Group();

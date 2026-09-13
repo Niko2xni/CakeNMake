@@ -1209,7 +1209,7 @@ describe('edge decoration placement', () => {
     // 10. Geometry verification: Cherry, Oreo, and ball rim rings
     const cherryRing = buildCherryRimRing(3.70, 1.0, () => 0.5);
     expect(cherryRing.isGroup).toBe(true);
-    expect(cherryRing.children.length).toBeGreaterThanOrEqual(12);
+    expect(cherryRing.children).toHaveLength(18);
     cherryRing.children.forEach((cherry) => {
       expect(cherry.isGroup).toBe(true);
       expect(cherry.children[0].isMesh).toBe(true);
@@ -1271,14 +1271,14 @@ describe('edge decoration placement', () => {
       expect(cookie.position.y).toBeCloseTo((1.55 - 0.04) * oreoScale, 3);
     });
     expect(basketballRing.isGroup).toBe(true);
-    expect(basketballRing.children.length).toBeGreaterThanOrEqual(10);
+    expect(basketballRing.children).toHaveLength(18);
     basketballRing.children.forEach((ball) => {
       expect(ball.isGroup).toBe(true);
       expect(ball.children).toHaveLength(1);
       expect(ball.children[0].isMesh).toBe(true);
     });
     expect(soccerBallRing.isGroup).toBe(true);
-    expect(soccerBallRing.children.length).toBeGreaterThanOrEqual(10);
+    expect(soccerBallRing.children).toHaveLength(18);
     soccerBallRing.children.forEach((ball) => {
       expect(ball.isGroup).toBe(true);
       expect(ball.children).toHaveLength(1);
