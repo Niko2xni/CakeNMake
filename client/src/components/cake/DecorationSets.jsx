@@ -234,7 +234,7 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
     bottomRadialInset = -0.24;
   } else if (baseTip === 'shell') {
     bottomRadialInset = -0.22;
-  } else if (['zigzag', 'wavePiping', 'ropeTwist', 'ropeTwistClassic'].includes(baseTip)) {
+  } else if (['zigzag', 'wavePiping', 'ropeTwist', 'ropeTwistClassic', 'pulledDot'].includes(baseTip)) {
     bottomRadialInset = -0.21;
   } else if (isWhippedCream) {
     bottomRadialInset = -0.74;
@@ -256,9 +256,10 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
       : (isDollopType ? topDollopInset
       : (['shell', 'reverseShell'].includes(baseTip) ? 0.40
       : (baseTip === 'bead' ? 0.38
+      : (baseTip === 'pulledDot' ? 0.40
       : (baseTip === 'zigzag' ? 0.40
       : (baseTip === 'wavePiping' ? 0.40
-      : (['ropeTwist', 'ropeTwistClassic'].includes(baseTip) ? 0.40 : 0.26))))))));
+      : (['ropeTwist', 'ropeTwistClassic'].includes(baseTip) ? 0.40 : 0.26)))))))));
   return Math.max(0.15, surfaceRadius - radialInset);
 
 }

@@ -263,6 +263,7 @@ export const PIPING_TIPS = [
   { id: 'shell', label: 'Shell Border' },
   { id: 'reverseShell', label: 'Reverse Shell' },
   { id: 'bead', label: 'Bead Piping' },
+  { id: 'pulledDot', label: 'Pulled Dot Piping' },
   { id: 'zigzag', label: 'Zigzag Piping' },
   { id: 'wavePiping', label: 'Wave Piping' },
   { id: 'star', label: 'Star' },
@@ -752,6 +753,7 @@ export const BORDER_PIPING_SOLID_VARIATIONS = [
   { id: 'ropeTwistClassic', label: 'Rope Twist (Classic)' },
   { id: 'wavePiping', label: 'Wave Border' },
   { id: 'rope', label: 'Rope Border' },
+  { id: 'pulledDot', label: 'Pulled Dot Piping' },
 ];
 
 export const BORDER_PIPING_ALTERNATING_VARIATIONS = [

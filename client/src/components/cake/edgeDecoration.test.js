@@ -44,6 +44,8 @@ describe('edge decoration placement', () => {
     expect(computeEdgeTrimRadius(4.0, 'reverseShellAlt', 'fullyFrosted', true)).toBeCloseTo(4.30, 2);
     expect(computeEdgeTrimRadius(4.0, 'bead', 'fullyFrosted')).toBeCloseTo(3.68, 2);
     expect(computeEdgeTrimRadius(4.0, 'bead', 'fullyFrosted', true)).toBeCloseTo(4.40, 2);
+    expect(computeEdgeTrimRadius(4.0, 'pulledDot', 'fullyFrosted')).toBeCloseTo(3.66, 2);
+    expect(computeEdgeTrimRadius(4.0, 'pulledDot', 'fullyFrosted', true)).toBeCloseTo(4.27, 2);
     expect(computeEdgeTrimRadius(4.0, 'beadAlt', 'fullyFrosted')).toBeCloseTo(3.68, 2);
     expect(computeEdgeTrimRadius(4.0, 'beadAlt', 'fullyFrosted', true)).toBeCloseTo(4.40, 2);
     expect(computeEdgeTrimRadius(4.0, 'zigzag', 'fullyFrosted')).toBeCloseTo(3.66, 2);
@@ -88,6 +90,7 @@ describe('edge decoration placement', () => {
     expect(screen.getByTitle('Rope Twist (Classic)')).toBeInTheDocument();
     expect(screen.getByTitle('Wave Border')).toBeInTheDocument();
     expect(screen.getByTitle('Rope Border')).toBeInTheDocument();
+    expect(screen.getByTitle('Pulled Dot Piping')).toBeInTheDocument();
     expect(screen.queryByTitle('Shell Border - Alternating')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Reverse Shell - Alternating')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Bead Piping - Alternating')).not.toBeInTheDocument();
@@ -96,7 +99,7 @@ describe('edge decoration placement', () => {
     expect(screen.queryByText('Zigzag Piping')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Zigzag Piping')).not.toBeInTheDocument();
     const borderPiping = within(screen.getByText('Border Piping').closest('div'));
-    expect(borderPiping.getAllByRole('button')).toHaveLength(7);
+    expect(borderPiping.getAllByRole('button')).toHaveLength(8);
     expect(screen.queryByText('Scallops')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Star Scallop')).not.toBeInTheDocument();
     expect(screen.queryByText('Rope')).not.toBeInTheDocument();
@@ -286,6 +289,27 @@ describe('edge decoration placement', () => {
       maxR = Math.max(maxR, Math.sqrt(x * x + z * z));
     }
     expect(maxR).toBeLessThanOrEqual(4.06);
+  });
+
+  it('generates asymmetric pulled-dot units with a rounded head, tapered tail, and zero overhang', async () => {
+    const { buildPipingRing, buildPulledDotUnitGeometry } = await import('./pipingTips');
+    const THREE = await import('three');
+    const unit = buildPulledDotUnitGeometry();
+    const bounds = unit.boundingBox;
+
+    expect(bounds.max.x).toBeGreaterThan(Math.abs(bounds.min.x) * 2);
+    expect(bounds.max.y).toBeCloseTo(0.18, 2);
+    expect(bounds.max.z).toBeCloseTo(0.125, 3);
+
+    const radius = computeEdgeTrimRadius(4.0, 'pulledDot', 'fullyFrosted');
+    const ring = buildPipingRing('pulledDot', new THREE.MeshBasicMaterial(), {
+      radius,
+      y: 1.0,
+      scale: 3,
+    });
+    expect(ring.isInstancedMesh).toBe(true);
+    expect(ring.count).toBe(26);
+    expect(radius + bounds.max.z * 3).toBeLessThanOrEqual(4.06);
   });
 
   it('generates classic rope twist geometry variation with zero overhang', async () => {

@@ -1070,6 +1070,62 @@ function buildBeadUnitGeometry({
   return geo;
 }
 
+/**
+ * Pulled-dot piping starts with a rounded pool of icing and finishes with a
+ * deliberate drag of the round tip. The asymmetric profile below preserves a
+ * full, smooth dot at the head while drawing it into a low pointed tail that
+ * can tuck beneath the next dot around the border.
+ */
+export function buildPulledDotUnitGeometry({
+  length = 0.42,
+  maxWidth = 0.25,
+  maxHeight = 0.18,
+  uSegments = 32,
+  phiSegments = 24,
+} = {}) {
+  const positions = [];
+  const indices = [];
+  const headCenter = 0.28;
+
+  for (let i = 0; i <= uSegments; i++) {
+    const u = i / uSegments;
+    const x = (u - headCenter) * length;
+    const profile = u <= headCenter
+      ? Math.pow(Math.sin((u / headCenter) * Math.PI * 0.5), 0.58)
+      : Math.pow(1 - ((u - headCenter) / (1 - headCenter)), 1.15);
+    const halfWidth = maxWidth * 0.5 * profile;
+    const halfHeight = maxHeight * 0.5 * profile;
+
+    for (let j = 0; j < phiSegments; j++) {
+      const phi = (j / phiSegments) * Math.PI * 2;
+      positions.push(
+        x,
+        Math.max(0, halfHeight + halfHeight * Math.cos(phi)),
+        halfWidth * Math.sin(phi)
+      );
+    }
+  }
+
+  for (let i = 0; i < uSegments; i++) {
+    for (let j = 0; j < phiSegments; j++) {
+      const nextJ = (j + 1) % phiSegments;
+      const current = i * phiSegments + j;
+      const currentNext = i * phiSegments + nextJ;
+      const nextRow = (i + 1) * phiSegments + j;
+      const nextRowNext = (i + 1) * phiSegments + nextJ;
+      indices.push(current, currentNext, nextRow);
+      indices.push(currentNext, nextRowNext, nextRow);
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  geo.computeBoundingBox();
+  return geo;
+}
+
 function buildLeafUnitGeometry() {
   return sweepProfileAlongCurve(
     leafProfilePoints(),
@@ -1917,6 +1973,7 @@ function getUnitGeometry(tip) {
       case 'star': unitGeometryCache[tip] = buildStarUnitGeometry(); break;
       case 'shell': unitGeometryCache[tip] = buildShellUnitGeometry(); break;
       case 'bead': unitGeometryCache[tip] = buildBeadUnitGeometry(); break;
+      case 'pulledDot': unitGeometryCache[tip] = buildPulledDotUnitGeometry(); break;
       case 'round': unitGeometryCache[tip] = buildRoundUnitGeometry(); break;
       case 'leaf': unitGeometryCache[tip] = buildLeafUnitGeometry(); break;
       case 'dropFlower': unitGeometryCache[tip] = buildDropFlowerUnitGeometry(); break;
@@ -2029,6 +2086,11 @@ export function buildPipingRing(tip, material, { radius, y, rand = Math.random, 
       const rawCount = Math.round((radius * Math.PI * 2) / (0.15 * scale));
       const count = Math.max(16, rawCount % 2 === 0 ? rawCount : rawCount + 1);
       return instanceAroundRing(getUnitGeometry('bead'), material, { ringRadius: radius, y, count, rand, scale, secondaryMaterial: secMat });
+    }
+    case 'pulledDot': {
+      const rawCount = Math.round((radius * Math.PI * 2) / (0.30 * scale));
+      const count = Math.max(18, rawCount % 2 === 0 ? rawCount : rawCount + 1);
+      return instanceAroundRing(getUnitGeometry('pulledDot'), material, { ringRadius: radius, y, count, rand, scale });
     }
     case 'round': {
       const count = Math.max(16, Math.round((radius * Math.PI * 2) / (0.2 * scale)));
