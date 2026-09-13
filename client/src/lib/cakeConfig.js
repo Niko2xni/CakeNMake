@@ -337,6 +337,7 @@ export const PIPING_TIPS = [
   { id: 'strawberryRim', label: 'Fresh Strawberries Rim 🍓' },
   { id: 'hersheysKissRim', label: "Hershey's Kisses Rim 🍫" },
   { id: 'ferreroRocherRim', label: 'Ferrero Rocher Rim 🌰' },
+  { id: 'oreoRim', label: 'Oreo Rim 🍪' },
 ];
 
 // ─── Filling Piping Designs — Filling's own piping vocabulary, split out
@@ -644,6 +645,7 @@ export const FRUIT_CONFECTION_RIM_OPTIONS = [
   { id: 'strawberryRim', label: 'Fresh Strawberries Rim 🍓' },
   { id: 'hersheysKissRim', label: "Hershey's Kisses Rim 🍫" },
   { id: 'ferreroRocherRim', label: 'Ferrero Rocher Rim 🌰' },
+  { id: 'oreoRim', label: 'Oreo Rim 🍪' },
 ];
 
 export const DOLLOPS_SOLID_VARIATIONS = [

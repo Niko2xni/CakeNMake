@@ -12,6 +12,7 @@ import {
   buildStrawberryRimRing,
   buildHersheysKissRimRing,
   buildFerreroRocherRimRing,
+  buildOreoRimRing,
   buildCheckerSideSquares,
   buildTriangleSideShapes,
   buildScatterPearlsRing,
@@ -1616,7 +1617,8 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         const isStrawberryRim = slot?.pipingTip === 'strawberryRim';
         const isHersheysKissRim = slot?.pipingTip === 'hersheysKissRim';
         const isFerreroRocherRim = slot?.pipingTip === 'ferreroRocherRim';
-        const isFruitConfectionRim = isStrawberryRim || isHersheysKissRim || isFerreroRocherRim;
+        const isOreoRim = slot?.pipingTip === 'oreoRim';
+        const isFruitConfectionRim = isStrawberryRim || isHersheysKissRim || isFerreroRocherRim || isOreoRim;
 
         const decorationKind = beadedTrimPattern
           ? 'beadedTrim'
@@ -1636,6 +1638,9 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           group.add(trim);
         } else if (isFerreroRocherRim) {
           const trim = buildFerreroRocherRimRing(edgeTrimRadius, edgeTrimY, rand);
+          group.add(trim);
+        } else if (isOreoRim) {
+          const trim = buildOreoRimRing(edgeTrimRadius, edgeTrimY, rand);
           group.add(trim);
         } else if (slot?.pipingTip) {
           const isAltTip = typeof slot.pipingTip === 'string' && slot.pipingTip.includes('Alt');

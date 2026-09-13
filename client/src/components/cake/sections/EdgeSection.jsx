@@ -20,6 +20,13 @@ import {
 } from '@/lib/cakeConfig';
 import SugarColorSection from './SugarColorSection';
 
+const FRUIT_CONFECTION_ICONS = {
+  strawberryRim: '🍓',
+  hersheysKissRim: '🍫',
+  ferreroRocherRim: '🌰',
+  oreoRim: '🍪',
+};
+
 const EMPTY_SLOT = () => ({
   decorations: { setId: null, colorId: 'vanilla' },
   piping: { tip: null, colorId: 'vanilla', secondaryColorId: 'red' },
@@ -290,13 +297,13 @@ export default function EdgeSection({
           {/* Fruit & Confections Rim — direct non-piping borders */}
           <div>
             <span className="text-xs font-semibold text-foreground/80 mb-1.5 block">
-              Fruit & Confections Rim 🍓🍫
+              Fruit & Confections Rim 🍓🍫🍪
             </span>
             <div className="flex flex-wrap gap-2">
               {FRUIT_CONFECTION_RIM_OPTIONS.map((variant) => {
                 const active =
                   (currentSlot.piping?.tip || currentSlot.decorations?.setId) === variant.id;
-                const icon = variant.id === 'strawberryRim' ? '🍓' : (variant.id === 'hersheysKissRim' ? '🍫' : '🌰');
+                const icon = FRUIT_CONFECTION_ICONS[variant.id];
                 return (
                   <button
                     key={variant.id}
@@ -315,7 +322,7 @@ export default function EdgeSection({
                     }`}
                   >
                     <span>{icon}</span>
-                    <span>{variant.label.replace(/ [🍓🍫🌰]/, '')}</span>
+                    <span>{variant.label.replace(/ [🍓🍫🌰🍪]/, '')}</span>
                   </button>
                 );
               })}

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { buildStrawberryMesh } from './toppings/strawberry';
 import { buildHersheysKissMesh } from './toppings/hersheysKiss';
 import { buildFerreroRocherMesh } from './toppings/ferreroRocher';
+import { buildOreoMesh } from './toppings/oreo';
 
 // ─── Decoration Set Geometry — first working example per category ─────────
 // Per instruction: keep every placeholder Set button in the UI (don't
@@ -67,7 +68,7 @@ export function computeEdgeTrimY(topSurfaceY, radius, decorationType = 'piping',
   const isDollopType = decorationType === 'dollops'
     || (typeof decorationType === 'string' && decorationType.startsWith('whippedCreamRosette'))
     || (typeof decorationType === 'string' && decorationType.toLowerCase().includes('dollop'));
-  const isFruitRim = ['strawberryRim', 'hersheysKissRim', 'ferreroRocherRim'].includes(decorationType);
+  const isFruitRim = ['strawberryRim', 'hersheysKissRim', 'ferreroRocherRim', 'oreoRim'].includes(decorationType);
 
   if (isBottom) {
     if (isFruitRim) {
@@ -214,6 +215,8 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
     bottomRadialInset = -0.41;
   } else if (baseTip === 'strawberryRim') {
     bottomRadialInset = -0.31;
+  } else if (baseTip === 'oreoRim') {
+    bottomRadialInset = -0.20;
   } else if (baseTip === 'bead') {
     bottomRadialInset = -0.34;
   } else if (baseTip === 'reverseShell') {
@@ -234,12 +237,13 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
       : (baseTip === 'strawberryRim' ? 0.42
       : (baseTip === 'hersheysKissRim' ? 0.48
       : (baseTip === 'ferreroRocherRim' ? 0.65
+      : (baseTip === 'oreoRim' ? 0.22
       : (isDollopType ? topDollopInset
       : (['shell', 'reverseShell'].includes(baseTip) ? 0.40
       : (baseTip === 'bead' ? 0.38
       : (baseTip === 'zigzag' ? 0.40
       : (baseTip === 'wavePiping' ? 0.40
-      : (['ropeTwist', 'ropeTwistClassic'].includes(baseTip) ? 0.40 : 0.26))))))))));
+      : (['ropeTwist', 'ropeTwistClassic'].includes(baseTip) ? 0.40 : 0.26)))))))))));
   return Math.max(0.15, surfaceRadius - radialInset);
 
 }
@@ -339,6 +343,27 @@ export function buildFerreroRocherRimRing(radius, y, rand = Math.random, opts = 
     const truffle = buildFerreroRocherMesh(cx, y, cz, scale);
     truffle.rotation.y = rand() * Math.PI * 2;
     group.add(truffle);
+  }
+  return group;
+}
+
+/**
+ * Oreo Rim — complete embossed sandwich cookies standing upright and tangent
+ * to the cake edge. The lift compensates for buildOreoMesh's intentional
+ * frosting embed so rim cookies rest directly on the supplied surface.
+ */
+export function buildOreoRimRing(radius, y, rand = Math.random, opts = {}) {
+  const count = opts.count ?? Math.max(10, Math.round((radius * Math.PI * 2) / 1.8));
+  const scale = opts.scale ?? 0.3889;
+  const surfaceLift = 0.70 * scale;
+  const group = new THREE.Group();
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2;
+    const cx = Math.sin(angle) * radius;
+    const cz = Math.cos(angle) * radius;
+    const cookie = buildOreoMesh(cx, y + surfaceLift, cz, scale, Math.PI / 2, angle, 0);
+    cookie.rotation.z += (rand() - 0.5) * 0.08;
+    group.add(cookie);
   }
   return group;
 }
