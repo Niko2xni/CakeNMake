@@ -1,10 +1,10 @@
 require('dotenv').config();
-const mongoose = require('mongoose');
+const connectDB = require('../config/db');
 const PricingPreset = require('../models/PricingPreset');
 const Platform = require('../models/Platform');
 
 async function seed() {
-  await mongoose.connect(process.env.MONGO_URI);
+  await connectDB();
 
   const platform = await Platform.findOne({ slug: 'mamshie-bakery' });
   if (!platform) {

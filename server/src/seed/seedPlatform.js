@@ -1,11 +1,9 @@
 require('dotenv').config();
-const mongoose = require('mongoose');
+const connectDB = require('../config/db');
 const Platform = require('../models/Platform');
 
 async function seed() {
-  // TODO: replace MONGO_URI with whatever env var name your existing db
-  // connection actually uses — check server.js/app.js for the real key.
-  await mongoose.connect(process.env.MONGO_URI);
+  await connectDB();
 
   const existing = await Platform.findOne({ slug: 'mamshie-bakery' });
   if (existing) {
