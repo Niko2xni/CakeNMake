@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowDownRight,
@@ -16,9 +16,7 @@ import './Landing.css';
 const navigation = [
   ['home', 'Home'],
   ['how-it-works', 'How it works'],
-  ['design-brief', 'The experience'],
-  ['about', 'About'],
-  ['questions', 'Questions'],
+  ['about', 'About us'],
 ];
 
 const occasions = ['Birthdays', 'Weddings', 'Anniversaries', 'Milestones', 'Just because'];
@@ -65,10 +63,16 @@ export default function Landing() {
   const [activeSection, setActiveSection] = useState('home');
   const [scrolled, setScrolled] = useState(false);
 
+  const scrollLockRef = useRef(false);
+  const scrollAnimRef = useRef(null);
+  const navContainerRef = useRef(null);
+  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0, opacity: 0 });
+
   useEffect(() => {
     const sections = document.querySelectorAll('.landing-page main section[id]');
     const observer = new IntersectionObserver(
       (entries) => {
+        if (scrollLockRef.current) return;
         entries.forEach((entry) => {
           if (entry.isIntersecting) setActiveSection(entry.target.id);
         });
@@ -81,11 +85,26 @@ export default function Landing() {
   }, []);
 
   useEffect(() => {
-    const updateScrolledState = () => setScrolled(window.scrollY > 36);
+    const updateScrolledState = () => {
+      const hero = document.getElementById('home');
+      if (!hero) {
+        setScrolled(window.scrollY > 80);
+        return;
+      }
+      const heroRect = hero.getBoundingClientRect();
+      // Transition to floating pill navbar when user scrolls past first section into next section
+      const isPastHero = heroRect.bottom <= 130 || (window.scrollY > 100 && activeSection !== 'home');
+      setScrolled(isPastHero);
+    };
+
     updateScrolledState();
     window.addEventListener('scroll', updateScrolledState, { passive: true });
-    return () => window.removeEventListener('scroll', updateScrolledState);
-  }, []);
+    window.addEventListener('resize', updateScrolledState, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', updateScrolledState);
+      window.removeEventListener('resize', updateScrolledState);
+    };
+  }, [activeSection]);
 
   useEffect(() => {
     const reveals = document.querySelectorAll('[data-reveal]');
@@ -107,33 +126,126 @@ export default function Landing() {
 
   const closeMenu = () => setMenuOpen(false);
 
+  const activeNavId =
+    activeSection === 'design-brief'
+      ? 'how-it-works'
+      : activeSection === 'questions'
+      ? 'about'
+      : activeSection;
+
+  const updateIndicator = () => {
+    if (!navContainerRef.current) return;
+    const activeLink = navContainerRef.current.querySelector(`[data-nav-id="${activeNavId}"]`);
+    if (activeLink) {
+      const containerRect = navContainerRef.current.getBoundingClientRect();
+      const linkRect = activeLink.getBoundingClientRect();
+      setIndicatorStyle({
+        left: linkRect.left - containerRect.left,
+        width: linkRect.width,
+        opacity: 1,
+      });
+    }
+  };
+
+  useEffect(() => {
+    updateIndicator();
+    window.addEventListener('resize', updateIndicator);
+    return () => window.removeEventListener('resize', updateIndicator);
+  }, [activeNavId]);
+
+  const smoothScrollTo = (targetY, duration = 800) => {
+    if (scrollAnimRef.current) {
+      cancelAnimationFrame(scrollAnimRef.current);
+    }
+    const startY = window.scrollY;
+    const difference = targetY - startY;
+    if (Math.abs(difference) < 4) {
+      scrollLockRef.current = false;
+      return;
+    }
+
+    const startTime = performance.now();
+    // EaseInOutCubic curve for cinematic smooth scroll
+    const easeInOutCubic = (t) =>
+      t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+    const step = (currentTime) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const ease = easeInOutCubic(progress);
+
+      window.scrollTo(0, startY + difference * ease);
+
+      if (progress < 1) {
+        scrollAnimRef.current = requestAnimationFrame(step);
+      } else {
+        scrollLockRef.current = false;
+      }
+    };
+
+    scrollAnimRef.current = requestAnimationFrame(step);
+  };
+
+  const scrollToSection = (e, targetId) => {
+    if (e) e.preventDefault();
+    closeMenu();
+    scrollLockRef.current = true;
+    setActiveSection(targetId);
+
+    if (targetId === 'home') {
+      smoothScrollTo(0);
+      return;
+    }
+    const targetElement = document.getElementById(targetId);
+    if (targetElement) {
+      const navOffset = 84;
+      const targetPosition = targetElement.getBoundingClientRect().top + window.scrollY - navOffset;
+      smoothScrollTo(Math.max(0, targetPosition));
+    } else {
+      scrollLockRef.current = false;
+    }
+  };
+
   return (
     <div className="landing-page">
-      <header className={`landing-nav ${scrolled ? 'is-scrolled' : ''}`}>
+      <header className={`landing-nav ${scrolled ? 'is-scrolled' : ''} ${menuOpen ? 'menu-is-open' : ''}`}>
         <div className="landing-container nav-inner">
-          <Link to="/" className="landing-brand" onClick={closeMenu} aria-label="CakeNMake home">
+          <Link to="/" className="landing-brand" onClick={(e) => scrollToSection(e, 'home')} aria-label="CakeNMake home">
             Cake<span>N</span>Make
           </Link>
 
-          <nav className={`nav-links ${menuOpen ? 'is-open' : ''}`} aria-label="Main navigation">
+          <nav
+            ref={navContainerRef}
+            className={`nav-links ${menuOpen ? 'is-open' : ''}`}
+            aria-label="Main navigation"
+          >
             {navigation.map(([id, label]) => (
               <a
                 key={id}
                 href={`#${id}`}
-                className={activeSection === id ? 'active' : ''}
-                onClick={closeMenu}
+                data-nav-id={id}
+                className={activeNavId === id ? 'active' : ''}
+                onClick={(e) => scrollToSection(e, id)}
               >
                 {label}
               </a>
             ))}
+            <span
+              className="nav-indicator"
+              style={{
+                transform: `translateX(${indicatorStyle.left}px)`,
+                width: `${indicatorStyle.width}px`,
+                opacity: indicatorStyle.opacity,
+              }}
+              aria-hidden="true"
+            />
             <Link to="/login" className="mobile-login" onClick={closeMenu}>Log in</Link>
             <Link to="/login" className="mobile-start" onClick={closeMenu}>Start designing</Link>
           </nav>
 
           <div className="nav-actions">
-            <Link to="/login" className="nav-login">Log in</Link>
             <Link to="/login" className="nav-cta">
-              Start designing <ArrowDownRight size={16} aria-hidden="true" />
+              Start designing
             </Link>
           </div>
 
@@ -163,7 +275,7 @@ export default function Landing() {
                 <Link to="/login" className="primary-action">
                   Design your cake <ArrowRight size={18} aria-hidden="true" />
                 </Link>
-                <a href="#how-it-works" className="text-action">See how it works</a>
+                <a href="#how-it-works" className="text-action" onClick={(e) => scrollToSection(e, 'how-it-works')}>See how it works</a>
               </div>
               <p className="hero-reassurance">
                 <span aria-hidden="true">✦</span> No design skills needed—just bring the occasion.
@@ -322,11 +434,11 @@ export default function Landing() {
 
       <footer className="landing-footer">
         <div className="landing-container footer-main">
-          <Link to="/" className="footer-brand">Cake<span>N</span>Make</Link>
+          <Link to="/" className="footer-brand" onClick={(e) => scrollToSection(e, 'home')}>Cake<span>N</span>Make</Link>
           <p>Designed by you. Made by a baker.</p>
           <div className="footer-links">
-            <a href="#how-it-works">How it works</a>
-            <a href="#about">About</a>
+            <a href="#how-it-works" onClick={(e) => scrollToSection(e, 'how-it-works')}>How it works</a>
+            <a href="#about" onClick={(e) => scrollToSection(e, 'about')}>About</a>
             <Link to="/login">Log in</Link>
           </div>
         </div>
