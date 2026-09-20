@@ -171,7 +171,7 @@ export default function Login() {
 
           <div className="relative mb-6">
             <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
-            <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-3 text-muted-foreground">or</span></div>
+            <div className="relative flex justify-center text-xs uppercase"><span className="cn-auth-divider-label px-3 text-muted-foreground">or</span></div>
           </div>
         </>
       )}
@@ -244,12 +244,12 @@ export default function Login() {
                 autoFocus
                 autoComplete="one-time-code"
               >
-                <InputOTPGroup className="gap-2">
+                <InputOTPGroup className="cn-auth-otp-group gap-2">
                   {[0, 1, 2, 3, 4, 5].map((index) => (
                     <InputOTPSlot
                       key={index}
                       index={index}
-                      className="h-12 w-11 rounded-xl border border-input bg-background text-base font-semibold shadow-sm data-[active=true]:ring-2 data-[active=true]:ring-primary/40"
+                      className="cn-auth-otp-slot h-12 w-11 rounded-xl border text-base font-semibold shadow-sm"
                     />
                   ))}
                 </InputOTPGroup>
@@ -258,7 +258,7 @@ export default function Login() {
             <Button
               type="button"
               variant="outline"
-              className="w-full h-10 text-sm font-medium disabled:cursor-not-allowed"
+              className="cn-auth-resend w-full h-10 text-sm font-medium disabled:cursor-not-allowed"
               onClick={requestNewOtp}
               disabled={loading || otpTimeLeft > 0}
             >
@@ -267,7 +267,7 @@ export default function Login() {
           </div>
         )}
 
-        <Button type="submit" className="w-full h-12 font-medium" disabled={loading || (otpSent && otp.length !== 6)}>
+        <Button type="submit" className="cn-auth-submit w-full h-12 font-medium" disabled={loading || (otpSent && otp.length !== 6)}>
           {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{otpSent ? "Verifying..." : "Sending code..."}</> : otpSent ? "Verify and log in" : "Send OTP"}
         </Button>
       </form>

@@ -316,9 +316,9 @@ function TemplateCard({ template, onSelect }) {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={handleMouseLeave}
       onClick={() => onSelect(template.id)}
-      className="rounded-xl border border-pink-100 overflow-hidden bg-white/80 backdrop-blur-sm shadow-lg cursor-pointer transition-shadow hover:shadow-xl"
+      className="cn-template-card rounded-xl border border-pink-100 overflow-hidden bg-white/80 backdrop-blur-sm shadow-lg cursor-pointer transition-shadow hover:shadow-xl"
     >
-      <div className="relative w-full aspect-square bg-pink-50 overflow-hidden">
+      <div className="cn-template-card-media relative w-full aspect-[4/3] bg-pink-50 overflow-hidden">
         <img
           src={baseImage}
           alt={template.name}
@@ -334,9 +334,9 @@ function TemplateCard({ template, onSelect }) {
           />
         )}
       </div>
-      <div className="px-3 py-2">
-        <p className="text-xs font-medium text-gray-800 truncate">{template.name}</p>
-        <p className="text-[10px] text-gray-400 truncate">{template.description}</p>
+      <div className="cn-template-card-copy px-3 py-2">
+        <p className="cn-template-card-title font-medium text-gray-800 truncate">{template.name}</p>
+        <p className="cn-template-card-description text-gray-400 truncate">{template.description}</p>
       </div>
     </div>
   );
@@ -362,10 +362,10 @@ function TemplateCarouselRow({ title, templates, onSelect }) {
   }
 
   return (
-    <div className="mb-10">
-      <div className="flex items-center justify-between mb-4">
+    <section className="cn-template-row mb-10">
+      <div className="cn-template-row-header flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-gray-800">{title}</h2>
-        <div className="flex gap-2">
+        <div className="cn-template-row-controls flex gap-2">
           <button
             onClick={() => scrollByPage(-1)}
             aria-label="Previous templates"
@@ -383,20 +383,22 @@ function TemplateCarouselRow({ title, templates, onSelect }) {
         </div>
       </div>
 
-      <div
-        ref={scrollRef}
-        onScroll={handleScroll}
-        className={`flex gap-6 overflow-x-auto scroll-smooth pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${
-          isScrolling ? 'pointer-events-none' : ''
-        }`}
-      >
-        {templates.map((template) => (
-          <div key={template.id} className="flex-shrink-0 w-[22%] min-w-[220px]">
-            <TemplateCard template={template} onSelect={onSelect} />
-          </div>
-        ))}
+      <div className="cn-template-track-shell">
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className={`cn-template-track flex overflow-x-auto scroll-smooth pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${
+            isScrolling ? 'pointer-events-none' : ''
+          }`}
+        >
+          {templates.map((template) => (
+            <div key={template.id} className="cn-template-item flex-shrink-0">
+              <TemplateCard template={template} onSelect={onSelect} />
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -559,7 +561,7 @@ export default function Templates({ onSelectTemplate }) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-orange-50 ml-[70px]">
+    <div className="cn-app-page cn-templates-page min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-orange-50 ml-[70px]">
       <style>{`
         @keyframes fadeIn {
           0% { opacity: 0; }
@@ -571,10 +573,10 @@ export default function Templates({ onSelectTemplate }) {
         }
       `}</style>
       <ClientNavbar />
-      <div className="w-full px-6 md:px-10 py-6">
-        <div className="max-w-[1800px] mx-auto">
+      <div className="cn-templates-shell w-full px-6 md:px-10 py-6">
+        <div className="cn-templates-content mx-auto">
           {/* Hero / search section */}
-          <div className="max-w-3xl mx-auto text-center pt-6 pb-10">
+          <div className="cn-page-header cn-template-hero max-w-3xl mx-auto text-center pt-6 pb-10">
             <h1 className="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-rose-500 to-orange-400 mb-6">
               What cake will you design today?
             </h1>

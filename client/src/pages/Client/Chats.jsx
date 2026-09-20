@@ -775,20 +775,31 @@ export default function Chats() {
   function renderTextWithLinks(text) {
     const parts = text.split(URL_REGEX);
     return parts.map((part, i) =>
-      URL_REGEX.test(part) ? (
+      /^https?:\/\//.test(part) ? (
         <a
           key={i}
           href={part}
           target="_blank"
           rel="noopener noreferrer"
-          className="underline break-all hover:opacity-80"
+          title={part}
+          className="cn-chat-inline-link underline hover:opacity-80"
         >
-          {part}
+          {formatReadableUrl(part)}
         </a>
       ) : (
         <span key={i}>{part}</span>
       )
     );
+  }
+
+  function formatReadableUrl(url) {
+    try {
+      const parsed = new URL(url);
+      const readable = `${parsed.hostname.replace(/^www\./, '')}${parsed.pathname === '/' ? '' : parsed.pathname}`;
+      return readable.length > 42 ? `${readable.slice(0, 39)}…` : readable;
+    } catch {
+      return url.length > 42 ? `${url.slice(0, 39)}…` : url;
+    }
   }
 
   function getMatchingSentence(text, query) {
@@ -989,7 +1000,7 @@ export default function Chats() {
   });
 
   return (
-    <div className="h-screen w-full flex bg-pink-50 overflow-hidden">
+    <div className="cn-chat-page h-screen w-full flex bg-pink-50 overflow-hidden">
       <style>{`
         @keyframes jumpBalloon {
           0% { transform: scale(1); }
@@ -1000,8 +1011,8 @@ export default function Chats() {
       `}</style>
       <ClientNavbar />
 
-      <div className="flex flex-1 ml-[70px] min-w-0 h-screen overflow-hidden p-4">
-        <div className="flex flex-1 min-w-0 rounded-2xl border border-pink-100 shadow-xl overflow-hidden bg-white">
+      <div className="cn-chat-body flex flex-1 ml-[70px] min-w-0 h-screen overflow-hidden p-4">
+        <div className="cn-chat-frame flex flex-1 min-w-0 rounded-2xl border border-pink-100 shadow-xl overflow-hidden bg-white">
           {/* Main conversation column */}
           <div
             className="relative flex flex-col flex-1 min-w-0"
@@ -1013,7 +1024,7 @@ export default function Chats() {
           >
             {/* Top nav: conversation info only */}
             <header className="flex-shrink-0 border-b border-pink-100 bg-white/90 backdrop-blur-sm px-4 sm:px-6 py-3">
-              <div className="flex items-center justify-between w-full">
+              <div className="cn-chat-header-content flex items-center justify-between w-full">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="relative flex-shrink-0">
                     <div className="w-11 h-11 rounded-full bg-gradient-to-br from-pink-500 via-rose-500 to-orange-400 flex items-center justify-center">
@@ -1036,7 +1047,7 @@ export default function Chats() {
                 {/* Facebook Messenger Style Circular Info Button */}
                 <button
                   onClick={toggleInfo}
-                  className={`p-2 rounded-full transition-all duration-200 outline-none focus:outline-none flex items-center justify-center ${
+                  className={`cn-chat-info-button px-3 py-2 rounded-full transition-all duration-200 outline-none focus:outline-none flex items-center justify-center gap-2 ${
                     showInfo 
                       ? 'bg-pink-100 text-pink-600 shadow-md ring-2 ring-pink-200' 
                       : 'text-pink-500 hover:bg-gray-100 hover:text-pink-600 hover:shadow-md hover:ring-4 hover:ring-gray-100'
@@ -1045,27 +1056,28 @@ export default function Chats() {
                   title="Chat info"
                 >
                   <Info className="w-5 h-5 stroke-[2.5]" />
+                  <span>Details</span>
                 </button>
               </div>
             </header>
 
             {/* Messages */}
             <div className="relative flex-1 min-h-0" onClick={focusComposer}>
-              <div className="absolute top-0 right-0 h-full w-5 flex flex-col z-10">
+              <div className="cn-chat-scrollbar absolute top-0 right-0 h-full w-4 flex flex-col z-10">
                 <button
                   onClick={scrollMessagesUp}
                   aria-label="Scroll up"
                   title="Scroll up"
-                  className="h-5 flex-shrink-0 flex items-center justify-center text-pink-300 hover:text-pink-400 text-[10px] leading-none transition-colors cursor-default"
+                  className="cn-chat-scroll-button h-5 flex-shrink-0 flex items-center justify-center text-[10px] leading-none transition-colors"
                 >
                   ▲
                 </button>
-                <div onClick={handleTrackClick} className="relative flex-1 cursor-default">
+                <div onClick={handleTrackClick} className="cn-chat-scroll-track relative flex-1 cursor-pointer">
                   {thumbMetrics.visible && (
                     <div
                       onMouseDown={handleThumbMouseDown}
                       onClick={(e) => e.stopPropagation()}
-                      className="absolute left-1/2 -translate-x-1/2 w-2.5 bg-pink-300 hover:bg-pink-400 rounded-full transition-colors cursor-default"
+                      className="cn-chat-scroll-thumb absolute left-1/2 -translate-x-1/2 w-1.5 rounded-full transition-colors cursor-grab active:cursor-grabbing"
                       style={{ top: thumbMetrics.top, height: thumbMetrics.height }}
                     />
                   )}
@@ -1074,7 +1086,7 @@ export default function Chats() {
                   onClick={scrollMessagesDown}
                   aria-label="Scroll down"
                   title="Scroll down"
-                  className="h-5 flex-shrink-0 flex items-center justify-center text-pink-300 hover:text-pink-400 text-[10px] leading-none transition-colors cursor-default"
+                  className="cn-chat-scroll-button h-5 flex-shrink-0 flex items-center justify-center text-[10px] leading-none transition-colors"
                 >
                   ▼
                 </button>
@@ -1083,15 +1095,16 @@ export default function Chats() {
               <div
                 ref={messagesScrollRef}
                 onScroll={updateThumbMetrics}
-                className="h-full overflow-y-auto pl-3 sm:pl-6 pr-6 sm:pr-9 py-6 bg-gradient-to-br from-pink-50 via-rose-50 to-orange-50 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]"
+                className="cn-chat-scroll h-full overflow-y-auto pl-3 sm:pl-6 pr-6 sm:pr-9 py-6 bg-gradient-to-br from-pink-50 via-rose-50 to-orange-50 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]"
               >
+              <div className="cn-chat-stream">
               <div className="flex justify-center mb-6">
                 <span className="text-xs font-medium text-gray-500 bg-white/70 px-3 py-1 rounded-full">
                   Today
                 </span>
               </div>
 
-              <div className="space-y-1 px-2">
+              <div className="cn-chat-message-list space-y-1 px-2">
                 {decorated.map((m) => {
                   const isUser = m.sender === 'user';
                   const isHighlighted = highlightId === m.id;
@@ -1101,7 +1114,7 @@ export default function Chats() {
                       <div
                         key={m.id}
                         id={`msg-${m.id}`}
-                        className={`group flex self-end mb-2 flex items-center gap-2 ${isUser ? 'justify-end' : 'justify-start'} ${m.isFirstInGroup ? 'mt-4' : 'mt-1'}`}
+                        className={`cn-chat-like-message group flex self-end mb-2 items-center gap-2 ${isUser ? 'justify-end' : 'justify-start'} ${m.isFirstInGroup ? 'mt-4' : 'mt-1'}`}
                       >
                         {isUser && (
                         <div className="self-center flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1124,12 +1137,13 @@ export default function Chats() {
                           </div>
                         )}
                         <div
-                          className={`w-12 h-12 rounded-full flex items-center justify-center text-pink-500 transition-shadow ${
+                          className={`cn-chat-like-bubble w-10 h-10 rounded-full flex items-center justify-center text-pink-500 transition-shadow ${
                             isHighlighted ? 'ring-1 ring-pink-300' : ''
                           }`}
                         >
-                          <ThumbsUp className="w-9 h-9" />
+                          <ThumbsUp className="w-6 h-6" />
                         </div>
+                        <span className="cn-chat-like-time">{formatTime(m.createdAt)}</span>
                         {!isUser && (
                           <div className="self-center flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
@@ -1156,8 +1170,9 @@ export default function Chats() {
 
                   return (
                     <div
-                      key={m.id} className={ m.isFirstInGroup ? 'mt-4' : 'mt-1'
+                      key={m.id} className={`cn-chat-message-group ${m.isFirstInGroup ? 'mt-4' : 'mt-1'
                       }
+                      `}
                     >
                   {/* Reply preview - its own row, above the message row, so it never
                       inflates the height the Pin/Reply buttons center against below */}
@@ -1203,7 +1218,7 @@ export default function Chats() {
                 {/* Wrap both rows in a React Fragment */}
                 <>
                   {/* Message Row */}
-                  <div className={`flex items-end gap-3 max-w-[85%] ${isUser ? 'ml-auto flex-row-reverse' : ''}`}>
+                  <div className={`cn-chat-message-row flex items-end gap-3 ${isUser ? 'ml-auto flex-row-reverse' : ''}`}>
                     {/* Avatar placement */}
                     <div className="w-9 h-9 flex-shrink-0">
                       {m.isFirstInGroup && !isUser && (
@@ -1214,11 +1229,11 @@ export default function Chats() {
                   </div>
 
                   {/* Bubble Anchor & Action buttons block */}
-                  <div className="max-w-[48%] sm:max-w-md w-full flex flex-col">
+                  <div className="cn-chat-message-cluster w-full flex flex-col">
                     {/* Pinned Indicator label row */}
-                    {m.type === 'text' && m.pinned && (
-                      <p className={`text-[10px] font-medium text-pink-400 mb-0.5 ${isUser ? 'text-right pr-1' : 'pl-1'}`}>
-                        Pinned
+                    {m.pinned && (
+                      <p className={`cn-chat-pinned-badge ${isUser ? 'self-end' : 'self-start'}`}>
+                        <Pin className="w-3 h-3" fill="currentColor" /> Pinned
                       </p>
                     )}
 
@@ -1226,12 +1241,9 @@ export default function Chats() {
           <div className={`group flex items-center gap-1.5 ${isUser ? 'flex-row-reverse' : ''}`}>
             
             {/* Bubble Content Wrapper */}
-            <div className="bubble-anchor relative min-w-0 max-w-full">
+            <div className="cn-chat-bubble-anchor bubble-anchor relative min-w-0 max-w-full">
               {m.type === 'text' && (
                 <div className={`relative w-fit max-w-full ${isUser ? 'ml-auto' : ''}`}>
-                  {m.pinned && (
-                    <Pin className={`w-3 h-3 absolute -top-1 ${isUser ? '-left-1.5' : '-right-1.5'} text-pink-400`} fill="currentColor" />
-                  )}
                   <div id={`msg-${m.id}`} className={`px-4 py-2 rounded-2xl text-sm break-words transition-shadow ${
                     isHighlighted ? 'ring-1 ring-pink-300' : ''
                   } ${
@@ -1247,12 +1259,12 @@ export default function Chats() {
                     if (!firstUrl) return null;
                     const info = getLinkInfo(firstUrl);
                     return (
-                      <div className={`mt-2 rounded-xl border p-2.5 text-xs bg-white text-gray-700 shadow-sm border-pink-100 max-w-xs ${isUser ? 'ml-auto' : ''}`}>
+                      <div className={`cn-chat-link-preview mt-2 rounded-xl border p-2.5 text-xs bg-white text-gray-700 shadow-sm border-pink-100 max-w-xs ${isUser ? 'ml-auto' : ''}`}>
                         <div className="flex items-center gap-1.5 mb-1 font-semibold text-pink-600">
                           <Link2 className="w-3.5 h-3.5" />
                           <span>{info.label}</span>
                         </div>
-                        <p className="text-gray-500 truncate mb-1">{firstUrl}</p>
+                        <p className="text-gray-500 truncate mb-1" title={firstUrl}>{formatReadableUrl(firstUrl)}</p>
                         <a href={firstUrl} target="_blank" rel="noopener noreferrer" className="text-pink-500 font-medium hover:underline flex items-center gap-0.5">
                           Open Link <ChevronRight className="w-3 h-3" />
                         </a>
@@ -1269,9 +1281,6 @@ export default function Chats() {
                   isUser ? 'ml-auto border-pink-200' : 'border-pink-100 shadow-sm'
                 }`}
                 >
-                  {m.pinned && (
-                    <Pin className={`w-3 h-3 absolute -top-1 z-10 ${isUser ? '-left-1.5' : '-right-1.5'} text-pink-400`} fill="currentColor" />
-                  )}
                   {m.illustration ? (
                     <div className="w-64 aspect-[3/2]">
                       <CakeIllustration />
@@ -1294,9 +1303,6 @@ export default function Chats() {
                   isUser ? 'ml-auto border-pink-200' : 'border-pink-100 shadow-sm'
                 }`}
                 >
-                  {m.pinned && (
-                    <Pin className={`w-3 h-3 absolute -top-1 z-10 ${isUser ? '-left-1.5' : '-right-1.5'} text-pink-400`} fill="currentColor" />
-                  )}
                   <div className="relative inline-block">
                     <video src={m.fileUrl} className="block w-auto h-auto max-w-full max-h-[380px]" muted playsInline preload="metadata" />
                     <div className="absolute inset-0 flex items-center justify-center bg-black/20">
@@ -1323,9 +1329,6 @@ export default function Chats() {
                   isUser ? 'ml-auto bg-white/90 border-pink-200' : 'bg-white border-pink-100 shadow-sm'
                 } ${m.fileUrl ? 'hover:bg-pink-50' : 'cursor-default'}`}
                 >
-                  {m.pinned && (
-                    <Pin className={`w-3 h-3 absolute -top-1 z-10 ${isUser ? '-left-1.5' : '-right-1.5'} text-pink-400`} fill="currentColor" />
-                  )}
                   <div className="w-9 h-9 rounded-lg bg-pink-100 flex items-center justify-center flex-shrink-0">
                     <FileText className="w-4.5 h-4.5 text-pink-600" />
                   </div>
@@ -1338,7 +1341,7 @@ export default function Chats() {
             </div>
 
             {/* Action buttons (Pin / Reply) — sit as siblings to bubble-anchor, centering strictly against it */}
-            <div className="self-center flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+            <div className="cn-chat-message-actions self-center flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex-shrink-0">
               <button onClick={() => startReply(m)} title="Reply" aria-label="Reply" className="w-7 h-7 rounded-full bg-white border border-pink-100 shadow-sm flex items-center justify-center text-pink-500 hover:bg-pink-50">
                 <Reply className="w-3.5 h-3.5" />
               </button>
@@ -1354,7 +1357,7 @@ export default function Chats() {
       {/* Timestamp Row */}
       {m.isLastInGroup && (
         <div
-          className={`mt-1 ${
+          className={`cn-chat-timestamp mt-1 ${
             isUser
               ? 'flex justify-end pr-2'
               : 'pl-9'
@@ -1373,6 +1376,7 @@ export default function Chats() {
                 <div ref={bottomRef} />
               </div>
               </div>
+              </div>
               
             </div>
             
@@ -1385,7 +1389,7 @@ export default function Chats() {
             )}
 
             {/* Composer: attach, text box, like/send */}
-            <div className="flex-shrink-0 border-t border-pink-100 bg-white/95 backdrop-blur-sm px-3 sm:px-6 py-3">
+            <div className="cn-chat-composer flex-shrink-0 border-t border-pink-100 bg-white/95 backdrop-blur-sm px-3 sm:px-6 py-3">
               {replyingTo && (
                 <div className="w-full flex items-center gap-2 px-1 pb-2">
                   <Reply className="w-3.5 h-3.5 text-pink-500 flex-shrink-0" />
@@ -1452,7 +1456,7 @@ export default function Chats() {
                 </div>
               )}
 
-              <div className="w-full flex items-center gap-2">
+              <div className="cn-chat-composer-row w-full flex items-center gap-2">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -1464,9 +1468,10 @@ export default function Chats() {
                   onClick={handleAttachClick}
                   aria-label="Attach a photo, video, or file"
                   title="Attach a photo, video, or file"
-                  className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-pink-500 hover:bg-pink-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-300"
+                  className="cn-chat-attach flex-shrink-0 h-10 rounded-full flex items-center justify-center gap-2 text-pink-500 hover:bg-pink-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-300"
                 >
-                  <ImageIcon className="w-6 h-6" />
+                  <ImageIcon className="w-5 h-5" />
+                  <span>Attach</span>
                 </button>
 
                 <input
@@ -1480,25 +1485,25 @@ export default function Chats() {
                   className="flex-1 px-4 py-2.5 rounded-full bg-pink-50/70 border border-pink-100 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-300 focus:border-transparent"
                 />
 
-                {(inputText.trim() || pendingAttachments.length > 0) ? (
-                  <button
-                    onClick={handleSendText}
-                    aria-label="Send message"
-                    title="Press Enter to send"
-                    className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-white flex items-center justify-center hover:from-pink-600 hover:to-rose-600 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-300"
-                  >
-                    <Send className="w-5 h-5" />
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleSendLike}
-                    aria-label="Send a like"
-                    title="Send a like"
-                    className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-pink-500 hover:bg-pink-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-300"
-                  >
-                    <ThumbsUp className="w-6 h-6" />
-                  </button>
-                )}
+                <button
+                  onClick={handleSendLike}
+                  aria-label="Send a quick like"
+                  title="Send a quick like"
+                  className="cn-chat-quick-like flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-pink-500 hover:bg-pink-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-300"
+                >
+                  <ThumbsUp className="w-5 h-5" />
+                </button>
+
+                <button
+                  onClick={handleSendText}
+                  disabled={!inputText.trim() && pendingAttachments.length === 0}
+                  aria-label="Send message"
+                  title="Press Enter to send"
+                  className="cn-chat-send flex-shrink-0 h-10 rounded-full text-white flex items-center justify-center gap-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-300"
+                >
+                  <span>Send</span>
+                  <Send className="w-4 h-4" />
+                </button>
               </div>
             </div>
 

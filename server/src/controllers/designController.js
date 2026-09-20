@@ -4,10 +4,11 @@ const { deleteImageByUrl } = require('../config/cloudinary');
 // Get all designs for a user
 exports.getDesigns = async (req, res) => {
   try {
-    const { userId } = req.query;
-    const designs = await Design.find({ userId })
+    const { userId, isTrashed = 'false' } = req.query;
+    const trashOnly = isTrashed === 'true';
+    const designs = await Design.find({ userId, isTrashed: trashOnly })
       .sort({ lastEdited: -1 })
-      .limit(3);
+      .limit(trashOnly ? 5 : 3);
     res.json(designs);
   } catch (error) {
     console.error('Error fetching designs:', error);

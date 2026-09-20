@@ -1,8 +1,8 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ClientNavbar from '@/components/client/ClientNavbar';
 import { useAuth } from '@/lib/AuthContext';
 import { auth, facebookProvider, googleProvider, storage } from '@/lib/firebase';
-import { Camera, User, Facebook, Globe, Loader2 } from 'lucide-react';
+import { User, Facebook, Globe, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { linkWithPopup, unlink, updateProfile } from 'firebase/auth';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 
@@ -31,10 +31,59 @@ export default function Profile() {
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [photoError, setPhotoError] = useState('');
   const [localPhotoURL, setLocalPhotoURL] = useState(user?.photoURL || null);
+  const [providerData, setProviderData] = useState(user?.providerData || []);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState(user?.displayName || '');
+  const [isSavingName, setIsSavingName] = useState(false);
+  const [feedback, setFeedback] = useState(null);
+  const [disconnectTarget, setDisconnectTarget] = useState(null);
+  const [preferenceStatus, setPreferenceStatus] = useState('Preferences save automatically on this device.');
 
-  const displayPhotoURL = localPhotoURL || user?.photoURL || null;
-  const displayName = user?.displayName || user?.email?.split('@')[0]?.replace(/[._-]/g, ' ') || 'Cake Lover';
+  const preferenceKey = `cakenmake-profile-preferences-${user?.uid || user?.email || 'guest'}`;
+  const [preferences, setPreferences] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(preferenceKey) || '{}');
+    } catch {
+      return {};
+    }
+  });
+
+  const displayPhotoURL = localPhotoURL;
+  const fallbackDisplayName = user?.displayName || user?.email?.split('@')[0]?.replace(/[._-]/g, ' ') || 'Cake Lover';
+  const displayName = nameValue.trim() || fallbackDisplayName;
   const email = user?.email || 'user@example.com';
+  const authProviderSignature = (user?.providerData || [])
+    .map((profile) => `${profile.providerId}:${profile.uid || profile.email || ''}`)
+    .join('|');
+
+  useEffect(() => {
+    setProviderData(user?.providerData || []);
+  // The signature avoids resetting locally refreshed provider state merely
+  // because an auth context consumer receives a new object reference.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authProviderSignature]);
+
+  useEffect(() => {
+    setNameValue(user?.displayName || '');
+  }, [user?.displayName]);
+
+  useEffect(() => {
+    localStorage.setItem(preferenceKey, JSON.stringify(preferences));
+  }, [preferenceKey, preferences]);
+
+  useEffect(() => {
+    if (!disconnectTarget) return undefined;
+    const handleEscape = (event) => event.key === 'Escape' && setDisconnectTarget(null);
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [disconnectTarget]);
+
+  const showFeedback = (type, message) => setFeedback({ type, message });
+
+  const handlePreferenceChange = (key, value) => {
+    setPreferences((current) => ({ ...current, [key]: value }));
+    setPreferenceStatus('Saved on this device.');
+  };
 
   const handlePhotoUpload = async (event) => {
     const selectedFile = event.target.files?.[0];
@@ -59,6 +108,7 @@ export default function Profile() {
       const photoURL = await getDownloadURL(avatarRef);
       await updateProfile(user, { photoURL });
       setLocalPhotoURL(photoURL);
+      showFeedback('success', 'Your profile photo was updated.');
     } catch (error) {
       console.error('Could not upload profile photo:', error);
       setPhotoError(error?.message || 'Unable to upload your profile photo right now.');
@@ -78,6 +128,7 @@ export default function Profile() {
       setIsUploadingPhoto(true);
       await updateProfile(user, { photoURL: null });
       setLocalPhotoURL(null);
+      showFeedback('success', 'Your profile photo was removed.');
     } catch (error) {
       console.error('Could not remove profile photo:', error);
       setPhotoError(error?.message || 'Unable to remove your profile photo right now.');
@@ -87,7 +138,7 @@ export default function Profile() {
   };
 
   const socialAccounts = useMemo(() => {
-    const providerMap = new Map((user?.providerData || []).map((profile) => [profile.providerId, profile]));
+    const providerMap = new Map(providerData.map((profile) => [profile.providerId, profile]));
 
     return Object.entries(SOCIAL_CONFIG).map(([providerId, config]) => {
       const account = providerMap.get(providerId);
@@ -99,7 +150,25 @@ export default function Profile() {
         accountEmail: account?.email || null,
       };
     });
-  }, [user]);
+  }, [providerData]);
+
+  const handleSaveName = async () => {
+    const nextName = nameValue.trim();
+    if (!nextName || !user || !auth) return;
+
+    setIsSavingName(true);
+    setFeedback(null);
+    try {
+      await updateProfile(user, { displayName: nextName });
+      setIsEditingName(false);
+      showFeedback('success', 'Your display name was updated.');
+    } catch (error) {
+      console.error('Could not update display name:', error);
+      showFeedback('error', error?.message || 'Unable to update your display name right now.');
+    } finally {
+      setIsSavingName(false);
+    }
+  };
 
   const handleConnectProvider = async (providerId) => {
     if (!user || !auth) return;
@@ -108,9 +177,12 @@ export default function Profile() {
     setConnectingProvider(providerId);
 
     try {
-      await linkWithPopup(user, provider);
+      const result = await linkWithPopup(user, provider);
+      setProviderData(result?.user?.providerData || user.providerData || []);
+      showFeedback('success', `${SOCIAL_CONFIG[providerId].provider} was connected successfully.`);
     } catch (error) {
       console.error(`Could not connect ${providerId}:`, error);
+      showFeedback('error', error?.message || `Unable to connect ${SOCIAL_CONFIG[providerId].provider}.`);
     } finally {
       setConnectingProvider(null);
     }
@@ -119,32 +191,60 @@ export default function Profile() {
   const handleDisconnectProvider = async (providerId) => {
     if (!user || !auth) return;
 
+    if (providerData.length <= 1) {
+      showFeedback('error', 'Connect another sign-in method before disconnecting your only provider.');
+      return;
+    }
+
     setDisconnectingProvider(providerId);
 
     try {
-      await unlink(user, providerId);
+      const updatedUser = await unlink(user, providerId);
+      setProviderData(updatedUser?.providerData || user.providerData?.filter((profile) => profile.providerId !== providerId) || []);
+      setDisconnectTarget(null);
+      showFeedback('success', `${SOCIAL_CONFIG[providerId].provider} was disconnected.`);
     } catch (error) {
       console.error(`Could not disconnect ${providerId}:`, error);
+      showFeedback('error', error?.message || `Unable to disconnect ${SOCIAL_CONFIG[providerId].provider}.`);
     } finally {
       setDisconnectingProvider(null);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-orange-50 ml-[70px]">
+    <div className="cn-app-page cn-profile-page min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-orange-50 ml-[70px]">
       <ClientNavbar />
 
-      <div className="container mx-auto px-4 py-12">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-5xl font-bold text-center text-gray-800 mb-10">Your profile</h1>
+      <div className="cn-profile-shell max-w-5xl mx-auto px-6 py-8">
+          <header className="cn-profile-header">
+            <p className="cn-profile-eyebrow">Made personal</p>
+            <h1 className="cn-profile-title text-5xl font-bold text-gray-800">Your profile</h1>
+            <p className="cn-profile-intro">Keep your account details, preferences, and sign-in methods in one place.</p>
+          </header>
 
-          <div className="mb-12">
-            <h2 className="text-3xl font-bold text-left text-gray-800 mb-6">Your account</h2>
+          <div className="cn-profile-feedback-region" aria-live="polite">
+            {feedback && (
+              <div className={`cn-profile-feedback is-${feedback.type}`} role={feedback.type === 'error' ? 'alert' : 'status'}>
+                {feedback.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                <span>{feedback.message}</span>
+                <button type="button" onClick={() => setFeedback(null)} aria-label="Dismiss notification">×</button>
+              </div>
+            )}
+          </div>
 
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="flex flex-col gap-4 px-6 py-6 border-b border-gray-200 md:flex-row md:items-center md:justify-between">
+          <section className="cn-profile-section">
+            <div className="cn-profile-section-heading">
+              <div>
+                <h2>Account details</h2>
+                <p>Manage the information that shapes your CakeNMake experience.</p>
+              </div>
+              <span className="cn-profile-save-status" role="status" aria-live="polite">{preferenceStatus}</span>
+            </div>
+
+            <div className="cn-profile-card bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="cn-profile-photo-row flex flex-col gap-4 px-6 py-5 border-b border-gray-200 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-center gap-5">
-                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-pink-200 via-rose-200 to-orange-200 flex items-center justify-center overflow-hidden border border-gray-200">
+                  <div className="cn-profile-avatar w-20 h-20 rounded-full bg-gradient-to-br from-pink-200 via-rose-200 to-orange-200 flex items-center justify-center overflow-hidden border border-gray-200">
                     {displayPhotoURL ? (
                       <img src={displayPhotoURL} alt={displayName} className="w-full h-full object-cover" />
                     ) : (
@@ -152,23 +252,28 @@ export default function Profile() {
                     )}
                   </div>
 
-                  <div className="text-xl font-semibold text-left text-gray-800">Profile Photo</div>
+                  <div>
+                    <div className="text-lg font-semibold text-left text-gray-800">Profile photo</div>
+                    <p className="cn-profile-helper">PNG, JPG, or WebP.</p>
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={handleRemovePhoto}
-                    disabled={isUploadingPhoto || !user}
-                    className="px-4 py-2 rounded-xl border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
-                  >
-                    {isUploadingPhoto ? 'Updating...' : 'Remove photo'}
-                  </button>
+                  {displayPhotoURL && (
+                    <button
+                      type="button"
+                      onClick={handleRemovePhoto}
+                      disabled={isUploadingPhoto || !user}
+                      className="cn-profile-button px-4 py-2 rounded-xl border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                    >
+                      {isUploadingPhoto ? 'Removing...' : 'Remove photo'}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploadingPhoto || !user}
-                    className="px-4 py-2 rounded-xl border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                    className="cn-profile-button px-4 py-2 rounded-xl border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
                   >
                     {isUploadingPhoto ? 'Uploading...' : 'Change photo'}
                   </button>
@@ -184,56 +289,99 @@ export default function Profile() {
               </div>
 
               {photoError && (
-                <div className="px-6 py-3 text-sm text-red-600 bg-red-50 border-b border-red-100">{photoError}</div>
+                <div role="alert" className="px-6 py-3 text-sm text-red-600 bg-red-50 border-b border-red-100">{photoError}</div>
               )}
 
-              <div className="divide-y divide-gray-200">
-                <div className="flex flex-col gap-3 px-6 py-5 text-left md:flex-row md:items-center md:justify-between">
-                  <div className="text-xl font-semibold text-gray-800">Name</div>
-                  <div className="flex items-center gap-4">
-                    <span className="text-lg text-gray-700">{displayName}</span>
-                    <button className="px-4 py-2 rounded-xl border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-                      Edit
-                    </button>
+              <div className="cn-profile-fields divide-y divide-gray-200">
+                <div className="cn-profile-field-row flex flex-col gap-3 px-6 py-4 text-left md:flex-row md:items-center md:justify-between">
+                  <div className="cn-profile-field-label">Name</div>
+                  <div className="cn-profile-field-value flex items-center gap-3">
+                    {isEditingName ? (
+                      <>
+                        <input
+                          value={nameValue}
+                          onChange={(event) => setNameValue(event.target.value)}
+                          onKeyDown={(event) => event.key === 'Enter' && handleSaveName()}
+                          aria-label="Display name"
+                          autoFocus
+                          maxLength={60}
+                        />
+                        <button type="button" onClick={handleSaveName} disabled={isSavingName || !nameValue.trim()} className="cn-profile-button is-primary">
+                          {isSavingName ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
+                        </button>
+                        <button type="button" onClick={() => { setNameValue(user?.displayName || ''); setIsEditingName(false); }} disabled={isSavingName} className="cn-profile-button">Cancel</button>
+                      </>
+                    ) : (
+                      <>
+                        <span>{displayName}</span>
+                        <button type="button" onClick={() => setIsEditingName(true)} className="cn-profile-button">Edit</button>
+                      </>
+                    )}
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-3 px-6 py-5 text-left md:flex-row md:items-center md:justify-between">
-                  <div className="text-xl font-semibold text-gray-800">Email address</div>
-                  <div className="flex items-center gap-4">
-                    <span className="text-lg text-gray-700">{email}</span>
+                <div className="cn-profile-field-row flex flex-col gap-3 px-6 py-4 text-left md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <div className="cn-profile-field-label">Email address</div>
+                    <p className="cn-profile-helper">Managed by your sign-in method.</p>
+                  </div>
+                  <div className="cn-profile-field-value">
+                    <span className="cn-profile-email" title={email}>{email}</span>
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-3 px-6 py-5 text-left md:flex-row md:items-center md:justify-between">
-                  <div className="text-xl font-semibold text-gray-800">What will you be using Canva for?</div>
-                  <button className="px-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-500 text-sm font-medium hover:bg-gray-50 transition-colors md:min-w-[220px] text-left">
-                    Select a journey
-                  </button>
+                <div className="cn-profile-field-row flex flex-col gap-3 px-6 py-4 text-left md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <label className="cn-profile-field-label" htmlFor="profile-occasion">What are you designing for?</label>
+                    <p className="cn-profile-helper">Choose the occasion that best matches your usual designs.</p>
+                  </div>
+                  <select
+                    id="profile-occasion"
+                    value={preferences.occasion || ''}
+                    onChange={(event) => handlePreferenceChange('occasion', event.target.value)}
+                    className="cn-profile-select"
+                  >
+                    <option value="">Choose an occasion</option>
+                    <option value="personal">Personal celebrations</option>
+                    <option value="gifts">Gifts for friends and family</option>
+                    <option value="events">Events and gatherings</option>
+                    <option value="business">Bakery or business projects</option>
+                  </select>
                 </div>
 
-                <div className="flex flex-col gap-3 px-6 py-5 text-left md:flex-row md:items-center md:justify-between">
-                  <div className="text-xl font-semibold text-gray-800">Language</div>
-                  <button className="px-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-500 text-sm font-medium hover:bg-gray-50 transition-colors md:min-w-[220px] text-left">
-                    English (US)
-                  </button>
+                <div className="cn-profile-field-row flex flex-col gap-3 px-6 py-4 text-left md:flex-row md:items-center md:justify-between">
+                  <label className="cn-profile-field-label" htmlFor="profile-language">Language</label>
+                  <select
+                    id="profile-language"
+                    value={preferences.language || 'en-US'}
+                    onChange={(event) => handlePreferenceChange('language', event.target.value)}
+                    className="cn-profile-select"
+                  >
+                    <option value="en-US">English (US)</option>
+                    <option value="en-PH">English (Philippines)</option>
+                    <option value="fil-PH">Filipino</option>
+                  </select>
                 </div>
               </div>
             </div>
-          </div>
+          </section>
 
-          <div>
-            <h2 className="text-3xl font-bold text-left text-gray-800 mb-4">Connected social accounts</h2>
-            <p className="text-xl text-left text-gray-600 mb-6">Services that you use to log in to CakeNMake</p>
+          <section className="cn-profile-section cn-profile-social-section">
+            <div className="cn-profile-section-heading">
+              <div>
+                <h2>Connected accounts</h2>
+                <p>Choose the services you can use to sign in to CakeNMake.</p>
+              </div>
+            </div>
 
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="cn-profile-card bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
               {socialAccounts.map(({ providerId, provider, color, letter, letterClassName, connected, accountName, accountEmail }) => {
                 const isBusy = connectingProvider === providerId || disconnectingProvider === providerId;
 
                 return (
                   <div
                     key={providerId}
-                    className="flex flex-col gap-4 px-6 py-5 border-b border-gray-200 last:border-b-0 md:flex-row md:items-center md:justify-between"
+                    className="cn-profile-provider-row flex flex-col gap-4 px-6 py-4 border-b border-gray-200 last:border-b-0 md:flex-row md:items-center md:justify-between"
                   >
                     <div className="flex items-center gap-4">
                       <div className={`w-12 h-12 rounded-full ${color} flex items-center justify-center shadow-sm border border-gray-200`}>
@@ -241,8 +389,8 @@ export default function Profile() {
                       </div>
 
                       <div className="text-left">
-                        <div className="text-2xl font-medium text-gray-800">{provider}</div>
-                        <div className="text-lg text-gray-700">{connected ? (accountName || accountEmail || displayName) : 'Not connected'}</div>
+                        <div className="cn-profile-provider-name">{provider}</div>
+                        <div className={`cn-profile-provider-status${connected ? '' : ' is-disconnected'}`}>{connected ? (accountName || accountEmail || displayName) : 'Not connected'}</div>
                         {connected && accountEmail && <div className="text-sm text-gray-500">{accountEmail}</div>}
                       </div>
                     </div>
@@ -250,9 +398,10 @@ export default function Profile() {
                     {connected ? (
                       <button
                         type="button"
-                        onClick={() => handleDisconnectProvider(providerId)}
-                        disabled={isBusy}
-                        className="px-5 py-3 rounded-xl border border-gray-300 bg-white text-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-60"
+                        onClick={() => setDisconnectTarget({ providerId, provider })}
+                        disabled={isBusy || providerData.length <= 1}
+                        title={providerData.length <= 1 ? 'Connect another sign-in method before disconnecting this provider.' : `Disconnect ${provider}`}
+                        className="cn-profile-button px-5 py-2 rounded-xl border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-60"
                       >
                         {isBusy ? <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Disconnecting</span> : 'Disconnect'}
                       </button>
@@ -261,7 +410,7 @@ export default function Profile() {
                         type="button"
                         onClick={() => handleConnectProvider(providerId)}
                         disabled={isBusy}
-                        className="px-5 py-3 rounded-xl border border-pink-200 bg-pink-50 text-lg font-medium text-pink-700 hover:bg-pink-100 transition-colors disabled:opacity-60"
+                        className="cn-profile-button is-connect px-5 py-2 rounded-xl border border-pink-200 bg-pink-50 text-sm font-medium text-pink-700 hover:bg-pink-100 transition-colors disabled:opacity-60"
                       >
                         {isBusy ? <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Connecting</span> : 'Connect'}
                       </button>
@@ -270,9 +419,23 @@ export default function Profile() {
                 );
               })}
             </div>
+          </section>
+      </div>
+
+      {disconnectTarget && (
+        <div className="cn-profile-dialog-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setDisconnectTarget(null)}>
+          <div className="cn-profile-dialog" role="dialog" aria-modal="true" aria-labelledby="disconnect-provider-title">
+            <h2 id="disconnect-provider-title">Disconnect {disconnectTarget.provider}?</h2>
+            <p>You will no longer be able to use this provider to sign in unless you connect it again.</p>
+            <div>
+              <button type="button" onClick={() => setDisconnectTarget(null)} disabled={Boolean(disconnectingProvider)} className="cn-profile-button">Cancel</button>
+              <button type="button" onClick={() => handleDisconnectProvider(disconnectTarget.providerId)} disabled={Boolean(disconnectingProvider)} className="cn-profile-button is-danger">
+                {disconnectingProvider ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Disconnect
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

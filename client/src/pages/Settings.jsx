@@ -1,193 +1,217 @@
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
 import ClientNavbar from '@/components/client/ClientNavbar';
 import { useAuth } from '@/lib/AuthContext';
-import { User, Bell, Palette, Shield, ChevronRight, Save } from 'lucide-react';
+import { updateProfile } from 'firebase/auth';
+import { AlertCircle, Bell, CheckCircle2, Loader2, LockKeyhole, Palette, Save, Shield, User } from 'lucide-react';
+
+const DEFAULT_NOTIFICATIONS = { email: true, push: true, orderUpdates: true, promotions: false };
+const NOTIFICATION_OPTIONS = [
+  ['email', 'Email notifications', 'Design activity and account updates.'],
+  ['push', 'Push notifications', 'Timely alerts while you are signed in.'],
+  ['orderUpdates', 'Order updates', 'Production, pickup, and delivery progress.'],
+  ['promotions', 'Promotional emails', 'Occasional CakeNMake news and offers.'],
+];
+
+const getPreferenceKey = (user) => `cakenmake-settings-${user?.uid || user?.email || 'guest'}`;
+
+function readPreferences(user) {
+  try {
+    const stored = JSON.parse(localStorage.getItem(getPreferenceKey(user)) || '{}');
+    return { notifications: { ...DEFAULT_NOTIFICATIONS, ...stored.notifications } };
+  } catch {
+    return { notifications: DEFAULT_NOTIFICATIONS };
+  }
+}
+
+function createFormState(user, preferences) {
+  return {
+    username: user?.displayName || user?.email?.split('@')[0]?.replace(/[._-]/g, ' ') || 'Cake Lover',
+    notifications: { ...preferences.notifications },
+  };
+}
 
 export default function Settings() {
   const { user } = useAuth();
-  const [settings, setSettings] = useState({
-    username: '',
-    email: '',
-    notifications: {
-      email: true,
-      push: true,
-      orderUpdates: true,
-      promotions: false
-    },
-    theme: 'light',
-    language: 'en'
-  });
+  const [savedSettings, setSavedSettings] = useState(() => createFormState(user, readPreferences(user)));
+  const [settings, setSettings] = useState(savedSettings);
+  const [isSaving, setIsSaving] = useState(false);
+  const [feedback, setFeedback] = useState(null);
+
+  const userSignature = `${user?.uid || ''}:${user?.displayName || ''}:${user?.email || ''}`;
+  const email = user?.email || 'No email address available';
+  const providerIds = useMemo(
+    () => new Set((user?.providerData || []).map((provider) => provider.providerId)),
+    [user?.providerData],
+  );
+  const hasPasswordProvider = providerIds.has('password');
+  const hasOtpProvider = providerIds.has('emailLink');
+  const securityMethod = providerIds.has('google.com')
+    ? 'Google sign-in'
+    : providerIds.has('facebook.com')
+      ? 'Facebook sign-in'
+      : hasPasswordProvider
+        ? 'Password sign-in'
+        : hasOtpProvider
+          ? 'Email verification code'
+          : 'Authentication provider';
 
   useEffect(() => {
-    const derivedUsername = user?.displayName || user?.email?.split('@')[0]?.replace(/[._-]/g, ' ') || 'Cake Lover';
-    const derivedEmail = user?.email || 'user@example.com';
+    const next = createFormState(user, readPreferences(user));
+    setSavedSettings(next);
+    setSettings(next);
+    setFeedback(null);
+  // A stable signature prevents provider array identity changes from resetting edits.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userSignature]);
 
-    setSettings((prev) => ({
-      ...prev,
-      username: derivedUsername,
-      email: derivedEmail,
+  const isDirty = JSON.stringify(settings) !== JSON.stringify(savedSettings);
+  const usernameIsValid = settings.username.trim().length > 0;
+
+  const updateNotification = (key) => {
+    setFeedback(null);
+    setSettings((current) => ({
+      ...current,
+      notifications: { ...current.notifications, [key]: !current.notifications[key] },
     }));
-  }, [user]);
+  };
 
-  const handleSave = () => {
-    // Save settings logic here
-    console.log('Settings saved:', settings);
-    alert('Settings saved successfully!');
+  const handleReset = () => {
+    setSettings(savedSettings);
+    setFeedback(null);
+  };
+
+  const handleSave = async () => {
+    if (!isDirty || !usernameIsValid || isSaving) return;
+    setIsSaving(true);
+    setFeedback(null);
+    try {
+      const nextSettings = { ...settings, username: settings.username.trim() };
+      if (user && nextSettings.username !== savedSettings.username) {
+        await updateProfile(user, { displayName: nextSettings.username });
+      }
+      localStorage.setItem(getPreferenceKey(user), JSON.stringify({ notifications: nextSettings.notifications }));
+      setSettings(nextSettings);
+      setSavedSettings(nextSettings);
+      setFeedback({ type: 'success', message: 'Your settings were saved.' });
+    } catch (error) {
+      console.error('Could not save settings:', error);
+      setFeedback({ type: 'error', message: error?.message || 'Unable to save your settings right now.' });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-orange-50">
+    <div className="cn-app-page cn-settings-page min-h-screen">
       <ClientNavbar />
-      
-      <div className="container mx-auto px-4 py-12">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-4xl font-bold text-gray-800 mb-8">
-            Settings
-          </h1>
+      <main className="cn-settings-shell">
+        <header className="cn-settings-header">
+          <p>MAKE IT WORK FOR YOU</p>
+          <h1 className="cn-settings-title">Settings</h1>
+          <span>Manage your account and the updates you want to receive.</span>
+        </header>
 
-          {/* Account Settings */}
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 mb-6 border border-pink-100">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 bg-pink-100 rounded-lg">
-                <User className="w-6 h-6 text-pink-600" />
-              </div>
-              <h2 className="text-xl font-bold text-gray-800">Account Settings</h2>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
-                <input
-                  type="text"
-                  value={settings.username}
-                  onChange={(e) => setSettings({ ...settings, username: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border border-pink-200 focus:border-pink-500 focus:ring-2 focus:ring-pink-200 outline-none transition-all"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                <input
-                  type="email"
-                  value={settings.email}
-                  onChange={(e) => setSettings({ ...settings, email: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border border-pink-200 focus:border-pink-500 focus:ring-2 focus:ring-pink-200 outline-none transition-all"
-                />
-              </div>
-            </div>
+        {feedback && (
+          <div className={`cn-settings-feedback is-${feedback.type}`} role={feedback.type === 'error' ? 'alert' : 'status'}>
+            {feedback.type === 'success' ? <CheckCircle2 aria-hidden="true" /> : <AlertCircle aria-hidden="true" />}
+            <span>{feedback.message}</span>
           </div>
+        )}
 
-          {/* Notification Settings */}
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 mb-6 border border-rose-100">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 bg-rose-100 rounded-lg">
-                <Bell className="w-6 h-6 text-rose-600" />
-              </div>
-              <h2 className="text-xl font-bold text-gray-800">Notification Settings</h2>
-            </div>
-            
-            <div className="space-y-4">
-              {Object.entries({
-                email: 'Email Notifications',
-                push: 'Push Notifications',
-                orderUpdates: 'Order Updates',
-                promotions: 'Promotional Emails'
-              }).map(([key, label]) => (
-                <div key={key} className="flex items-center justify-between">
-                  <span className="text-gray-700">{label}</span>
-                  <button
-                    onClick={() => setSettings({
-                      ...settings,
-                      notifications: {
-                        ...settings.notifications,
-                        [key]: !settings.notifications[key]
-                      }
-                    })}
-                    className={`w-14 h-8 rounded-full p-1 transition-colors ${
-                      settings.notifications[key] ? 'bg-pink-500' : 'bg-gray-300'
-                    }`}
-                  >
-                    <div
-                      className={`w-6 h-6 bg-white rounded-full shadow-md transition-transform ${
-                        settings.notifications[key] ? 'translate-x-6' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
+        <form onSubmit={(event) => { event.preventDefault(); handleSave(); }}>
+          <div className="cn-settings-columns">
+            <div className="cn-settings-column">
+              <section className="cn-settings-card" aria-labelledby="account-settings-title">
+                <div className="cn-settings-card-heading">
+                  <span className="cn-settings-icon"><User aria-hidden="true" /></span>
+                  <div><h2 id="account-settings-title">Account</h2><p>Your public name and sign-in address.</p></div>
                 </div>
-              ))}
+                <div className="cn-settings-account-grid">
+                  <label className="cn-settings-field">
+                    <span>Display name</span>
+                    <input
+                      type="text"
+                      value={settings.username}
+                      onChange={(event) => {
+                        setFeedback(null);
+                        setSettings((current) => ({ ...current, username: event.target.value }));
+                      }}
+                      aria-invalid={!usernameIsValid}
+                      aria-describedby={!usernameIsValid ? 'username-error' : undefined}
+                    />
+                    <small id={!usernameIsValid ? 'username-error' : undefined} className={!usernameIsValid ? 'is-error' : ''}>
+                      {!usernameIsValid ? 'Enter a display name.' : 'Shown on shared cake briefs and messages.'}
+                    </small>
+                  </label>
+                  <label className="cn-settings-field">
+                    <span>Email address</span>
+                    <input type="email" value={email} readOnly aria-readonly="true" />
+                    <small>Your sign-in email is managed by your login provider.</small>
+                  </label>
+                </div>
+              </section>
+
+              <section className="cn-settings-card" aria-labelledby="appearance-settings-title">
+                <div className="cn-settings-card-heading">
+                  <span className="cn-settings-icon is-gold"><Palette aria-hidden="true" /></span>
+                  <div><h2 id="appearance-settings-title">Appearance</h2><p>The current CakeNMake experience.</p></div>
+                </div>
+                <div className="cn-settings-static-row">
+                  <div><strong>Theme</strong><span>Warm light</span></div>
+                  <span className="cn-settings-status">Current</span>
+                </div>
+              </section>
+            </div>
+
+            <div className="cn-settings-column">
+              <section className="cn-settings-card" aria-labelledby="notification-settings-title">
+                <div className="cn-settings-card-heading">
+                  <span className="cn-settings-icon"><Bell aria-hidden="true" /></span>
+                  <div><h2 id="notification-settings-title">Notifications</h2><p>Choose which CakeNMake updates reach you.</p></div>
+                </div>
+                <div className="cn-settings-toggle-list">
+                  {NOTIFICATION_OPTIONS.map(([key, label, description]) => (
+                    <div className="cn-settings-toggle-row" key={key}>
+                      <label htmlFor={`notification-${key}`}><strong>{label}</strong><span>{description}</span></label>
+                      <button
+                        id={`notification-${key}`}
+                        type="button"
+                        role="switch"
+                        aria-checked={settings.notifications[key]}
+                        aria-label={label}
+                        className="cn-settings-switch"
+                        onClick={() => updateNotification(key)}
+                      ><span /></button>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="cn-settings-card" aria-labelledby="security-settings-title">
+                <div className="cn-settings-card-heading">
+                  <span className="cn-settings-icon"><Shield aria-hidden="true" /></span>
+                  <div><h2 id="security-settings-title">Security</h2><p>Your current sign-in method.</p></div>
+                </div>
+                <div className="cn-settings-static-row">
+                  <div>{hasPasswordProvider ? <LockKeyhole aria-hidden="true" /> : <Shield aria-hidden="true" />}<span>{securityMethod}</span></div>
+                  <span className="cn-settings-status">Active</span>
+                </div>
+              </section>
             </div>
           </div>
 
-          {/* Theme Settings */}
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 mb-6 border border-orange-100">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 bg-orange-100 rounded-lg">
-                <Palette className="w-6 h-6 text-orange-500" />
-              </div>
-              <h2 className="text-xl font-bold text-gray-800">Appearance</h2>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Theme</label>
-                <select
-                  value={settings.theme}
-                  onChange={(e) => setSettings({ ...settings, theme: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border border-pink-200 focus:border-pink-500 focus:ring-2 focus:ring-pink-200 outline-none transition-all"
-                >
-                  <option value="light">Light</option>
-                  <option value="dark">Dark</option>
-                  <option value="system">System Default</option>
-                </select>
-              </div>
+          <div className="cn-settings-actions">
+            <p aria-live="polite">{isDirty ? 'You have unsaved changes.' : 'Everything is up to date.'}</p>
+            <div>
+              <button type="button" className="cn-settings-cancel" onClick={handleReset} disabled={!isDirty || isSaving}>Cancel changes</button>
+              <button type="submit" className="cn-settings-save" disabled={!isDirty || !usernameIsValid || isSaving}>
+                {isSaving ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Save aria-hidden="true" />}
+                {isSaving ? 'Saving…' : 'Save changes'}
+              </button>
             </div>
           </div>
-
-          {/* Security Settings */}
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 mb-6 border border-pink-100">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 bg-pink-100 rounded-lg">
-                <Shield className="w-6 h-6 text-pink-600" />
-              </div>
-              <h2 className="text-xl font-bold text-gray-800">Security</h2>
-            </div>
-            
-            <div className="space-y-3">
-              <Link
-                to="/change-password"
-                className="flex items-center justify-between p-4 bg-pink-50 rounded-xl hover:bg-pink-100 transition-colors"
-              >
-                <span className="text-gray-700">Change Password</span>
-                <ChevronRight className="w-5 h-5 text-gray-500" />
-              </Link>
-              <Link
-                to="/two-factor"
-                className="flex items-center justify-between p-4 bg-pink-50 rounded-xl hover:bg-pink-100 transition-colors"
-              >
-                <span className="text-gray-700">Two-Factor Authentication</span>
-                <ChevronRight className="w-5 h-5 text-gray-500" />
-              </Link>
-            </div>
-          </div>
-
-          {/* Save Button */}
-          <div className="flex justify-end gap-4">
-            <Link
-              to="/client"
-              className="px-6 py-3 border border-pink-300 text-pink-600 rounded-xl hover:bg-pink-50 transition-colors font-medium"
-            >
-              Cancel
-            </Link>
-            <button
-              onClick={handleSave}
-              className="px-6 py-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-xl hover:from-pink-600 hover:to-rose-600 transition-all font-medium flex items-center gap-2 shadow-md hover:shadow-lg"
-            >
-              <Save className="w-5 h-5" />
-              Save Changes
-            </button>
-          </div>
-        </div>
-      </div>
+        </form>
+      </main>
     </div>
   );
 }

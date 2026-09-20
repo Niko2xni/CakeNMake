@@ -104,20 +104,20 @@ function CustomScrollbar({ className = '', contentClassName = '', children }) {
   return (
     <div className={`relative min-h-0 ${className}`}>
       {thumbMetrics.visible && (
-        <div className="absolute top-0 right-0 h-full w-5 flex flex-col z-10">
+        <div className="cn-ai-scrollbar absolute top-0 right-0 h-full w-4 flex flex-col z-10">
           <button
             onClick={scrollUp}
             aria-label="Scroll up"
             title="Scroll up"
-            className="h-5 flex-shrink-0 flex items-center justify-center text-pink-400 hover:text-pink-500 text-[10px] leading-none transition-colors cursor-default select-none"
+            className="cn-ai-scroll-button h-5 flex-shrink-0 flex items-center justify-center text-[10px] leading-none transition-colors select-none"
           >
             ▲
           </button>
-          <div onClick={handleTrackClick} className="relative flex-1 cursor-default">
+          <div onClick={handleTrackClick} className="cn-ai-scroll-track relative flex-1 cursor-pointer">
             <div
               onMouseDown={handleThumbMouseDown}
               onClick={(e) => e.stopPropagation()}
-              className="absolute left-1/2 -translate-x-1/2 w-2.5 bg-pink-200 hover:bg-pink-300 rounded-full transition-colors cursor-default"
+              className="cn-ai-scroll-thumb absolute left-1/2 -translate-x-1/2 w-1.5 rounded-full transition-colors cursor-grab active:cursor-grabbing"
               style={{ top: thumbMetrics.top, height: thumbMetrics.height }}
             />
           </div>
@@ -125,7 +125,7 @@ function CustomScrollbar({ className = '', contentClassName = '', children }) {
             onClick={scrollDown}
             aria-label="Scroll down"
             title="Scroll down"
-            className="h-5 flex-shrink-0 flex items-center justify-center text-pink-400 hover:text-pink-500 text-[10px] leading-none transition-colors cursor-default select-none"
+            className="cn-ai-scroll-button h-5 flex-shrink-0 flex items-center justify-center text-[10px] leading-none transition-colors select-none"
           >
             ▼
           </button>
@@ -300,20 +300,20 @@ export default function CakeAI() {
   const hasContentToSend = message.trim().length > 0 || attachedFiles.length > 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-orange-50 ml-[70px] flex relative overflow-visible">
+    <div className="cn-app-page cn-ai-page min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-orange-50 ml-[70px] flex relative overflow-visible">
       <ClientNavbar />
       
       {/* PERSONAL HISTORY SIDE NAVIGATION */}
-      <div className="hidden md:flex w-64 border-r border-pink-100/60 bg-white/30 backdrop-blur-md flex flex-col py-6 select-none shrink-0 relative z-40 overflow-visible">
+      <aside className="cn-ai-history hidden lg:flex border-r border-pink-100/60 bg-white/30 backdrop-blur-md flex-col py-6 select-none shrink-0 relative z-40 overflow-visible">
         
         {/* Header Title Block */}
-        <div className="flex items-center gap-2 mb-5 px-6 text-gray-400 font-semibold text-xs tracking-wider">
+        <div className="cn-ai-history-heading flex items-center gap-2 mb-5 px-5 text-gray-400 font-semibold text-xs tracking-wider">
           <History className="w-3.5 h-3.5 text-pink-400" />
           <span>DESIGN HISTORY</span>
         </div>
 
         {/* New Concept Action Trigger */}
-        <div className="px-4 mb-5">
+        <div className="px-4 mb-4">
           <button 
             onClick={() => { setMessage(''); setAttachedFiles([]); setActiveChatId(null); }}
             className="flex items-center justify-between px-3 py-2.5 text-sm font-medium text-pink-600 bg-white hover:bg-pink-50 rounded-xl border border-pink-100 shadow-3xs transition-all w-full text-left group"
@@ -325,8 +325,8 @@ export default function CakeAI() {
 
         {/* Scrollable Chat Items Area */}
         <CustomScrollbar 
-          className="w-full h-[calc(100vh-160px)] pl-4 pr-1 overflow-visible"
-          contentClassName="space-y-1 pb-6"
+          className="cn-ai-history-list w-full pl-3 pr-1 overflow-visible"
+          contentClassName="space-y-0.5 pb-10"
         >
           {chatHistory.map((chat) => (
             <div
@@ -335,7 +335,9 @@ export default function CakeAI() {
             >
               <button
                 onClick={() => setActiveChatId(chat.id)}
-                className={`flex items-center w-full text-left px-3 py-3.5 rounded-xl transition-all ${
+                aria-current={activeChatId === chat.id ? 'page' : undefined}
+                title={chat.title}
+                className={`cn-ai-history-item flex items-center w-full text-left px-3 py-3 rounded-xl transition-all ${
                   activeChatId === chat.id 
                     ? 'bg-white text-gray-900 border border-pink-100/70 shadow-3xs pr-12' 
                     : 'text-gray-600 hover:bg-white/50 hover:text-gray-900 pr-12'
@@ -427,13 +429,13 @@ export default function CakeAI() {
             </div>
           ))}
         </CustomScrollbar>
-      </div>
+      </aside>
 
       {/* CORE WORKSPACE INPUT CANVAS */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 pl-8 pr-4 pb-12 relative z-10">
+      <main className="cn-ai-stage flex-1 flex flex-col items-center px-6 relative z-10">
         
         {/* RESPONSIVE TOP-RIGHT TOGGLE BUTTON (Hidden on Desktop) */}
-        <div className="absolute top-6 right-2 md:hidden z-50">
+        <div className="absolute top-6 right-4 lg:hidden z-50">
           <button
             onClick={() => setIsMobileHistoryOpen(true)}
             className="p-3 bg-white border border-pink-100 text-pink-600 rounded-xl shadow-xs hover:bg-pink-50 transition-all flex items-center gap-2 font-medium text-sm"
@@ -445,7 +447,7 @@ export default function CakeAI() {
 
         {/* FULL PAGE RESPONSIVE MOBILE MENU COVER OVERLAY */}
         {isMobileHistoryOpen && (
-          <div className="fixed inset-0 bg-gradient-to-br from-pink-50 via-rose-50 to-orange-50 z-[100] flex flex-col pt-6 pb-6 pr-2 pl-[86px] animate-in fade-in slide-in-from-top duration-200 md:hidden overflow-y-auto">
+          <div className="cn-ai-mobile-history fixed inset-0 bg-gradient-to-br from-pink-50 via-rose-50 to-orange-50 z-[100] flex flex-col pt-6 pb-6 pr-4 pl-[86px] animate-in fade-in slide-in-from-top duration-200 lg:hidden overflow-y-auto">
             {/* Top Bar inside Full Screen Menu */}
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-pink-100 shrink-0 relative">
               <div className="flex items-center gap-2 text-gray-400 font-semibold text-xs tracking-wider">
@@ -480,6 +482,7 @@ export default function CakeAI() {
                       setActiveChatId(chat.id);
                       setIsMobileHistoryOpen(false);
                     }}
+                    aria-current={activeChatId === chat.id ? 'page' : undefined}
                     className={`flex items-center w-full text-left px-3 py-3.5 rounded-xl transition-all ${
                       activeChatId === chat.id 
                         ? 'bg-white text-gray-900 border border-pink-100/70 shadow-3xs pr-12' 
@@ -488,7 +491,7 @@ export default function CakeAI() {
                   >
                     <div className="flex items-center gap-2.5 w-full min-w-0">
                       <MessageSquare className={`w-4 h-4 shrink-0 ${activeChatId === chat.id ? 'text-pink-500' : 'text-gray-400'}`} />
-                      <span className="text-sm font-medium truncate flex-1">{chat.title}</span>
+                      <span className="text-sm font-medium truncate flex-1" title={chat.title}>{chat.title}</span>
                     </div>
                   </button>
                   
@@ -527,16 +530,17 @@ export default function CakeAI() {
           </div>
         )}
 
-        <div className="w-full max-w-2xl mx-auto -mt-32">
+        <div className="cn-ai-composer-wrap w-full mx-auto">
           {/* Header Section */}
-          <div className="text-center mb-6">
+          <div className="cn-ai-prompt-heading text-center">
             <div className="flex items-center justify-center gap-2">
               <Bot className="w-6 h-6 text-pink-500" />
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-pink-500 via-rose-500 to-orange-400 bg-clip-text text-transparent py-1">
+              <h1 className="font-bold py-1">
                 What will we design today?
               </h1>
               <Sparkles className="w-6 h-6 text-orange-400" />
             </div>
+            <p>Describe the occasion, flavors, colors, and details you have in mind.</p>
           </div>
 
           {/* Text Box Container */}
@@ -544,7 +548,7 @@ export default function CakeAI() {
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            className="relative flex flex-col border rounded-2xl transition-all duration-200 p-3 bg-white border-gray-200 shadow-[0_12px_32px_-4px_rgba(244,63,94,0.14)] focus-within:border-pink-300 focus-within:ring-2 focus-within:ring-pink-100/50"
+            className="cn-ai-composer relative flex flex-col border rounded-2xl transition-all duration-200 bg-white border-gray-200 focus-within:border-pink-300 focus-within:ring-2 focus-within:ring-pink-100/50"
           >
             {isDragging && (
               <div className="absolute inset-0 bg-pink-50/90 backdrop-blur-xs flex items-center justify-center rounded-2xl z-10 text-pink-600 font-medium pointer-events-none text-sm">
@@ -560,7 +564,7 @@ export default function CakeAI() {
                 onKeyDown={handleKeyPress}
                 placeholder="Describe your idea, and I'll bring it to life"
                 rows={1}
-                className="w-full bg-transparent border-0 outline-none resize-none px-2 text-gray-700 placeholder-gray-400 focus:ring-0 focus:outline-none text-base leading-6 min-h-[44px]"
+                className="cn-ai-textarea w-full bg-transparent border-0 outline-none resize-none text-gray-700 placeholder-gray-400 focus:ring-0 focus:outline-none text-base leading-6"
               />
             </div>
 
@@ -585,14 +589,16 @@ export default function CakeAI() {
               </div>
             )}
 
-            <div className="flex items-center justify-between pt-2 mt-2 border-t border-gray-50">
+            <div className="cn-ai-composer-actions flex items-center justify-between border-t">
               <div>
                 <button
                   onClick={() => fileInputRef.current.click()}
-                  className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-50 rounded-xl transition-all h-9 w-9 flex items-center justify-center"
-                  title="Upload Files"
+                  className="cn-ai-attach flex items-center justify-center gap-2 rounded-full"
+                  title="Attach files"
+                  aria-label="Attach files"
                 >
-                  <Plus className="w-5 h-5 stroke-[2.5]" />
+                  <Paperclip className="w-4 h-4" />
+                  <span>Attach files</span>
                 </button>
                 <input 
                   type="file" 
@@ -603,21 +609,19 @@ export default function CakeAI() {
                 />
               </div>
 
-              <div className="h-9 min-w-[56px] flex items-center justify-end">
-                {hasContentToSend && (
-                  <button
-                    onClick={handleSendMessage}
-                    className="px-4 py-2 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white rounded-xl shadow-3xs transition-all flex items-center justify-center h-9 w-14 animate-in fade-in scale-100 hover:scale-102 active:scale-98 duration-100"
-                    title="Send to Cake AI"
-                  >
-                    <Send className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
+              <button
+                onClick={handleSendMessage}
+                disabled={!hasContentToSend}
+                className="cn-ai-submit flex items-center justify-center gap-2 rounded-full"
+                title="Generate cake concept"
+              >
+                <span>Generate concept</span>
+                <Send className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>
-      </div>
+      </main>
 
       {/* SYSTEM CONFIRMATION MODAL OVERLAY */}
       {deleteConfirmId && (

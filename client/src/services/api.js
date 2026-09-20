@@ -34,9 +34,9 @@ const getUserId = () => {
 // Design API calls
 export const designApi = {
   // Get all designs for current user
-  getDesigns: async () => {
+  getDesigns: async ({ trashOnly = false } = {}) => {
     const userId = getUserId();
-    const response = await fetch(`${API_BASE_URL}/designs?userId=${userId}`);
+    const response = await fetch(`${API_BASE_URL}/designs?userId=${userId}&isTrashed=${trashOnly}`);
     if (!response.ok) throw new Error('Failed to fetch designs');
     return response.json();
   },

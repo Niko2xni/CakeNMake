@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowDownRight,
   ArrowRight,
   Check,
   ChevronDown,
@@ -11,6 +10,7 @@ import {
   X,
 } from 'lucide-react';
 import heroCake from '@/assets/hero-cake.png';
+import briefCake from '@/assets/landing-page-bg.jpg';
 import './Landing.css';
 
 const navigation = [
@@ -288,7 +288,6 @@ export default function Landing() {
                 <div className="hero-sticker" aria-hidden="true">Made for<br />your moment</div>
                 <div className="hero-image-caption">
                   <span><strong>Cherry on top</strong> Your design, from every angle</span>
-                  <span>01 / 04</span>
                 </div>
               </div>
             </figure>
@@ -326,7 +325,6 @@ export default function Landing() {
                     <h3>{step.title}</h3>
                     <p>{step.text}</p>
                   </div>
-                  <ArrowDownRight size={25} aria-hidden="true" />
                 </article>
               ))}
             </div>
@@ -341,7 +339,7 @@ export default function Landing() {
                 <span className="brief-status"><i /> Saved</span>
               </div>
               <div className="brief-preview">
-                <img src={heroCake} alt="Cake shown inside the CakeNMake design preview" />
+                <img src={briefCake} alt="Cake shown inside the CakeNMake design preview" />
                 <span className="preview-mode"><Rotate3D size={14} aria-hidden="true" /> Live 3D preview</span>
                 <div className="preview-annotations" aria-hidden="true">
                   <span className="annotation-one">Cream drip</span>
@@ -392,6 +390,7 @@ export default function Landing() {
                 The screen helps you be specific. The baker brings the craft. The result
                 should still feel personal, beautifully made, and unmistakably yours.
               </p>
+              <p className="craft-proof"><Check size={16} aria-hidden="true" /> A clear brief gives your baker a practical starting point.</p>
               <div className="craft-signoff">
                 <span>Our promise</span>
                 <strong>Your idea stays at the heart of the cake.</strong>
