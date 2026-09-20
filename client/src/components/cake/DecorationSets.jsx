@@ -93,7 +93,16 @@ export function computeEdgeTrimY(topSurfaceY, radius, decorationType = 'piping',
     return -0.05;
   }
   if (isFruitRim) {
-    return decorationType === 'strawberryRim' ? topSurfaceY - 0.04 : topSurfaceY;
+    if (exteriorFinishStyle === 'naked') {
+      return decorationType === 'strawberryRim' ? topSurfaceY - 0.04 : topSurfaceY;
+    }
+    const compactDepth = Math.min(0.12, Math.max(0.06, radius * 0.08));
+    const finishDepth = 0.06;
+    const extraInset = 0.04;
+    const frostCapRecess = compactDepth + extraInset + finishDepth;
+    return decorationType === 'strawberryRim'
+      ? topSurfaceY - (frostCapRecess + 0.04)
+      : topSurfaceY - frostCapRecess;
   }
   if (exteriorFinishStyle === 'naked') {
     // compactDepth + extraInset below (0.10–0.16 depending on cake size
@@ -221,7 +230,7 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
   } else if (baseTip === 'roundDollop' || baseTip === 'kissDollop') {
     bottomRadialInset = -0.40;
   } else if (baseTip === 'ferreroRocherRim') {
-    bottomRadialInset = -0.61;
+    bottomRadialInset = -0.48;
   } else if (baseTip === 'hersheysKissRim') {
     bottomRadialInset = -0.41;
   } else if (baseTip === 'strawberryRim') {
@@ -401,57 +410,128 @@ export function buildBeadedTrimRing(radius, colorHex, rand, opts = {}) {
 }
 
 /**
- * Fresh Strawberries Rim — a handcrafted ring of complete ripe strawberries
- * sitting directly along the cake edge.
+ * Fresh Strawberries Rim — a handcrafted ring of ripe strawberries sitting
+ * along the cake edge.
+ * - Top rim: Strawberries stand nestled upright in the top buttercream,
+ *   subtly leaning radially inward toward the cake center with organic rotation jitter.
+ * - Bottom rim: Strawberries rest naturally on their side along the cake skirt,
+ *   nestled against the base cylinder in a continuous fruit garland.
  */
 export function buildStrawberryRimRing(radius, y, rand = Math.random, opts = {}) {
-  const count = opts.count ?? Math.max(10, Math.round((radius * Math.PI * 2) / 1.45));
+  const isBottom = opts.isBottom ?? false;
+  const count = opts.count ?? Math.max(10, Math.round((radius * Math.PI * 2) / (isBottom ? 1.35 : 1.45)));
   const scale = opts.scale ?? 0.82;
+  // Sinking & grounding offset:
+  // Top: sink ~24% into top frosting (-0.20 * scale) so the narrow conical tip is firmly buried
+  // and the plump berry body emerges naturally from the buttercream rather than balancing on a needle tip.
+  // Bottom: 0.25 * scale rests the sideways garland flush on the cake plate.
+  const surfaceLift = isBottom ? 0.25 * scale : -0.20 * scale;
   const group = new THREE.Group();
+
   for (let i = 0; i < count; i++) {
     const angle = (i / count) * Math.PI * 2;
     const cx = Math.sin(angle) * radius;
     const cz = Math.cos(angle) * radius;
-    const strawberry = buildStrawberryMesh(cx, y, cz, scale, rand);
-    strawberry.rotation.y = angle;
-    strawberry.rotation.x = -0.38 + (rand() - 0.5) * 0.08;
-    strawberry.rotation.z += (rand() - 0.5) * 0.08;
+    const strawberry = buildStrawberryMesh(cx, y + surfaceLift, cz, scale, rand);
+
+    if (isBottom) {
+      // Bottom rim: lying on its side, cradled where cake cylinder wall meets cake board
+      const qRing = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+      // Lie horizontally along the tangent (stem pointing along the circumference)
+      const qLie = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -Math.PI / 2);
+      // Natural fruit taper lifts crown/stem ~16 deg relative to the surface
+      const qElevate = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), 0.25 + (rand() - 0.5) * 0.08);
+      // Roll slightly so seeds and leaves face outward/upward naturally
+      const qRoll = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.20 + (rand() - 0.5) * 0.12);
+      // Gentle yaw contouring to hug the cake base
+      const qYaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -0.06 + (rand() - 0.5) * 0.06);
+
+      strawberry.quaternion.copy(qRing.multiply(qYaw).multiply(qLie).multiply(qElevate).multiply(qRoll));
+    } else {
+      // Top rim: upright with leaves/stem on top, nestled deeply into frosting,
+      // leaning gently inward (~10 deg) toward the cake center with organic hand-placed jitter
+      const inwardTilt = -0.18 + (rand() - 0.5) * 0.08;
+      const sideTilt = (rand() - 0.5) * 0.08;
+      const spin = rand() * Math.PI * 2;
+
+      const qRing = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+      const qTilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), inwardTilt);
+      const qSide = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), sideTilt);
+      const qSpin = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), spin);
+
+      strawberry.quaternion.copy(qRing.multiply(qTilt).multiply(qSide).multiply(qSpin));
+    }
+
     group.add(strawberry);
   }
   return group;
 }
 
 /**
- * Hershey's Kisses Chocolate Rim — upright chocolate kisses lining the cake rim.
+ * Hershey's Kisses Chocolate Rim — chocolate kisses lining the cake rim (Option A):
+ * - 360° Randomized Tip Curls: Each Kiss spins freely around its vertical axis so
+ *   the signature teardrop tips flick in diverse, natural directions rather than
+ *   pointing synchronously in a cloned array.
+ * - Top Rim: Sunk ~20% into the top buttercream with subtle organic hand-placed
+ *   tilt (±4°).
+ * - Bottom Rim: Firmly grounded on the cake plate surface, tucked snugly against
+ *   the cake base cylinder with zero floating gap.
  */
 export function buildHersheysKissRimRing(radius, y, rand = Math.random, opts = {}) {
+  const isBottom = opts.isBottom ?? false;
   const count = opts.count ?? Math.max(12, Math.round((radius * Math.PI * 2) / 1.35));
   const scale = opts.scale ?? 0.36;
+  // Sinking & grounding offset:
+  // Top: sink ~20% into top frosting (-0.14 * scale)
+  // Bottom: ground firmly flush on cake plate (-0.02)
+  const surfaceOffset = isBottom ? -0.02 : -0.14 * scale;
   const group = new THREE.Group();
+
   for (let i = 0; i < count; i++) {
     const angle = (i / count) * Math.PI * 2;
     const cx = Math.sin(angle) * radius;
     const cz = Math.cos(angle) * radius;
-    const rotY = angle + (rand() - 0.5) * 0.3;
-    const kiss = buildHersheysKissMesh(cx, y, cz, scale, rotY);
+    const rotY = rand() * Math.PI * 2;
+    const kiss = buildHersheysKissMesh(cx, y + surfaceOffset, cz, scale, rotY);
+
+    // Subtle hand-placed organic tilt
+    kiss.rotation.order = 'YXZ';
+    kiss.rotation.x = (rand() - 0.5) * 0.14;
+    kiss.rotation.z = (rand() - 0.5) * 0.14;
+
     group.add(kiss);
   }
   return group;
 }
 
 /**
- * Ferrero Rocher Truffle Rim — textured hazelnut chocolate truffles lining the cake rim.
+ * Ferrero Rocher Truffle Rim — textured hazelnut chocolate truffles lining the cake rim (Option 1):
+ * - Top rim: Sunk ~28% into the top buttercream so they look securely anchored and nestled into the soft frosting.
+ * - Bottom rim: Grounded firmly flush on the cake plate surface and tucked snugly against the cake base cylinder.
+ * - Organic 3D Tumble: Full rotation across pitch, roll, and yaw so textured hazelnut pieces and facets face diverse 3D angles.
+ * - Spacing: Tuned density (~15-16 on an 8" cake) creating a rich, decadent confection border without large empty gaps.
  */
 export function buildFerreroRocherRimRing(radius, y, rand = Math.random, opts = {}) {
-  const count = opts.count ?? Math.max(8, Math.round((radius * Math.PI * 2) / 2.15));
+  const isBottom = opts.isBottom ?? false;
+  const count = opts.count ?? Math.max(8, Math.round((radius * Math.PI * 2) / 1.65));
   const scale = opts.scale ?? 0.45;
+  // Sinking & grounding offset:
+  // Top: sink ~28% into top frosting (-0.28 * scale)
+  // Bottom: rest firmly on plate (+0.07)
+  const surfaceOffset = isBottom ? 0.07 : -0.28 * scale;
   const group = new THREE.Group();
+
   for (let i = 0; i < count; i++) {
     const angle = (i / count) * Math.PI * 2;
     const cx = Math.sin(angle) * radius;
     const cz = Math.cos(angle) * radius;
-    const truffle = buildFerreroRocherMesh(cx, y, cz, scale);
+    const truffle = buildFerreroRocherMesh(cx, y + surfaceOffset, cz, scale);
+
+    // Organic 3D tumble: rotate across pitch, roll, and yaw in-place around sphere center
+    truffle.rotation.x = (rand() - 0.5) * 2.2;
+    truffle.rotation.z = (rand() - 0.5) * 2.2;
     truffle.rotation.y = rand() * Math.PI * 2;
+
     group.add(truffle);
   }
   return group;
@@ -489,35 +569,103 @@ export function buildOreoRimRing(radius, y, rand = Math.random, opts = {}) {
   return group;
 }
 
-/** Cherry Rim — complete glossy cherries nestled along the cake edge. */
+/**
+ * Cherry Rim — complete glossy cherries lining the cake edge (Option A):
+ * - Top rim: Stems arch inward gracefully toward the cake center with a subtle
+ *   inward body lean and organic hand-placed variation rather than standing
+ *   straight up like radio antennae.
+ * - Bottom rim: Stemless glossy cocktail/maraschino cherries with the apical
+ *   dimple visible on top, resting flush on the cake plate along the base cylinder.
+ */
 export function buildCherryRimRing(radius, y, rand = Math.random, opts = {}) {
+  const isBottom = opts.isBottom ?? false;
   const count = opts.count ?? 18;
   const scale = opts.scale ?? 0.85;
+  // minY of cherry body geometry was translated by -0.10.
+  // For the bottom rim resting on the cake plate plane, offset +0.10 * scale to be flush.
+  const surfaceOffset = isBottom ? 0.10 * scale : 0.0;
   const group = new THREE.Group();
+
   for (let i = 0; i < count; i++) {
     const angle = (i / count) * Math.PI * 2;
     const cx = Math.sin(angle) * radius;
     const cz = Math.cos(angle) * radius;
-    const cherry = buildCherryMesh(cx, y, cz, scale, rand);
-    cherry.rotation.y = angle + (rand() - 0.5) * 0.3;
-    cherry.rotation.x = (rand() - 0.5) * 0.06;
-    cherry.rotation.z = (rand() - 0.5) * 0.06;
-    group.add(cherry);
+
+    if (isBottom) {
+      // Bottom rim: stemless glossy maraschino cherries resting flush on plate
+      const cherry = buildCherryMesh(cx, y + surfaceOffset, cz, scale, rand, { stem: false });
+      cherry.rotation.order = 'YXZ';
+      cherry.rotation.y = angle + rand() * Math.PI * 2;
+      cherry.rotation.x = (rand() - 0.5) * 0.08;
+      cherry.rotation.z = (rand() - 0.5) * 0.08;
+      group.add(cherry);
+    } else {
+      // Top rim: blend of casual hand-placed draping (Option 1) and
+      // perimeter garland swirl along the rim curve (Option 2).
+      // Stems sweep gracefully along the perimeter (+X) with a gentle inward
+      // bias (-Z) and generous hand-placed organic variance so each stem looks
+      // unique without pointing like rigid spokes into the center.
+      const stemBaseAngle = -Math.PI * 0.28; // ~ -50° diagonal between tangential (+X) and inward (-Z)
+      const stemJitter = (rand() - 0.5) * 1.05; // natural organic spread (~ -80° to -20°)
+      const stemAngle = stemBaseAngle + stemJitter;
+      const bendAmount = 0.24 + rand() * 0.16;
+
+      const cherry = buildCherryMesh(cx, y + surfaceOffset, cz, scale, rand, {
+        stem: true,
+        stemAngle,
+        bendAmount,
+      });
+
+      // Subtle organic hand-placed body tilt and varied rotation
+      cherry.rotation.order = 'YXZ';
+      cherry.rotation.y = angle + (rand() - 0.5) * 0.40;
+      cherry.rotation.x = -0.06 + (rand() - 0.5) * 0.10;
+      cherry.rotation.z = (rand() - 0.5) * 0.10;
+      group.add(cherry);
+    }
   }
   return group;
 }
 
-function buildBallRimRing(buildBall, radius, y, rand, opts) {
+/**
+ * Basketball / Soccer Ball Rim helper.
+ * - Top rim: Spheres are nestled ~30% into the top frosting layer rather than
+ *   balancing on an unstable single tangent point.
+ * - Bottom rim: Spheres rest firmly on the cake board / plate, tucked flush
+ *   against the cake base cylinder with zero floating gap.
+ * - Organic 3D Tumble: Pitches, rolls, and yaws each ball's inner sphere mesh
+ *   in place so seams and pentagon panels face varied natural angles.
+ */
+function buildBallRimRing(buildBall, radius, y, rand = Math.random, opts = {}) {
+  const isBottom = opts.isBottom ?? false;
   const count = opts.count ?? 16;
   const scale = opts.scale ?? 0.18;
-  const surfaceLift = 0.50 * scale;
+  // Sinking / grounding offset:
+  // Top: sink ~30% into top frosting (-1.25 * scale)
+  // Bottom: rest directly on cake plate surface (0.01)
+  const surfaceOffset = isBottom ? 0.01 : -1.25 * scale;
   const group = new THREE.Group();
+
   for (let i = 0; i < count; i++) {
     const angle = (i / count) * Math.PI * 2;
     const cx = Math.sin(angle) * radius;
     const cz = Math.cos(angle) * radius;
-    const ball = buildBall(cx, y + surfaceLift, cz, scale);
-    ball.rotation.y = angle + rand() * Math.PI * 2;
+    const ball = buildBall(cx, y + surfaceOffset, cz, scale);
+
+    // Organic 3D tumble & rotation:
+    // Tumble the inner sphere mesh/group around its own center (0, 0, 0)
+    // so seams and panels face varied 3D angles without shifting the ball position
+    const innerObj = ball.children[0];
+    if (innerObj) {
+      const pitch = (rand() - 0.5) * 1.8;
+      const roll = (rand() - 0.5) * 1.8;
+      const yaw = rand() * Math.PI * 2;
+      innerObj.rotation.x += pitch;
+      innerObj.rotation.z += roll;
+      innerObj.rotation.y += yaw;
+    }
+
+    ball.rotation.y = angle + (rand() - 0.5) * 0.4;
     group.add(ball);
   }
   return group;

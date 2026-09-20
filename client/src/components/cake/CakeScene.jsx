@@ -1654,25 +1654,25 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           trim.position.y = edgeTrimY;
           group.add(trim);
         } else if (isStrawberryRim) {
-          const trim = buildStrawberryRimRing(edgeTrimRadius, edgeTrimY, rand);
+          const trim = buildStrawberryRimRing(edgeTrimRadius, edgeTrimY, rand, { isBottom });
           group.add(trim);
         } else if (isHersheysKissRim) {
-          const trim = buildHersheysKissRimRing(edgeTrimRadius, edgeTrimY, rand);
+          const trim = buildHersheysKissRimRing(edgeTrimRadius, edgeTrimY, rand, { isBottom });
           group.add(trim);
         } else if (isFerreroRocherRim) {
-          const trim = buildFerreroRocherRimRing(edgeTrimRadius, edgeTrimY, rand);
+          const trim = buildFerreroRocherRimRing(edgeTrimRadius, edgeTrimY, rand, { isBottom });
           group.add(trim);
         } else if (isOreoRim) {
           const trim = buildOreoRimRing(edgeTrimRadius, edgeTrimY, rand, { isBottom });
           group.add(trim);
         } else if (isCherryRim) {
-          const trim = buildCherryRimRing(edgeTrimRadius, edgeTrimY, rand);
+          const trim = buildCherryRimRing(edgeTrimRadius, edgeTrimY, rand, { isBottom });
           group.add(trim);
         } else if (isBasketballRim) {
-          const trim = buildBasketballRimRing(edgeTrimRadius, edgeTrimY, rand);
+          const trim = buildBasketballRimRing(edgeTrimRadius, edgeTrimY, rand, { isBottom });
           group.add(trim);
         } else if (isSoccerBallRim) {
-          const trim = buildSoccerBallRimRing(edgeTrimRadius, edgeTrimY, rand);
+          const trim = buildSoccerBallRimRing(edgeTrimRadius, edgeTrimY, rand, { isBottom });
           group.add(trim);
         } else if (slot?.pipingTip) {
           const isAltTip = typeof slot.pipingTip === 'string' && slot.pipingTip.includes('Alt');
