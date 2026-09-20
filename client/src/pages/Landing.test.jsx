@@ -37,6 +37,9 @@ describe('Landing page presentation', () => {
     expect(heroImage).toHaveAttribute('src', expect.stringContaining('landing-page-bg'));
     expect(heroImage.getAttribute('src')).not.toBe(briefImage.getAttribute('src'));
 
+    const sectionIds = [...container.querySelectorAll('main > section')].map((section) => section.id);
+    expect(sectionIds.indexOf('about')).toBeLessThan(sectionIds.indexOf('design-brief'));
+
     const firstQuestion = screen.getByText('Do I need design experience?').closest('details');
     expect(firstQuestion).toHaveAttribute('open');
     expect(screen.getByText(/a clear brief gives your baker a practical starting point/i)).toBeVisible();

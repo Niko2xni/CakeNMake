@@ -330,6 +330,30 @@ export default function Landing() {
           </div>
         </section>
 
+        <section className="craft-section" id="about">
+          <div className="landing-container craft-grid">
+            <div className="craft-art" aria-hidden="true" data-reveal>
+              <span className="craft-orbit one" />
+              <span className="craft-orbit two" />
+              <p>made<br /><em>by hand</em></p>
+              <span className="craft-spark">✦</span>
+            </div>
+            <div className="craft-copy" data-reveal>
+              <p className="editorial-kicker light">Technology with a human finish</p>
+              <h2>Designed digitally.<br /><em>Finished by human hands.</em></h2>
+              <p>
+                The screen helps you be specific. The baker brings the craft. The result
+                should still feel personal, beautifully made, and unmistakably yours.
+              </p>
+              <p className="craft-proof"><Check size={16} aria-hidden="true" /> A clear brief gives your baker a practical starting point.</p>
+              <div className="craft-signoff">
+                <span>Our promise</span>
+                <strong>Your idea stays at the heart of the cake.</strong>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section className="brief-section" id="design-brief">
           <div className="landing-container brief-grid">
             <div className="brief-board" aria-label="Example CakeNMake cake design brief" data-reveal>
@@ -370,30 +394,6 @@ export default function Landing() {
                 <span>Why it matters</span>
                 <p>“Something like this” becomes one cake both you and your baker can see.</p>
               </aside>
-            </div>
-          </div>
-        </section>
-
-        <section className="craft-section" id="about">
-          <div className="landing-container craft-grid">
-            <div className="craft-art" aria-hidden="true" data-reveal>
-              <span className="craft-orbit one" />
-              <span className="craft-orbit two" />
-              <p>made<br /><em>by hand</em></p>
-              <span className="craft-spark">✦</span>
-            </div>
-            <div className="craft-copy" data-reveal>
-              <p className="editorial-kicker light">Technology with a human finish</p>
-              <h2>Designed digitally.<br /><em>Finished by human hands.</em></h2>
-              <p>
-                The screen helps you be specific. The baker brings the craft. The result
-                should still feel personal, beautifully made, and unmistakably yours.
-              </p>
-              <p className="craft-proof"><Check size={16} aria-hidden="true" /> A clear brief gives your baker a practical starting point.</p>
-              <div className="craft-signoff">
-                <span>Our promise</span>
-                <strong>Your idea stays at the heart of the cake.</strong>
-              </div>
             </div>
           </div>
         </section>
