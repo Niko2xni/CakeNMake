@@ -30,10 +30,11 @@ describe('Landing page presentation', () => {
   });
 
   it('uses a distinct composition for the example brief and keeps the FAQ accessible', () => {
-    render(<MemoryRouter><Landing /></MemoryRouter>);
+    const { container } = render(<MemoryRouter><Landing /></MemoryRouter>);
 
-    const heroImage = screen.getByAltText(/chocolate cake with a cream drip finish/i);
+    const heroImage = container.querySelector('#home .hero-background');
     const briefImage = screen.getByAltText(/cake shown inside the cakenmake design preview/i);
+    expect(heroImage).toHaveAttribute('src', expect.stringContaining('landing-page-bg'));
     expect(heroImage.getAttribute('src')).not.toBe(briefImage.getAttribute('src'));
 
     const firstQuestion = screen.getByText('Do I need design experience?').closest('details');

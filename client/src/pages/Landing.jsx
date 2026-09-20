@@ -10,7 +10,7 @@ import {
   X,
 } from 'lucide-react';
 import heroCake from '@/assets/hero-cake.png';
-import briefCake from '@/assets/landing-page-bg.jpg';
+import landingPageBackground from '@/assets/landing-page-bg.jpg';
 import './Landing.css';
 
 const navigation = [
@@ -262,11 +262,21 @@ export default function Landing() {
       </header>
 
       <main>
-        <section className="landing-hero" id="home">
+        <section className="landing-hero" id="home" aria-labelledby="landing-hero-title">
+          <img
+            className="hero-background"
+            src={landingPageBackground}
+            alt=""
+            aria-hidden="true"
+          />
           <div className="landing-container hero-grid">
             <div className="hero-copy" data-reveal>
               <p className="editorial-kicker">You imagine it. We make it bakeable.</p>
-              <h1>A cake for the way <em>you</em> celebrate.</h1>
+              <h1 id="landing-hero-title">
+                <span>A cake for the</span>
+                <span>way <em>you</em></span>
+                <span>celebrate.</span>
+              </h1>
               <p className="hero-description">
                 Choose the shape, finish, colors, and little details. See your cake in 3D,
                 know the price as you go, then send a design your baker can bring to life.
@@ -281,18 +291,7 @@ export default function Landing() {
                 <span aria-hidden="true">✦</span> No design skills needed—just bring the occasion.
               </p>
             </div>
-
-            <figure className="hero-visual" data-reveal>
-              <div className="hero-image-frame">
-                <img src={heroCake} alt="Chocolate cake with a cream drip finish and a cherry-red topper" />
-                <div className="hero-sticker" aria-hidden="true">Made for<br />your moment</div>
-                <div className="hero-image-caption">
-                  <span><strong>Cherry on top</strong> Your design, from every angle</span>
-                </div>
-              </div>
-            </figure>
           </div>
-          <span className="hero-side-note" aria-hidden="true">Designed by you · Made by a baker</span>
         </section>
 
         <section className="occasion-strip" aria-label="Celebration occasions">
@@ -339,7 +338,7 @@ export default function Landing() {
                 <span className="brief-status"><i /> Saved</span>
               </div>
               <div className="brief-preview">
-                <img src={briefCake} alt="Cake shown inside the CakeNMake design preview" />
+                <img src={heroCake} alt="Cake shown inside the CakeNMake design preview" />
                 <span className="preview-mode"><Rotate3D size={14} aria-hidden="true" /> Live 3D preview</span>
                 <div className="preview-annotations" aria-hidden="true">
                   <span className="annotation-one">Cream drip</span>
