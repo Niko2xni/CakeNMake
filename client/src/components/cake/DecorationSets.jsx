@@ -530,20 +530,60 @@ export function buildOreoRimRing(radius, y, rand = Math.random, opts = {}) {
   return group;
 }
 
-/** Cherry Rim — complete glossy cherries nestled along the cake edge. */
+/**
+ * Cherry Rim — complete glossy cherries lining the cake edge (Option A):
+ * - Top rim: Stems arch inward gracefully toward the cake center with a subtle
+ *   inward body lean and organic hand-placed variation rather than standing
+ *   straight up like radio antennae.
+ * - Bottom rim: Stemless glossy cocktail/maraschino cherries with the apical
+ *   dimple visible on top, resting flush on the cake plate along the base cylinder.
+ */
 export function buildCherryRimRing(radius, y, rand = Math.random, opts = {}) {
+  const isBottom = opts.isBottom ?? false;
   const count = opts.count ?? 18;
   const scale = opts.scale ?? 0.85;
+  // minY of cherry body geometry was translated by -0.10.
+  // For the bottom rim resting on the cake plate plane, offset +0.10 * scale to be flush.
+  const surfaceOffset = isBottom ? 0.10 * scale : 0.0;
   const group = new THREE.Group();
+
   for (let i = 0; i < count; i++) {
     const angle = (i / count) * Math.PI * 2;
     const cx = Math.sin(angle) * radius;
     const cz = Math.cos(angle) * radius;
-    const cherry = buildCherryMesh(cx, y, cz, scale, rand);
-    cherry.rotation.y = angle + (rand() - 0.5) * 0.3;
-    cherry.rotation.x = (rand() - 0.5) * 0.06;
-    cherry.rotation.z = (rand() - 0.5) * 0.06;
-    group.add(cherry);
+
+    if (isBottom) {
+      // Bottom rim: stemless glossy maraschino cherries resting flush on plate
+      const cherry = buildCherryMesh(cx, y + surfaceOffset, cz, scale, rand, { stem: false });
+      cherry.rotation.order = 'YXZ';
+      cherry.rotation.y = angle + rand() * Math.PI * 2;
+      cherry.rotation.x = (rand() - 0.5) * 0.08;
+      cherry.rotation.z = (rand() - 0.5) * 0.08;
+      group.add(cherry);
+    } else {
+      // Top rim: blend of casual hand-placed draping (Option 1) and
+      // perimeter garland swirl along the rim curve (Option 2).
+      // Stems sweep gracefully along the perimeter (+X) with a gentle inward
+      // bias (-Z) and generous hand-placed organic variance so each stem looks
+      // unique without pointing like rigid spokes into the center.
+      const stemBaseAngle = -Math.PI * 0.28; // ~ -50° diagonal between tangential (+X) and inward (-Z)
+      const stemJitter = (rand() - 0.5) * 1.05; // natural organic spread (~ -80° to -20°)
+      const stemAngle = stemBaseAngle + stemJitter;
+      const bendAmount = 0.24 + rand() * 0.16;
+
+      const cherry = buildCherryMesh(cx, y + surfaceOffset, cz, scale, rand, {
+        stem: true,
+        stemAngle,
+        bendAmount,
+      });
+
+      // Subtle organic hand-placed body tilt and varied rotation
+      cherry.rotation.order = 'YXZ';
+      cherry.rotation.y = angle + (rand() - 0.5) * 0.40;
+      cherry.rotation.x = -0.06 + (rand() - 0.5) * 0.10;
+      cherry.rotation.z = (rand() - 0.5) * 0.10;
+      group.add(cherry);
+    }
   }
   return group;
 }

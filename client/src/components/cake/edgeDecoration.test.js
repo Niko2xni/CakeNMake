@@ -1231,6 +1231,16 @@ describe('edge decoration placement', () => {
       expect(cherry.isGroup).toBe(true);
       expect(cherry.children[0].isMesh).toBe(true);
       expect(cherry.children[0].geometry).toBe(getSharedCherryBodyGeometry());
+      expect(cherry.userData.hasStem).toBe(true);
+    });
+
+    const bottomCherryRing = buildCherryRimRing(3.70, 0.0, () => 0.5, { isBottom: true });
+    expect(bottomCherryRing.isGroup).toBe(true);
+    expect(bottomCherryRing.children).toHaveLength(18);
+    bottomCherryRing.children.forEach((cherry) => {
+      expect(cherry.isGroup).toBe(true);
+      expect(cherry.userData.hasStem).toBe(false);
+      expect(cherry.children).toHaveLength(1);
     });
 
     const canvasContext = {

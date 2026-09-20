@@ -38,6 +38,16 @@ describe('High-Fidelity Toppings Upgrade', () => {
       meshes.forEach((mesh) => {
         expect(mesh.castShadow).toBe(true);
       });
+      expect(cherry.userData.hasStem).toBe(true);
+    });
+
+    it('creates a stemless Cherry mesh group when stem is false', () => {
+      const cherry = buildCherryMesh(1, 2, 3, 0.85, Math.random, { stem: false });
+      expect(cherry).toBeInstanceOf(THREE.Group);
+      expect(cherry.children).toHaveLength(1);
+      expect(cherry.children[0].isMesh).toBe(true);
+      expect(cherry.children[0].geometry).toBe(getSharedCherryBodyGeometry());
+      expect(cherry.userData.hasStem).toBe(false);
     });
 
     it('caches Cherry geometry and materials properly', () => {
