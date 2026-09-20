@@ -1206,12 +1206,21 @@ describe('edge decoration placement', () => {
     });
 
     // 8. Geometry verification: Hershey's Kiss rim ring
-    const kissRing = buildHersheysKissRimRing(3.58, 1.0);
+    const kissRing = buildHersheysKissRimRing(3.58, 1.0, () => 0.8);
     expect(kissRing).toBeDefined();
     expect(kissRing.isGroup).toBe(true);
     expect(kissRing.children.length).toBeGreaterThanOrEqual(12);
     kissRing.children.forEach((kiss) => {
       expect(kiss.isMesh).toBe(true);
+    });
+
+    const bottomKissRing = buildHersheysKissRimRing(3.58, 0.0, () => 0.8, { isBottom: true });
+    expect(bottomKissRing.isGroup).toBe(true);
+    expect(bottomKissRing.children.length).toBeGreaterThanOrEqual(12);
+    bottomKissRing.children.forEach((kiss) => {
+      expect(kiss.isMesh).toBe(true);
+      expect(kiss.rotation.x).not.toBe(0);
+      expect(kiss.rotation.z).not.toBe(0);
     });
 
     // 9. Geometry verification: Ferrero Rocher rim ring

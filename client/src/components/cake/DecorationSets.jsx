@@ -421,7 +421,11 @@ export function buildStrawberryRimRing(radius, y, rand = Math.random, opts = {})
   const isBottom = opts.isBottom ?? false;
   const count = opts.count ?? Math.max(10, Math.round((radius * Math.PI * 2) / (isBottom ? 1.35 : 1.45)));
   const scale = opts.scale ?? 0.82;
-  const surfaceLift = isBottom ? 0.25 * scale : 0;
+  // Sinking & grounding offset:
+  // Top: sink ~24% into top frosting (-0.20 * scale) so the narrow conical tip is firmly buried
+  // and the plump berry body emerges naturally from the buttercream rather than balancing on a needle tip.
+  // Bottom: 0.25 * scale rests the sideways garland flush on the cake plate.
+  const surfaceLift = isBottom ? 0.25 * scale : -0.20 * scale;
   const group = new THREE.Group();
 
   for (let i = 0; i < count; i++) {
@@ -444,9 +448,10 @@ export function buildStrawberryRimRing(radius, y, rand = Math.random, opts = {})
 
       strawberry.quaternion.copy(qRing.multiply(qYaw).multiply(qLie).multiply(qElevate).multiply(qRoll));
     } else {
-      // Top rim: nestled upright with subtle inward radial tilt (~6 deg) and random axial spin
-      const inwardTilt = -0.10 + (rand() - 0.5) * 0.05;
-      const sideTilt = (rand() - 0.5) * 0.05;
+      // Top rim: upright with leaves/stem on top, nestled deeply into frosting,
+      // leaning gently inward (~10 deg) toward the cake center with organic hand-placed jitter
+      const inwardTilt = -0.18 + (rand() - 0.5) * 0.08;
+      const sideTilt = (rand() - 0.5) * 0.08;
       const spin = rand() * Math.PI * 2;
 
       const qRing = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), angle);
@@ -463,18 +468,37 @@ export function buildStrawberryRimRing(radius, y, rand = Math.random, opts = {})
 }
 
 /**
- * Hershey's Kisses Chocolate Rim — upright chocolate kisses lining the cake rim.
+ * Hershey's Kisses Chocolate Rim — chocolate kisses lining the cake rim (Option A):
+ * - 360° Randomized Tip Curls: Each Kiss spins freely around its vertical axis so
+ *   the signature teardrop tips flick in diverse, natural directions rather than
+ *   pointing synchronously in a cloned array.
+ * - Top Rim: Sunk ~20% into the top buttercream with subtle organic hand-placed
+ *   tilt (±4°).
+ * - Bottom Rim: Firmly grounded on the cake plate surface, tucked snugly against
+ *   the cake base cylinder with zero floating gap.
  */
 export function buildHersheysKissRimRing(radius, y, rand = Math.random, opts = {}) {
+  const isBottom = opts.isBottom ?? false;
   const count = opts.count ?? Math.max(12, Math.round((radius * Math.PI * 2) / 1.35));
   const scale = opts.scale ?? 0.36;
+  // Sinking & grounding offset:
+  // Top: sink ~20% into top frosting (-0.14 * scale)
+  // Bottom: ground firmly flush on cake plate (-0.02)
+  const surfaceOffset = isBottom ? -0.02 : -0.14 * scale;
   const group = new THREE.Group();
+
   for (let i = 0; i < count; i++) {
     const angle = (i / count) * Math.PI * 2;
     const cx = Math.sin(angle) * radius;
     const cz = Math.cos(angle) * radius;
-    const rotY = angle + (rand() - 0.5) * 0.3;
-    const kiss = buildHersheysKissMesh(cx, y, cz, scale, rotY);
+    const rotY = rand() * Math.PI * 2;
+    const kiss = buildHersheysKissMesh(cx, y + surfaceOffset, cz, scale, rotY);
+
+    // Subtle hand-placed organic tilt
+    kiss.rotation.order = 'YXZ';
+    kiss.rotation.x = (rand() - 0.5) * 0.14;
+    kiss.rotation.z = (rand() - 0.5) * 0.14;
+
     group.add(kiss);
   }
   return group;
