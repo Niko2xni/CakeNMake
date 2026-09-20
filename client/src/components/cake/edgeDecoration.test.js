@@ -1138,38 +1138,44 @@ describe('edge decoration placement', () => {
     const { getSharedCherryBodyGeometry } = await import('./toppings/cherry');
 
     // 1. Placement verification for Strawberry Rim
-    expect(computeEdgeTrimY(1.0, 4.0, 'strawberryRim', 'fullyFrosted', false)).toBeCloseTo(0.96, 2);
+    expect(computeEdgeTrimY(1.0, 4.0, 'strawberryRim', 'naked', false)).toBeCloseTo(0.96, 2);
+    expect(computeEdgeTrimY(1.25, 4.0, 'strawberryRim', 'fullyFrosted', false)).toBeCloseTo(0.99, 2);
     expect(computeEdgeTrimY(0.0, 4.0, 'strawberryRim', 'fullyFrosted', true)).toBeCloseTo(0.0, 2);
     expect(computeEdgeTrimRadius(4.0, 'strawberryRim', 'fullyFrosted', false)).toBeCloseTo(3.64, 2);
     expect(computeEdgeTrimRadius(4.0, 'strawberryRim', 'fullyFrosted', true)).toBeCloseTo(4.37, 2);
 
     // 2. Placement verification for Hershey's Kisses Rim
-    expect(computeEdgeTrimY(1.0, 4.0, 'hersheysKissRim', 'fullyFrosted', false)).toBeCloseTo(1.0, 2);
+    expect(computeEdgeTrimY(1.0, 4.0, 'hersheysKissRim', 'naked', false)).toBeCloseTo(1.0, 2);
+    expect(computeEdgeTrimY(1.25, 4.0, 'hersheysKissRim', 'fullyFrosted', false)).toBeCloseTo(1.03, 2);
     expect(computeEdgeTrimY(0.0, 4.0, 'hersheysKissRim', 'fullyFrosted', true)).toBeCloseTo(0.0, 2);
     expect(computeEdgeTrimRadius(4.0, 'hersheysKissRim', 'fullyFrosted', false)).toBeCloseTo(3.58, 2);
     expect(computeEdgeTrimRadius(4.0, 'hersheysKissRim', 'fullyFrosted', true)).toBeCloseTo(4.47, 2);
 
     // 3. Placement verification for Ferrero Rocher Rim
-    expect(computeEdgeTrimY(1.0, 4.0, 'ferreroRocherRim', 'fullyFrosted', false)).toBeCloseTo(1.0, 2);
+    expect(computeEdgeTrimY(1.0, 4.0, 'ferreroRocherRim', 'naked', false)).toBeCloseTo(1.0, 2);
+    expect(computeEdgeTrimY(1.25, 4.0, 'ferreroRocherRim', 'fullyFrosted', false)).toBeCloseTo(1.03, 2);
     expect(computeEdgeTrimY(0.0, 4.0, 'ferreroRocherRim', 'fullyFrosted', true)).toBeCloseTo(0.0, 2);
     expect(computeEdgeTrimRadius(4.0, 'ferreroRocherRim', 'fullyFrosted', false)).toBeCloseTo(3.41, 2);
     expect(computeEdgeTrimRadius(4.0, 'ferreroRocherRim', 'fullyFrosted', true)).toBeCloseTo(4.67, 2);
 
     // 4. Placement verification for Oreo rim
-    expect(computeEdgeTrimY(1.0, 4.0, 'oreoRim', 'fullyFrosted', false)).toBeCloseTo(1.0, 2);
+    expect(computeEdgeTrimY(1.0, 4.0, 'oreoRim', 'naked', false)).toBeCloseTo(1.0, 2);
+    expect(computeEdgeTrimY(1.25, 4.0, 'oreoRim', 'fullyFrosted', false)).toBeCloseTo(1.03, 2);
     expect(computeEdgeTrimY(0.0, 4.0, 'oreoRim', 'fullyFrosted', true)).toBeCloseTo(0.0, 2);
     expect(computeEdgeTrimRadius(4.0, 'oreoRim', 'fullyFrosted', false)).toBeCloseTo(3.84, 2);
     expect(computeEdgeTrimRadius(4.0, 'oreoRim', 'fullyFrosted', true)).toBeCloseTo(4.26, 2);
 
     // 5. Placement verification for Cherry Rim
-    expect(computeEdgeTrimY(1.0, 4.0, 'cherryRim', 'fullyFrosted', false)).toBeCloseTo(1.0, 2);
+    expect(computeEdgeTrimY(1.0, 4.0, 'cherryRim', 'naked', false)).toBeCloseTo(1.0, 2);
+    expect(computeEdgeTrimY(1.25, 4.0, 'cherryRim', 'fullyFrosted', false)).toBeCloseTo(1.03, 2);
     expect(computeEdgeTrimY(0.0, 4.0, 'cherryRim', 'fullyFrosted', true)).toBeCloseTo(0.0, 2);
     expect(computeEdgeTrimRadius(4.0, 'cherryRim', 'fullyFrosted', false)).toBeCloseTo(3.70, 2);
     expect(computeEdgeTrimRadius(4.0, 'cherryRim', 'fullyFrosted', true)).toBeCloseTo(4.42, 2);
 
     // 6. Placement verification for Basketball and Soccer Ball rims
     for (const rimId of ['basketballRim', 'soccerBallRim']) {
-      expect(computeEdgeTrimY(1.0, 4.0, rimId, 'fullyFrosted', false)).toBeCloseTo(1.0, 2);
+      expect(computeEdgeTrimY(1.0, 4.0, rimId, 'naked', false)).toBeCloseTo(1.0, 2);
+      expect(computeEdgeTrimY(1.25, 4.0, rimId, 'fullyFrosted', false)).toBeCloseTo(1.03, 2);
       expect(computeEdgeTrimY(0.0, 4.0, rimId, 'fullyFrosted', true)).toBeCloseTo(0.0, 2);
       expect(computeEdgeTrimRadius(4.0, rimId, 'fullyFrosted', false)).toBeCloseTo(3.56, 2);
       expect(computeEdgeTrimRadius(4.0, rimId, 'fullyFrosted', true)).toBeCloseTo(4.56, 2);
@@ -1186,6 +1192,17 @@ describe('edge decoration placement', () => {
       expect(bodyMeshes).toHaveLength(1);
       expect(bodyMeshes[0].geometry).toBe(getSharedStrawberryBodyGeometry());
       expect(berry.children.some((child) => child.isGroup)).toBe(true);
+    });
+
+    const bottomStrawberryRing = buildStrawberryRimRing(4.37, 0.0, () => 0.5, { isBottom: true });
+    expect(bottomStrawberryRing).toBeDefined();
+    expect(bottomStrawberryRing.isGroup).toBe(true);
+    expect(bottomStrawberryRing.children.length).toBeGreaterThanOrEqual(10);
+    bottomStrawberryRing.children.forEach((berry) => {
+      expect(berry.isGroup).toBe(true);
+      const bodyMeshes = berry.children.filter((child) => child.isMesh);
+      expect(bodyMeshes).toHaveLength(1);
+      expect(bodyMeshes[0].geometry).toBe(getSharedStrawberryBodyGeometry());
     });
 
     // 8. Geometry verification: Hershey's Kiss rim ring

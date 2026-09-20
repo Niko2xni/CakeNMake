@@ -1654,7 +1654,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           trim.position.y = edgeTrimY;
           group.add(trim);
         } else if (isStrawberryRim) {
-          const trim = buildStrawberryRimRing(edgeTrimRadius, edgeTrimY, rand);
+          const trim = buildStrawberryRimRing(edgeTrimRadius, edgeTrimY, rand, { isBottom });
           group.add(trim);
         } else if (isHersheysKissRim) {
           const trim = buildHersheysKissRimRing(edgeTrimRadius, edgeTrimY, rand);

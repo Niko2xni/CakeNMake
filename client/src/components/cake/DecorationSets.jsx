@@ -93,7 +93,16 @@ export function computeEdgeTrimY(topSurfaceY, radius, decorationType = 'piping',
     return -0.05;
   }
   if (isFruitRim) {
-    return decorationType === 'strawberryRim' ? topSurfaceY - 0.04 : topSurfaceY;
+    if (exteriorFinishStyle === 'naked') {
+      return decorationType === 'strawberryRim' ? topSurfaceY - 0.04 : topSurfaceY;
+    }
+    const compactDepth = Math.min(0.12, Math.max(0.06, radius * 0.08));
+    const finishDepth = 0.06;
+    const extraInset = 0.04;
+    const frostCapRecess = compactDepth + extraInset + finishDepth;
+    return decorationType === 'strawberryRim'
+      ? topSurfaceY - (frostCapRecess + 0.04)
+      : topSurfaceY - frostCapRecess;
   }
   if (exteriorFinishStyle === 'naked') {
     // compactDepth + extraInset below (0.10–0.16 depending on cake size
@@ -401,21 +410,53 @@ export function buildBeadedTrimRing(radius, colorHex, rand, opts = {}) {
 }
 
 /**
- * Fresh Strawberries Rim — a handcrafted ring of complete ripe strawberries
- * sitting directly along the cake edge.
+ * Fresh Strawberries Rim — a handcrafted ring of ripe strawberries sitting
+ * along the cake edge.
+ * - Top rim: Strawberries stand nestled upright in the top buttercream,
+ *   subtly leaning radially inward toward the cake center with organic rotation jitter.
+ * - Bottom rim: Strawberries rest naturally on their side along the cake skirt,
+ *   nestled against the base cylinder in a continuous fruit garland.
  */
 export function buildStrawberryRimRing(radius, y, rand = Math.random, opts = {}) {
-  const count = opts.count ?? Math.max(10, Math.round((radius * Math.PI * 2) / 1.45));
+  const isBottom = opts.isBottom ?? false;
+  const count = opts.count ?? Math.max(10, Math.round((radius * Math.PI * 2) / (isBottom ? 1.35 : 1.45)));
   const scale = opts.scale ?? 0.82;
+  const surfaceLift = isBottom ? 0.25 * scale : 0;
   const group = new THREE.Group();
+
   for (let i = 0; i < count; i++) {
     const angle = (i / count) * Math.PI * 2;
     const cx = Math.sin(angle) * radius;
     const cz = Math.cos(angle) * radius;
-    const strawberry = buildStrawberryMesh(cx, y, cz, scale, rand);
-    strawberry.rotation.y = angle;
-    strawberry.rotation.x = -0.38 + (rand() - 0.5) * 0.08;
-    strawberry.rotation.z += (rand() - 0.5) * 0.08;
+    const strawberry = buildStrawberryMesh(cx, y + surfaceLift, cz, scale, rand);
+
+    if (isBottom) {
+      // Bottom rim: lying on its side, cradled where cake cylinder wall meets cake board
+      const qRing = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+      // Lie horizontally along the tangent (stem pointing along the circumference)
+      const qLie = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -Math.PI / 2);
+      // Natural fruit taper lifts crown/stem ~16 deg relative to the surface
+      const qElevate = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), 0.25 + (rand() - 0.5) * 0.08);
+      // Roll slightly so seeds and leaves face outward/upward naturally
+      const qRoll = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.20 + (rand() - 0.5) * 0.12);
+      // Gentle yaw contouring to hug the cake base
+      const qYaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -0.06 + (rand() - 0.5) * 0.06);
+
+      strawberry.quaternion.copy(qRing.multiply(qYaw).multiply(qLie).multiply(qElevate).multiply(qRoll));
+    } else {
+      // Top rim: nestled upright with subtle inward radial tilt (~6 deg) and random axial spin
+      const inwardTilt = -0.10 + (rand() - 0.5) * 0.05;
+      const sideTilt = (rand() - 0.5) * 0.05;
+      const spin = rand() * Math.PI * 2;
+
+      const qRing = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+      const qTilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), inwardTilt);
+      const qSide = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), sideTilt);
+      const qSpin = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), spin);
+
+      strawberry.quaternion.copy(qRing.multiply(qTilt).multiply(qSide).multiply(qSpin));
+    }
+
     group.add(strawberry);
   }
   return group;
