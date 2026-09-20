@@ -1156,7 +1156,7 @@ describe('edge decoration placement', () => {
     expect(computeEdgeTrimY(1.25, 4.0, 'ferreroRocherRim', 'fullyFrosted', false)).toBeCloseTo(1.03, 2);
     expect(computeEdgeTrimY(0.0, 4.0, 'ferreroRocherRim', 'fullyFrosted', true)).toBeCloseTo(0.0, 2);
     expect(computeEdgeTrimRadius(4.0, 'ferreroRocherRim', 'fullyFrosted', false)).toBeCloseTo(3.41, 2);
-    expect(computeEdgeTrimRadius(4.0, 'ferreroRocherRim', 'fullyFrosted', true)).toBeCloseTo(4.67, 2);
+    expect(computeEdgeTrimRadius(4.0, 'ferreroRocherRim', 'fullyFrosted', true)).toBeCloseTo(4.54, 2);
 
     // 4. Placement verification for Oreo rim
     expect(computeEdgeTrimY(1.0, 4.0, 'oreoRim', 'naked', false)).toBeCloseTo(1.0, 2);
@@ -1215,12 +1215,21 @@ describe('edge decoration placement', () => {
     });
 
     // 9. Geometry verification: Ferrero Rocher rim ring
-    const ferreroRing = buildFerreroRocherRimRing(3.41, 1.0);
+    const ferreroRing = buildFerreroRocherRimRing(3.41, 1.0, () => 0.7);
     expect(ferreroRing).toBeDefined();
     expect(ferreroRing.isGroup).toBe(true);
     expect(ferreroRing.children.length).toBeGreaterThanOrEqual(8);
     ferreroRing.children.forEach((truffle) => {
       expect(truffle.isMesh).toBe(true);
+    });
+
+    const bottomFerreroRing = buildFerreroRocherRimRing(3.41, 0.0, () => 0.7, { isBottom: true });
+    expect(bottomFerreroRing.isGroup).toBe(true);
+    expect(bottomFerreroRing.children.length).toBeGreaterThanOrEqual(8);
+    bottomFerreroRing.children.forEach((truffle) => {
+      expect(truffle.isMesh).toBe(true);
+      expect(truffle.rotation.x).not.toBe(0);
+      expect(truffle.rotation.z).not.toBe(0);
     });
 
     // 10. Geometry verification: Cherry, Oreo, and ball rim rings

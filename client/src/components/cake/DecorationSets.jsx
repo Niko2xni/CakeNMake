@@ -230,7 +230,7 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
   } else if (baseTip === 'roundDollop' || baseTip === 'kissDollop') {
     bottomRadialInset = -0.40;
   } else if (baseTip === 'ferreroRocherRim') {
-    bottomRadialInset = -0.61;
+    bottomRadialInset = -0.48;
   } else if (baseTip === 'hersheysKissRim') {
     bottomRadialInset = -0.41;
   } else if (baseTip === 'strawberryRim') {
@@ -481,18 +481,33 @@ export function buildHersheysKissRimRing(radius, y, rand = Math.random, opts = {
 }
 
 /**
- * Ferrero Rocher Truffle Rim — textured hazelnut chocolate truffles lining the cake rim.
+ * Ferrero Rocher Truffle Rim — textured hazelnut chocolate truffles lining the cake rim (Option 1):
+ * - Top rim: Sunk ~28% into the top buttercream so they look securely anchored and nestled into the soft frosting.
+ * - Bottom rim: Grounded firmly flush on the cake plate surface and tucked snugly against the cake base cylinder.
+ * - Organic 3D Tumble: Full rotation across pitch, roll, and yaw so textured hazelnut pieces and facets face diverse 3D angles.
+ * - Spacing: Tuned density (~15-16 on an 8" cake) creating a rich, decadent confection border without large empty gaps.
  */
 export function buildFerreroRocherRimRing(radius, y, rand = Math.random, opts = {}) {
-  const count = opts.count ?? Math.max(8, Math.round((radius * Math.PI * 2) / 2.15));
+  const isBottom = opts.isBottom ?? false;
+  const count = opts.count ?? Math.max(8, Math.round((radius * Math.PI * 2) / 1.65));
   const scale = opts.scale ?? 0.45;
+  // Sinking & grounding offset:
+  // Top: sink ~28% into top frosting (-0.28 * scale)
+  // Bottom: rest firmly on plate (+0.07)
+  const surfaceOffset = isBottom ? 0.07 : -0.28 * scale;
   const group = new THREE.Group();
+
   for (let i = 0; i < count; i++) {
     const angle = (i / count) * Math.PI * 2;
     const cx = Math.sin(angle) * radius;
     const cz = Math.cos(angle) * radius;
-    const truffle = buildFerreroRocherMesh(cx, y, cz, scale);
+    const truffle = buildFerreroRocherMesh(cx, y + surfaceOffset, cz, scale);
+
+    // Organic 3D tumble: rotate across pitch, roll, and yaw in-place around sphere center
+    truffle.rotation.x = (rand() - 0.5) * 2.2;
+    truffle.rotation.z = (rand() - 0.5) * 2.2;
     truffle.rotation.y = rand() * Math.PI * 2;
+
     group.add(truffle);
   }
   return group;
