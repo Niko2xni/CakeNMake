@@ -1669,10 +1669,10 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           const trim = buildCherryRimRing(edgeTrimRadius, edgeTrimY, rand);
           group.add(trim);
         } else if (isBasketballRim) {
-          const trim = buildBasketballRimRing(edgeTrimRadius, edgeTrimY, rand);
+          const trim = buildBasketballRimRing(edgeTrimRadius, edgeTrimY, rand, { isBottom });
           group.add(trim);
         } else if (isSoccerBallRim) {
-          const trim = buildSoccerBallRimRing(edgeTrimRadius, edgeTrimY, rand);
+          const trim = buildSoccerBallRimRing(edgeTrimRadius, edgeTrimY, rand, { isBottom });
           group.add(trim);
         } else if (slot?.pipingTip) {
           const isAltTip = typeof slot.pipingTip === 'string' && slot.pipingTip.includes('Alt');

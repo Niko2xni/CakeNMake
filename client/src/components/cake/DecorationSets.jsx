@@ -548,17 +548,45 @@ export function buildCherryRimRing(radius, y, rand = Math.random, opts = {}) {
   return group;
 }
 
-function buildBallRimRing(buildBall, radius, y, rand, opts) {
+/**
+ * Basketball / Soccer Ball Rim helper.
+ * - Top rim: Spheres are nestled ~30% into the top frosting layer rather than
+ *   balancing on an unstable single tangent point.
+ * - Bottom rim: Spheres rest firmly on the cake board / plate, tucked flush
+ *   against the cake base cylinder with zero floating gap.
+ * - Organic 3D Tumble: Pitches, rolls, and yaws each ball's inner sphere mesh
+ *   in place so seams and pentagon panels face varied natural angles.
+ */
+function buildBallRimRing(buildBall, radius, y, rand = Math.random, opts = {}) {
+  const isBottom = opts.isBottom ?? false;
   const count = opts.count ?? 16;
   const scale = opts.scale ?? 0.18;
-  const surfaceLift = 0.50 * scale;
+  // Sinking / grounding offset:
+  // Top: sink ~30% into top frosting (-1.25 * scale)
+  // Bottom: rest directly on cake plate surface (0.01)
+  const surfaceOffset = isBottom ? 0.01 : -1.25 * scale;
   const group = new THREE.Group();
+
   for (let i = 0; i < count; i++) {
     const angle = (i / count) * Math.PI * 2;
     const cx = Math.sin(angle) * radius;
     const cz = Math.cos(angle) * radius;
-    const ball = buildBall(cx, y + surfaceLift, cz, scale);
-    ball.rotation.y = angle + rand() * Math.PI * 2;
+    const ball = buildBall(cx, y + surfaceOffset, cz, scale);
+
+    // Organic 3D tumble & rotation:
+    // Tumble the inner sphere mesh/group around its own center (0, 0, 0)
+    // so seams and panels face varied 3D angles without shifting the ball position
+    const innerObj = ball.children[0];
+    if (innerObj) {
+      const pitch = (rand() - 0.5) * 1.8;
+      const roll = (rand() - 0.5) * 1.8;
+      const yaw = rand() * Math.PI * 2;
+      innerObj.rotation.x += pitch;
+      innerObj.rotation.z += roll;
+      innerObj.rotation.y += yaw;
+    }
+
+    ball.rotation.y = angle + (rand() - 0.5) * 0.4;
     group.add(ball);
   }
   return group;
