@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Cake, Palette, Sparkles, RotateCcw, Layers, Building2, Wand2, ChevronDown, ChevronUp, Eye, EyeOff, Bot, Lock } from 'lucide-react';
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Cake, Palette, Sparkles, RotateCcw, Layers, Building2, Wand2, ChevronDown, ChevronUp, Eye, Bot } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { DEFAULT_CONFIG } from '@/lib/cakeConfig';
+import { FLAVORS } from '@/lib/cakeFlavors';
 import CakeStructureSection from './sections/CakeStructureSection';
 import SpongeFlavorSection from './sections/SpongeFlavorSection';
 import FillingSection from './sections/FillingSection';
@@ -58,42 +59,29 @@ export default function ToolPanel({
   const activeExteriorStyle = isIndividual
     ? (config.exteriorFinish?.layerStyles || [])[activeLayer]
     : config.exteriorFinish?.style;
-
-  // Sponge Flavor AND Filling both stay locked shut until Exterior
-  // Finish's style is 'naked' — falls back to 'naked' (DEFAULT_CONFIG's
-  // own default) when nothing's been chosen yet, so both sections start
-  // open on a fresh cake rather than locked before the person has
-  // touched anything. Both sections share this same gate (rather than
-  // each getting its own flag) since the rule — and its Exterior Finish
-  // dependency — is identical for the two of them.
   const effectiveExteriorStyle = activeExteriorStyle || 'naked';
-  const nakedGatedLocked = effectiveExteriorStyle !== 'naked';
-  const NAKED_GATED_SECTIONS = ['sponge', 'filling'];
+  const exteriorCoversInterior = effectiveExteriorStyle !== 'naked';
+
+  const setCakeView = (showInterior) => {
+    if (Boolean(config.interiorPreview) === showInterior) return;
+    onChange({ ...config, interiorPreview: showInterior });
+  };
 
   const toggleSection = (section) => {
-    // Sponge Flavor and Filling can't be toggled open (or closed, but
-    // they're already closed) while locked — Naked is the only Exterior
-    // Finish style that unlocks them, see nakedGatedLocked above.
-    if (NAKED_GATED_SECTIONS.includes(section) && nakedGatedLocked) return;
+    const willOpen = !expandedSections[section];
     setExpandedSections(prev => ({
       ...prev,
       [section]: !prev[section]
     }));
-  };
 
-  // If Exterior Finish moves off Naked while Sponge Flavor and/or
-  // Filling happen to be open, force them closed rather than leaving
-  // stale expanded state that toggleSection's guard above would then
-  // refuse to ever open again from.
-  useEffect(() => {
-    if (nakedGatedLocked) {
-      setExpandedSections(prev => (
-        (prev.sponge || prev.filling)
-          ? { ...prev, sponge: false, filling: false }
-          : prev
-      ));
+    if (!willOpen) return;
+
+    if ((section === 'sponge' || section === 'filling') && exteriorCoversInterior) {
+      setCakeView(true);
+    } else if (section === 'structure' || section === 'exteriorFinish' || section === 'surfaceTreatment') {
+      setCakeView(false);
     }
-  }, [nakedGatedLocked]);
+  };
 
   // The shared layer strip (extracted from what used to be duplicated
   // inline markup in Sponge/Filling/Exterior Finish) only actually
@@ -102,10 +90,6 @@ export default function ToolPanel({
   // gap, see CAKE_SETS_REWORK_SPEC.md §11), so it's hidden on those tabs
   // rather than showing a control that wouldn't do anything there.
   const showLayerStrip = isIndividual && tab === 'fundamentals';
-
-  const toggleInteriorPreview = () => {
-    onChange({ ...config, interiorPreview: !config.interiorPreview });
-  };
 
   // Surface Treatment (Glaze) has no flavor of its own to derive a Default
   // color from — unlike Filling/Exterior Finish, which DO have their own
@@ -129,78 +113,100 @@ export default function ToolPanel({
   );
   const fillingSugarColor = config.sugarColorOverrides?.[isIndividual ? `filling-${activeLayer}` : 'filling'] || DEFAULT_CONFIG.sugarColor;
   const exteriorSugarColor = config.sugarColorOverrides?.[isIndividual ? `exterior-${activeLayer}` : 'exterior'] || DEFAULT_CONFIG.sugarColor;
+  const activeSpongeFlavorId = isIndividual
+    ? (config.sponge?.layerFlavors || [])[activeLayer] || 'vanilla'
+    : config.sponge?.flavor || 'vanilla';
+  const activeFillingFlavorId = isIndividual
+    ? (config.filling?.layerFlavors || [])[activeLayer] || 'vanilla'
+    : config.filling?.flavor || 'vanilla';
+  const spongeSummary = `${FLAVORS[activeSpongeFlavorId]?.name || 'Vanilla'} · inside the cake`;
+  const fillingSummary = config.filling?.enabled
+    ? `${FLAVORS[activeFillingFlavorId]?.name || 'Vanilla'} · ${config.filling.layers || 1} filling ${(config.filling.layers || 1) === 1 ? 'layer' : 'layers'}`
+    : 'No filling selected';
 
   return (
     <div className="flex flex-col h-full bg-card rounded-2xl shadow-xl border border-border/50 overflow-hidden">
       {/* Mode switcher header */}
-      <div className="px-4 pt-4 pb-3 flex items-center gap-2">
-        <button
-          onClick={() => setModeUi('design')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
-            modeUi === 'design'
-              ? 'bg-primary text-primary-foreground shadow-md'
-              : 'bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted'
-          }`}
-        >
-          <Cake className="w-4 h-4" />
-          Design
-        </button>
-        <button
-          onClick={() => {
-            onSelectTool?.(null);
-            setModeUi('ai');
-          }}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
-            modeUi === 'ai'
-              ? 'bg-primary text-primary-foreground shadow-md'
-              : 'bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted'
-          }`}
-        >
-          <Bot className="w-4 h-4" />
-          AI
-        </button>
-        {/* Interior Preview toggle — this control didn't exist before;
-            toggleInteriorPreview was defined in the previous ToolPanel but
-            never actually wired to anything clickable. */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className={`rounded-full shrink-0 h-9 w-9 ${
-            config.interiorPreview ? 'text-amber-600' : 'text-muted-foreground hover:text-foreground'
-          }`}
-          onClick={toggleInteriorPreview}
-          title={config.interiorPreview ? 'Turn off Interior Preview' : 'Turn on Interior Preview'}
-        >
-          {config.interiorPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="rounded-full text-muted-foreground hover:text-foreground shrink-0 h-9 w-9"
-          onClick={onReset}
-          title="Reset"
-        >
-          <RotateCcw className="w-4 h-4" />
-        </Button>
+      <div className="px-4 pt-4 pb-3 space-y-3">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setModeUi('design')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
+              modeUi === 'design'
+                ? 'bg-primary text-primary-foreground shadow-md'
+                : 'bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted'
+            }`}
+          >
+            <Cake className="w-4 h-4" />
+            Design
+          </button>
+          <button
+            onClick={() => {
+              onSelectTool?.(null);
+              setModeUi('ai');
+            }}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
+              modeUi === 'ai'
+                ? 'bg-primary text-primary-foreground shadow-md'
+                : 'bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted'
+            }`}
+          >
+            <Bot className="w-4 h-4" />
+            AI
+          </button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-full text-muted-foreground hover:text-foreground shrink-0 h-11 w-11"
+            onClick={onReset}
+            title="Reset"
+            aria-label="Reset design"
+          >
+            <RotateCcw className="w-4 h-4" />
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <span id="cake-view-label" className="shrink-0 text-xs font-semibold text-muted-foreground">
+            View
+          </span>
+          <div
+            className="grid flex-1 grid-cols-2 overflow-hidden rounded-xl border border-border/60 bg-muted/70"
+            role="group"
+            aria-labelledby="cake-view-label"
+          >
+            <button
+              type="button"
+              aria-pressed={!config.interiorPreview}
+              onClick={() => setCakeView(false)}
+              className={`min-h-11 px-3 text-sm font-semibold transition-colors duration-200 ${
+                !config.interiorPreview
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:bg-card/70 hover:text-foreground'
+              }`}
+            >
+              Outside
+            </button>
+            <button
+              type="button"
+              aria-pressed={Boolean(config.interiorPreview)}
+              onClick={() => setCakeView(true)}
+              className={`min-h-11 border-l border-border/60 px-3 text-sm font-semibold transition-colors duration-200 ${
+                config.interiorPreview
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:bg-card/70 hover:text-foreground'
+              }`}
+            >
+              Inside
+            </button>
+          </div>
+        </div>
       </div>
 
       <Separator />
 
-      {/* Everything below the header becomes view-only once Interior
-          Preview is active — the mode switcher, Eye toggle, and Reset
-          button above stay live so the person can always get back out.
-          The content itself is blurred + non-interactive, with a bigger
-          "Interior Preview Mode" badge overlaid on top (rather than the
-          small inline banner this replaces). */}
       <div className="relative flex-1 flex flex-col min-h-0">
-        <div
-          className={`flex-1 flex flex-col min-h-0 transition-all duration-300 ${
-            config.interiorPreview
-              ? 'blur-[3px] opacity-30 pointer-events-none select-none'
-              : ''
-          }`}
-          aria-hidden={config.interiorPreview}
-        >
+        <div className="flex-1 flex flex-col min-h-0">
           {modeUi === 'ai' ? (
             <div className="flex-1 p-4 min-h-0 flex flex-col">
               <AIChatPanel />
@@ -217,6 +223,7 @@ export default function ToolPanel({
                         onSelectTool?.(null);
                       }
                       setTab(id);
+                      if (id !== 'fundamentals') setCakeView(false);
                     }}
                     className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-semibold transition-all duration-200 ${
                       tab === id
@@ -250,6 +257,19 @@ export default function ToolPanel({
               animate={{ opacity: 1 }}
               transition={{ duration: 0.2 }}
             >
+              {config.interiorPreview && (
+                <div
+                  className="flex items-center gap-2 rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2 text-amber-950"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <Eye className="h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
+                  <p className="text-[11px] leading-snug">
+                    <span className="font-semibold">Inside view:</span> exterior hidden for editing.
+                  </p>
+                </div>
+              )}
+
               {tab === 'fundamentals' && (
                 <>
                   {/* 1. Cake Structure */}
@@ -287,57 +307,41 @@ export default function ToolPanel({
 
                   <Separator className="opacity-50" />
 
-                  {/* 2. Sponge Flavor — locked shut (and locked from
-                      opening) until Exterior Finish's style is Naked, see
-                      nakedGatedLocked above. Trigger is a real disabled
-                      <button>, not just a styling change, so it can't be
-                      opened via keyboard/click while locked either. */}
+                  {/* 2. Sponge Flavor — remains editable with every exterior
+                      finish. Covered cakes switch to the inside view when
+                      this section is opened so changes stay visible. */}
                   <Collapsible
-                    open={expandedSections.sponge && !nakedGatedLocked}
+                    open={expandedSections.sponge}
                     onOpenChange={() => toggleSection('sponge')}
                   >
-                    <CollapsibleTrigger
-                      disabled={nakedGatedLocked}
-                      className={`flex items-center justify-between w-full ${
-                        nakedGatedLocked ? 'opacity-50 cursor-not-allowed' : ''
-                      }`}
-                    >
+                    <CollapsibleTrigger className="flex items-center justify-between w-full min-h-11">
                       <div className="flex items-center gap-2">
                         <Cake className="w-4 h-4 text-primary/60" />
-                        <span className="text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">
-                          Sponge Flavor
-                        </span>
+                        <div className="text-left">
+                          <span className="block text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">
+                            Sponge Flavor
+                          </span>
+                          <span className="block mt-0.5 text-[10px] font-normal normal-case tracking-normal text-muted-foreground">
+                            {expandedSections.sponge ? 'Flavor and color inside the cake' : spongeSummary}
+                          </span>
+                        </div>
                       </div>
-                      {nakedGatedLocked ? (
-                        <Lock className="w-3.5 h-3.5 text-muted-foreground" />
-                      ) : expandedSections.sponge ? (
+                      {expandedSections.sponge ? (
                         <ChevronUp className="w-4 h-4 text-muted-foreground" />
                       ) : (
                         <ChevronDown className="w-4 h-4 text-muted-foreground" />
                       )}
                     </CollapsibleTrigger>
-                    {nakedGatedLocked && (
-                      <p className="text-[10px] text-muted-foreground mt-1.5">
-                        Set Exterior Finish to Naked to unlock Sponge Flavor.
-                      </p>
-                    )}
                     <CollapsibleContent className="mt-3">
                       <SpongeFlavorSection
                         sponge={config.sponge || DEFAULT_CONFIG.sponge}
                         structure={config.structure || DEFAULT_CONFIG.structure}
                         activeLayer={activeLayer}
-                        sugarColor={fillingSugarColor}
-                        onSugarColorChange={(newSugarColor) => onChange({
-                          ...config,
-                          sugarColorOverrides: {
-                            ...(config.sugarColorOverrides || {}),
-                            [isIndividual ? `filling-${activeLayer}` : 'filling']: newSugarColor,
-                          },
-                        })}
                         onChange={(newSponge) => {
                           onChange({
                             ...config,
-                            sponge: newSponge
+                            sponge: newSponge,
+                            interiorPreview: exteriorCoversInterior ? true : config.interiorPreview,
                           });
                         }}
                       />
@@ -346,38 +350,29 @@ export default function ToolPanel({
 
                   <Separator className="opacity-50" />
 
-                  {/* 3. Filling — locked shut (and locked from opening)
-                      until Exterior Finish's style is Naked, same
-                      nakedGatedLocked gate as Sponge Flavor above. */}
+                  {/* 3. Filling — also editable regardless of finish. */}
                   <Collapsible
-                    open={expandedSections.filling && !nakedGatedLocked}
+                    open={expandedSections.filling}
                     onOpenChange={() => toggleSection('filling')}
                   >
-                    <CollapsibleTrigger
-                      disabled={nakedGatedLocked}
-                      className={`flex items-center justify-between w-full ${
-                        nakedGatedLocked ? 'opacity-50 cursor-not-allowed' : ''
-                      }`}
-                    >
+                    <CollapsibleTrigger className="flex items-center justify-between w-full min-h-11">
                       <div className="flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-primary/60" />
-                        <span className="text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">
-                          Filling
-                        </span>
+                        <div className="text-left">
+                          <span className="block text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">
+                            Filling
+                          </span>
+                          <span className="block mt-0.5 text-[10px] font-normal normal-case tracking-normal text-muted-foreground">
+                            {expandedSections.filling ? 'Filling between the sponge layers' : fillingSummary}
+                          </span>
+                        </div>
                       </div>
-                      {nakedGatedLocked ? (
-                        <Lock className="w-3.5 h-3.5 text-muted-foreground" />
-                      ) : expandedSections.filling ? (
+                      {expandedSections.filling ? (
                         <ChevronUp className="w-4 h-4 text-muted-foreground" />
                       ) : (
                         <ChevronDown className="w-4 h-4 text-muted-foreground" />
                       )}
                     </CollapsibleTrigger>
-                    {nakedGatedLocked && (
-                      <p className="text-[10px] text-muted-foreground mt-1.5">
-                        Set Exterior Finish to Naked to unlock Filling.
-                      </p>
-                    )}
                     <CollapsibleContent className="mt-3">
                       <FillingSection
                         filling={config.filling || DEFAULT_CONFIG.filling}
@@ -396,7 +391,8 @@ export default function ToolPanel({
                         onChange={(newFilling) => {
                           onChange({
                             ...config,
-                            filling: newFilling
+                            filling: newFilling,
+                            interiorPreview: exteriorCoversInterior ? true : config.interiorPreview,
                           });
                         }}
                       />
@@ -410,12 +406,17 @@ export default function ToolPanel({
                     open={expandedSections.exteriorFinish}
                     onOpenChange={() => toggleSection('exteriorFinish')}
                   >
-                    <CollapsibleTrigger className="flex items-center justify-between w-full">
+                    <CollapsibleTrigger className="flex items-center justify-between w-full min-h-11">
                       <div className="flex items-center gap-2">
                         <Palette className="w-4 h-4 text-primary/60" />
-                        <span className="text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">
-                          Exterior Finish
-                        </span>
+                        <div className="text-left">
+                          <span className="block text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">
+                            Exterior Finish
+                          </span>
+                          <span className="block mt-0.5 text-[10px] font-normal normal-case tracking-normal text-muted-foreground">
+                            Coating visible on the outside
+                          </span>
+                        </div>
                       </div>
                       {expandedSections.exteriorFinish ? (
                         <ChevronUp className="w-4 h-4 text-muted-foreground" />
@@ -439,7 +440,8 @@ export default function ToolPanel({
                         onChange={(newExteriorFinish) => {
                           onChange({
                             ...config,
-                            exteriorFinish: newExteriorFinish
+                            exteriorFinish: newExteriorFinish,
+                            interiorPreview: false,
                           });
                         }}
                       />
@@ -571,32 +573,6 @@ export default function ToolPanel({
           )}
         </div>
 
-        {/* Interior Preview overlay — a bigger, badge-style indicator over
-            the blurred/disabled content above (replaces the old small
-            inline banner). Purely visual: the content beneath already has
-            pointer-events disabled, so this doesn't need to catch clicks. */}
-        <AnimatePresence>
-          {config.interiorPreview && (
-            <motion.div
-              key="interior-preview-overlay"
-              initial={{ opacity: 0, scale: 0.94 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.94 }}
-              transition={{ duration: 0.25, ease: 'easeOut' }}
-              className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 px-8 text-center pointer-events-none"
-            >
-              <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 shadow-lg shadow-amber-500/30">
-                <Eye className="w-8 h-8 text-white" />
-              </div>
-              <span className="text-lg font-heading font-bold text-foreground tracking-tight drop-shadow-[0_1px_12px_rgba(255,255,255,0.9)]">
-                Interior Preview Mode
-              </span>
-              <p className="text-sm font-medium text-foreground/90 max-w-[240px] leading-relaxed drop-shadow-[0_1px_10px_rgba(255,255,255,0.9)]">
-                Editing is paused while you look inside the cake. Turn off preview above to keep designing.
-              </p>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     </div>
   );
