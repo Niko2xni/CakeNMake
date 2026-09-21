@@ -24,13 +24,16 @@ const SOCIAL_CONFIG = {
 };
 
 export default function Profile() {
-  const { user } = useAuth();
+  const { user, account } = useAuth();
   const fileInputRef = useRef(null);
   const [connectingProvider, setConnectingProvider] = useState(null);
   const [disconnectingProvider, setDisconnectingProvider] = useState(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [photoError, setPhotoError] = useState('');
-  const [localPhotoURL, setLocalPhotoURL] = useState(user?.photoURL || null);
+  const [photoLoadFailed, setPhotoLoadFailed] = useState(false);
+  // `undefined` means no local choice has been made, so provider/account data
+  // can continue to hydrate after Firebase restores the session.
+  const [photoOverride, setPhotoOverride] = useState(undefined);
   const [providerData, setProviderData] = useState(user?.providerData || []);
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(user?.displayName || '');
@@ -48,10 +51,14 @@ export default function Profile() {
     }
   });
 
-  const displayPhotoURL = localPhotoURL;
+  const providerProfile = (providerData || []).find((profile) => profile.providerId === 'facebook.com')
+    || (providerData || []).find((profile) => profile.email || profile.photoURL)
+    || null;
+  const synchronizedPhotoURL = user?.photoURL || providerProfile?.photoURL || account?.photoURL || null;
+  const displayPhotoURL = photoOverride === undefined ? synchronizedPhotoURL : photoOverride;
   const fallbackDisplayName = user?.displayName || user?.email?.split('@')[0]?.replace(/[._-]/g, ' ') || 'Cake Lover';
   const displayName = nameValue.trim() || fallbackDisplayName;
-  const email = user?.email || 'user@example.com';
+  const email = user?.email || providerProfile?.email || account?.email || '';
   const authProviderSignature = (user?.providerData || [])
     .map((profile) => `${profile.providerId}:${profile.uid || profile.email || ''}`)
     .join('|');
@@ -66,6 +73,17 @@ export default function Profile() {
   useEffect(() => {
     setNameValue(user?.displayName || '');
   }, [user?.displayName]);
+
+  useEffect(() => {
+    // Reset only when the signed-in identity changes. This lets asynchronously
+    // loaded Firebase/provider/Mongo data render without overwriting a photo
+    // the user has just uploaded or removed in this session.
+    setPhotoOverride(undefined);
+  }, [user?.uid]);
+
+  useEffect(() => {
+    setPhotoLoadFailed(false);
+  }, [displayPhotoURL]);
 
   useEffect(() => {
     localStorage.setItem(preferenceKey, JSON.stringify(preferences));
@@ -107,7 +125,7 @@ export default function Profile() {
 
       const photoURL = await getDownloadURL(avatarRef);
       await updateProfile(user, { photoURL });
-      setLocalPhotoURL(photoURL);
+      setPhotoOverride(photoURL);
       showFeedback('success', 'Your profile photo was updated.');
     } catch (error) {
       console.error('Could not upload profile photo:', error);
@@ -127,7 +145,7 @@ export default function Profile() {
       setPhotoError('');
       setIsUploadingPhoto(true);
       await updateProfile(user, { photoURL: null });
-      setLocalPhotoURL(null);
+      setPhotoOverride(null);
       showFeedback('success', 'Your profile photo was removed.');
     } catch (error) {
       console.error('Could not remove profile photo:', error);
@@ -245,8 +263,14 @@ export default function Profile() {
               <div className="cn-profile-photo-row flex flex-col gap-4 px-6 py-5 border-b border-gray-200 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-center gap-5">
                   <div className="cn-profile-avatar w-20 h-20 rounded-full bg-gradient-to-br from-pink-200 via-rose-200 to-orange-200 flex items-center justify-center overflow-hidden border border-gray-200">
-                    {displayPhotoURL ? (
-                      <img src={displayPhotoURL} alt={displayName} className="w-full h-full object-cover" />
+                    {displayPhotoURL && !photoLoadFailed ? (
+                      <img
+                        src={displayPhotoURL}
+                        alt={displayName}
+                        referrerPolicy="no-referrer"
+                        onError={() => setPhotoLoadFailed(true)}
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
                       <User className="w-10 h-10 text-pink-500" />
                     )}
@@ -326,7 +350,7 @@ export default function Profile() {
                     <p className="cn-profile-helper">Managed by your sign-in method.</p>
                   </div>
                   <div className="cn-profile-field-value">
-                    <span className="cn-profile-email" title={email}>{email}</span>
+                    <span className="cn-profile-email" title={email || 'Email unavailable'}>{email || 'Email unavailable'}</span>
                   </div>
                 </div>
 

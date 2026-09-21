@@ -1,11 +1,13 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { accountApi } from '@/services/api';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [account, setAccount] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState(Boolean(auth));
   const [isLoadingPublicSettings, setIsLoadingPublicSettings] = useState(false);
@@ -20,21 +22,61 @@ export const AuthProvider = ({ children }) => {
       return undefined;
     }
 
-    const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
-      setUser(nextUser);
-      setIsAuthenticated(Boolean(nextUser));
-      setAuthChecked(true);
-      setIsLoadingAuth(false);
+    let active = true;
+
+    const unsubscribe = onAuthStateChanged(auth, async (nextUser) => {
+      if (!active) return;
+
+      setIsLoadingAuth(true);
+      setAuthError(null);
+
+      if (!nextUser) {
+        setUser(null);
+        setAccount(null);
+        setIsAuthenticated(false);
+        setAuthChecked(true);
+        setIsLoadingAuth(false);
+        return;
+      }
+
+      try {
+        const response = await accountApi.sync();
+        if (!active) return;
+
+        setUser(nextUser);
+        setAccount(response.user);
+        setIsAuthenticated(true);
+      } catch (error) {
+        if (!active) return;
+
+        setUser(nextUser);
+        setAccount(null);
+        setIsAuthenticated(false);
+        setAuthError({
+          type: error.code || 'account_sync_failed',
+          message: error.message || 'Your account could not be loaded.',
+        });
+      } finally {
+        if (active) {
+          setAuthChecked(true);
+          setIsLoadingAuth(false);
+        }
+      }
     });
     setIsLoadingPublicSettings(false);
 
-    return unsubscribe;
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, []);
 
   const logout = async (shouldRedirect = true) => {
     if (auth) {
       await signOut(auth);
     }
+
+    setAccount(null);
 
     if (shouldRedirect) {
       window.location.href = '/';
@@ -57,7 +99,9 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider value={{ 
-      user, 
+      user,
+      firebaseUser: user,
+      account,
       isAuthenticated, 
       isLoadingAuth,
       isLoadingPublicSettings,

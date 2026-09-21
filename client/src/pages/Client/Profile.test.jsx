@@ -40,16 +40,21 @@ vi.mock('@/lib/AuthContext', () => ({
     user: {
       uid: 'test-user',
       displayName: 'Jane Doe',
-      email: 'jane@example.com',
+      email: null,
       providerData: [
         {
           providerId: 'google.com',
           uid: 'google-123',
           displayName: 'Jane Doe',
-          email: 'jane@example.com',
+          email: null,
           photoURL: 'https://example.com/google-avatar.jpg',
         },
       ],
+    },
+    account: {
+      email: 'jane@example.com',
+      displayName: 'Jane Doe',
+      photoURL: null,
     },
   }),
 }));
@@ -73,7 +78,9 @@ describe('Profile', () => {
     expect(screen.queryByText(/using canva/i)).not.toBeInTheDocument();
     expect(screen.getByLabelText(/what are you designing for/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^disconnect$/i })).toBeDisabled();
-    expect(screen.queryByRole('button', { name: /remove photo/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /remove photo/i })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Jane Doe' })).toHaveAttribute('src', 'https://example.com/google-avatar.jpg');
+    expect(screen.getByRole('img', { name: 'Jane Doe' })).toHaveAttribute('referrerpolicy', 'no-referrer');
   });
 
   it('persists profile preferences locally and confirms that they are device-only', async () => {

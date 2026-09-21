@@ -68,7 +68,7 @@ export default function BakeryReservations() {
 
   const filtered = reservations.filter((r) => {
     if (!search.trim()) return true;
-    return (r.user?.name || '').toLowerCase().includes(search.toLowerCase());
+    return (r.user?.displayName || r.user?.name || '').toLowerCase().includes(search.toLowerCase());
   });
 
   return (
@@ -134,7 +134,7 @@ export default function BakeryReservations() {
 
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-gray-900 truncate">
-                        {r.user?.name || 'Unknown customer'}
+                        {r.user?.displayName || r.user?.name || 'Unknown customer'}
                       </p>
                       <p className="text-xs text-gray-500">
                         Pickup {formatDate(r.pickupDate)} · {formatPeso(r.totalPrice)}
@@ -175,7 +175,7 @@ export default function BakeryReservations() {
                   <User className="w-6 h-6 text-gray-500" />
                 </div>
                 <div>
-                  <p className="font-semibold text-gray-900">{selected.user?.name || 'Unknown customer'}</p>
+                  <p className="font-semibold text-gray-900">{selected.user?.displayName || selected.user?.name || 'Unknown customer'}</p>
                   <p className="text-xs text-gray-500">{selected.user?.email}</p>
                 </div>
               </div>

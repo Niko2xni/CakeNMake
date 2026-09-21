@@ -1291,8 +1291,11 @@
 }
 
 .cn-profile-field-value {
+  width: 100%;
   min-width: 0;
+  display: flex;
   justify-content: flex-end;
+  justify-self: end;
   color: var(--cn-muted);
   font-size: 14px;
 }

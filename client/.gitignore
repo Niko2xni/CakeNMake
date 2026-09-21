@@ -10,6 +10,7 @@ dist-ssr/
 .env
 .env.*
 *.local
+!.env.example
 
 # Debug logs
 /logs
@@ -30,4 +31,3 @@ lerna-debug.log*
 *.njsproj
 *.sln
 *.sw?
-

@@ -1,20 +1,10 @@
 const Reservation = require('../models/Reservation');
-const Platform = require('../models/Platform');
 
-async function resolvePlatform(slug) {
-  if (!slug) return null;
-  return Platform.findOne({ slug });
-}
-
-// GET /api/bakery/transactions?platformSlug=mamshie-bakery
+// GET /api/bakery/transactions
 async function listTransactions(req, res) {
   try {
-    const { platformSlug } = req.query;
-    const platform = await resolvePlatform(platformSlug);
-    if (!platform) return res.status(404).json({ message: 'Bakery not found' });
-
-    const reservations = await Reservation.find({ platform: platform._id })
-      .populate('user', 'name email')
+    const reservations = await Reservation.find({ platform: req.platformId })
+      .populate('user', 'displayName email')
       .sort({ createdAt: -1 });
 
     const summary = reservations.reduce(

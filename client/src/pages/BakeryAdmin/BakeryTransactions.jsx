@@ -102,7 +102,7 @@ export default function BakeryTransactions() {
 
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-900 truncate">
-                      {t.user?.name || 'Unknown customer'}
+                      {t.user?.displayName || t.user?.name || 'Unknown customer'}
                     </p>
                     <p className="text-xs text-gray-500">{formatDate(t.createdAt)}</p>
                   </div>

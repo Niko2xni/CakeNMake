@@ -1,24 +1,16 @@
 const Reservation = require('../models/Reservation');
-const Platform = require('../models/Platform');
 
-async function resolvePlatform(slug) {
-  if (!slug) return null;
-  return Platform.findOne({ slug });
-}
-
-// GET /api/bakery/reservations?platformSlug=mamshie-bakery&status=confirmed
+// GET /api/bakery/reservations?status=confirmed
 async function listReservations(req, res) {
   try {
-    const { platformSlug, status } = req.query;
-    const platform = await resolvePlatform(platformSlug);
-    if (!platform) return res.status(404).json({ message: 'Bakery not found' });
+    const { status } = req.query;
 
-    const filter = { platform: platform._id };
+    const filter = { platform: req.platformId };
     if (status && status !== 'all') filter.status = status;
 
     const reservations = await Reservation.find(filter)
-      .populate('user', 'name email')
-      .populate('design', 'thumbnailUrl')
+      .populate('user', 'displayName email')
+      .populate('design', 'thumbnail')
       .sort({ createdAt: -1 });
 
     res.json(reservations);
@@ -27,15 +19,11 @@ async function listReservations(req, res) {
   }
 }
 
-// GET /api/bakery/reservations/:id?platformSlug=mamshie-bakery
+// GET /api/bakery/reservations/:id
 async function getReservation(req, res) {
   try {
-    const { platformSlug } = req.query;
-    const platform = await resolvePlatform(platformSlug);
-    if (!platform) return res.status(404).json({ message: 'Bakery not found' });
-
-    const reservation = await Reservation.findOne({ _id: req.params.id, platform: platform._id })
-      .populate('user', 'name email')
+    const reservation = await Reservation.findOne({ _id: req.params.id, platform: req.platformId })
+      .populate('user', 'displayName email')
       .populate('design');
 
     if (!reservation) return res.status(404).json({ message: 'Reservation not found' });
@@ -45,12 +33,10 @@ async function getReservation(req, res) {
   }
 }
 
-// PATCH /api/bakery/reservations/:id/status   body: { status, platformSlug }
+// PATCH /api/bakery/reservations/:id/status   body: { status }
 async function updateStatus(req, res) {
   try {
-    const { status, platformSlug } = req.body;
-    const platform = await resolvePlatform(platformSlug);
-    if (!platform) return res.status(404).json({ message: 'Bakery not found' });
+    const { status } = req.body;
 
     const allowed = ['pending_payment', 'confirmed', 'in_production', 'completed'];
     if (!allowed.includes(status)) {
@@ -58,7 +44,7 @@ async function updateStatus(req, res) {
     }
 
     const reservation = await Reservation.findOneAndUpdate(
-      { _id: req.params.id, platform: platform._id },
+      { _id: req.params.id, platform: req.platformId },
       { status },
       { new: true }
     );

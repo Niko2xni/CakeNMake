@@ -1,10 +1,46 @@
-const API_BASE_URL = 'http://localhost:5000/api';
+import { auth } from '@/lib/firebase';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+
+const parseJsonResponse = async (response) => {
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const error = new Error(data.message || 'Request failed');
+    error.code = data.code;
+    error.status = response.status;
+    throw error;
+  }
+
+  return data;
+};
 
 const requestJson = async (url, options) => {
   const response = await fetch(url, options);
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.message || 'Authentication request failed');
-  return data;
+  return parseJsonResponse(response);
+};
+
+const requestAuthenticatedJson = async (url, options = {}) => {
+  const currentUser = auth?.currentUser;
+
+  if (!currentUser) {
+    const error = new Error('You must be signed in.');
+    error.code = 'AUTH_REQUIRED';
+    error.status = 401;
+    throw error;
+  }
+
+  const idToken = await currentUser.getIdToken();
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${idToken}`,
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...options.headers,
+    },
+  });
+
+  return parseJsonResponse(response);
 };
 
 export const authApi = {
@@ -22,6 +58,17 @@ export const authApi = {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, code }),
+  }),
+};
+
+export const accountApi = {
+  sync: () => requestAuthenticatedJson(`${API_BASE_URL}/account/sync`, {
+    method: 'POST',
+  }),
+  getMe: () => requestAuthenticatedJson(`${API_BASE_URL}/account/me`),
+  updateMe: (updates) => requestAuthenticatedJson(`${API_BASE_URL}/account/me`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
   }),
 };
 
@@ -53,19 +100,19 @@ export const designApi = {
     const userId = getUserId();
     const payload = { ...designData, userId };
     console.log('Sending design data:', payload);
-    
+
     const response = await fetch(`${API_BASE_URL}/designs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Server error response:', errorText);
       throw new Error('Failed to create design');
     }
-    
+
     return response.json();
   },
 
@@ -122,8 +169,8 @@ export const designApi = {
   // Upload image to Cloudinary
   uploadImage: async (base64Image) => {
     // Ensure the base64 data has the data URL prefix
-    const imageData = base64Image.startsWith('data:') 
-      ? base64Image 
+    const imageData = base64Image.startsWith('data:')
+      ? base64Image
       : `data:image/png;base64,${base64Image}`;
 
     const formData = new FormData();
@@ -152,86 +199,39 @@ export const designApi = {
 
 
 
-// Only one bakery exists right now, so this is hardcoded. Once a real bakery
-// admin login flow exists, store the logged-in bakery's slug here instead.
-const DEFAULT_PLATFORM_SLUG = 'mamshie-bakery';
-
-const getPlatformSlug = () => {
-  return localStorage.getItem('bakeryPlatformSlug') || DEFAULT_PLATFORM_SLUG;
-};
-
 export const bakeryApi = {
   getReservations: async (status) => {
-    const platformSlug = getPlatformSlug();
-    const qs = status && status !== 'all' ? `&status=${status}` : '';
-    const response = await fetch(`${API_BASE_URL}/bakery/reservations?platformSlug=${platformSlug}${qs}`);
-    if (!response.ok) throw new Error('Failed to fetch reservations');
-    return response.json();
+    const qs = status && status !== 'all' ? `?status=${encodeURIComponent(status)}` : '';
+    return requestAuthenticatedJson(`${API_BASE_URL}/bakery/reservations${qs}`);
   },
 
   updateReservationStatus: async (id, status) => {
-    const platformSlug = getPlatformSlug();
-    const response = await fetch(`${API_BASE_URL}/bakery/reservations/${id}/status`, {
+    return requestAuthenticatedJson(`${API_BASE_URL}/bakery/reservations/${id}/status`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status, platformSlug }),
+      body: JSON.stringify({ status }),
     });
-    if (!response.ok) throw new Error('Failed to update reservation status');
-    return response.json();
   },
 };
 
 export const pricingApi = {
-  getPresets: async () => {
-    const platformSlug = getPlatformSlug();
-    const response = await fetch(`${API_BASE_URL}/bakery/pricing?platformSlug=${platformSlug}`);
-    if (!response.ok) throw new Error('Failed to fetch pricing presets');
-    return response.json();
-  },
+  getPresets: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/pricing`),
 
   updatePresetPrice: async (id, price, reason) => {
-    const platformSlug = getPlatformSlug();
-    const response = await fetch(`${API_BASE_URL}/bakery/pricing/${id}`, {
+    return requestAuthenticatedJson(`${API_BASE_URL}/bakery/pricing/${id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ price, reason, platformSlug }),
+      body: JSON.stringify({ price, reason }),
     });
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.message || 'Failed to update price');
-    }
-    return response.json();
   },
 
-  getChangeLog: async () => {
-    const platformSlug = getPlatformSlug();
-    const response = await fetch(`${API_BASE_URL}/bakery/pricing/log?platformSlug=${platformSlug}`);
-    if (!response.ok) throw new Error('Failed to fetch change log');
-    return response.json();
-  },
+  getChangeLog: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/pricing/log`),
 };
 
 export const billingApi = {
-  getAIUsageSummary: async () => {
-    const platformSlug = getPlatformSlug();
-    const response = await fetch(`${API_BASE_URL}/bakery/billing/usage?platformSlug=${platformSlug}`);
-    if (!response.ok) throw new Error('Failed to fetch billing usage');
-    return response.json();
-  },
+  getAIUsageSummary: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/billing/usage`),
 
-  getInvoiceHistory: async () => {
-    const platformSlug = getPlatformSlug();
-    const response = await fetch(`${API_BASE_URL}/bakery/billing/invoices?platformSlug=${platformSlug}`);
-    if (!response.ok) throw new Error('Failed to fetch invoice history');
-    return response.json();
-  },
+  getInvoiceHistory: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/billing/invoices`),
 };
 
 export const transactionApi = {
-  getTransactions: async () => {
-    const platformSlug = getPlatformSlug();
-    const response = await fetch(`${API_BASE_URL}/bakery/transactions?platformSlug=${platformSlug}`);
-    if (!response.ok) throw new Error('Failed to fetch transactions');
-    return response.json();
-  },
+  getTransactions: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/transactions`),
 };

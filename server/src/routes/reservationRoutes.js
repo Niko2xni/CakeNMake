@@ -1,9 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const { listReservations, getReservation, updateStatus } = require('../controllers/reservationController');
+const authenticate = require('../middleware/authenticate');
+const {
+  loadAppUser,
+  requirePlatformMembership,
+  requireRole,
+} = require('../middleware/authorize');
 
-// No auth middleware yet — see the security caveat above.
-// Wire in real JWT + role-check middleware here once bakery login exists.
+router.use(authenticate);
+router.use(loadAppUser);
+router.use(requireRole('bakery_staff', 'bakery_admin', 'platform_admin'));
+router.use(requirePlatformMembership);
 
 router.get('/', listReservations);
 router.get('/:id', getReservation);
