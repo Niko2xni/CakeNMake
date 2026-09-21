@@ -70,6 +70,14 @@ export const accountApi = {
     method: 'PATCH',
     body: JSON.stringify(updates),
   }),
+  requestEmailLinkOtp: (email) => requestAuthenticatedJson(`${API_BASE_URL}/account/email/request-otp`, {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  }),
+  verifyEmailLinkOtp: (email, code) => requestAuthenticatedJson(`${API_BASE_URL}/account/email/verify-otp`, {
+    method: 'POST',
+    body: JSON.stringify({ email, code }),
+  }),
 };
 
 // Get user ID from localStorage (simplified auth)

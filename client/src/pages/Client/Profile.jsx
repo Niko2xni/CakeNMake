@@ -2,11 +2,19 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ClientNavbar from '@/components/client/ClientNavbar';
 import { useAuth } from '@/lib/AuthContext';
 import { auth, facebookProvider, googleProvider, storage } from '@/lib/firebase';
-import { User, Facebook, Globe, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
-import { linkWithPopup, unlink, updateProfile } from 'firebase/auth';
+import { accountApi } from '@/services/api';
+import { User, Facebook, Globe, Mail, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { linkWithPopup, reload, unlink, updateProfile } from 'firebase/auth';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 
 const SOCIAL_CONFIG = {
+  'email-otp': {
+    provider: 'Email verification',
+    color: 'bg-rose-50',
+    icon: Mail,
+    letter: '@',
+    letterClassName: 'text-[#BD3C47]',
+  },
   'google.com': {
     provider: 'Google',
     color: 'bg-white',
@@ -24,7 +32,7 @@ const SOCIAL_CONFIG = {
 };
 
 export default function Profile() {
-  const { user, account } = useAuth();
+  const { user, account, refreshAccount } = useAuth();
   const fileInputRef = useRef(null);
   const [connectingProvider, setConnectingProvider] = useState(null);
   const [disconnectingProvider, setDisconnectingProvider] = useState(null);
@@ -40,6 +48,11 @@ export default function Profile() {
   const [isSavingName, setIsSavingName] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [disconnectTarget, setDisconnectTarget] = useState(null);
+  const [emailLinkOpen, setEmailLinkOpen] = useState(false);
+  const [emailLinkAddress, setEmailLinkAddress] = useState('');
+  const [emailLinkCode, setEmailLinkCode] = useState('');
+  const [emailLinkExpiresAt, setEmailLinkExpiresAt] = useState(null);
+  const [isLinkingEmail, setIsLinkingEmail] = useState(false);
   const [preferenceStatus, setPreferenceStatus] = useState('Preferences save automatically on this device.');
 
   const preferenceKey = `cakenmake-profile-preferences-${user?.uid || user?.email || 'guest'}`;
@@ -59,6 +72,8 @@ export default function Profile() {
   const fallbackDisplayName = user?.displayName || user?.email?.split('@')[0]?.replace(/[._-]/g, ' ') || 'Cake Lover';
   const displayName = nameValue.trim() || fallbackDisplayName;
   const email = user?.email || providerProfile?.email || account?.email || '';
+  const hasVerifiedEmail = Boolean(email && (user?.emailVerified || account?.emailVerified));
+  const signInMethodCount = providerData.length + (hasVerifiedEmail ? 1 : 0);
   const authProviderSignature = (user?.providerData || [])
     .map((profile) => `${profile.providerId}:${profile.uid || profile.email || ''}`)
     .join('|');
@@ -125,6 +140,7 @@ export default function Profile() {
 
       const photoURL = await getDownloadURL(avatarRef);
       await updateProfile(user, { photoURL });
+      await refreshAccount();
       setPhotoOverride(photoURL);
       showFeedback('success', 'Your profile photo was updated.');
     } catch (error) {
@@ -145,6 +161,7 @@ export default function Profile() {
       setPhotoError('');
       setIsUploadingPhoto(true);
       await updateProfile(user, { photoURL: null });
+      await refreshAccount();
       setPhotoOverride(null);
       showFeedback('success', 'Your profile photo was removed.');
     } catch (error) {
@@ -159,6 +176,17 @@ export default function Profile() {
     const providerMap = new Map(providerData.map((profile) => [profile.providerId, profile]));
 
     return Object.entries(SOCIAL_CONFIG).map(([providerId, config]) => {
+      if (providerId === 'email-otp') {
+        return {
+          ...config,
+          providerId,
+          connected: hasVerifiedEmail,
+          accountName: email || null,
+          accountEmail: null,
+          disconnectable: false,
+        };
+      }
+
       const account = providerMap.get(providerId);
       return {
         ...config,
@@ -166,9 +194,10 @@ export default function Profile() {
         connected: Boolean(account),
         accountName: account?.displayName || account?.email || null,
         accountEmail: account?.email || null,
+        disconnectable: true,
       };
     });
-  }, [providerData]);
+  }, [email, hasVerifiedEmail, providerData]);
 
   const handleSaveName = async () => {
     const nextName = nameValue.trim();
@@ -178,6 +207,7 @@ export default function Profile() {
     setFeedback(null);
     try {
       await updateProfile(user, { displayName: nextName });
+      await refreshAccount();
       setIsEditingName(false);
       showFeedback('success', 'Your display name was updated.');
     } catch (error) {
@@ -191,12 +221,23 @@ export default function Profile() {
   const handleConnectProvider = async (providerId) => {
     if (!user || !auth) return;
 
+    if (providerId === 'email-otp') {
+      setEmailLinkAddress('');
+      setEmailLinkCode('');
+      setEmailLinkExpiresAt(null);
+      setEmailLinkOpen(true);
+      return;
+    }
+
     const provider = providerId === 'facebook.com' ? facebookProvider : googleProvider;
     setConnectingProvider(providerId);
 
     try {
       const result = await linkWithPopup(user, provider);
-      setProviderData(result?.user?.providerData || user.providerData || []);
+      await reload(result.user);
+      await result.user.getIdToken(true);
+      await refreshAccount();
+      setProviderData(result.user.providerData || []);
       showFeedback('success', `${SOCIAL_CONFIG[providerId].provider} was connected successfully.`);
     } catch (error) {
       console.error(`Could not connect ${providerId}:`, error);
@@ -206,10 +247,49 @@ export default function Profile() {
     }
   };
 
+  const handleRequestEmailLink = async (event) => {
+    event.preventDefault();
+    if (!emailLinkAddress.trim()) return;
+
+    setIsLinkingEmail(true);
+    setFeedback(null);
+    try {
+      const response = await accountApi.requestEmailLinkOtp(emailLinkAddress.trim());
+      setEmailLinkExpiresAt(response.expiresAt);
+      setEmailLinkCode('');
+    } catch (error) {
+      showFeedback('error', error.message || 'Unable to send the verification code.');
+    } finally {
+      setIsLinkingEmail(false);
+    }
+  };
+
+  const handleVerifyEmailLink = async (event) => {
+    event.preventDefault();
+    if (!/^\d{6}$/.test(emailLinkCode)) return;
+
+    setIsLinkingEmail(true);
+    setFeedback(null);
+    try {
+      await accountApi.verifyEmailLinkOtp(emailLinkAddress.trim(), emailLinkCode);
+      await reload(user);
+      await user.getIdToken(true);
+      await refreshAccount();
+      setEmailLinkOpen(false);
+      setEmailLinkCode('');
+      setEmailLinkExpiresAt(null);
+      showFeedback('success', 'Your verified email was connected successfully.');
+    } catch (error) {
+      showFeedback('error', error.message || 'Unable to verify this email.');
+    } finally {
+      setIsLinkingEmail(false);
+    }
+  };
+
   const handleDisconnectProvider = async (providerId) => {
     if (!user || !auth) return;
 
-    if (providerData.length <= 1) {
+    if (signInMethodCount <= 1) {
       showFeedback('error', 'Connect another sign-in method before disconnecting your only provider.');
       return;
     }
@@ -218,7 +298,10 @@ export default function Profile() {
 
     try {
       const updatedUser = await unlink(user, providerId);
-      setProviderData(updatedUser?.providerData || user.providerData?.filter((profile) => profile.providerId !== providerId) || []);
+      await reload(updatedUser);
+      await updatedUser.getIdToken(true);
+      await refreshAccount();
+      setProviderData(updatedUser.providerData || []);
       setDisconnectTarget(null);
       showFeedback('success', `${SOCIAL_CONFIG[providerId].provider} was disconnected.`);
     } catch (error) {
@@ -399,7 +482,7 @@ export default function Profile() {
             </div>
 
             <div className="cn-profile-card bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-              {socialAccounts.map(({ providerId, provider, color, letter, letterClassName, connected, accountName, accountEmail }) => {
+              {socialAccounts.map(({ providerId, provider, color, letter, letterClassName, connected, accountName, accountEmail, disconnectable }) => {
                 const isBusy = connectingProvider === providerId || disconnectingProvider === providerId;
 
                 return (
@@ -419,15 +502,19 @@ export default function Profile() {
                       </div>
                     </div>
 
-                    {connected ? (
+                    {connected && disconnectable ? (
                       <button
                         type="button"
                         onClick={() => setDisconnectTarget({ providerId, provider })}
-                        disabled={isBusy || providerData.length <= 1}
-                        title={providerData.length <= 1 ? 'Connect another sign-in method before disconnecting this provider.' : `Disconnect ${provider}`}
+                        disabled={isBusy || signInMethodCount <= 1}
+                        title={signInMethodCount <= 1 ? 'Connect another sign-in method before disconnecting this provider.' : `Disconnect ${provider}`}
                         className="cn-profile-button px-5 py-2 rounded-xl border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-60"
                       >
                         {isBusy ? <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Disconnecting</span> : 'Disconnect'}
+                      </button>
+                    ) : connected ? (
+                      <button type="button" disabled className="cn-profile-button px-5 py-2 opacity-60">
+                        Connected
                       </button>
                     ) : (
                       <button
@@ -457,6 +544,49 @@ export default function Profile() {
                 {disconnectingProvider ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Disconnect
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {emailLinkOpen && (
+        <div className="cn-profile-dialog-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setEmailLinkOpen(false)}>
+          <div className="cn-profile-dialog" role="dialog" aria-modal="true" aria-labelledby="connect-email-title">
+            <h2 id="connect-email-title">Connect a verified email</h2>
+            <p>Use this address for CakeNMake email-code sign-in without creating another account.</p>
+            <form onSubmit={emailLinkExpiresAt ? handleVerifyEmailLink : handleRequestEmailLink} className="space-y-4">
+              <label className="block text-sm font-semibold" htmlFor="email-link-address">Email address</label>
+              <input
+                id="email-link-address"
+                type="email"
+                value={emailLinkAddress}
+                onChange={(event) => setEmailLinkAddress(event.target.value)}
+                disabled={Boolean(emailLinkExpiresAt) || isLinkingEmail}
+                required
+                className="w-full rounded-xl border px-3 py-2"
+              />
+              {emailLinkExpiresAt && (
+                <>
+                  <label className="block text-sm font-semibold" htmlFor="email-link-code">Six-digit verification code</label>
+                  <input
+                    id="email-link-code"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={emailLinkCode}
+                    onChange={(event) => setEmailLinkCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                    maxLength={6}
+                    required
+                    className="w-full rounded-xl border px-3 py-2 tracking-[0.35em]"
+                  />
+                </>
+              )}
+              <div>
+                <button type="button" onClick={() => setEmailLinkOpen(false)} disabled={isLinkingEmail} className="cn-profile-button">Cancel</button>
+                <button type="submit" disabled={isLinkingEmail || (emailLinkExpiresAt && emailLinkCode.length !== 6)} className="cn-profile-button is-primary">
+                  {isLinkingEmail ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  {emailLinkExpiresAt ? 'Verify email' : 'Send code'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

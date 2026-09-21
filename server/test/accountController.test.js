@@ -65,9 +65,10 @@ test('syncAccount creates a customer from verified Firebase claims', async () =>
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.user, savedUser);
   assert.equal(capturedUpdate.$set.email, 'user@example.com');
+  assert.equal(capturedUpdate.$set.displayName, 'Cake User');
+  assert.deepEqual(capturedUpdate.$set.providers, ['google.com']);
   assert.equal(capturedUpdate.$setOnInsert.role, 'customer');
   assert.equal(capturedUpdate.$setOnInsert.status, 'active');
-  assert.deepEqual(capturedUpdate.$addToSet, { providers: 'google.com' });
   assert.equal(capturedUpdate.$set.role, undefined);
   assert.equal(capturedUpdate.$set.status, undefined);
 });

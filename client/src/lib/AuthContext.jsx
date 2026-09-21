@@ -15,6 +15,13 @@ export const AuthProvider = ({ children }) => {
   const [authChecked, setAuthChecked] = useState(!auth);
   const [appPublicSettings, setAppPublicSettings] = useState(null);
 
+  const refreshAccount = async () => {
+    const response = await accountApi.sync();
+    setAccount(response.user);
+    setAuthError(null);
+    return response.user;
+  };
+
   useEffect(() => {
     if (!auth) {
       setAuthChecked(true);
@@ -40,11 +47,11 @@ export const AuthProvider = ({ children }) => {
       }
 
       try {
-        const response = await accountApi.sync();
+        const synchronizedAccount = await refreshAccount();
         if (!active) return;
 
         setUser(nextUser);
-        setAccount(response.user);
+        setAccount(synchronizedAccount);
         setIsAuthenticated(true);
       } catch (error) {
         if (!active) return;
@@ -111,7 +118,8 @@ export const AuthProvider = ({ children }) => {
       logout,
       navigateToLogin,
       checkUserAuth,
-      checkAppState
+      checkAppState,
+      refreshAccount,
     }}>
       {children}
     </AuthContext.Provider>

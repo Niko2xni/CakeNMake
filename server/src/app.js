@@ -6,6 +6,12 @@ const accountRoutes = require('./routes/accountRoutes');
 
 const app = express();
 
+if (process.env.NODE_ENV === 'production') {
+    // Render terminates HTTPS at its proxy. Trust the first proxy so OTP rate
+    // limits use the originating client IP instead of one shared proxy IP.
+    app.set('trust proxy', 1);
+}
+
 app.use(cors());
 app.use(express.json());
 

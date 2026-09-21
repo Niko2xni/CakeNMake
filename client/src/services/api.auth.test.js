@@ -58,6 +58,27 @@ describe('authenticated account API', () => {
     });
   });
 
+  it('authenticates requests that connect a verified email to the current account', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ expiresAt: Date.now() + 180_000 }),
+    });
+
+    await accountApi.requestEmailLinkOtp('jane@example.com');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringMatching(/\/api\/account\/email\/request-otp$/),
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer firebase-id-token',
+          'Content-Type': 'application/json',
+        }),
+        body: JSON.stringify({ email: 'jane@example.com' }),
+      }),
+    );
+  });
+
   it('authenticates bakery requests without sending a client-controlled platform slug', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,

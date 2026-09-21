@@ -7,6 +7,8 @@ const mockUploadBytes = vi.fn();
 const mockGetDownloadURL = vi.fn();
 const mockLinkWithPopup = vi.fn();
 const mockUnlink = vi.fn();
+const mockReload = vi.fn();
+const mockRefreshAccount = vi.fn();
 
 vi.mock('@/components/client/ClientNavbar', () => ({
   default: () => <div data-testid="client-navbar" />,
@@ -25,6 +27,7 @@ vi.mock('firebase/auth', async () => {
     updateProfile: (...args) => mockUpdateProfile(...args),
     linkWithPopup: (...args) => mockLinkWithPopup(...args),
     unlink: (...args) => mockUnlink(...args),
+    reload: (...args) => mockReload(...args),
   };
 });
 
@@ -50,18 +53,23 @@ vi.mock('@/lib/AuthContext', () => ({
           photoURL: 'https://example.com/google-avatar.jpg',
         },
       ],
+      getIdToken: vi.fn().mockResolvedValue('refreshed-token'),
     },
     account: {
       email: 'jane@example.com',
+      emailVerified: true,
       displayName: 'Jane Doe',
       photoURL: null,
     },
+    refreshAccount: (...args) => mockRefreshAccount(...args),
   }),
 }));
 
 describe('Profile', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRefreshAccount.mockResolvedValue({ firebaseUid: 'test-user' });
+    mockReload.mockResolvedValue(undefined);
     localStorage.clear();
   });
 
@@ -77,7 +85,7 @@ describe('Profile', () => {
     expect(screen.getAllByRole('button', { name: /connect/i }).length).toBeGreaterThan(0);
     expect(screen.queryByText(/using canva/i)).not.toBeInTheDocument();
     expect(screen.getByLabelText(/what are you designing for/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^disconnect$/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^disconnect$/i })).toBeEnabled();
     expect(screen.getByRole('button', { name: /remove photo/i })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Jane Doe' })).toHaveAttribute('src', 'https://example.com/google-avatar.jpg');
     expect(screen.getByRole('img', { name: 'Jane Doe' })).toHaveAttribute('referrerpolicy', 'no-referrer');
@@ -118,6 +126,7 @@ describe('Profile', () => {
           { providerId: 'google.com', displayName: 'Jane Doe', email: 'jane@example.com' },
           { providerId: 'facebook.com', displayName: 'Jane Doe', email: 'jane@example.com' },
         ],
+        getIdToken: vi.fn().mockResolvedValue('refreshed-token'),
       },
     });
     render(<Profile />);
@@ -125,6 +134,7 @@ describe('Profile', () => {
     fireEvent.click(screen.getByRole('button', { name: /^connect$/i }));
 
     await waitFor(() => expect(mockLinkWithPopup).toHaveBeenCalledTimes(1));
+    expect(mockRefreshAccount).toHaveBeenCalledTimes(1);
     expect(await screen.findAllByRole('button', { name: /^disconnect$/i })).toHaveLength(2);
   });
 
