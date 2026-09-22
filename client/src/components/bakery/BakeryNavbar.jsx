@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Cake,
@@ -12,6 +12,8 @@ import {
   Store,
   LogOut,
   CreditCard,
+  Menu,
+  X,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -28,6 +30,27 @@ const NAV_ITEMS = [
 
 export default function BakeryNavbar() {
   const location = useLocation();
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreButtonRef = useRef(null);
+
+  const mobilePrimaryItems = NAV_ITEMS.slice(0, 4);
+  const mobileMoreItems = NAV_ITEMS.slice(4);
+
+  useEffect(() => {
+    setMoreOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!moreOpen) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') {
+        setMoreOpen(false);
+        moreButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [moreOpen]);
 
   function isActive(to) {
     if (to === '/bakery') return location.pathname === '/bakery';
@@ -35,7 +58,8 @@ export default function BakeryNavbar() {
   }
 
   return (
-    <nav className="fixed left-0 top-0 h-screen w-[70px] flex flex-col items-center bg-white border-r border-pink-100 py-4 z-20">
+    <>
+    <nav className="cn-bakery-nav" aria-label="Bakery navigation">
       {/* Brand */}
       <div className="relative mb-6 flex-shrink-0" title="Mamshie Bakery">
         <div className="w-11 h-11 rounded-full bg-gradient-to-br from-pink-500 via-rose-500 to-orange-400 flex items-center justify-center">
@@ -77,5 +101,62 @@ export default function BakeryNavbar() {
         <LogOut className="w-5 h-5" />
       </button>
     </nav>
+
+    <nav className="cn-bakery-mobile-nav" aria-label="Bakery mobile navigation">
+      {mobilePrimaryItems.map(({ to, icon: Icon, label }) => {
+        const active = isActive(to);
+        return (
+          <Link key={to} to={to} className={active ? 'is-active' : ''} aria-current={active ? 'page' : undefined}>
+            <Icon aria-hidden="true" />
+            <span>{label}</span>
+          </Link>
+        );
+      })}
+      <button
+        ref={moreButtonRef}
+        type="button"
+        className={mobileMoreItems.some(({ to }) => isActive(to)) ? 'is-active' : ''}
+        aria-expanded={moreOpen}
+        aria-controls="bakery-more-menu"
+        onClick={() => setMoreOpen((open) => !open)}
+      >
+        <Menu aria-hidden="true" />
+        <span>More</span>
+      </button>
+    </nav>
+
+    {moreOpen && (
+      <div className="cn-bakery-more-backdrop" role="presentation" onMouseDown={() => setMoreOpen(false)}>
+        <section
+          id="bakery-more-menu"
+          className="cn-bakery-more-sheet"
+          role="dialog"
+          aria-modal="true"
+          aria-label="More bakery navigation"
+          onMouseDown={(event) => event.stopPropagation()}
+        >
+          <header>
+            <div>
+              <strong>Mamshie Bakery</strong>
+              <span>More tools</span>
+            </div>
+            <button type="button" aria-label="Close menu" onClick={() => setMoreOpen(false)}><X /></button>
+          </header>
+          <div className="cn-bakery-more-grid">
+            {mobileMoreItems.map(({ to, icon: Icon, label }) => {
+              const active = isActive(to);
+              return (
+                <Link key={to} to={to} className={active ? 'is-active' : ''} aria-current={active ? 'page' : undefined}>
+                  <Icon aria-hidden="true" />
+                  <span>{label}</span>
+                </Link>
+              );
+            })}
+          </div>
+          <button type="button" className="cn-bakery-mobile-logout"><LogOut /> Log out</button>
+        </section>
+      </div>
+    )}
+    </>
   );
 }

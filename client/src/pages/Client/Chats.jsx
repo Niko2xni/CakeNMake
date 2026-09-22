@@ -1519,7 +1519,7 @@ export default function Chats() {
         </div>
 
         {/* Chat info panel - its own separate floating card now */}
-        <div className={`flex-shrink-0 ${showInfo ? 'w-[26rem] ml-4' : 'w-0 ml-0'
+        <div className={`cn-chat-info-panel flex-shrink-0 ${showInfo ? 'is-open w-[26rem] ml-4' : 'w-0 ml-0'
           }`}
         >
           <div className="w-full h-full flex flex-col bg-white rounded-2xl border border-pink-100 shadow-xl overflow-hidden">

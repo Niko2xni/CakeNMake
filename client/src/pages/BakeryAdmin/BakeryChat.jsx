@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Cake, Send, Reply, X, ThumbsUp, Image as ImageIcon, User } from 'lucide-react';
+import { ArrowLeft, Cake, Send, User } from 'lucide-react';
 import CustomScrollbar from '@/components/shared/CustomScrollbar';
 
 const BAKERY_NAME = 'Mamshie Bakery';
@@ -96,9 +96,9 @@ export default function BakeryChat() {
   }
 
   return (
-    <div className="flex h-full gap-4">
+    <div className={`cn-bakery-chat flex h-full gap-4 ${active ? 'has-active-chat' : ''}`}>
       {/* Inbox list */}
-      <div className="w-72 flex-shrink-0 rounded-2xl border border-pink-100 shadow-xl bg-white flex flex-col overflow-hidden">
+      <div className="cn-bakery-chat-list w-72 flex-shrink-0 rounded-2xl border border-pink-100 shadow-xl bg-white flex flex-col overflow-hidden">
         <header className="flex-shrink-0 border-b border-pink-100 px-4 py-3">
           <h1 className="font-bold text-gray-900">Customer Chats</h1>
           <p className="text-xs text-gray-500">Post-reservation messages</p>
@@ -140,7 +140,7 @@ export default function BakeryChat() {
       </div>
 
       {/* Thread */}
-      <div className="flex-1 min-w-0 rounded-2xl border border-pink-100 shadow-xl bg-white flex flex-col overflow-hidden">
+      <div className="cn-bakery-chat-thread flex-1 min-w-0 rounded-2xl border border-pink-100 shadow-xl bg-white flex flex-col overflow-hidden">
         {!active ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="flex flex-col items-center gap-3 text-center px-6">
@@ -155,6 +155,9 @@ export default function BakeryChat() {
         ) : (
           <>
             <header className="flex-shrink-0 border-b border-pink-100 px-6 py-3 flex items-center gap-3">
+              <button type="button" className="cn-bakery-chat-back" aria-label="Back to conversations" onClick={() => setActiveId(null)}>
+                <ArrowLeft />
+              </button>
               <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
                 <User className="w-5 h-5 text-gray-500" />
               </div>

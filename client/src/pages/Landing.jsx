@@ -9,7 +9,7 @@ import {
   Rotate3D,
   X,
 } from 'lucide-react';
-import heroCake from '@/assets/hero-cake.png';
+import cakePreview from '@/assets/cake-preview.png';
 import landingPageBackground from '@/assets/landing-page-bg.jpg';
 import './Landing.css';
 
@@ -362,18 +362,21 @@ export default function Landing() {
                 <span className="brief-status"><i /> Saved</span>
               </div>
               <div className="brief-preview">
-                <img src={heroCake} alt="Cake shown inside the CakeNMake design preview" />
-                <span className="preview-mode"><Rotate3D size={14} aria-hidden="true" /> Live 3D preview</span>
+                <img
+                  src={cakePreview}
+                  alt="Cake shown inside the CakeNMake design preview with gold buttercream, whipped cream, cherries, and the message Twenty and Thriving"
+                />
+                <span className="preview-mode"><Rotate3D size={14} aria-hidden="true" /> 3D design preview</span>
                 <div className="preview-annotations" aria-hidden="true">
-                  <span className="annotation-one">Cream drip</span>
-                  <span className="annotation-two">Chocolate finish</span>
+                  <span className="annotation-one">Gold buttercream</span>
+                  <span className="annotation-two">Whipped cream &amp; cherries</span>
                 </div>
               </div>
               <div className="brief-selections">
-                <div><span>Finish</span><strong>Blush buttercream</strong></div>
+                <div><span>Finish</span><strong>Gold buttercream</strong></div>
                 <div><span>Palette</span><span className="color-swatches"><i /><i /><i /></span></div>
                 <div><span>Message</span><strong>Twenty & thriving</strong></div>
-                <div><span>Estimate</span><strong>Updates as you design</strong></div>
+                <div><span>Estimate</span><strong>₱64 preview total</strong></div>
               </div>
             </div>
 

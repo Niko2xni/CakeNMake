@@ -72,7 +72,7 @@ export default function BakeryReservations() {
   });
 
   return (
-    <div className="flex h-full">
+    <div className="cn-bakery-reservations flex h-full">
       {/* Main list */}
       <div className="flex-1 min-w-0 rounded-2xl border border-pink-100 shadow-xl bg-white flex flex-col overflow-hidden">
         <header className="flex-shrink-0 border-b border-pink-100 px-6 py-4">
@@ -155,7 +155,7 @@ export default function BakeryReservations() {
       </div>
 
       {/* Detail panel - same floating-card pattern as Chats.jsx's Chat info panel, no animation */}
-      <div className={`flex-shrink-0 overflow-hidden ${selected ? 'w-[26rem] ml-4' : 'w-0 ml-0'}`}>
+      <div className={`cn-reservation-detail flex-shrink-0 overflow-hidden ${selected ? 'is-open w-[26rem] ml-4' : 'w-0 ml-0'}`}>
         {selected && (
           <div className="w-full h-full flex flex-col bg-white rounded-2xl border border-pink-100 shadow-xl overflow-hidden">
             <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-pink-100">

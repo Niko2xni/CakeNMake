@@ -1890,12 +1890,30 @@
   .cn-chat-message-row, .cn-chat-like-message { max-width: 94%; }
   .cn-chat-message-cluster { max-width: min(76vw, 520px); }
 
+  .cn-chat-page { height: 100dvh !important; }
+  .cn-chat-body { height: 100dvh !important; }
+  .cn-chat-info-panel {
+    position: fixed;
+    z-index: 70;
+    inset: 8px 8px calc(78px + env(safe-area-inset-bottom));
+    width: auto !important;
+    margin: 0 !important;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .cn-chat-info-panel.is-open {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
   .cn-sidebar {
     inset: auto 0 0;
     width: 100%;
-    height: 70px;
+    height: calc(70px + env(safe-area-inset-bottom));
     flex-direction: row;
-    padding: 6px 8px;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
     border-top: 1px solid var(--cn-line);
     border-right: 0;
     box-shadow: 0 -8px 30px rgba(67, 36, 28, 0.08);
@@ -1911,11 +1929,29 @@
 }
 
 @media (max-width: 520px) {
-  .cn-auth-page { padding-right: 18px; padding-left: 18px; }
+  .cn-auth-page {
+    min-height: 100dvh;
+    align-items: start;
+    padding: 92px 18px 40px;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
   .cn-auth-brand { left: 22px; }
   .cn-auth-form { padding: 24px !important; }
+  .cn-auth-panel > div:first-child { margin-bottom: 24px; }
+  .cn-auth-panel h1 { font-size: clamp(2rem, 11vw, 2.5rem) !important; }
+  .cn-auth-otp-group { gap: 5px !important; }
+  .cn-auth-otp-slot { width: auto !important; height: 44px !important; max-width: 46px; }
   .cn-nav-item span { display: none; }
   .cn-nav-item { min-width: 42px; }
+}
+
+@media (max-width: 360px) {
+  .cn-auth-page { padding-right: 12px; padding-left: 12px; }
+  .cn-auth-form { padding: 20px 16px !important; }
+  .cn-auth-otp-slot { height: 42px !important; max-width: 42px; }
+  .cn-sidebar { padding-right: 4px; padding-left: 4px; }
+  .cn-nav-item { min-width: 38px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

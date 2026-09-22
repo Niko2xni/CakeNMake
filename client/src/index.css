@@ -105,6 +105,307 @@ body,
   height: 100%;
 }
 
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Bakery application shell */
+.cn-bakery-nav {
+  position: fixed;
+  z-index: 50;
+  inset: 0 auto 0 0;
+  width: 70px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem 0;
+  border-right: 1px solid rgb(252 231 243);
+  background: white;
+}
+
+.cn-bakery-mobile-nav,
+.cn-bakery-more-backdrop,
+.cn-bakery-chat-back {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .cn-bakery-shell {
+    min-height: 100dvh;
+    height: 100dvh !important;
+  }
+
+  .cn-bakery-nav {
+    display: none;
+  }
+
+  .cn-bakery-content {
+    height: auto !important;
+    min-height: 0;
+    margin-left: 0 !important;
+    padding: 8px 8px calc(78px + env(safe-area-inset-bottom)) !important;
+    overflow: auto !important;
+  }
+
+  .cn-bakery-content > * {
+    min-height: calc(100dvh - 94px - env(safe-area-inset-bottom));
+    height: auto !important;
+  }
+
+  .cn-bakery-content header {
+    padding-right: 16px !important;
+    padding-left: 16px !important;
+  }
+
+  .cn-bakery-mobile-nav {
+    position: fixed;
+    z-index: 70;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    min-height: 68px;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+    border-top: 1px solid rgb(252 231 243);
+    background: rgba(255, 255, 255, 0.97);
+    box-shadow: 0 -10px 30px rgba(80, 30, 50, 0.08);
+    backdrop-filter: blur(16px);
+  }
+
+  .cn-bakery-mobile-nav > :is(a, button) {
+    min-width: 0;
+    min-height: 52px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    border-radius: 12px;
+    color: rgb(156 163 175);
+    font-size: 9px;
+    font-weight: 600;
+  }
+
+  .cn-bakery-mobile-nav svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .cn-bakery-mobile-nav > .is-active {
+    background: rgb(253 242 248);
+    color: rgb(219 39 119);
+  }
+
+  .cn-bakery-more-backdrop {
+    position: fixed;
+    z-index: 80;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    padding: 16px 12px calc(82px + env(safe-area-inset-bottom));
+    background: rgba(31, 20, 25, 0.38);
+  }
+
+  .cn-bakery-more-sheet {
+    width: 100%;
+    max-height: min(620px, calc(100dvh - 112px));
+    padding: 18px;
+    overflow-y: auto;
+    border-radius: 22px;
+    background: white;
+    box-shadow: 0 24px 70px rgba(48, 20, 35, 0.24);
+  }
+
+  .cn-bakery-more-sheet header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .cn-bakery-more-sheet header div,
+  .cn-bakery-more-sheet header span {
+    display: block;
+  }
+
+  .cn-bakery-more-sheet header span {
+    margin-top: 2px;
+    color: rgb(107 114 128);
+    font-size: 12px;
+  }
+
+  .cn-bakery-more-sheet header button,
+  .cn-bakery-chat-back {
+    width: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    color: rgb(107 114 128);
+    background: rgb(253 242 248);
+  }
+
+  .cn-bakery-more-sheet header svg,
+  .cn-bakery-chat-back svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .cn-bakery-more-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .cn-bakery-more-grid a {
+    min-height: 72px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid rgb(252 231 243);
+    border-radius: 14px;
+    color: rgb(75 85 99);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .cn-bakery-more-grid a.is-active {
+    border-color: rgb(249 168 212);
+    background: rgb(253 242 248);
+    color: rgb(219 39 119);
+  }
+
+  .cn-bakery-more-grid svg,
+  .cn-bakery-mobile-logout svg {
+    width: 21px;
+    height: 21px;
+  }
+
+  .cn-bakery-mobile-logout {
+    width: 100%;
+    min-height: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    margin-top: 12px;
+    border-radius: 13px;
+    color: rgb(107 114 128);
+    background: rgb(249 250 251);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .cn-bakery-reservations {
+    position: relative;
+  }
+
+  .cn-reservation-detail {
+    position: fixed;
+    z-index: 60;
+    inset: 8px 8px calc(78px + env(safe-area-inset-bottom));
+    width: auto !important;
+    margin: 0 !important;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 160ms ease;
+  }
+
+  .cn-reservation-detail.is-open {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .cn-bakery-chat-list,
+  .cn-bakery-chat-thread {
+    width: 100% !important;
+    min-height: calc(100dvh - 94px - env(safe-area-inset-bottom));
+  }
+
+  .cn-bakery-chat-thread {
+    display: none !important;
+  }
+
+  .cn-bakery-chat.has-active-chat .cn-bakery-chat-list {
+    display: none;
+  }
+
+  .cn-bakery-chat.has-active-chat .cn-bakery-chat-thread {
+    display: flex !important;
+  }
+
+  .cn-bakery-chat-back {
+    flex: 0 0 auto;
+    margin-left: -8px;
+  }
+
+  .cn-bakery-chat-thread header {
+    padding-left: 12px !important;
+  }
+
+  .cn-bakery-chat-thread [class*='max-w-[60%]'] {
+    max-width: 84%;
+  }
+
+  .cn-bakery-content [class~='grid-cols-3'] {
+    grid-template-columns: 1fr !important;
+  }
+
+  .cn-bakery-content [class~='w-80'] {
+    width: 100% !important;
+  }
+
+  .cn-bakery-content > .flex.gap-4:not(.cn-bakery-chat) {
+    flex-direction: column;
+  }
+
+  .cn-bakery-content > .flex.gap-4:not(.cn-bakery-chat) > * {
+    width: 100% !important;
+    flex: 0 0 auto;
+  }
+
+  .cn-bakery-content :is(button, a) {
+    touch-action: manipulation;
+  }
+}
+
+@media (max-width: 420px) {
+  .cn-bakery-mobile-nav > :is(a, button) span {
+    max-width: 58px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .cn-bakery-more-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cn-bakery-shell *,
+  .cn-bakery-more-backdrop * {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
 /* ── Sponge Cake page ── */
 .cake-page {
   position: relative;
