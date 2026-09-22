@@ -766,62 +766,116 @@ html {
 
 .craft-art {
   position: relative;
-  min-height: 380px;
+  min-height: 430px;
   display: grid;
   place-items: center;
+  isolation: isolate;
 }
 
-.craft-art::before {
+.craft-cake-showcase::before,
+.craft-cake-showcase::after {
   content: '';
   position: absolute;
-  width: 300px;
-  height: 300px;
+  z-index: 0;
+  width: min(88%, 410px);
+  height: 250px;
+  border: 1px solid rgba(255, 250, 242, 0.2);
   border-radius: 50%;
-  background: var(--cherry);
+  pointer-events: none;
 }
 
-.craft-art p {
-  position: relative;
-  z-index: 2;
-  margin: 0;
-  font-family: 'Fraunces', serif;
-  font-size: 42px;
-  line-height: 0.95;
-  text-align: center;
-  transform: rotate(-8deg);
+.craft-cake-showcase::before {
+  transform: rotate(28deg);
 }
 
-.craft-art em {
-  color: var(--butter);
-  font-weight: 400;
+.craft-cake-showcase::after {
+  transform: rotate(-23deg);
 }
 
-.craft-orbit {
+.craft-cake-glow {
   position: absolute;
-  z-index: 3;
-  border: 1px solid rgba(255, 250, 242, 0.5);
+  z-index: -1;
+  width: 330px;
+  height: 330px;
   border-radius: 50%;
+  background: radial-gradient(circle, rgba(189, 60, 71, 0.38), rgba(189, 60, 71, 0.08) 58%, transparent 72%);
 }
 
-.craft-orbit.one {
-  width: 352px;
-  height: 225px;
-  transform: rotate(34deg);
+.craft-cake {
+  position: absolute;
+  display: block;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  will-change: transform;
 }
 
-.craft-orbit.two {
-  width: 352px;
-  height: 225px;
-  transform: rotate(-34deg);
+.craft-cake-one {
+  z-index: 2;
+  width: min(46%, 215px);
+  top: 2%;
+  left: 0;
+  filter: drop-shadow(0 16px 16px rgba(8, 2, 1, 0.24));
+  animation: craft-cake-float-one 6.4s ease-in-out infinite;
+}
+
+.craft-cake-two {
+  z-index: 4;
+  width: min(65%, 305px);
+  top: 17%;
+  right: -2%;
+  filter: drop-shadow(0 24px 24px rgba(8, 2, 1, 0.32));
+  animation: craft-cake-float-two 7.1s ease-in-out -1.8s infinite;
+}
+
+.craft-cake-three {
+  z-index: 2;
+  width: min(42%, 195px);
+  bottom: 0;
+  left: 4%;
+  filter: drop-shadow(0 14px 14px rgba(8, 2, 1, 0.22));
+  animation: craft-cake-float-three 5.8s ease-in-out -3.2s infinite;
 }
 
 .craft-spark {
   position: absolute;
-  z-index: 4;
-  top: 50px;
-  right: 45px;
+  z-index: 5;
   color: var(--butter);
-  font-size: 34px;
+  line-height: 1;
+}
+
+.craft-spark-one {
+  top: 44%;
+  left: 1%;
+  font-size: 30px;
+  animation: craft-spark-pulse 3.8s ease-in-out infinite;
+}
+
+.craft-spark-two {
+  top: 8%;
+  right: 2%;
+  font-size: 18px;
+  animation: craft-spark-pulse 3.8s ease-in-out -1.9s infinite;
+}
+
+@keyframes craft-cake-float-one {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(-3deg); }
+  50% { transform: translate3d(0, -9px, 0) rotate(-1deg); }
+}
+
+@keyframes craft-cake-float-two {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(3deg); }
+  50% { transform: translate3d(0, -11px, 0) rotate(1deg); }
+}
+
+@keyframes craft-cake-float-three {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(1deg); }
+  50% { transform: translate3d(0, -7px, 0) rotate(3deg); }
+}
+
+@keyframes craft-spark-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(0.86) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1.08) rotate(12deg); }
 }
 
 .craft-copy h2 {
@@ -1417,15 +1471,16 @@ html {
     border-right: 0;
   }
 
-  .craft-orbit.one,
-  .craft-orbit.two {
-    width: 300px;
-    height: 195px;
+  .craft-cake-showcase {
+    min-height: 360px;
+    width: 100%;
+    max-width: 460px;
+    margin: 0 auto;
   }
 
-  .craft-art::before {
-    width: 250px;
-    height: 250px;
+  .craft-cake-glow {
+    width: 270px;
+    height: 270px;
   }
 
   .craft-signoff {
@@ -1456,6 +1511,8 @@ html {
   .landing-page *::after {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 
   [data-reveal] {

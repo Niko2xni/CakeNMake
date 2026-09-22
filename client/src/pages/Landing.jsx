@@ -10,6 +10,9 @@ import {
   X,
 } from 'lucide-react';
 import cakePreview from '@/assets/cake-preview.png';
+import cakeChoiceOne from '@/assets/cake1-choice.png';
+import cakeChoiceTwo from '@/assets/cake2-choice.png';
+import cakeChoiceThree from '@/assets/cake3-choice.png';
 import landingPageBackground from '@/assets/landing-page-bg.jpg';
 import './Landing.css';
 
@@ -332,11 +335,13 @@ export default function Landing() {
 
         <section className="craft-section" id="about">
           <div className="landing-container craft-grid">
-            <div className="craft-art" aria-hidden="true" data-reveal>
-              <span className="craft-orbit one" />
-              <span className="craft-orbit two" />
-              <p>made<br /><em>by hand</em></p>
-              <span className="craft-spark">✦</span>
+            <div className="craft-art craft-cake-showcase" aria-hidden="true" data-reveal>
+              <span className="craft-cake-glow" />
+              <img className="craft-cake craft-cake-one" src={cakeChoiceOne} alt="" />
+              <img className="craft-cake craft-cake-two" src={cakeChoiceTwo} alt="" />
+              <img className="craft-cake craft-cake-three" src={cakeChoiceThree} alt="" />
+              <span className="craft-spark craft-spark-one">✦</span>
+              <span className="craft-spark craft-spark-two">✦</span>
             </div>
             <div className="craft-copy" data-reveal>
               <p className="editorial-kicker light">Technology with a human finish</p>
