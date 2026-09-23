@@ -41,6 +41,14 @@ const designSchema = new mongoose.Schema({
   sentToBakery: {
     type: Boolean,
     default: false
+  },
+  // Informational estimate shown with saved designs. Reservation checkout
+  // recalculates authoritatively and stores its own immutable snapshot.
+  lastEstimate: {
+    pricingVersion: { type: Number, default: null },
+    currency: { type: String, default: 'PHP' },
+    totalMinor: { type: Number, default: null },
+    calculatedAt: { type: Date, default: null }
   }
 }, {
   timestamps: true

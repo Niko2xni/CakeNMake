@@ -160,22 +160,9 @@ export default function ClientHome() {
     setActiveMenu(null);
   };
 
-  const calculateTotal = (config) => {
-    const CAKE_FLAVOR_PRICES = { vanilla: 15, chocolate: 18, strawberry: 18, cheese: 20, ube: 22, mocha: 20 };
-    const FROSTING_PRICES = { vanilla: 5, chocolate: 7, strawberry: 7, cheese: 8, ube: 9, mocha: 8 };
-    const LAYER_PRICES = { 1: 10, 2: 15, 3: 20 };
-    const TOPPING_PRICES = { cherry: 3, sprinkles: 2, candles: 4, strawberries: 5, chocolateChips: 3, rosettes: 6 };
-    const PLACED_ITEM_PRICES = { cherry: 3, strawberry: 4, candle: 4, chocolateChip: 2, rosette: 5 };
-    const PIPING_PRICE = 5;
-
-    const { layers = 2, frostingColor = 'vanilla', cakeColor = 'vanilla', toppings = [], placedItems = [] } = config;
-    const layerCost = LAYER_PRICES[Math.min(layers, 3)] || 10;
-    const cakeCost = CAKE_FLAVOR_PRICES[cakeColor] || 15;
-    const frostingCost = FROSTING_PRICES[frostingColor] || 5;
-    const toppingsCost = toppings.reduce((s, t) => s + (TOPPING_PRICES[t] || 0), 0);
-    const placedCost = (placedItems || []).reduce((s, item) => s + (item.type === 'piping' ? PIPING_PRICE : (PLACED_ITEM_PRICES[item.type] || 0)), 0);
-    return layerCost + cakeCost + frostingCost + toppingsCost + placedCost;
-  };
+  const formatEstimate = (design) => design.lastEstimate?.totalMinor == null
+    ? 'Open design to refresh'
+    : new Intl.NumberFormat('en-PH', { style: 'currency', currency: design.lastEstimate.currency || 'PHP' }).format(design.lastEstimate.totalMinor / 100);
 
   return (
     <div className="cn-app-page cn-home-page min-h-screen">
@@ -322,7 +309,7 @@ export default function ClientHome() {
               <p><span className="font-medium">Cake Flavor:</span> {detailsModal.design.config?.cakeColor || 'vanilla'}</p>
               <p><span className="font-medium">Frosting:</span> {detailsModal.design.config?.frostingColor || 'vanilla'}</p>
               <p><span className="font-medium">Toppings:</span> {(detailsModal.design.config?.toppings || []).join(', ') || 'None'}</p>
-              <p><span className="font-medium">Total Price:</span> ₱{calculateTotal(detailsModal.design.config)}</p>
+              <p><span className="font-medium">Saved estimate:</span> {formatEstimate(detailsModal.design)}</p>
               <p><span className="font-medium">Sent to Bakery:</span> {detailsModal.design.sentToBakery ? 'Yes' : 'No'}</p>
               <p><span className="font-medium">Date Modified:</span> {formatDate(detailsModal.design.lastEdited)}</p>
               <p><span className="font-medium">Date Created:</span> {formatDate(detailsModal.design.createdAt)}</p>

@@ -1,5 +1,20 @@
 const mongoose = require('mongoose');
 
+const pricingSnapshotSchema = new mongoose.Schema({
+  pricingVersion: { type: Number, required: true },
+  currency: { type: String, default: 'PHP' },
+  lineItems: [{
+    componentKey: { type: String, required: true },
+    label: { type: String, required: true },
+    unit: { type: String, required: true },
+    quantity: { type: Number, required: true },
+    unitPriceMinor: { type: Number, required: true },
+    lineTotalMinor: { type: Number, required: true },
+  }],
+  totalMinor: { type: Number, required: true },
+  calculatedAt: { type: Date, required: true },
+}, { _id: false });
+
 const reservationSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -8,6 +23,10 @@ const reservationSchema = new mongoose.Schema(
 
     pickupDate: { type: Date, required: true },
     totalPrice: { type: Number, required: true },
+
+    // Immutable estimate captured when the reservation is created. Historical
+    // orders must never change when a newer price book becomes active.
+    pricingSnapshot: { type: pricingSnapshotSchema, default: null },
 
     downPayment: {
       amount: { type: Number, required: true },

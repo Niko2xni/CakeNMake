@@ -1,189 +1,87 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Coins, X } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Coins, LoaderCircle, TriangleAlert, X } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
-import { adaptConfigToLegacy } from '@/lib/configAdapter';
 
-const CAKE_FLAVOR_PRICES = {
-  vanilla: 15,
-  chocolate: 18,
-  strawberry: 18,
-  cheese: 20,
-  ube: 22,
-  mocha: 20,
-};
+const formatMoney = (minor = 0) => new Intl.NumberFormat('en-PH', {
+  style: 'currency', currency: 'PHP', minimumFractionDigits: minor % 100 === 0 ? 0 : 2,
+}).format(minor / 100);
 
-const FILLING_PRICES = {
-  vanilla: 8,
-  chocolate: 10,
-  strawberry: 10,
-  cheese: 12,
-  ube: 14,
-  mocha: 12,
-};
-
-const FROSTING_PRICES = {
-  vanilla: 5,
-  chocolate: 7,
-  strawberry: 7,
-  cheese: 8,
-  ube: 9,
-  mocha: 8,
-};
-
-const LAYER_PRICES = { 1: 10, 2: 15 };
-const SIZE_PRICES = { big: 20, small: 10 };
-
-// Tier dimensions per size and layer count
-const SIZE_LABELS = {
-  big:   { 1: '8"×5"', 2: '8"×5" + 6"×4"' },
-  small: { 1: '6"×4"', 2: '6"×4" + 4"×3"' },
-};
-
-const TOPPING_PRICES = {
-  cherry: 3,
-  sprinkles: 2,
-  candles: 4,
-  strawberries: 5,
-  chocolateChips: 3,
-  rosettes: 6,
-};
-
-const PLACED_ITEM_PRICES = {
-  cherry: 3,
-  strawberry: 4,
-  candle: 4,
-  chocolateChip: 2,
-  rosette: 5,
-};
-
-const PIPING_PRICE = 5;
-
-export default function PricingPanel({ config }) {
-  const [modalOpen, setModalOpen] = useState(false);
-  // Adapt new config to legacy format for pricing calculation
-  const legacyConfig = adaptConfigToLegacy(config);
-  const { layers = 2, cakeSize = 'big', frostingColor = 'vanilla', cakeColor = 'vanilla', fillingColor = 'vanilla', toppings = [], placedItems = [] } = legacyConfig;
-
-  const layerCost = LAYER_PRICES[Math.min(layers, 2)] || 10;
-  const sizeCost = SIZE_PRICES[cakeSize] || 20;
-  const cakeCost = CAKE_FLAVOR_PRICES[cakeColor] || 15;
-  const fillingCost = FILLING_PRICES[fillingColor] || 8;
-  const frostingCost = FROSTING_PRICES[frostingColor] || 5;
-
-  const toppingsCost = toppings.reduce((sum, t) => sum + (TOPPING_PRICES[t] || 0), 0);
-
-  const placedCost = (placedItems || []).reduce((sum, item) => {
-    if (item.type === 'piping') return sum + PIPING_PRICE;
-    return sum + (PLACED_ITEM_PRICES[item.type] || 0);
-  }, 0);
-
-  const total = layerCost + sizeCost + cakeCost + fillingCost + frostingCost + toppingsCost + placedCost;
-
-  const sizeLabel = SIZE_LABELS[cakeSize]?.[Math.min(layers, 2)] || '';
-
-  const allItems = [
-    { label: `Size: ${cakeSize === 'big' ? 'Big' : 'Small'} — ${sizeLabel}`, amount: sizeCost },
-    { label: `${layers} Layer${layers > 1 ? 's' : ''}`, amount: layerCost },
-    { label: `${cakeColor} sponge`, amount: cakeCost },
-    { label: `${fillingColor} filling`, amount: fillingCost },
-    { label: `${frostingColor} frosting`, amount: frostingCost },
-    ...toppings.map((t) => ({ label: t, amount: TOPPING_PRICES[t] || 0, indent: true })),
-    ...(placedItems || []).map((item) => {
-      const label = item.type === 'piping' ? `piping (${item.pattern})` : item.type;
-      const amount = item.type === 'piping' ? PIPING_PRICE : (PLACED_ITEM_PRICES[item.type] || 0);
-      return { label, amount, indent: true };
-    }),
-  ];
-
-  const LineItem = ({ label, amount, indent }) => (
-    <div className={`flex justify-between items-center text-xs ${indent ? 'pl-3' : ''}`}>
-      <span className="text-foreground/70 truncate mr-2">{label}</span>
-      <span className="font-medium tabular-nums shrink-0">₱{amount}</span>
+function LineItem({ label, lineTotalMinor = 0, quantity = 1, unitPriceMinor = 0 }) {
+  return (
+    <div className="flex items-start justify-between gap-3 text-xs">
+      <span className="min-w-0 text-foreground/70">
+        {label}
+        {quantity > 1 && <span className="ml-1 text-[10px] text-muted-foreground">({quantity} × {formatMoney(unitPriceMinor)})</span>}
+      </span>
+      <span className="shrink-0 font-medium tabular-nums">{formatMoney(lineTotalMinor)}</span>
     </div>
   );
+}
 
-  const hasOverflow = allItems.length > 5;
+export default function PricingPanel({ quote, loading, error }) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const lineItems = quote?.lineItems || [];
+  const hasOverflow = lineItems.length > 5;
 
   return (
     <>
-      <motion.div
+      <motion.button
+        type="button"
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.5 }}
-        className="bg-card/90 backdrop-blur-md rounded-2xl shadow-lg border border-border/40 p-4 w-[220px] cursor-pointer hover:shadow-xl transition-shadow"
+        className="w-[220px] rounded-2xl border border-border/40 bg-card/90 p-4 text-left shadow-lg backdrop-blur-md transition-shadow hover:shadow-xl disabled:cursor-wait"
         onClick={() => setModalOpen(true)}
+        disabled={!quote && loading}
+        aria-label="Open estimated price breakdown"
       >
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-            <Coins className="w-4 h-4 text-primary" />
+        <div className="mb-3 flex items-center gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
+            {loading ? <LoaderCircle className="h-4 w-4 animate-spin text-primary" /> : <Coins className="h-4 w-4 text-primary" />}
           </div>
-          <h3 className="font-heading font-bold text-sm">Pricing</h3>
+          <div>
+            <h3 className="font-heading text-sm font-bold">Estimated pricing</h3>
+            {quote?.pricingVersion && <p className="text-[10px] text-muted-foreground">Price list v{quote.pricingVersion}</p>}
+          </div>
         </div>
 
-        <div className={`space-y-1.5 ${hasOverflow ? 'max-h-[140px] overflow-hidden relative' : ''}`}>
-          {allItems.map((item, i) => (
-            <LineItem key={i} {...item} />
-          ))}
-          {hasOverflow && (
-            <>
-              <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-card/90 to-transparent" />
-              <p className="text-[11px] text-muted-foreground text-center pt-1">...</p>
-            </>
-          )}
-        </div>
+        {error && !quote ? (
+          <div className="flex gap-2 text-xs text-destructive">
+            <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>Pricing is temporarily unavailable.</span>
+          </div>
+        ) : lineItems.length ? (
+          <div className={`space-y-1.5 ${hasOverflow ? 'relative max-h-[140px] overflow-hidden' : ''}`}>
+            {lineItems.map((item) => <LineItem key={item.componentKey} {...item} />)}
+            {hasOverflow && <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-card/95 to-transparent" />}
+          </div>
+        ) : <p className="text-xs text-muted-foreground">Calculating your estimate…</p>}
 
         <Separator className="my-2.5" />
-
-        <div className="flex justify-between items-center">
-          <span className="font-heading font-bold text-sm">Total</span>
-          <span className="font-heading font-bold text-lg text-primary tabular-nums">₱{total}</span>
+        <div className="flex items-center justify-between">
+          <span className="font-heading text-sm font-bold">Estimate</span>
+          <span className="font-heading text-lg font-bold tabular-nums text-primary">{quote ? formatMoney(quote.totalMinor) : '—'}</span>
         </div>
-      </motion.div>
+        <p className="mt-1 text-[10px] text-muted-foreground">Final price is confirmed by the bakery.</p>
+      </motion.button>
 
       <AnimatePresence>
-        {modalOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
-            onClick={() => setModalOpen(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-card rounded-2xl shadow-2xl border border-border/40 p-6 w-[300px] max-w-[90vw]"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-4">
+        {modalOpen && quote && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm" onClick={() => setModalOpen(false)}>
+            <motion.div role="dialog" aria-modal="true" aria-label="Estimated price breakdown" initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }} className="w-[340px] max-w-full rounded-2xl border border-border/40 bg-card p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+              <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <Coins className="w-4 h-4 text-primary" />
-                  </div>
-                  <h3 className="font-heading font-bold text-sm">Price Breakdown</h3>
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10"><Coins className="h-4 w-4 text-primary" /></div>
+                  <div><h3 className="font-heading text-sm font-bold">Estimated price breakdown</h3><p className="text-[10px] text-muted-foreground">Price list v{quote.pricingVersion}</p></div>
                 </div>
-                <button
-                  onClick={() => setModalOpen(false)}
-                  className="rounded-full p-1 hover:bg-muted transition-colors"
-                >
-                  <X className="w-4 h-4 text-muted-foreground" />
-                </button>
+                <button type="button" onClick={() => setModalOpen(false)} className="rounded-full p-1 hover:bg-muted" aria-label="Close"><X className="h-4 w-4 text-muted-foreground" /></button>
               </div>
-
-              <div className="space-y-1.5 max-h-[50vh] overflow-y-auto">
-                {allItems.map((item, i) => (
-                  <LineItem key={i} {...item} />
-                ))}
-              </div>
-
+              <div className="max-h-[50vh] space-y-2 overflow-y-auto pr-1">{lineItems.map((item) => <LineItem key={item.componentKey} {...item} />)}</div>
+              {quote.warnings?.length > 0 && <div className="mt-3 rounded-lg bg-amber-50 p-2 text-[11px] text-amber-800">Some options do not have configured prices yet and were estimated at ₱0.</div>}
               <Separator className="my-3" />
-
-              <div className="flex justify-between items-center">
-                <span className="font-heading font-bold text-base">Total</span>
-                <span className="font-heading font-bold text-2xl text-primary tabular-nums">₱{total}</span>
-              </div>
+              <div className="flex items-center justify-between"><span className="font-heading font-bold">Estimated total</span><span className="font-heading text-2xl font-bold tabular-nums text-primary">{formatMoney(quote.totalMinor)}</span></div>
+              <p className="mt-2 text-[11px] text-muted-foreground">This estimate uses the current bakery price list. The bakery confirms the final price before production.</p>
             </motion.div>
           </motion.div>
         )}

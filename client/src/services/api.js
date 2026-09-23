@@ -222,16 +222,24 @@ export const bakeryApi = {
 };
 
 export const pricingApi = {
-  getPresets: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/pricing`),
-
-  updatePresetPrice: async (id, price, reason) => {
-    return requestAuthenticatedJson(`${API_BASE_URL}/bakery/pricing/${id}`, {
+  getWorkspace: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/pricing`),
+  createDraft: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/pricing/draft`, { method: 'POST' }),
+  updateDraftItem: async (componentKey, costBasisMinor, markupMinor) => {
+    return requestAuthenticatedJson(`${API_BASE_URL}/bakery/pricing/draft/items/${encodeURIComponent(componentKey)}`, {
       method: 'PATCH',
-      body: JSON.stringify({ price, reason }),
+      body: JSON.stringify({ costBasisMinor, markupMinor }),
     });
   },
-
-  getChangeLog: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/pricing/log`),
+  scheduleDraft: (reason) => requestAuthenticatedJson(`${API_BASE_URL}/bakery/pricing/draft/schedule`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  publishDraftNow: (reason) => requestAuthenticatedJson(`${API_BASE_URL}/bakery/pricing/draft/publish-now`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  discardDraft: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/pricing/draft`, { method: 'DELETE' }),
+  cancelScheduled: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/pricing/scheduled/cancel`, { method: 'POST' }),
+  getActiveCatalog: (platform = 'mamshie-bakery') => requestJson(`${API_BASE_URL}/pricing/active?platform=${encodeURIComponent(platform)}`),
+  quoteCake: (config, platform = 'mamshie-bakery') => requestJson(`${API_BASE_URL}/pricing/quote`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ platform, config }),
+  }),
 };
 
 export const billingApi = {

@@ -29,6 +29,8 @@ app.use('/api/bakery/reservations', reservationRoutes);
 
 const pricingRoutes = require('./routes/pricingRoutes');
 app.use('/api/bakery/pricing', pricingRoutes);
+const publicPricingRoutes = require('./routes/publicPricingRoutes');
+app.use('/api/pricing', publicPricingRoutes);
 
 const transactionRoutes = require('./routes/transactionRoutes');
 app.use('/api/bakery/transactions', transactionRoutes);

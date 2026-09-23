@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { listPresets, updatePresetPrice, listChangeLog } = require('../controllers/pricingController');
+const { cancelScheduled, createDraft, discardDraft, getWorkspace, publishDraftNow, scheduleDraft, updateDraftItem } = require('../controllers/priceBookController');
 const authenticate = require('../middleware/authenticate');
 const {
   loadAppUser,
@@ -10,11 +11,19 @@ const {
 
 router.use(authenticate);
 router.use(loadAppUser);
-router.use(requireRole('bakery_staff', 'bakery_admin', 'platform_admin'));
 router.use(requirePlatformMembership);
 
-router.get('/', listPresets);
-router.get('/log', listChangeLog);
-router.patch('/:id', updatePresetPrice);
+router.get('/', requireRole('bakery_staff', 'bakery_admin', 'platform_admin'), getWorkspace);
+router.post('/draft', requireRole('bakery_admin', 'platform_admin'), createDraft);
+router.patch('/draft/items/:componentKey', requireRole('bakery_admin', 'platform_admin'), updateDraftItem);
+router.post('/draft/schedule', requireRole('bakery_admin', 'platform_admin'), scheduleDraft);
+router.post('/draft/publish-now', requireRole('bakery_admin', 'platform_admin'), publishDraftNow);
+router.delete('/draft', requireRole('bakery_admin', 'platform_admin'), discardDraft);
+router.post('/scheduled/cancel', requireRole('bakery_admin', 'platform_admin'), cancelScheduled);
+
+// Legacy endpoints remain during the price-book migration window.
+router.get('/legacy/presets', requireRole('bakery_staff', 'bakery_admin', 'platform_admin'), listPresets);
+router.get('/legacy/log', requireRole('bakery_staff', 'bakery_admin', 'platform_admin'), listChangeLog);
+router.patch('/legacy/:id', requireRole('bakery_admin', 'platform_admin'), updatePresetPrice);
 
 module.exports = router;

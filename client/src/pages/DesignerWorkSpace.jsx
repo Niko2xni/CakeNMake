@@ -12,30 +12,7 @@ import { Input } from '@/components/ui/input';
 import { designApi } from '@/services/api';
 import { DEFAULT_CONFIG } from '@/lib/cakeConfig';
 import { adaptConfigToLegacy, adaptConfigFromLegacy } from '@/lib/configAdapter';
-
-// Mirrors PricingPanel price logic
-const CAKE_FLAVOR_PRICES = { vanilla: 15, chocolate: 18, strawberry: 18, cheese: 20, ube: 22, mocha: 20 };
-const FILLING_PRICES = { vanilla: 8, chocolate: 10, strawberry: 10, cheese: 12, ube: 14, mocha: 12 };
-const FROSTING_PRICES = { vanilla: 5, chocolate: 7, strawberry: 7, cheese: 8, ube: 9, mocha: 8 };
-const LAYER_PRICES = { 1: 10, 2: 15, 3: 20 };
-const SIZE_PRICES = { big: 20, small: 10 };
-const TOPPING_PRICES = { cherry: 3, sprinkles: 2, candles: 4, strawberries: 5, chocolateChips: 3, rosettes: 6 };
-const PLACED_ITEM_PRICES = { cherry: 3, strawberry: 4, candle: 4, chocolateChip: 2, rosette: 5 };
-const PIPING_PRICE = 5;
-
-function calcTotal(config) {
-  // Adapt new config to legacy format for pricing calculation
-  const legacyConfig = adaptConfigToLegacy(config);
-  const { layers = 2, cakeSize = 'big', frostingColor = 'vanilla', cakeColor = 'vanilla', fillingColor = 'vanilla', toppings = [], placedItems = [] } = legacyConfig;
-  const layerCost = LAYER_PRICES[Math.min(layers, 3)] || 10;
-  const sizeCost = SIZE_PRICES[cakeSize] || 20;
-  const cakeCost = CAKE_FLAVOR_PRICES[cakeColor] || 15;
-  const fillingCost = FILLING_PRICES[fillingColor] || 8;
-  const frostingCost = FROSTING_PRICES[frostingColor] || 5;
-  const toppingsCost = toppings.reduce((s, t) => s + (TOPPING_PRICES[t] || 0), 0);
-  const placedCost = (placedItems || []).reduce((s, item) => s + (item.type === 'piping' ? PIPING_PRICE : (PLACED_ITEM_PRICES[item.type] || 0)), 0);
-  return layerCost + sizeCost + cakeCost + fillingCost + frostingCost + toppingsCost + placedCost;
-}
+import useCakeQuote from '@/hooks/use-cake-quote';
 
 // Use the new bakery-style config structure
 const INITIAL_CONFIG = DEFAULT_CONFIG;
@@ -44,6 +21,7 @@ export default function DesignerWorkSpace() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [config, setConfig] = useState(INITIAL_CONFIG);
+  const { quote, loading: quoteLoading, error: quoteError, versionChanged, dismissVersionChanged } = useCakeQuote(config);
   const [panelOpen, setPanelOpen] = useState(false);
   const [activeTool, setActiveTool] = useState(null);
   const [title, setTitle] = useState('Unnamed 1');
@@ -113,7 +91,12 @@ export default function DesignerWorkSpace() {
       const designData = {
         name: title,
         config: legacyConfig,
-        totalPrice: calcTotal(config),
+        lastEstimate: quote ? {
+          pricingVersion: quote.pricingVersion,
+          currency: quote.currency,
+          totalMinor: quote.totalMinor,
+          calculatedAt: new Date().toISOString(),
+        } : null,
         previewImage: previewImageUrl,
         isPublic: false,
       };
@@ -138,7 +121,7 @@ export default function DesignerWorkSpace() {
       setSaveStatus('error');
       return null;
     }
-  }, [config, title, designId, navigate]);
+  }, [config, title, designId, navigate, quote]);
 
   // Auto-save effect
   useEffect(() => {
@@ -352,6 +335,19 @@ export default function DesignerWorkSpace() {
 
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-background">
+      <AnimatePresence>
+        {versionChanged && (
+          <motion.div
+            initial={{ opacity: 0, y: -12, x: '-50%' }}
+            animate={{ opacity: 1, y: 0, x: '-50%' }}
+            exit={{ opacity: 0, y: -12, x: '-50%' }}
+            className="fixed left-1/2 top-20 z-50 flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-sm shadow-xl"
+          >
+            <span>The bakery updated its prices. Your estimate has been recalculated.</span>
+            <button type="button" onClick={dismissVersionChanged} className="shrink-0 font-semibold text-primary hover:underline">Got it</button>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* Top bar */}
       <header className="flex items-center justify-between px-4 md:px-6 py-3 border-b border-border/40 bg-card/80 backdrop-blur-sm z-20">
         <div className="flex items-center gap-3">
@@ -501,7 +497,7 @@ export default function DesignerWorkSpace() {
 
           {/* Pricing panel */}
           <div className="absolute top-4 left-4 z-10">
-            <PricingPanel config={config} />
+            <PricingPanel quote={quote} loading={quoteLoading} error={quoteError} />
           </div>
 
           {/* Overlap / clipping warning toast */}
@@ -601,7 +597,7 @@ export default function DesignerWorkSpace() {
         {bakeryOpen && (
           <SendBakeryModal
             config={config}
-            total={calcTotal(config)}
+            total={quote ? quote.totalMinor / 100 : 0}
             onClose={() => setBakeryOpen(false)}
             onOrderComplete={handleOrderComplete}
           />

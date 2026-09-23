@@ -32,7 +32,7 @@ exports.getDesignById = async (req, res) => {
 // Create a new design
 exports.createDesign = async (req, res) => {
   try {
-    const { name, config, userId } = req.body;
+    const { name, config, userId, lastEstimate } = req.body;
     
     console.log('Creating design with data:', { name, userId, hasConfig: !!config });
     
@@ -46,7 +46,8 @@ exports.createDesign = async (req, res) => {
     const design = new Design({
       name: designName,
       config,
-      userId
+      userId,
+      lastEstimate: lastEstimate || undefined
     });
 
     const savedDesign = await design.save();
@@ -61,7 +62,7 @@ exports.createDesign = async (req, res) => {
 // Update a design
 exports.updateDesign = async (req, res) => {
   try {
-    const { name, config, thumbnail } = req.body;
+    const { name, config, thumbnail, lastEstimate } = req.body;
     const design = await Design.findById(req.params.id);
 
     if (!design) {
@@ -113,6 +114,7 @@ exports.updateDesign = async (req, res) => {
     // Update other fields
     if (name) design.name = name;
     if (config) design.config = config;
+    if (lastEstimate) design.lastEstimate = lastEstimate;
 
     const updatedDesign = await design.save();
     console.log('[DEBUG] updateDesign - Design saved successfully');
