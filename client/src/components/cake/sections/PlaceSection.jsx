@@ -176,8 +176,8 @@ export default function PlaceSection({
                 {placedCount > 0 && (
                   <span className={cn(
                     'absolute top-1 right-1.5 text-[9px] font-bold px-1.5 py-0.2 rounded-full',
-                    isSelected 
-                      ? 'bg-white/30 text-white' 
+                    isSelected
+                      ? 'bg-white/30 text-white'
                       : 'bg-primary/15 text-primary'
                   )}>
                     {placedCount}

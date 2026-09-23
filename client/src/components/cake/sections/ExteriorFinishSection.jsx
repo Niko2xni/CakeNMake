@@ -73,7 +73,7 @@ export default function ExteriorFinishSection({ exterior, structure, activeLayer
       {/* Finish Style */}
       <div>
         <span className="text-xs text-muted-foreground mb-2 block">
-          {isIndividual ? `Layer ${activeLayer + 1} Finish Style` : 'Finish Style'}
+          {isIndividual ? `Tier ${activeLayer + 1} Finish Style` : 'Finish Style'}
         </span>
         <div className="space-y-2">
           {FINISH_STYLES.map((style) => {
@@ -110,27 +110,32 @@ export default function ExteriorFinishSection({ exterior, structure, activeLayer
           {showButtercreamTextureOptions && (
             <div>
               <span className="text-xs text-muted-foreground mb-2 block">
-                {isIndividual ? `Layer ${activeLayer + 1} Texture` : 'Buttercream Texture'}
+                {isIndividual ? `Tier ${activeLayer + 1} Texture` : 'Buttercream Texture'}
               </span>
-              <div className="space-y-2">
+              {/* Secondary tier: smaller grid-of-chips (same style as Sugar
+                  Color's Match Flavor/Pick Color buttons — grid-cols-2,
+                  py-2/px-3/rounded-lg) rather than Finish Style's full-width
+                  px-4/py-3/rounded-xl rows above. This is a sub-choice that
+                  only exists once Textured Buttercream is already selected,
+                  so it needs to read as nested under that choice, not as
+                  another top-level option list in the same visual weight. */}
+              <div className="grid grid-cols-2 gap-2">
                 {BUTTERCREAM_TEXTURES.map((texture) => {
                   const active = getActiveButtercreamTexture() === texture.id;
                   return (
                     <button
                       key={texture.id}
                       onClick={() => updateButtercreamTexture(texture.id)}
-                      className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-left transition-all duration-200 border-2 ${
+                      className={`py-2 px-3 rounded-lg text-left transition-all duration-150 border-2 ${
                         active
                           ? 'bg-primary text-primary-foreground border-primary shadow-md'
-                          : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
+                          : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
                       }`}
                     >
-                      <div>
-                        <span className="text-xs font-semibold block">{texture.label}</span>
-                        <span className={`text-[10px] mt-0.5 block ${active ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
-                          {texture.description}
-                        </span>
-                      </div>
+                      <span className="block text-xs font-semibold">{texture.label}</span>
+                      <span className={`block text-[10px] mt-0.5 ${active ? 'text-primary-foreground/80' : 'text-muted-foreground/70'}`}>
+                        {texture.description}
+                      </span>
                     </button>
                   );
                 })}
@@ -146,7 +151,7 @@ export default function ExteriorFinishSection({ exterior, structure, activeLayer
           >
           <div>
             <span className="text-xs text-muted-foreground mb-2 block">
-              {isIndividual ? `Layer ${activeLayer + 1} Flavor` : 'Frosting Flavor'}
+                {isIndividual ? `Tier ${activeLayer + 1} Flavor` : 'Frosting Flavor'}
             </span>
             <div className="grid grid-cols-2 gap-2">
               {FROSTING_FILLING_FLAVOR_ORDER.map((flavorId) => {
@@ -162,7 +167,7 @@ export default function ExteriorFinishSection({ exterior, structure, activeLayer
                         : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
                     }`}
                   >
-                    <div 
+                    <div
                       className="w-8 h-8 rounded-full border-2 border-black/10"
                       style={{ backgroundColor: flavor.colors.crumbBase }}
                     />

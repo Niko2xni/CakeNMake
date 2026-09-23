@@ -1,4 +1,8 @@
 import * as THREE from 'three';
+import { getFrostingMaterial, applyVerticalGradientUV } from './frostingMaterial';
+import { markShared, parseGradientStops } from './materialUtils';
+import { buildGradientTexture } from './cakeTextures';
+import { SUGAR_COLORS } from '../../lib/cakeConfig';
 import { buildStrawberryMesh } from './toppings/strawberry';
 import { buildHersheysKissMesh } from './toppings/hersheysKiss';
 import { buildFerreroRocherMesh } from './toppings/ferreroRocher';
@@ -93,16 +97,7 @@ export function computeEdgeTrimY(topSurfaceY, radius, decorationType = 'piping',
     return -0.05;
   }
   if (isFruitRim) {
-    if (exteriorFinishStyle === 'naked') {
-      return decorationType === 'strawberryRim' ? topSurfaceY - 0.04 : topSurfaceY;
-    }
-    const compactDepth = Math.min(0.12, Math.max(0.06, radius * 0.08));
-    const finishDepth = 0.06;
-    const extraInset = 0.04;
-    const frostCapRecess = compactDepth + extraInset + finishDepth;
-    return decorationType === 'strawberryRim'
-      ? topSurfaceY - (frostCapRecess + 0.04)
-      : topSurfaceY - frostCapRecess;
+    return decorationType === 'strawberryRim' ? topSurfaceY - 0.04 : topSurfaceY;
   }
   if (exteriorFinishStyle === 'naked') {
     // compactDepth + extraInset below (0.10–0.16 depending on cake size
@@ -128,64 +123,18 @@ export function computeEdgeTrimY(topSurfaceY, radius, decorationType = 'piping',
   return topSurfaceY - (compactDepth + extraInset + finishDepth);
 }
 
-// Per-decoration-type radial inset from the finish-adjusted surface
-// radius, split by whether the trim sits at the top rim (tucked back,
-// positive inset) or the bottom (pushed proud of the wall, negative
-// inset — see the reasoning below computeEdgeTrimRadius' own comment).
-// One shared table now covers every Edge design instead of a single
-// generic vs. beadedTrim branch, since the newer Edge designs (Shell
-// Border's two variants, Bead Piping, Dollops, Zigzag, Wave Piping, the
-// two Rope Twist variants) each read at meaningfully different sizes —
-// Dollops in particular sits much further in (0.54) than anything else,
-// since its wide piped blobs need more clearance from the true edge than
-// a thin piped line does. Anything not listed here (plain 'piping',
-// star/round/leaf/petal/dropFlower/scallop/rope/lambeth, and any future
-// tip not yet given its own tuned figures) falls through to the existing
-// generic default, unchanged.
-const EDGE_TRIM_RADIAL_INSETS = {
-  beadedTrim: { top: 0.22, bottom: -0.10 },
-  dollops: { top: 0.54, bottom: -0.06 },
-  bead: { top: 0.38, bottom: -0.04 },
-  shell: { top: 0.40, bottom: -0.04 },
-  reverseShell: { top: 0.40, bottom: -0.04 },
-  zigzag: { top: 0.40, bottom: -0.04 },
-  wavePiping: { top: 0.40, bottom: -0.04 },
-  ropeTwist: { top: 0.40, bottom: -0.04 },
-  ropeTwistClassic: { top: 0.40, bottom: -0.04 },
-};
-const DEFAULT_EDGE_TRIM_RADIAL_INSET = { top: 0.26, bottom: -0.14 };
-
 export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', exteriorFinishStyle = 'fullyFrosted', isBottom = false) {
   // `edgeRadius` (topRadius/BASE_RADIUS in CakeScene.jsx) is the raw
   // sponge radius, identical for every finish — unlike topSurfaceY above,
-  // nothing upstream adjusts it for frosting bulge. So the flat
-  // per-finish "finishInset" constants this used to use (applied
-  // directly to that same raw number for every finish alike) never
-  // actually accounted for Fully Frosted's real surface sitting further
-  // out than Naked's does — only for however different those constants
-  // happened to be tuned. Deriving an actual surfaceRadius first — the
-  // same frosting-bulge convention the Side decorations already use (see
-  // sideDecorationRadius/hasFrostingForDeco above: frosted finishes add
-  // ~0.06 outward, Naked sits ~0.02 in from the bare sponge) — then
-  // applying ONE consistent radialInset on top of that for every finish,
-  // is what actually keeps the trim sitting an equivalent distance from
-  // each finish's own real edge instead of from a shared number that
-  // doesn't represent any of their real edges.
+  // nothing upstream adjusts it for frosting bulge. Deriving an actual
+  // surfaceRadius first (the same frosting-bulge convention the Side
+  // decorations already use), then applying ONE consistent radialInset on
+  // top of that for every finish, keeps the trim sitting an equivalent
+  // distance from each finish's own real edge.
   const surfaceRadius = exteriorFinishStyle === 'naked'
     ? edgeRadius - 0.02
     : edgeRadius + (exteriorFinishStyle === 'texturedButtercream' ? 0.08 : 0.06);
-  // The top rim's radialInset (0.22–0.26) is tuned to nestle the trim
-  // back into the top surface, inset from the very edge — appropriate
-  // there since the whole top disc is visible from above and the trim
-  // needs room to sit "on" it. The bottom trim isn't sitting on any
-  // visible surface the same way — it reads as a border/skirt piped
-  // right at the base perimeter, resting against the cake board. A
-  // small POSITIVE inset there (the first attempt at this) still tucked
-  // it just inside the wall's own radius, which was enough for the wall
-  // to keep occluding most of it from a normal viewing angle. Going
-  // negative instead pushes it genuinely proud of the wall — actually in
-  // front of the surface, the way a piped border resting against the
-  // board would really sit — rather than just closer to flush with it.
+
   const isWhippedCream = typeof decorationType === 'string' && decorationType.startsWith('whippedCreamRosette');
   const isDollopType = isWhippedCream || decorationType === 'dollops' || (typeof decorationType === 'string' && decorationType.toLowerCase().includes('dollop'));
 
@@ -194,21 +143,18 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
     : decorationType;
   let topDollopInset = 0.76;
   if (baseTip === 'starDollopContinuous') {
-    topDollopInset = 0.66; // R = 4.06 - 0.66 = 3.40 -> outer edge: 3.40 + 0.625 = 4.025 (right by edge, strictly <= 4.06)
+    topDollopInset = 0.66;
   } else if (baseTip === 'starDollop' || baseTip === 'roundDollopMedium' || baseTip === 'kissDollopMedium') {
-    topDollopInset = 0.76; // R = 4.06 - 0.76 = 3.30 -> outer edge: 3.30 + 0.725 = 4.025 (right by edge, strictly <= 4.06)
+    topDollopInset = 0.76;
   } else if (baseTip === 'starDollopSparse' || baseTip === 'roundDollopSparse' || baseTip === 'kissDollopSparse') {
-    topDollopInset = 0.82; // R = 4.06 - 0.82 = 3.24 -> outer edge: 3.24 + 0.7875 = 4.028 (right by edge, strictly <= 4.06)
+    topDollopInset = 0.82;
   } else if (baseTip === 'roundDollop' || baseTip === 'kissDollop') {
-    topDollopInset = 0.58; // R = 4.06 - 0.58 = 3.48 -> outer edge: 3.48 + 0.5445 = 4.025 (touching side-by-side)
+    topDollopInset = 0.58;
   } else if (baseTip === 'whippedCreamRosetteContinuous') {
-    // dScale=0.48*3=1.44; rosette outer ≈0.464*1.44=0.668; ring center=4.06-0.72=3.34 → outer edge 3.34+0.668=4.008 ≤ 4.06 ✓
     topDollopInset = 0.72;
   } else if (baseTip === 'whippedCreamRosette') {
-    // dScale=0.56*3=1.68; rosette outer ≈0.464*1.68=0.779; ring center=4.06-0.82=3.24 → outer edge 3.24+0.779=4.019 ≤ 4.06 ✓
     topDollopInset = 0.82;
   } else if (baseTip === 'whippedCreamRosetteSparse') {
-    // dScale=0.64*3=1.92; rosette outer ≈0.464*1.92=0.891; ring center=4.06-0.94=3.12 → outer edge 3.12+0.891=4.011 ≤ 4.06 ✓
     topDollopInset = 0.94;
   }
 
@@ -230,7 +176,7 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
   } else if (baseTip === 'roundDollop' || baseTip === 'kissDollop') {
     bottomRadialInset = -0.40;
   } else if (baseTip === 'ferreroRocherRim') {
-    bottomRadialInset = -0.48;
+    bottomRadialInset = -0.61;
   } else if (baseTip === 'hersheysKissRim') {
     bottomRadialInset = -0.41;
   } else if (baseTip === 'strawberryRim') {
@@ -275,24 +221,72 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
       : (baseTip === 'wavePiping' ? 0.40
       : (['ropeTwist', 'ropeTwistClassic'].includes(baseTip) ? 0.40 : 0.26)))))))));
   return Math.max(0.15, surfaceRadius - radialInset);
+}
 
+const beadedTrimMaterialCache = {};
+
+export function getBeadedTrimMaterial(colorHex, colorId = null) {
+  const cacheKey = colorId ? `${colorId}_${colorHex}` : colorHex;
+  if (beadedTrimMaterialCache[cacheKey]) {
+    return beadedTrimMaterialCache[cacheKey];
+  }
+
+  const sugarColor = colorId ? SUGAR_COLORS.find((c) => c.id === colorId) : null;
+  const isGradient = sugarColor && sugarColor.swatchCss && sugarColor.swatchCss.includes('gradient');
+  const isMetallic = !!(sugarColor && sugarColor.metallic);
+
+  let gradientTexture = null;
+  if (isGradient) {
+    const colorStops = parseGradientStops(sugarColor.swatchCss);
+    if (colorStops.length > 0) {
+      gradientTexture = buildGradientTexture(colorStops, 512, 512);
+      gradientTexture.wrapS = THREE.ClampToEdgeWrapping;
+      gradientTexture.wrapT = THREE.ClampToEdgeWrapping;
+      gradientTexture.needsUpdate = true;
+    }
+  }
+
+  let mat;
+  if (isGradient && gradientTexture) {
+    mat = new THREE.MeshPhysicalMaterial({
+      map: gradientTexture,
+      roughness: 0.25,
+      clearcoat: 0.6,
+    });
+    mat.userData.isGradient = true;
+  } else if (isMetallic) {
+    mat = new THREE.MeshPhysicalMaterial({
+      color: colorHex,
+      roughness: 0.2,
+      metalness: 0.85,
+      clearcoat: 0.8,
+    });
+    mat.userData.isMetallic = true;
+  } else {
+    mat = new THREE.MeshPhysicalMaterial({
+      color: colorHex,
+      roughness: 0.25,
+      clearcoat: 0.6,
+    });
+  }
+
+  beadedTrimMaterialCache[cacheKey] = markShared(mat);
+  return mat;
 }
 
 /**
- * Beaded Trim — three designs sharing this one geometry function, only
- * the per-bead size rhythm around the ring differs (`opts.pattern`):
- *
- * - 'classic' (default, the original Beaded Trim): alternates Big/Small.
- * - 'trio' (Trio Beaded Trim): cycles Small → Big → Medium. Deliberately
- *   not a Small → Medium → Big ramp — see EDGE_DECORATION_SETS' comment
- *   in cakeConfig.js for why that reads as lopsided once it wraps around
- *   a full circle instead of balanced.
- * - 'petite' (Petite Beaded Trim): every bead the same small size — a
- *   finer, more delicate trim than either of the other two.
+ * Beaded Trim — shares one geometry function across every bead-rhythm
+ * design (`opts.pattern`): 'classic' (Big/Small alternating, the
+ * original), 'trio' (Small → Big → Medium), 'petite' (uniform small),
+ * 'graduated' (a swelling/tapering wave), 'spacer' (Big, Small, Small),
+ * 'grand' (uniform bold), and three 'morse*' patterns (dot/dash Morse-code
+ * rhythms, built from spheres + capsules rather than the plain sphere
+ * ring the other patterns use).
  */
 export function buildBeadedTrimRing(radius, colorHex, rand, opts = {}) {
   const pattern = opts.pattern || 'classic';
-  const mat = new THREE.MeshPhysicalMaterial({ color: colorHex, roughness: 0.25, clearcoat: 0.6 });
+  const colorId = opts.colorId || null;
+  const mat = getBeadedTrimMaterial(colorHex, colorId);
 
   if (pattern.startsWith('morse')) {
     const MORSE_SPECS = {
@@ -320,7 +314,7 @@ export function buildBeadedTrimRing(radius, colorHex, rand, opts = {}) {
 
     const group = new THREE.Group();
     if (dotAngles.length > 0) {
-      const dotGeo = new THREE.SphereGeometry(0.13, 14, 10);
+      const dotGeo = applyVerticalGradientUV(new THREE.SphereGeometry(0.13, 14, 10));
       const dotMesh = new THREE.InstancedMesh(dotGeo, mat, dotAngles.length);
       const dummy = new THREE.Object3D();
       for (let i = 0; i < dotAngles.length; i++) {
@@ -339,7 +333,7 @@ export function buildBeadedTrimRing(radius, colorHex, rand, opts = {}) {
     }
 
     if (dashAngles.length > 0) {
-      const dashGeo = new THREE.CapsuleGeometry(0.13, spec.dashLen * k, 8, 14);
+      const dashGeo = applyVerticalGradientUV(new THREE.CapsuleGeometry(0.13, spec.dashLen * k, 8, 14));
       const dashMesh = new THREE.InstancedMesh(dashGeo, mat, dashAngles.length);
       const dummy = new THREE.Object3D();
       const upVec = new THREE.Vector3(0, 1, 0);
@@ -375,7 +369,7 @@ export function buildBeadedTrimRing(radius, colorHex, rand, opts = {}) {
       count = rawCount;
     }
   }
-  const geo = new THREE.SphereGeometry(0.13, 14, 10);
+  const geo = applyVerticalGradientUV(new THREE.SphereGeometry(0.13, 14, 10));
   const mesh = new THREE.InstancedMesh(geo, mat, count);
   const dummy = new THREE.Object3D();
   for (let i = 0; i < count; i++) {
@@ -383,17 +377,17 @@ export function buildBeadedTrimRing(radius, colorHex, rand, opts = {}) {
     let baseScale;
     if (pattern === 'trio') {
       const cyclePos = i % 3;
-      baseScale = cyclePos === 0 ? 0.58 : cyclePos === 1 ? 1.05 : 0.82; // Small, Big, Medium
+      baseScale = cyclePos === 0 ? 0.58 : cyclePos === 1 ? 1.05 : 0.82;
     } else if (pattern === 'petite') {
       baseScale = 0.62;
     } else if (pattern === 'graduated') {
       const cyclePos = i % 6;
-      baseScale = [0.55, 0.72, 0.92, 1.06, 0.92, 0.72][cyclePos]; // Wave swell & taper
+      baseScale = [0.55, 0.72, 0.92, 1.06, 0.92, 0.72][cyclePos];
     } else if (pattern === 'spacer') {
       const cyclePos = i % 3;
-      baseScale = cyclePos === 0 ? 1.06 : 0.55; // Big, Small, Small
+      baseScale = cyclePos === 0 ? 1.06 : 0.55;
     } else if (pattern === 'grand') {
-      baseScale = 1.02; // Uniform bold statement pearls
+      baseScale = 1.02;
     } else {
       const big = i % 2 === 0;
       baseScale = big ? 1 : 0.62;
@@ -410,128 +404,57 @@ export function buildBeadedTrimRing(radius, colorHex, rand, opts = {}) {
 }
 
 /**
- * Fresh Strawberries Rim — a handcrafted ring of ripe strawberries sitting
- * along the cake edge.
- * - Top rim: Strawberries stand nestled upright in the top buttercream,
- *   subtly leaning radially inward toward the cake center with organic rotation jitter.
- * - Bottom rim: Strawberries rest naturally on their side along the cake skirt,
- *   nestled against the base cylinder in a continuous fruit garland.
+ * Fresh Strawberries Rim — a handcrafted ring of complete ripe strawberries
+ * sitting directly along the cake edge.
  */
 export function buildStrawberryRimRing(radius, y, rand = Math.random, opts = {}) {
-  const isBottom = opts.isBottom ?? false;
-  const count = opts.count ?? Math.max(10, Math.round((radius * Math.PI * 2) / (isBottom ? 1.35 : 1.45)));
+  const count = opts.count ?? Math.max(10, Math.round((radius * Math.PI * 2) / 1.45));
   const scale = opts.scale ?? 0.82;
-  // Sinking & grounding offset:
-  // Top: sink ~24% into top frosting (-0.20 * scale) so the narrow conical tip is firmly buried
-  // and the plump berry body emerges naturally from the buttercream rather than balancing on a needle tip.
-  // Bottom: 0.25 * scale rests the sideways garland flush on the cake plate.
-  const surfaceLift = isBottom ? 0.25 * scale : -0.20 * scale;
   const group = new THREE.Group();
-
   for (let i = 0; i < count; i++) {
     const angle = (i / count) * Math.PI * 2;
     const cx = Math.sin(angle) * radius;
     const cz = Math.cos(angle) * radius;
-    const strawberry = buildStrawberryMesh(cx, y + surfaceLift, cz, scale, rand);
-
-    if (isBottom) {
-      // Bottom rim: lying on its side, cradled where cake cylinder wall meets cake board
-      const qRing = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), angle);
-      // Lie horizontally along the tangent (stem pointing along the circumference)
-      const qLie = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -Math.PI / 2);
-      // Natural fruit taper lifts crown/stem ~16 deg relative to the surface
-      const qElevate = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), 0.25 + (rand() - 0.5) * 0.08);
-      // Roll slightly so seeds and leaves face outward/upward naturally
-      const qRoll = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.20 + (rand() - 0.5) * 0.12);
-      // Gentle yaw contouring to hug the cake base
-      const qYaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -0.06 + (rand() - 0.5) * 0.06);
-
-      strawberry.quaternion.copy(qRing.multiply(qYaw).multiply(qLie).multiply(qElevate).multiply(qRoll));
-    } else {
-      // Top rim: upright with leaves/stem on top, nestled deeply into frosting,
-      // leaning gently inward (~10 deg) toward the cake center with organic hand-placed jitter
-      const inwardTilt = -0.18 + (rand() - 0.5) * 0.08;
-      const sideTilt = (rand() - 0.5) * 0.08;
-      const spin = rand() * Math.PI * 2;
-
-      const qRing = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), angle);
-      const qTilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), inwardTilt);
-      const qSide = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), sideTilt);
-      const qSpin = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), spin);
-
-      strawberry.quaternion.copy(qRing.multiply(qTilt).multiply(qSide).multiply(qSpin));
-    }
-
+    const strawberry = buildStrawberryMesh(cx, y, cz, scale, rand);
+    strawberry.rotation.y = angle;
+    strawberry.rotation.x = -0.38 + (rand() - 0.5) * 0.08;
+    strawberry.rotation.z += (rand() - 0.5) * 0.08;
     group.add(strawberry);
   }
   return group;
 }
 
 /**
- * Hershey's Kisses Chocolate Rim — chocolate kisses lining the cake rim (Option A):
- * - 360° Randomized Tip Curls: Each Kiss spins freely around its vertical axis so
- *   the signature teardrop tips flick in diverse, natural directions rather than
- *   pointing synchronously in a cloned array.
- * - Top Rim: Sunk ~20% into the top buttercream with subtle organic hand-placed
- *   tilt (±4°).
- * - Bottom Rim: Firmly grounded on the cake plate surface, tucked snugly against
- *   the cake base cylinder with zero floating gap.
+ * Hershey's Kisses Chocolate Rim — upright chocolate kisses lining the cake rim.
  */
 export function buildHersheysKissRimRing(radius, y, rand = Math.random, opts = {}) {
-  const isBottom = opts.isBottom ?? false;
   const count = opts.count ?? Math.max(12, Math.round((radius * Math.PI * 2) / 1.35));
   const scale = opts.scale ?? 0.36;
-  // Sinking & grounding offset:
-  // Top: sink ~20% into top frosting (-0.14 * scale)
-  // Bottom: ground firmly flush on cake plate (-0.02)
-  const surfaceOffset = isBottom ? -0.02 : -0.14 * scale;
   const group = new THREE.Group();
-
   for (let i = 0; i < count; i++) {
     const angle = (i / count) * Math.PI * 2;
     const cx = Math.sin(angle) * radius;
     const cz = Math.cos(angle) * radius;
-    const rotY = rand() * Math.PI * 2;
-    const kiss = buildHersheysKissMesh(cx, y + surfaceOffset, cz, scale, rotY);
-
-    // Subtle hand-placed organic tilt
-    kiss.rotation.order = 'YXZ';
-    kiss.rotation.x = (rand() - 0.5) * 0.14;
-    kiss.rotation.z = (rand() - 0.5) * 0.14;
-
+    const rotY = angle + (rand() - 0.5) * 0.3;
+    const kiss = buildHersheysKissMesh(cx, y, cz, scale, rotY);
     group.add(kiss);
   }
   return group;
 }
 
 /**
- * Ferrero Rocher Truffle Rim — textured hazelnut chocolate truffles lining the cake rim (Option 1):
- * - Top rim: Sunk ~28% into the top buttercream so they look securely anchored and nestled into the soft frosting.
- * - Bottom rim: Grounded firmly flush on the cake plate surface and tucked snugly against the cake base cylinder.
- * - Organic 3D Tumble: Full rotation across pitch, roll, and yaw so textured hazelnut pieces and facets face diverse 3D angles.
- * - Spacing: Tuned density (~15-16 on an 8" cake) creating a rich, decadent confection border without large empty gaps.
+ * Ferrero Rocher Truffle Rim — textured hazelnut chocolate truffles lining the cake rim.
  */
 export function buildFerreroRocherRimRing(radius, y, rand = Math.random, opts = {}) {
-  const isBottom = opts.isBottom ?? false;
-  const count = opts.count ?? Math.max(8, Math.round((radius * Math.PI * 2) / 1.65));
+  const count = opts.count ?? Math.max(8, Math.round((radius * Math.PI * 2) / 2.15));
   const scale = opts.scale ?? 0.45;
-  // Sinking & grounding offset:
-  // Top: sink ~28% into top frosting (-0.28 * scale)
-  // Bottom: rest firmly on plate (+0.07)
-  const surfaceOffset = isBottom ? 0.07 : -0.28 * scale;
   const group = new THREE.Group();
-
   for (let i = 0; i < count; i++) {
     const angle = (i / count) * Math.PI * 2;
     const cx = Math.sin(angle) * radius;
     const cz = Math.cos(angle) * radius;
-    const truffle = buildFerreroRocherMesh(cx, y + surfaceOffset, cz, scale);
-
-    // Organic 3D tumble: rotate across pitch, roll, and yaw in-place around sphere center
-    truffle.rotation.x = (rand() - 0.5) * 2.2;
-    truffle.rotation.z = (rand() - 0.5) * 2.2;
+    const truffle = buildFerreroRocherMesh(cx, y, cz, scale);
     truffle.rotation.y = rand() * Math.PI * 2;
-
     group.add(truffle);
   }
   return group;
@@ -569,103 +492,35 @@ export function buildOreoRimRing(radius, y, rand = Math.random, opts = {}) {
   return group;
 }
 
-/**
- * Cherry Rim — complete glossy cherries lining the cake edge (Option A):
- * - Top rim: Stems arch inward gracefully toward the cake center with a subtle
- *   inward body lean and organic hand-placed variation rather than standing
- *   straight up like radio antennae.
- * - Bottom rim: Stemless glossy cocktail/maraschino cherries with the apical
- *   dimple visible on top, resting flush on the cake plate along the base cylinder.
- */
+/** Cherry Rim — complete glossy cherries nestled along the cake edge. */
 export function buildCherryRimRing(radius, y, rand = Math.random, opts = {}) {
-  const isBottom = opts.isBottom ?? false;
   const count = opts.count ?? 18;
   const scale = opts.scale ?? 0.85;
-  // minY of cherry body geometry was translated by -0.10.
-  // For the bottom rim resting on the cake plate plane, offset +0.10 * scale to be flush.
-  const surfaceOffset = isBottom ? 0.10 * scale : 0.0;
   const group = new THREE.Group();
-
   for (let i = 0; i < count; i++) {
     const angle = (i / count) * Math.PI * 2;
     const cx = Math.sin(angle) * radius;
     const cz = Math.cos(angle) * radius;
-
-    if (isBottom) {
-      // Bottom rim: stemless glossy maraschino cherries resting flush on plate
-      const cherry = buildCherryMesh(cx, y + surfaceOffset, cz, scale, rand, { stem: false });
-      cherry.rotation.order = 'YXZ';
-      cherry.rotation.y = angle + rand() * Math.PI * 2;
-      cherry.rotation.x = (rand() - 0.5) * 0.08;
-      cherry.rotation.z = (rand() - 0.5) * 0.08;
-      group.add(cherry);
-    } else {
-      // Top rim: blend of casual hand-placed draping (Option 1) and
-      // perimeter garland swirl along the rim curve (Option 2).
-      // Stems sweep gracefully along the perimeter (+X) with a gentle inward
-      // bias (-Z) and generous hand-placed organic variance so each stem looks
-      // unique without pointing like rigid spokes into the center.
-      const stemBaseAngle = -Math.PI * 0.28; // ~ -50° diagonal between tangential (+X) and inward (-Z)
-      const stemJitter = (rand() - 0.5) * 1.05; // natural organic spread (~ -80° to -20°)
-      const stemAngle = stemBaseAngle + stemJitter;
-      const bendAmount = 0.24 + rand() * 0.16;
-
-      const cherry = buildCherryMesh(cx, y + surfaceOffset, cz, scale, rand, {
-        stem: true,
-        stemAngle,
-        bendAmount,
-      });
-
-      // Subtle organic hand-placed body tilt and varied rotation
-      cherry.rotation.order = 'YXZ';
-      cherry.rotation.y = angle + (rand() - 0.5) * 0.40;
-      cherry.rotation.x = -0.06 + (rand() - 0.5) * 0.10;
-      cherry.rotation.z = (rand() - 0.5) * 0.10;
-      group.add(cherry);
-    }
+    const cherry = buildCherryMesh(cx, y, cz, scale, rand);
+    cherry.rotation.y = angle + (rand() - 0.5) * 0.3;
+    cherry.rotation.x = (rand() - 0.5) * 0.06;
+    cherry.rotation.z = (rand() - 0.5) * 0.06;
+    group.add(cherry);
   }
   return group;
 }
 
-/**
- * Basketball / Soccer Ball Rim helper.
- * - Top rim: Spheres are nestled ~30% into the top frosting layer rather than
- *   balancing on an unstable single tangent point.
- * - Bottom rim: Spheres rest firmly on the cake board / plate, tucked flush
- *   against the cake base cylinder with zero floating gap.
- * - Organic 3D Tumble: Pitches, rolls, and yaws each ball's inner sphere mesh
- *   in place so seams and pentagon panels face varied natural angles.
- */
-function buildBallRimRing(buildBall, radius, y, rand = Math.random, opts = {}) {
-  const isBottom = opts.isBottom ?? false;
+function buildBallRimRing(buildBall, radius, y, rand, opts) {
   const count = opts.count ?? 16;
   const scale = opts.scale ?? 0.18;
-  // Sinking / grounding offset:
-  // Top: sink ~30% into top frosting (-1.25 * scale)
-  // Bottom: rest directly on cake plate surface (0.01)
-  const surfaceOffset = isBottom ? 0.01 : -1.25 * scale;
+  const surfaceLift = 0.50 * scale;
   const group = new THREE.Group();
-
   for (let i = 0; i < count; i++) {
     const angle = (i / count) * Math.PI * 2;
     const cx = Math.sin(angle) * radius;
     const cz = Math.cos(angle) * radius;
-    const ball = buildBall(cx, y + surfaceOffset, cz, scale);
-
-    // Organic 3D tumble & rotation:
-    // Tumble the inner sphere mesh/group around its own center (0, 0, 0)
-    // so seams and panels face varied 3D angles without shifting the ball position
-    const innerObj = ball.children[0];
-    if (innerObj) {
-      const pitch = (rand() - 0.5) * 1.8;
-      const roll = (rand() - 0.5) * 1.8;
-      const yaw = rand() * Math.PI * 2;
-      innerObj.rotation.x += pitch;
-      innerObj.rotation.z += roll;
-      innerObj.rotation.y += yaw;
-    }
-
-    ball.rotation.y = angle + (rand() - 0.5) * 0.4;
+    const ball = buildBall(cx, y + surfaceLift, cz, scale);
+    ball.rotation.y = angle + rand() * Math.PI * 2;
     group.add(ball);
   }
   return group;
@@ -699,8 +554,21 @@ const CHECKER_STANDOFF = -0.06;   // negative standoff embeds the back face into
 const CHECKER_THICKNESS = 0.12;   // increased thickness offsets the embedding so the front face stays visible
 const CHECKER_GAP_RATIO = 0.9;    // slightly smaller than the grid cell, like stencil grout lines
 
-function buildCheckerSquareMaterial(colorHex) {
-  return new THREE.MeshStandardMaterial({ color: colorHex ?? '#1F1F1F', roughness: 0.72 });
+// Was a plain THREE.MeshStandardMaterial({ color }) — a flat color only,
+// with no way to build the real pattern/gradient/metallic material for
+// Marble/Ombré/Rainbow Swirl/Gold Shimmer/Watercolor Pastel Mix/Red-White
+// Gradient, so all six silently rendered as a flat swatch regardless of
+// which was picked (same failure this had in common with Filling Piping/
+// the Frosting Shell before those were fixed to pass a colorId through).
+// Now delegates to getFrostingMaterial (frostingMaterial.js) — the same
+// shared material Exterior Finish/Filling Piping/Glaze use — instead of
+// building its own separate flat-color material, so Checkered Pattern
+// gets the same pattern/gradient/metallic support those already have, and
+// reads as the same "buttercream" material family the squares are
+// actually meant to look like (see buildCheckerSideSquares' own "real
+// raised squares (buttercream stenciling)" comment below).
+function buildCheckerSquareMaterial(colorHex, colorId = null) {
+  return getFrostingMaterial(colorHex ?? '#1F1F1F', colorId);
 }
 
 /** Raised black squares wrapped around a tier's side wall.
@@ -789,7 +657,10 @@ function selectParallelRows(pattern, rows) {
   }
   return selected;
 }
-export function buildCheckerSideSquares(radius, height, opts = {}) {
+// Shared by buildCheckerSideSquares below so the pattern-selection logic
+// (Full/Left Diagonal/Right Diagonal/Parallel Lines, gap dashing, etc.)
+// lives in exactly one place.
+function computeCheckerLayout(radius, height, opts = {}) {
   const pattern = opts.pattern ?? 'full';
   const isDiagonalPattern = pattern === 'leftDiagonal' || pattern === 'rightDiagonal';
   const diagonalPeriod = opts.diagonalPeriod ?? 2;
@@ -862,12 +733,93 @@ export function buildCheckerSideSquares(radius, height, opts = {}) {
     }
   }
 
+  return { cells, cols, rows, cellAngle, cellHeight };
+}
+
+/**
+ * Answers "how much is this point on the tier's side wall covered by an
+ * active Checkered Pattern square?" as a 0..1 weight — NOT a mesh. Built
+ * for Filling's own Piping Design (Mashed Circles/Mashed Swirls) to shave
+ * its bumps down wherever a square will actually sit on top of it, so the
+ * square itself can stay flat/rigid instead of having to bend to follow
+ * the bump (see buildMashedCircleFillingGeometry's own `coverageFn`
+ * option in spongeGeometry.js, and CakeScene.jsx's call site). Uncovered
+ * points (the checkerboard's own grout gaps) return 0, so the filling's
+ * real piped texture stays fully visible there.
+ *
+ * This returns a SMOOTHED weight (ramping 0->1 over a small margin near
+ * each square's own edge), not a hard cutoff — an earlier version of this
+ * returned a flat 0-or-1, which looked fine on the square itself (a real
+ * rigid edge) but tore the CONTINUOUS filling mesh underneath: two
+ * neighboring vertices on that mesh, one just inside the cutoff and one
+ * just outside, would jump straight from "fully flattened" to "full bump
+ * height" with nothing between them, which reads as a jagged/torn crease
+ * under shading wherever a square's edge didn't happen to land exactly on
+ * one of the filling mesh's own vertex rows (which is most of the time).
+ * A short smoothstep ramp keeps the transition thin enough to still read
+ * as "flat under the square, bumpy in the gap" while removing that
+ * discontinuity.
+ *
+ * `localY` uses the SAME center-anchored convention buildCheckerSideSquares
+ * itself uses for a cell's own y (-height/2..+height/2) — callers convert
+ * to/from their own coordinate frame the same way CakeScene.jsx's
+ * checkerCoverageFn adapter already does.
+ */
+export function getCheckerCoverageFn(radius, height, opts = {}) {
+  const { cells, cols, rows, cellAngle, cellHeight } = computeCheckerLayout(radius, height, opts);
+  const covered = new Set(cells.map(({ row, col }) => row * cols + col));
+
+  // Half-width (in the cell's own 0..1 local space) of the square's real
+  // footprint, matching CHECKER_GAP_RATIO's own shrink — the square's
+  // real geometry is smaller than its full grid cell, so coverage should
+  // only claim the square's actual footprint, not the whole cell
+  // (otherwise the grout gap between adjacent squares would get shaved
+  // too, even though nothing is there to hide it).
+  const half = CHECKER_GAP_RATIO / 2;
+  // Width of the smoothing ramp, in that same fraction-of-cell space —
+  // small enough to stay visually "flat under the square", large enough
+  // to comfortably span a few of the filling mesh's own vertex rows so
+  // no single pair of adjacent vertices ever sees a hard jump.
+  const smoothWidth = Math.min(half, 0.15);
+
+  const smoothstep = (t) => {
+    const c = Math.min(1, Math.max(0, t));
+    return c * c * (3 - 2 * c);
+  };
+
+  return (angle, localY) => {
+    const wrappedAngle = ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    const colF = wrappedAngle / cellAngle;
+    const rowF = (localY + height / 2) / cellHeight;
+    const col = Math.floor(colF);
+    const row = Math.floor(rowF);
+    if (row < 0 || row >= rows) return 0;
+    if (!covered.has(row * cols + col)) return 0;
+
+    // Distance from THIS cell's own center, along whichever axis is
+    // closer to the square's edge — used to ramp coverage down to 0
+    // right at the square's own edge instead of the full cell's edge.
+    const fx = Math.abs(colF - col - 0.5);
+    const fy = Math.abs(rowF - row - 0.5);
+    const distInsideEdge = half - Math.max(fx, fy); // > 0 inside the square, <= 0 outside
+    if (distInsideEdge <= 0) return 0;
+    return smoothstep(distInsideEdge / smoothWidth);
+  };
+}
+
+export function buildCheckerSideSquares(radius, height, opts = {}) {
+  const { cells, cellAngle, cellHeight } = computeCheckerLayout(radius, height, opts);
+
   // Curve the square's own geometry along the cylinder's arc instead of
   // using a flat chord — teammate's improvement (mirrors the standoffRadius
   // used for instance placement below, computed once here and shared since
-  // every instance uses the exact same curved shape template).
+  // every instance uses the exact same curved shape template). Squares
+  // are plain flat/rigid boxes — no relationship to Filling's Piping
+  // Design at all.
   const standoffRadius = radius + CHECKER_THICKNESS / 2 + CHECKER_STANDOFF;
   const arcLength = standoffRadius * cellAngle * CHECKER_GAP_RATIO;
+  const mat = buildCheckerSquareMaterial(opts.color, opts.colorId);
+
   const geo = new THREE.BoxGeometry(arcLength, cellHeight * CHECKER_GAP_RATIO, CHECKER_THICKNESS, 4, 1, 1);
   const posAttribute = geo.attributes.position;
   const v = new THREE.Vector3();
@@ -880,8 +832,12 @@ export function buildCheckerSideSquares(radius, height, opts = {}) {
     posAttribute.setXYZ(i, newX, v.y, newZ);
   }
   geo.computeVertexNormals();
+  // Checker Pattern's Pick Color never had this applied before, so the
+  // six gradient/metallic patterns (Marble/Ombré/Rainbow Swirl/Gold
+  // Shimmer/Watercolor Pastel Mix/Red-White Gradient) fell back to a flat
+  // swatch here specifically — same fix already applied elsewhere.
+  applyVerticalGradientUV(geo);
 
-  const mat = buildCheckerSquareMaterial(opts.color);
   const mesh = new THREE.InstancedMesh(geo, mat, cells.length);
   const dummy = new THREE.Object3D();
 
@@ -924,8 +880,13 @@ const TRIANGLE_STANDOFF = -0.06;
 const TRIANGLE_THICKNESS = 0.12;
 const TRIANGLE_GAP_RATIO = 0.9;
 
-function buildTriangleShapeMaterial(colorHex) {
-  return new THREE.MeshStandardMaterial({ color: colorHex ?? '#1F1F1F', roughness: 0.72 });
+// Same fix as buildCheckerSquareMaterial above — was a plain
+// THREE.MeshStandardMaterial({ color }), no colorId, so all six pattern
+// colors (Marble/Ombré/Rainbow Swirl/Gold Shimmer/Watercolor Pastel Mix/
+// Red-White Gradient) rendered as a flat swatch. Now delegates to
+// getFrostingMaterial the same way.
+function buildTriangleShapeMaterial(colorHex, colorId = null) {
+  return getFrostingMaterial(colorHex ?? '#1F1F1F', colorId);
 }
 
 // One triangular prism cell — apex up, base at the bottom, spanning the
@@ -956,45 +917,96 @@ function buildTriangleCellGeometry(arcLength, cellHeight, thickness) {
 
   const positions = [], indices = [];
   const vertsPerFace = rows * cols;
-  const frontOffset = 0, backOffset = vertsPerFace;
-  for (let n = 0; n < vertsPerFace; n++) positions.push(gridX[n], gridY[n], halfThickness);
-  for (let n = 0; n < vertsPerFace; n++) positions.push(gridX[n], gridY[n], -halfThickness);
 
-  // Front face (normal +Z)
+  // Front face — smooth-shaded across its own grid, which is what the
+  // arc-bend applied after this needs to read as a smooth curve rather
+  // than a faceted one.
+  const frontOffset = 0;
+  for (let n = 0; n < vertsPerFace; n++) positions.push(gridX[n], gridY[n], halfThickness);
   for (let j = 0; j < rows - 1; j++) {
     for (let i = 0; i < cols - 1; i++) {
       const a = frontOffset + j * cols + i, b = a + 1, c = a + cols, d = c + 1;
       indices.push(a, b, c, b, d, c);
     }
   }
-  // Back face (normal -Z, reversed winding)
+
+  // Back face — its OWN separate vertex set (positions duplicated, not
+  // shared with the front face's), so computeVertexNormals() below can't
+  // blend its backward-facing normals into the front face's forward-facing
+  // ones.
+  const backOffset = positions.length / 3;
+  for (let n = 0; n < vertsPerFace; n++) positions.push(gridX[n], gridY[n], -halfThickness);
   for (let j = 0; j < rows - 1; j++) {
     for (let i = 0; i < cols - 1; i++) {
       const a = backOffset + j * cols + i, b = a + 1, c = a + cols, d = c + 1;
       indices.push(a, c, b, b, c, d);
     }
   }
-  // Side walls — left edge, right edge, and the base (bottom); the apex
-  // needs no wall, since the top row collapses to a single point on its
-  // own (halfW=0), same convergence Checkered's own box corners don't
-  // need to worry about since a box has no taper at all.
+
+  // Side walls — left edge, right edge, and the base. These used to reuse
+  // the front/back face indices directly, which meant computeVertexNormals
+  // blended each wall's own sideways-facing normal together with the
+  // front/back face's normal at every shared edge vertex — a soft
+  // gradient/highlight along every triangle's edges that Checkered's
+  // THREE.BoxGeometry never had (a box's faces don't share ANY vertices
+  // with each other, so every face reads as a crisp, flat, distinctly-shaded
+  // plane with no blending at all). Each wall segment now gets its own
+  // freshly duplicated quad instead, so its normal comes out flat and
+  // unblended — same crisp look Checkered's boxes have. Winding matches
+  // the original left/right/base triangles exactly, just addressed via
+  // these new local vertices instead of the shared front/back ones. The
+  // apex still needs no wall of its own — the top row collapses to a
+  // single point (halfW=0), same convergence as before.
   for (let j = 0; j < rows - 1; j++) {
-    const fA = frontOffset + j * cols, fB = frontOffset + (j + 1) * cols;
-    const bA = backOffset + j * cols, bB = backOffset + (j + 1) * cols;
-    indices.push(fA, fB, bB, fA, bB, bA); // left
-    const rFA = fA + cols - 1, rFB = fB + cols - 1, rBA = bA + cols - 1, rBB = bB + cols - 1;
-    indices.push(rFA, rBA, rBB, rFA, rBB, rFB); // right
+    // Left wall: fA (front, this row), fB (front, next row), bA (back,
+    // this row), bB (back, next row) — triangles (fA,fB,bB),(fA,bB,bA).
+    const lOff = positions.length / 3;
+    const iCur = j * cols, iNext = (j + 1) * cols;
+    positions.push(
+      gridX[iCur], gridY[iCur], halfThickness,    // fA
+      gridX[iNext], gridY[iNext], halfThickness,  // fB
+      gridX[iCur], gridY[iCur], -halfThickness,   // bA
+      gridX[iNext], gridY[iNext], -halfThickness, // bB
+    );
+    indices.push(lOff, lOff + 1, lOff + 3, lOff, lOff + 3, lOff + 2);
+
+    // Right wall: rFA, rFB, rBA, rBB — triangles (rFA,rBA,rBB),(rFA,rBB,rFB).
+    const rOff = positions.length / 3;
+    const riCur = j * cols + cols - 1, riNext = (j + 1) * cols + cols - 1;
+    positions.push(
+      gridX[riCur], gridY[riCur], halfThickness,    // rFA
+      gridX[riNext], gridY[riNext], halfThickness,  // rFB
+      gridX[riCur], gridY[riCur], -halfThickness,   // rBA
+      gridX[riNext], gridY[riNext], -halfThickness, // rBB
+    );
+    indices.push(rOff, rOff + 2, rOff + 3, rOff, rOff + 3, rOff + 1);
   }
+  // Base wall: fA, fB, bA, bB per column step — triangles (fA,bB,bA),(fA,fB,bB).
   for (let i = 0; i < cols - 1; i++) {
-    const fA = frontOffset + i, fB = frontOffset + i + 1;
-    const bA = backOffset + i, bB = backOffset + i + 1;
-    indices.push(fA, bB, bA, fA, fB, bB); // base
+    const bOff = positions.length / 3;
+    positions.push(
+      gridX[i], gridY[i], halfThickness,        // fA
+      gridX[i + 1], gridY[i + 1], halfThickness,    // fB
+      gridX[i], gridY[i], -halfThickness,       // bA
+      gridX[i + 1], gridY[i + 1], -halfThickness,   // bB
+    );
+    indices.push(bOff, bOff + 3, bOff + 2, bOff, bOff + 1, bOff + 3);
   }
 
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geo.setIndex(indices);
   geo.computeVertexNormals();
+  // No uv attribute existed on this geometry at all before — harmless for
+  // the flat colorHex-only material this used to always get, but
+  // getFrostingMaterial's gradient colors (Marble/Ombré/Rainbow Swirl/
+  // Watercolor Pastel Mix/Red-White Gradient — everything except Gold
+  // Shimmer, which is metalness/roughness only and doesn't sample a
+  // texture) sample a texture via UV, and with nothing there to sample
+  // against they rendered as a flat, wrong single color instead of the
+  // actual gradient. Same fix as the Mashed Circles/Mashed Swirls
+  // filling-piping geometry had earlier.
+  applyVerticalGradientUV(geo);
   return geo;
 }
 
@@ -1008,7 +1020,13 @@ function buildTriangleCellGeometry(arcLength, cellHeight, thickness) {
  * THREE.BoxGeometry, and the arc-bend applies to that triangle's own
  * (already width-subdivided) vertices instead of a box's.
  */
-export function buildTriangleSideShapes(radius, height, opts = {}) {
+// Shared by buildTriangleSideShapes (builds the actual mesh) and
+// getTriangleCoverageFn (answers "is this point covered by a triangle?"
+// for Filling's own shaving) so the two can never drift out of sync on
+// which cells are actually active — same reasoning Checkered Pattern's
+// computeCheckerLayout used to have before its own filling-hugging
+// feature was reverted; Triangle's own hasn't been.
+function computeTriangleLayout(radius, height, opts = {}) {
   const pattern = opts.pattern ?? 'full';
   const isDiagonalPattern = pattern === 'leftDiagonal' || pattern === 'rightDiagonal';
   const diagonalPeriod = opts.diagonalPeriod ?? 2;
@@ -1050,6 +1068,54 @@ export function buildTriangleSideShapes(radius, height, opts = {}) {
     }
   }
 
+  return { cells, cols, rows, cellAngle, cellHeight };
+}
+
+/**
+ * Answers "how much is this point on the tier's side wall covered by an
+ * active Triangle Pattern shape?" as a 0/1 weight, for Filling's own
+ * Piping Design to shave against (see buildMashedCircleFillingGeometry's
+ * `coverageFn` option in spongeGeometry.js, and CakeScene.jsx's call
+ * site). Approximates each triangle's coverage as its bounding cell
+ * footprint (same CHECKER_GAP_RATIO-style margin, via TRIANGLE_GAP_RATIO)
+ * rather than its exact triangular silhouette — a small overcoverage
+ * right at a triangle's own empty corners, not worth the extra precision
+ * for a flattening cue that's already invisible under an opaque shape.
+ */
+export function getTriangleCoverageFn(radius, height, opts = {}) {
+  const { cells, cols, rows, cellAngle, cellHeight } = computeTriangleLayout(radius, height, opts);
+  const covered = new Set(cells.map(({ row, col }) => row * cols + col));
+  const half = TRIANGLE_GAP_RATIO / 2;
+
+  return (angle, localY) => {
+    const wrappedAngle = ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    const colF = wrappedAngle / cellAngle;
+    const rowF = (localY + height / 2) / cellHeight;
+    const col = Math.floor(colF);
+    const row = Math.floor(rowF);
+    if (row < 0 || row >= rows) return 0;
+    if (!covered.has(row * cols + col)) return 0;
+
+    const fx = Math.abs(colF - col - 0.5);
+    const fy = Math.abs(rowF - row - 0.5);
+    if (fx > half || fy > half) return 0;
+    return 1;
+  };
+}
+
+/** Raised triangles wrapped around a tier's side wall — exact same 6
+ * patterns, exact same cell-selection logic as buildCheckerSideSquares
+ * above (see that function's own doc comment for the full pattern
+ * explanation: 'full', 'leftDiagonal'/'rightDiagonal' with
+ * diagonalPeriod/diagonalBandWidth/gapDashPeriod, 'parallelOuter'/
+ * 'parallelInner' via selectParallelRows). The only difference from
+ * Checkered is buildTriangleCellGeometry (a triangular prism) in place of
+ * THREE.BoxGeometry, and the arc-bend applies to that triangle's own
+ * (already width-subdivided) vertices instead of a box's.
+ */
+export function buildTriangleSideShapes(radius, height, opts = {}) {
+  const { cells, cellAngle, cellHeight } = computeTriangleLayout(radius, height, opts);
+
   const standoffRadius = radius + TRIANGLE_THICKNESS / 2 + TRIANGLE_STANDOFF;
   const arcLength = standoffRadius * cellAngle * TRIANGLE_GAP_RATIO;
   const geo = buildTriangleCellGeometry(arcLength, cellHeight * TRIANGLE_GAP_RATIO, TRIANGLE_THICKNESS);
@@ -1067,7 +1133,7 @@ export function buildTriangleSideShapes(radius, height, opts = {}) {
   }
   geo.computeVertexNormals();
 
-  const mat = buildTriangleShapeMaterial(opts.color);
+  const mat = buildTriangleShapeMaterial(opts.color, opts.colorId);
   const mesh = new THREE.InstancedMesh(geo, mat, cells.length);
   const dummy = new THREE.Object3D();
 
@@ -1114,9 +1180,9 @@ function scatterPearlPositions(count) {
   };
   for (let i = 0; i < count; i++) {
     points.push({
-      angle: seededRandom() * Math.PI * 2,
+      angle:      seededRandom() * Math.PI * 2,
       heightFrac: seededRandom(),
-      sizeFrac: seededRandom(),
+      sizeFrac:   seededRandom(),
     });
   }
   return points;
@@ -1185,15 +1251,18 @@ function scatterNonCollidingBigPearls(radius, height, targetCount, getScale) {
   return accepted;
 }
 
-export function buildScatterPearlsRing(radius, height, colorHex, rand, opts = {}) {
+export function buildScatterPearlsRing(radius, height, colorHex, colorId, rand, opts = {}) {
   const variant = opts.variant || 'randomScatter';
-  const mat = new THREE.MeshPhysicalMaterial({
-    color: colorHex || '#FFFFFF',
-    roughness: 0.2,
-    metalness: 0.05,
-    clearcoat: 1.0,
-    clearcoatRoughness: 0.1,
-  });
+  // Was a dedicated glossy THREE.MeshPhysicalMaterial (clearcoat, low
+  // roughness) — genuinely different from buttercream's matte procedural
+  // look, and correct for real pearls. Switched to getFrostingMaterial
+  // anyway, on request, to keep Pick Color support consistent and simple
+  // across every Side treatment rather than maintaining a second,
+  // gradient/metallic-aware material just for this one. The glossy
+  // clearcoat look is the deliberate tradeoff — pearls now render in the
+  // same matte buttercream material Checkered/Triangle/Piping Scrolls use,
+  // not their own glass-bead finish.
+  const mat = getFrostingMaterial(colorHex || '#FFFFFF', colorId);
   const geo = new THREE.SphereGeometry(1, 16, 16);
 
   if (variant === 'diamondGrid') {
@@ -1383,6 +1452,100 @@ export function buildScatterPearlsRing(radius, height, colorHex, rand, opts = {}
 }
 
 /**
+ * Answers "how much is this point on the tier's side wall covered by an
+ * active Scatter Pearls pearl?" as a 0..1 weight, for Filling's own
+ * Piping Design to shave against — same purpose/smoothstep-edge
+ * reasoning as getCheckerCoverageFn above. Every Scatter Pearls variant
+ * places pearls via a FIXED-seed formula (scatterPearlPositions/
+ * scatterNonCollidingBigPearls use hardcoded LCG seeds, not the `rand`
+ * this file's build functions otherwise take — see their own doc
+ * comments), so this calls those exact same functions with the exact
+ * same inputs each variant's own branch above uses, rather than a second,
+ * driftable reimplementation of "roughly where the pearls probably are".
+ *
+ * A pearl's coverage footprint on the cylinder's surface is approximated
+ * as a flat circle of radius = its own render scale (a sphere's actual
+ * radius, since base SphereGeometry(1,...) scaled by `scale` gives a
+ * real-world radius of `scale`) — ignoring the small extra reach a sphere
+ * bulging away from a curved surface would really have, the same
+ * flat-footprint approximation Checkered/Triangle/Chevron's own box/zigzag
+ * shapes already use.
+ */
+export function getScatterPearlsCoverageFn(radius, height, opts = {}) {
+  const variant = opts.variant || 'randomScatter';
+  const pearls = []; // { angle, y, footprintR }
+
+  if (variant === 'diamondGrid' || variant === 'diamondGridBorder') {
+    const totalRows = 4;
+    const keepRows = variant === 'diamondGrid' ? [0, 1, 2, 3] : [0, 3];
+    const colsPerTier = Math.max(8, Math.round((radius * Math.PI * 2) / 0.8));
+    const scale = 0.16;
+    for (const r of keepRows) {
+      const y = -height / 2 + (r + 0.5) * (height / totalRows);
+      const rowOffset = (r % 2) * (Math.PI / colsPerTier);
+      for (let c = 0; c < colsPerTier; c++) {
+        const angle = (c / colsPerTier) * Math.PI * 2 + rowOffset;
+        pearls.push({ angle, y, footprintR: scale });
+      }
+    }
+  } else if (variant === 'horizontalRows') {
+    const rows = 3;
+    const colsPerTier = Math.max(10, Math.round((radius * Math.PI * 2) / 0.65));
+    for (let r = 0; r < rows; r++) {
+      const y = -height / 2 + (r + 1) * (height / (rows + 1));
+      for (let c = 0; c < colsPerTier; c++) {
+        const angle = (c / colsPerTier) * Math.PI * 2;
+        const scale = (c % 2 === 0) ? 0.18 : 0.12;
+        pearls.push({ angle, y, footprintR: scale });
+      }
+    }
+  } else if (variant === 'bigPearlsScatter') {
+    const areaPerPearl = 2.6;
+    const targetCount = Math.max(15, Math.round((2 * Math.PI * radius * height) / areaPerPearl));
+    const getScale = (sizeFrac) => 0.22 + sizeFrac * 0.06;
+    const placed = scatterNonCollidingBigPearls(radius, height, targetCount, getScale);
+    for (const p of placed) pearls.push({ angle: p.angle, y: p.y, footprintR: p.scale });
+  } else if (variant === 'smallPearlsScatter') {
+    const areaPerPearl = 0.32;
+    const pearlCount = Math.max(130, Math.round((2 * Math.PI * radius * height) / areaPerPearl));
+    for (const p of scatterPearlPositions(pearlCount)) {
+      const y = -height / 2 + height * 0.05 + p.heightFrac * height * 0.9;
+      pearls.push({ angle: p.angle, y, footprintR: 0.07 + p.sizeFrac * 0.04 });
+    }
+  } else {
+    // 'randomScatter', the default.
+    const areaPerPearl = 0.75;
+    const pearlCount = Math.max(70, Math.round((2 * Math.PI * radius * height) / areaPerPearl));
+    for (const p of scatterPearlPositions(pearlCount)) {
+      const y = -height / 2 + height * 0.05 + p.heightFrac * height * 0.9;
+      pearls.push({ angle: p.angle, y, footprintR: 0.06 + p.sizeFrac * 0.10 });
+    }
+  }
+
+  const smoothstep = (t) => {
+    const c = Math.min(1, Math.max(0, t));
+    return c * c * (3 - 2 * c);
+  };
+
+  return (angle, localY) => {
+    let coverage = 0;
+    for (const p of pearls) {
+      let dAngle = Math.abs(angle - p.angle) % (Math.PI * 2);
+      if (dAngle > Math.PI) dAngle = Math.PI * 2 - dAngle;
+      const arcDist = radius * dAngle;
+      const yDist = localY - p.y;
+      const dist = Math.sqrt(arcDist * arcDist + yDist * yDist);
+      const distInsideEdge = p.footprintR - dist;
+      if (distInsideEdge <= 0) continue;
+      const smoothWidth = Math.max(0.02, p.footprintR * 0.25);
+      coverage = Math.max(coverage, smoothstep(distInsideEdge / smoothWidth));
+      if (coverage >= 1) break; // fully covered — no need to keep scanning the rest
+    }
+    return coverage;
+  };
+}
+
+/**
  * Chevron Pattern (Multi-Color / Single Color / Two-Tone Zigzag Stripes)
  * Real 3D extruded chevron ribbons wrapped cylindrically around the side wall.
  */
@@ -1459,13 +1622,75 @@ function buildChevronRowGeometry(radius, rowY, rowHeight, numTeeth, thickness) {
   geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
   geo.setIndex(indices);
   geo.computeVertexNormals();
+  // Same fix as buildTriangleCellGeometry above — no uv attribute existed
+  // here either, so getFrostingMaterial's gradient colors (everything
+  // except Gold Shimmer, which doesn't sample a texture) had nothing to
+  // sample against and rendered as a flat, wrong single color.
+  applyVerticalGradientUV(geo);
   return geo;
+}
+
+/**
+ * Answers "how much is this point on the tier's side wall covered by an
+ * active Chevron Pattern stripe?" as a 0..1 weight, for Filling's own
+ * Piping Design to shave against — same purpose as getCheckerCoverageFn/
+ * getTriangleCoverageFn, same smoothstep-edge reasoning (a hard 0/1
+ * cutoff creases the continuous filling mesh — see that comment for the
+ * full explanation), just reproducing Chevron's own zigzag tooth-wave
+ * formula (buildChevronRowGeometry's toothU/T/yCenter above) instead of a
+ * grid of cells. Chevron sits at one FIXED radius across the whole
+ * pattern (only its vertical center wobbles per angle, not its radius),
+ * so unlike Checkered/Triangle this doesn't need a cell lookup at all —
+ * just the same tooth-wave Y envelope evaluated at the query's own angle.
+ */
+export function getChevronCoverageFn(radius, height, opts = {}) {
+  const setId = opts.setId || 'multiColor';
+  let numRows = 5;
+  if (setId === 'wideZigzag') numRows = 3;
+  else if (setId === 'tightZigzag') numRows = 7;
+
+  const rowHeight = height / numRows;
+  const circumference = radius * Math.PI * 2;
+  const targetToothWidth = 1.6;
+  const numTeeth = Math.max(6, Math.round(circumference / targetToothWidth));
+  const bandHeight = rowHeight * 0.70;
+  const amplitude = rowHeight * 0.28;
+
+  const activeRowYs = [];
+  for (let r = 0; r < numRows; r++) {
+    if (setId === 'singleColorGapped' && (r === 1 || r === 3)) continue;
+    activeRowYs.push(-height / 2 + (r + 0.5) * rowHeight);
+  }
+
+  const smoothWidth = Math.max(0.01, bandHeight * 0.08);
+  const smoothstep = (t) => {
+    const c = Math.min(1, Math.max(0, t));
+    return c * c * (3 - 2 * c);
+  };
+
+  return (angle, localY) => {
+    const wrappedAngle = ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    const toothU = ((wrappedAngle / (Math.PI * 2)) * numTeeth) % 1;
+    const T = (toothU < 0.5) ? (-1 + 4 * toothU) : (3 - 4 * toothU);
+    const yOffset = amplitude * T;
+
+    let coverage = 0;
+    for (const rowY of activeRowYs) {
+      const distFromCenter = Math.abs(localY - (rowY + yOffset));
+      const distInsideEdge = bandHeight / 2 - distFromCenter;
+      if (distInsideEdge <= 0) continue;
+      coverage = Math.max(coverage, smoothstep(distInsideEdge / smoothWidth));
+      if (coverage >= 1) break;
+    }
+    return coverage;
+  };
 }
 
 export function buildChevronSideStripes(radius, height, opts = {}) {
   const group = new THREE.Group();
   const setId = opts.setId || 'multiColor';
   const mainColor = opts.color || '#3B5FA0';
+  const mainColorId = opts.colorId || null;
 
   let numRows = 5;
   if (setId === 'wideZigzag') numRows = 3;
@@ -1484,21 +1709,44 @@ export function buildChevronSideStripes(radius, height, opts = {}) {
     if (setId === 'singleColorGapped' && (r === 1 || r === 3)) continue;
 
     const rowY = -height / 2 + (r + 0.5) * rowHeight;
+    // isMainColorRow tracks whether THIS row is actually the one driven
+    // by Sugar Color (mainColor/mainColorId) — 'multiColor' cycles its
+    // own fixed MULTI_COLOR_PALETTE regardless of Sugar Color (Color
+    // Override is already disabled for it in SideSection.jsx, so there's
+    // nothing to fix there), and 'twoTone's alternate row is hardcoded
+    // white, never Sugar Color either. Only the rows that actually ARE
+    // mainColor need the colorId-aware material below.
     let hexColor;
+    let isMainColorRow = false;
     if (setId === 'multiColor') {
       hexColor = MULTI_COLOR_PALETTE[r % MULTI_COLOR_PALETTE.length];
     } else if (setId === 'twoTone') {
-      hexColor = (r % 2 === 0) ? mainColor : '#FFFFFF';
+      if (r % 2 === 0) {
+        hexColor = mainColor;
+        isMainColorRow = true;
+      } else {
+        hexColor = '#FFFFFF';
+      }
     } else {
       hexColor = mainColor;
+      isMainColorRow = true;
     }
 
-    const mat = new THREE.MeshStandardMaterial({
-      color: hexColor,
-      roughness: 0.55,
-      metalness: 0.05,
-      side: THREE.DoubleSide
-    });
+    // Same fix as buildCheckerSquareMaterial/buildTriangleShapeMaterial
+    // above, but scoped to just the rows Sugar Color actually drives —
+    // those get getFrostingMaterial so Marble/Ombré/Rainbow Swirl/Gold
+    // Shimmer/Watercolor Pastel Mix/Red-White Gradient render correctly;
+    // multiColor's fixed palette and twoTone's white alternate keep their
+    // own plain flat material exactly as before, unaffected, since Sugar
+    // Color was never meant to apply to those rows at all.
+    const mat = isMainColorRow
+      ? getFrostingMaterial(hexColor, mainColorId)
+      : new THREE.MeshStandardMaterial({
+          color: hexColor,
+          roughness: 0.55,
+          metalness: 0.05,
+          side: THREE.DoubleSide
+        });
 
     const geo = buildChevronRowGeometry(radius, rowY, rowHeight, numTeeth, CHEVRON_THICKNESS);
     const mesh = new THREE.Mesh(geo, mat);

@@ -1,29 +1,61 @@
 import * as THREE from 'three';
-import { markShared, getSpongeDummyMap } from './materialUtils';
+import { markShared, getSpongeDummyMap, parseGradientStops } from './materialUtils';
+import { buildGradientTexture } from './cakeTextures';
+import { SUGAR_COLORS } from '../../lib/cakeConfig';
 
 export const fillingMaterialCache = {};
 
 /**
  * Procedural filling material — soft, glossy, gently undulating like real
  * whipped cream/jam, instead of a single flat diffuse color.
+ * Extended to support Sugar Color patterns, gradients, and metallic Gold Shimmer.
  */
-export function createFillingMaterial(hexColor) {
+export function createFillingMaterial(hexColor, colorId = null) {
   const dummyMap = getSpongeDummyMap();
+
+  const sugarColor = colorId ? SUGAR_COLORS.find((c) => c.id === colorId) : null;
+  const isGradient = sugarColor && sugarColor.swatchCss && sugarColor.swatchCss.includes('gradient');
+  const isMetallic = !!(sugarColor && sugarColor.metallic);
+
+  let gradientTexture = null;
+  if (isGradient) {
+    const colorStops = parseGradientStops(sugarColor.swatchCss);
+    if (colorStops.length > 0) {
+      gradientTexture = buildGradientTexture(colorStops, 512, 512);
+      gradientTexture.wrapS = THREE.ClampToEdgeWrapping;
+      gradientTexture.wrapT = THREE.ClampToEdgeWrapping;
+      gradientTexture.needsUpdate = true;
+    }
+  }
+
+  // For gradient colors, return a material with the gradient texture and the signature glossy finish (0.38 roughness)
+  if (isGradient && gradientTexture) {
+    const material = new THREE.MeshStandardMaterial({
+      map: gradientTexture,
+      roughness: 0.38,
+      metalness: 0,
+    });
+    material.userData.isGradient = true;
+    return material;
+  }
+
   const material = new THREE.MeshStandardMaterial({
     map: dummyMap,
     bumpMap: dummyMap,
     bumpScale: 0.35,
     color: '#ffffff',
-    roughness: 0.38,
-    metalness: 0,
+    roughness: isMetallic ? 0.25 : 0.38,
+    metalness: isMetallic ? 0.85 : 0,
   });
 
-  material.customProgramCacheKey = () => 'fillingProcedural';
+  material.customProgramCacheKey = () => (isMetallic ? 'fillingProceduralMetallic' : 'fillingProcedural');
   material.userData.fillColor = hexColor;
+  material.userData.isMetallic = isMetallic;
   material.defines = { ...material.defines, USE_UV: '', USE_BUMPMAP: '' };
 
   material.onBeforeCompile = function (shader) {
     shader.uniforms.uFillColor = { value: new THREE.Color(this.userData.fillColor) };
+    shader.uniforms.uIsMetallic = { value: this.userData.isMetallic ? 1.0 : 0.0 };
 
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>\nvarying vec3 vFillPos;`)
@@ -33,6 +65,7 @@ export function createFillingMaterial(hexColor) {
       .replace('#include <common>', `#include <common>
 varying vec3 vFillPos;
 uniform vec3 uFillColor;
+uniform float uIsMetallic;
 float gFillHeight;
 
 float fillHash(vec3 p) {
@@ -78,20 +111,33 @@ float fillNoise(vec3 p) {
   diffuseColor.rgb *= body;
 }
 `)
+      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+if (uIsMetallic > 0.5) {
+  roughnessFactor = clamp(roughnessFactor + (0.5 - gFillHeight) * 0.06, 0.20, 0.35);
+}
+`)
       .replace('#include <normal_fragment_maps>', `#ifdef USE_BUMPMAP
 {
   vec2 gDHdxy = vec2(dFdx(gFillHeight), dFdy(gFillHeight));
   normal = perturbNormalArb(-vViewPosition, normal, gDHdxy, faceDirection);
 }
-#endif`);
+#endif`)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+if (uIsMetallic > 0.5) {
+  vec3 sparkleCoord = vFillPos * 40.0;
+  float sparkleN = fillNoise(sparkleCoord) * 0.5 + fillNoise(sparkleCoord * 1.7 + 91.0) * 0.5;
+  float glint = smoothstep(0.88, 0.97, sparkleN);
+  totalEmissiveRadiance += uFillColor * glint * 1.4;
+}`);
   };
 
   return material;
 }
 
-export function getFillingMaterial(hexColor) {
-  if (!fillingMaterialCache[hexColor]) {
-    fillingMaterialCache[hexColor] = markShared(createFillingMaterial(hexColor));
+export function getFillingMaterial(hexColor, colorId = null) {
+  const cacheKey = colorId ? `${colorId}_${hexColor}` : hexColor;
+  if (!fillingMaterialCache[cacheKey]) {
+    fillingMaterialCache[cacheKey] = markShared(createFillingMaterial(hexColor, colorId));
   }
-  return fillingMaterialCache[hexColor];
+  return fillingMaterialCache[cacheKey];
 }

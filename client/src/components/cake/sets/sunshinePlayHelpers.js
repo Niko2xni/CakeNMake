@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { getFrostingMaterial, applyVerticalGradientUV } from '../frostingMaterial';
 
 // ─── Sunshine Play ──────────────────────────────────────────────────────────
 // Replaces the old Fondant Swag / Stripes / Tuxedo trio. Unlike every other
@@ -105,7 +106,7 @@ const ASSORTED_STAR_COLORS = [
   '#C77DFF', // lavender purple
 ];
 
-function buildStarBurst(radius, height, colorHex, isAssorted = false) {
+function buildStarBurst(radius, height, colorHex, isAssorted = false, colorId = null) {
   const group = new THREE.Group();
 
   let materials;
@@ -119,17 +120,20 @@ function buildStarBurst(radius, height, colorHex, isAssorted = false) {
         })
     );
   } else {
-    materials = [
-      new THREE.MeshStandardMaterial({
-        color: colorHex || '#FFFDF7',
-        roughness: 0.7,
-        metalness: 0,
-      }),
-    ];
+    // Same fix as buildFlatCloud (see its comment): a plain
+    // MeshStandardMaterial only understands a flat hex color, so the six
+    // gradient/metallic Pick Color patterns (Marble, Ombré, Rainbow
+    // Swirl, Gold Shimmer, Watercolor Pastel Mix, Red-White Gradient)
+    // silently fell back to a solid swatch here. getFrostingMaterial
+    // needs colorId to know which pattern to build.
+    materials = [getFrostingMaterial(colorHex || '#FFFDF7', colorId)];
   }
 
-  // Create reusable star geometry
+  // Create reusable star geometry. Shared across every star mesh (only
+  // position/rotation/scale differ per instance), so the gradient UV
+  // wash only needs to be applied once here rather than per-star.
   const starGeo = buildStarGeo(1);
+  applyVerticalGradientUV(starGeo);
 
   // Calculate star count based on cake surface area
   const areaPerStar = 1.2; // reduced density - fewer stars
@@ -341,14 +345,15 @@ const CLOUDY_CHUMP_SPECS = [
   { angleDeg: 326, yFrac: -0.26, sizeMul: 0.92, variant: 'A' }, // front-left, low
 ];
 
-function buildCloudyChump(radius, height, colorHex) {
+function buildCloudyChump(radius, height, colorHex, colorId = null) {
   const group = new THREE.Group();
 
-  const cloudMat = new THREE.MeshStandardMaterial({
-    color: colorHex || CLOUD_COLOR,
-    roughness: 0.55,
-    metalness: 0.02,
-  });
+  // Same fix as buildFlatCloud (see its comment): a plain
+  // MeshStandardMaterial only understands a flat hex color, so the six
+  // gradient/metallic Pick Color patterns (Marble, Ombré, Rainbow Swirl,
+  // Gold Shimmer, Watercolor Pastel Mix, Red-White Gradient) silently
+  // fell back to a solid swatch here.
+  const cloudMat = getFrostingMaterial(colorHex || CLOUD_COLOR, colorId);
 
   // Generous cloud scale for bold, cute, visible fondant cloud cutouts
   const baseScale = Math.min(0.85, height * 0.40);
@@ -370,6 +375,9 @@ function buildCloudyChump(radius, height, colorHex) {
     });
     geo.translate(tangentialX, y, standoff);
     wrapGeometryPreservingNormals(geo, radius);
+    // Each cloud's own gradient wash — same reasoning as buildFlatCloud's
+    // applyVerticalGradientUV call.
+    applyVerticalGradientUV(geo);
 
     const mesh = new THREE.Mesh(geo, cloudMat);
     mesh.castShadow = true;
@@ -420,7 +428,7 @@ class UArchCurve extends THREE.Curve {
 // 3D extruded fondant cloud puff with flat front face and crisp perpendicular side walls (no bevel, no bulges).
 // Sits over the cut ends of the rainbow bands like a 3D cut fondant piece.
 // Uses the same cute, fluffy cloud shape as Cloudy Chump.
-function buildFlatCloud(centerX, bottomY, wallRadius, scale, depth, zBack, isLeft = false, colorHex = CLOUD_COLOR) {
+function buildFlatCloud(centerX, bottomY, wallRadius, scale, depth, zBack, isLeft = false, colorHex = CLOUD_COLOR, colorId = null) {
   // Left foot has wider lobes facing outward (unmirrored); right foot is mirrored so wider lobes face outward
   const isMirrored = !isLeft;
   const shape = createFluffyCloudShapeA(scale, isMirrored);
@@ -433,12 +441,19 @@ function buildFlatCloud(centerX, bottomY, wallRadius, scale, depth, zBack, isLef
   });
   geo.translate(centerX - xOffset, bottomY, zBack);
   wrapGeometryPreservingNormals(geo, wallRadius);
+  // ExtrudeGeometry's own default UVs are built from the flat shape's
+  // bounding box, before wrapGeometryPreservingNormals bends it onto the
+  // cylinder — not guaranteed to give a clean vertical wash for gradient
+  // Sugar Colors (Marble/Ombré/Rainbow Swirl/Watercolor Pastel Mix/
+  // Red-White Gradient) the way a purpose-built vertical ramp does. Same
+  // fix as Triangle/Chevron/Piping Scrolls.
+  applyVerticalGradientUV(geo);
 
-  const mat = new THREE.MeshStandardMaterial({
-    color: colorHex || CLOUD_COLOR,
-    roughness: 0.55,
-    metalness: 0.02,
-  });
+  // Was a plain THREE.MeshStandardMaterial({ color }), no colorId — same
+  // fix as Checkered/Triangle/Chevron/Piping Scrolls/Scatter Pearls, so
+  // the six special colors render correctly here instead of falling back
+  // to a flat swatch.
+  const mat = getFrostingMaterial(colorHex || CLOUD_COLOR, colorId);
 
   const mesh = new THREE.Mesh(geo, mat);
   mesh.castShadow = true;
@@ -499,7 +514,7 @@ function addHandmadeWobble(geo, seedOffset, amount = 0.006) {
 
 // Builds a single complete rainbow arc with its 4 color bands and 2 fondant cloud feet,
 // wrapped flush to the cake cylinder at the specified radius.
-function buildSingleRainbowArc(radius, height, scale = 1, colorHex = CLOUD_COLOR) {
+function buildSingleRainbowArc(radius, height, scale = 1, colorHex = CLOUD_COLOR, colorId = null) {
   const arcGroup = new THREE.Group();
   const effectiveHeight = height * scale;
 
@@ -558,10 +573,10 @@ function buildSingleRainbowArc(radius, height, scale = 1, colorHex = CLOUD_COLOR
   const cloudDepth = 0.24 * scale; // sleek 3D plaque thickness (~10-12% of width)
   const zBack = tube * 2 + 0.048 - cloudDepth;
   const cloudFootY = -legLength + centerYOffset + 0.015 * effectiveHeight;
-  const leftCloud = buildFlatCloud(-legMidX, cloudFootY, radius, cloudScale, cloudDepth, zBack, true, colorHex);
+  const leftCloud = buildFlatCloud(-legMidX, cloudFootY, radius, cloudScale, cloudDepth, zBack, true, colorHex, colorId);
   arcGroup.add(leftCloud);
 
-  const rightCloud = buildFlatCloud(legMidX, cloudFootY, radius, cloudScale, cloudDepth, zBack, false, colorHex);
+  const rightCloud = buildFlatCloud(legMidX, cloudFootY, radius, cloudScale, cloudDepth, zBack, false, colorHex, colorId);
   arcGroup.add(rightCloud);
 
   return arcGroup;
@@ -633,23 +648,21 @@ function buildRainbowChamp(radius, height, colorHex) {
 // ─── Starry Rainbow (Rainbow Arc + Cloudy Champ + Star Burst) ───────────────
 // A dreamscape combining rainbow arcs, 3D fluffy clouds, and twinkling stars.
 
-function buildStarryRainbow(radius, height, colorHex, isAssortedStars = false) {
+function buildStarryRainbow(radius, height, colorHex, isAssortedStars = false, colorId = null) {
   const group = new THREE.Group();
 
   // 1. Rainbow Arcs
   for (const spec of RAINBOW_CHAMP_ARCS) {
-    const arc = buildSingleRainbowArc(radius, height, spec.scale, colorHex);
+    const arc = buildSingleRainbowArc(radius, height, spec.scale, colorHex, colorId);
     arc.rotation.y = (spec.angleDeg * Math.PI) / 180;
     arc.position.y = spec.yFrac * height;
     group.add(arc);
   }
 
-  // 2. Cloudy Champ Clouds
-  const cloudMat = new THREE.MeshStandardMaterial({
-    color: colorHex || CLOUD_COLOR,
-    roughness: 0.55,
-    metalness: 0.02,
-  });
+  // 2. Cloudy Champ Clouds — same fix as buildCloudyChump/buildFlatCloud:
+  // getFrostingMaterial (not a plain MeshStandardMaterial) is what
+  // actually understands the six gradient/metallic Pick Color patterns.
+  const cloudMat = getFrostingMaterial(colorHex || CLOUD_COLOR, colorId);
 
   const baseScale = Math.min(0.85, height * 0.38);
   const cloudDepth = 0.09;
@@ -670,6 +683,7 @@ function buildStarryRainbow(radius, height, colorHex, isAssortedStars = false) {
     });
     geo.translate(tangentialX, y, cloudStandoff);
     wrapGeometryPreservingNormals(geo, radius);
+    applyVerticalGradientUV(geo);
 
     const mesh = new THREE.Mesh(geo, cloudMat);
     mesh.castShadow = true;
@@ -689,16 +703,11 @@ function buildStarryRainbow(radius, height, colorHex, isAssortedStars = false) {
         })
     );
   } else {
-    starMats = [
-      new THREE.MeshStandardMaterial({
-        color: colorHex || CLOUD_COLOR,
-        roughness: 0.7,
-        metalness: 0,
-      }),
-    ];
+    starMats = [getFrostingMaterial(colorHex || CLOUD_COLOR, colorId)];
   }
 
   const starGeo = buildStarGeo(1);
+  applyVerticalGradientUV(starGeo);
   const standoffRadius = radius + 0.02;
 
   // Build obstacle bounding boxes (rainbows and clouds) so stars don't collide with them
@@ -797,12 +806,212 @@ function buildStarryRainbow(radius, height, colorHex, isAssortedStars = false) {
 }
 
 /**
+ * Reproduces buildSingleRainbowArc's own U-arch geometry math, but
+ * collapses the 4 individually-touching color bands (see that function's
+ * own comment: tube radius is chosen so neighboring bands touch with no
+ * gap) into ONE thick curve at their shared midpoint radius, with a
+ * half-thickness covering the full 4-band span — a reasonable
+ * approximation for a coverage query, not worth sampling each band
+ * separately. Returns points in the arc's own LOCAL flat frame (before
+ * the cylinder wrap / group rotation.y / position.y a real copy applies)
+ * — getSunshinePlayCoverageFn's addRainbowArc converts these into real
+ * (angle, y) itself, once per placed copy.
+ */
+function sampleUArchSpine(effectiveHeight) {
+  const bandCount = RAINBOW_BAND_COLORS.length;
+  const outerRadius = effectiveHeight * 0.29;
+  const bandWidth = effectiveHeight * 0.050;
+  const tube = bandWidth * 0.52;
+  const legLength = effectiveHeight * 0.050;
+  const innerRadius = outerRadius - (bandCount - 1) * bandWidth;
+  const midRadius = (innerRadius + outerRadius) / 2;
+  const halfThickness = (outerRadius - innerRadius) / 2 + tube;
+
+  const topY = outerRadius + tube;
+  const bottomY = -legLength - 0.05 * effectiveHeight;
+  const centerYOffset = -(topY + bottomY) / 2;
+
+  const arcLen = Math.PI * midRadius;
+  const totalLen = 2 * legLength + arcLen;
+  const steps = 40;
+  const points = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const s = t * totalLen;
+    let x, y;
+    if (s <= legLength) {
+      x = -midRadius; y = -legLength + s;
+    } else if (s <= legLength + arcLen) {
+      const theta = Math.PI - (s - legLength) / midRadius;
+      x = midRadius * Math.cos(theta); y = midRadius * Math.sin(theta);
+    } else {
+      const u = s - (legLength + arcLen);
+      x = midRadius; y = -u;
+    }
+    points.push([x, y + centerYOffset]);
+  }
+
+  const legMidX = (innerRadius + outerRadius) / 2;
+  const cloudFootY = -legLength + centerYOffset + 0.015 * effectiveHeight;
+  const cloudScale = ((outerRadius + tube - (innerRadius - tube)) * 1.68) / 1.985;
+
+  return { points, halfThickness, legMidX, cloudFootY, cloudScale };
+}
+
+/**
+ * Answers "how much is this point on the tier's side wall covered by an
+ * active Sunshine Play element (a star, a cloud, or a rainbow arc)?" as a
+ * 0..1 weight, for Filling's own Piping Design to shave against — same
+ * purpose/smoothstep-edge reasoning as the other coverage functions (see
+ * getCheckerCoverageFn's own comment in DecorationSets.jsx).
+ *
+ * Sunshine Play's shapes are accent pieces stuck onto the wall (not tiled
+ * or gridded), so each one is approximated by the simplest shape that
+ * reasonably matches its real footprint: a star as a small circle (its
+ * points are thin, so a circle a bit smaller than its own outer radius),
+ * a cloud as an ellipse (matching createFluffyCloudShapeA/B's own rough
+ * bounding proportions), and a rainbow arc as a thick curve
+ * (sampleUArchSpine above) plus its own two cloud feet. Star/cloud
+ * positions for the scattered variants (Star Burst, Cloudy Champ) come
+ * straight from the same deterministic placement functions/specs the
+ * real build functions use (scatterStarPositions, CLOUDY_CHUMP_SPECS),
+ * so they can't drift out of sync with the real layout.
+ *
+ * Starry Rainbow/Assorted Starry Rainbow's own scattered stars (on top of
+ * its arcs and clouds) are left out here — reproducing
+ * buildStarryRainbow's own obstacle-avoidance scatter loop exactly would
+ * mean duplicating that whole algorithm for a relatively minor addition
+ * on top of the arcs/clouds, which already dominate the covered area.
+ * That's a real gap in this approximation (small floating stars in the
+ * open sky areas won't get any shaving), not in the arcs/clouds
+ * themselves.
+ */
+export function getSunshinePlayCoverageFn(radius, height, opts = {}) {
+  const variant = opts.variant || 'rainbowArc';
+  const elements = []; // { type: 'circle'|'ellipse', angle, y, ... } | { type: 'curve', points: [[angle,y],...], r }
+
+  const addStar = (angle, y, scale) => {
+    elements.push({ type: 'circle', angle, y, r: 0.11 * scale });
+  };
+  const addCloud = (angle, y, scale) => {
+    // The cloud shape's own local vertical center sits noticeably above
+    // its nominal placement point (see createFluffyCloudShapeA/B's own
+    // vertex range, roughly y ∈ [-0.2, 0.68] * scale) — its half-extents
+    // come from that same bounding range.
+    elements.push({ type: 'ellipse', angle, y: y + 0.24 * scale, halfW: 0.85 * scale, halfH: 0.44 * scale });
+  };
+  const addRainbowArc = (angleDeg, yFrac, scale) => {
+    const effectiveHeight = height * scale;
+    const spine = sampleUArchSpine(effectiveHeight);
+    const groupAngle = (angleDeg * Math.PI) / 180;
+    const groupY = yFrac * height;
+    const curvePoints = spine.points.map(([lx, ly]) => [groupAngle + lx / radius, groupY + ly]);
+    elements.push({ type: 'curve', points: curvePoints, r: spine.halfThickness });
+    const leftAngle = groupAngle + (-spine.legMidX) / radius;
+    const rightAngle = groupAngle + spine.legMidX / radius;
+    const footY = groupY + spine.cloudFootY;
+    addCloud(leftAngle, footY, spine.cloudScale);
+    addCloud(rightAngle, footY, spine.cloudScale);
+  };
+
+  const starScaleFor = (sizeFrac) => {
+    if (sizeFrac < 0.36) return 0.45 + (sizeFrac / 0.36) * 0.22;
+    if (sizeFrac < 0.72) return 0.85 + ((sizeFrac - 0.36) / 0.36) * 0.30;
+    return 1.35 + ((sizeFrac - 0.72) / 0.28) * 0.40;
+  };
+
+  if (variant === 'rainbowArc') {
+    const RAINBOW_COPIES = [
+      { angleDeg: 0, yFrac: 0.00, scale: 1.00 },
+      { angleDeg: 118, yFrac: 0.10, scale: 0.88 },
+      { angleDeg: 238, yFrac: -0.08, scale: 0.94 },
+    ];
+    for (const spec of RAINBOW_COPIES) addRainbowArc(spec.angleDeg, spec.yFrac, spec.scale);
+  } else if (variant === 'cloudyChump') {
+    const baseScale = Math.min(0.85, height * 0.40);
+    for (const spec of CLOUDY_CHUMP_SPECS) {
+      addCloud((spec.angleDeg * Math.PI) / 180, spec.yFrac * height, baseScale * spec.sizeMul);
+    }
+  } else if (variant === 'starBurst' || variant === 'assortedStarBurst') {
+    const areaPerStar = 1.2;
+    const starCount = Math.max(40, Math.round((2 * Math.PI * radius * height) / areaPerStar));
+    const points = scatterStarPositions(starCount);
+    for (let i = 0; i < starCount; i++) {
+      const { angle, heightFrac, sizeFrac } = points[i];
+      const y = -height / 2 + height * 0.05 + heightFrac * height * 0.9;
+      addStar(angle, y, starScaleFor(sizeFrac));
+    }
+  } else if (variant === 'starryRainbow' || variant === 'assortedStarryRainbow') {
+    const RAINBOW_CHAMP_ARCS_LOCAL = [
+      { angleDeg: 0, yFrac: 0.00, scale: 1.00 },
+      { angleDeg: 165, yFrac: 0.06, scale: 0.90 },
+    ];
+    for (const spec of RAINBOW_CHAMP_ARCS_LOCAL) addRainbowArc(spec.angleDeg, spec.yFrac, spec.scale);
+    const baseScale = Math.min(0.85, height * 0.38);
+    const RAINBOW_CHAMP_CLOUDS_LOCAL = [
+      { angleDeg: 50, yFrac: 0.22, sizeMul: 1.05 },
+      { angleDeg: 105, yFrac: -0.22, sizeMul: 0.95 },
+      { angleDeg: 220, yFrac: -0.18, sizeMul: 0.92 },
+      { angleDeg: 265, yFrac: 0.20, sizeMul: 1.10 },
+      { angleDeg: 315, yFrac: -0.12, sizeMul: 0.96 },
+    ];
+    for (const spec of RAINBOW_CHAMP_CLOUDS_LOCAL) {
+      addCloud((spec.angleDeg * Math.PI) / 180, spec.yFrac * height, baseScale * spec.sizeMul);
+    }
+  }
+
+  const smoothstep = (t) => {
+    const c = Math.min(1, Math.max(0, t));
+    return c * c * (3 - 2 * c);
+  };
+  const angleDelta = (a, b) => {
+    let d = Math.abs(a - b) % (Math.PI * 2);
+    if (d > Math.PI) d = Math.PI * 2 - d;
+    return d;
+  };
+
+  return (angle, localY) => {
+    let coverage = 0;
+    for (const el of elements) {
+      if (el.type === 'curve') {
+        for (const [px, py] of el.points) {
+          const arcDist = radius * angleDelta(angle, px);
+          const dY = localY - py;
+          const dist = Math.sqrt(arcDist * arcDist + dY * dY);
+          const distInsideEdge = el.r - dist;
+          if (distInsideEdge <= 0) continue;
+          const smoothWidth = Math.max(0.02, el.r * 0.25);
+          coverage = Math.max(coverage, smoothstep(distInsideEdge / smoothWidth));
+          if (coverage >= 1) break;
+        }
+      } else {
+        const arcDist = radius * angleDelta(angle, el.angle);
+        const dY = localY - el.y;
+        let distInsideEdge;
+        let smoothWidth;
+        if (el.type === 'circle') {
+          distInsideEdge = el.r - Math.sqrt(arcDist * arcDist + dY * dY);
+          smoothWidth = Math.max(0.02, el.r * 0.25);
+        } else {
+          const ellipseDist = Math.sqrt((arcDist / el.halfW) ** 2 + (dY / el.halfH) ** 2);
+          distInsideEdge = (1 - ellipseDist) * Math.min(el.halfW, el.halfH);
+          smoothWidth = Math.max(0.03, Math.min(el.halfW, el.halfH) * 0.2);
+        }
+        if (distInsideEdge > 0) coverage = Math.max(coverage, smoothstep(distInsideEdge / smoothWidth));
+      }
+      if (coverage >= 1) return 1;
+    }
+    return coverage;
+  };
+}
+
+/**
  * Builds the Sunshine Play side decoration as a single Group, sized to fit
  * within `height` and stuck flush against the cake wall at `radius` — one
  * accent piece, not tiled around the circumference like the other Side
  * treatments.
  */
-export function buildSunshinePlay(radius, height, colorHex, variant = 'rainbowArc', _flavorId = 'vanilla') {
+export function buildSunshinePlay(radius, height, colorHex, colorId, variant = 'rainbowArc', _flavorId = 'vanilla') {
   const group = new THREE.Group();
 
   if (variant === 'rainbowArc') {
@@ -814,18 +1023,18 @@ export function buildSunshinePlay(radius, height, colorHex, variant = 'rainbowAr
     ];
 
     for (const spec of RAINBOW_COPIES) {
-      const arc = buildSingleRainbowArc(radius, height, spec.scale, colorHex);
+      const arc = buildSingleRainbowArc(radius, height, spec.scale, colorHex, colorId);
       arc.rotation.y = (spec.angleDeg * Math.PI) / 180;
       arc.position.y = spec.yFrac * height;
       group.add(arc);
     }
   } else if (variant === 'cloudyChump') {
-    // Variation 2: Cloudy Champ (randomized clouds only, respects colorHex)
-    const cloudyChump = buildCloudyChump(radius, height, colorHex);
+    // Variation 2: Cloudy Champ (randomized clouds only, respects colorHex/colorId)
+    const cloudyChump = buildCloudyChump(radius, height, colorHex, colorId);
     group.add(cloudyChump);
   } else if (variant === 'starBurst') {
-    // Variation 3: Star Burst (scattered buttercream stars, respects colorHex)
-    const starBurst = buildStarBurst(radius, height, colorHex);
+    // Variation 3: Star Burst (scattered buttercream stars, respects colorHex/colorId)
+    const starBurst = buildStarBurst(radius, height, colorHex, false, colorId);
     group.add(starBurst);
   } else if (variant === 'assortedStarBurst') {
     // Variation 4: Assorted Star Burst (scattered buttercream stars in assorted colors)
@@ -833,11 +1042,11 @@ export function buildSunshinePlay(radius, height, colorHex, variant = 'rainbowAr
     group.add(assortedStarBurst);
   } else if (variant === 'starryRainbow') {
     // Variation 5: Starry Rainbow (Rainbow Arc + Cloudy Champ + Star Burst)
-    const starryRainbow = buildStarryRainbow(radius, height, colorHex, false);
+    const starryRainbow = buildStarryRainbow(radius, height, colorHex, false, colorId);
     group.add(starryRainbow);
   } else if (variant === 'assortedStarryRainbow') {
     // Variation 6: Same as Starry Rainbow but with assorted star colors
-    const assortedStarryRainbow = buildStarryRainbow(radius, height, colorHex, true);
+    const assortedStarryRainbow = buildStarryRainbow(radius, height, colorHex, true, colorId);
     group.add(assortedStarryRainbow);
   } else if (variant === 'rainbowChamp') {
     // Legacy support: combination of Rainbow Arc and Cloudy Champ

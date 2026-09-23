@@ -105,6 +105,28 @@ export function buildFillingProfileGeometry(radius, height, oozeAmount = 0) {
 }
 
 /**
+ * The per-bump randomized parameters buildMashedCircleFillingGeometry
+ * uses (widthFrac/heightMul/vScale/phase, one set per bump around the
+ * ring). Pulled out to its own export so a caller that needs to
+ * reproduce this exact mesh's displacement elsewhere — Glaze's hugging
+ * profile in CakeScene.jsx, specifically — can generate (or receive) the
+ * SAME jitter values rather than re-consuming `rand`'s sequence a second
+ * time, which would desync from wherever `rand` had already advanced to
+ * and produce different-looking bumps than the actual mesh.
+ */
+export function makeMashedBumpJitter(bumpCount, vScaleMin, vScaleMax, rand = Math.random, pattern = 'none') {
+  if (pattern === 'diagonalSlashes') {
+    for (let i = 0; i < 13; i++) rand();
+  }
+  return Array.from({ length: bumpCount }, () => ({
+    widthFrac: 0.86 + rand() * 0.3,
+    heightMul: 0.6 + rand() * 0.55,
+    vScale: Math.min(1, vScaleMin + rand() * (vScaleMax - vScaleMin)),
+    phase: (rand() - 0.4) * 0.12,
+  }));
+}
+
+/**
  * Filling body for the "Mashed Circles" design (see FILLING_PIPING_DESIGNS
  * in cakeConfig.js).
  */
@@ -116,6 +138,22 @@ export function buildMashedCircleFillingGeometry(radius, height, {
   vScaleMax = 1.0,
   pattern = 'none',
   rand = Math.random,
+  // Pass a jitter array already produced by makeMashedBumpJitter to use
+  // it as-is instead of generating (and consuming rand() for) a fresh
+  // one — see that function's own doc comment for why a caller would
+  // need this.
+  precomputedJitter = null,
+  // Optional (angle, y) -> 0..1 weight. Where this returns 1, the bump at
+  // that point is fully shaved down to the flat baseline radius instead
+  // of bulging/recessing — used so a covering Side Treatment (e.g.
+  // Checkered Pattern) can stay flat/rigid rather than having to bend to
+  // follow bumps that will just sit underneath its own squares anyway
+  // (see CakeScene.jsx's checkerCoverageFn and getCheckerCoverageFn in
+  // DecorationSets.jsx, which is what callers actually build this from).
+  // Returns 0 (untouched) for any uncovered point — e.g. the checkerboard's
+  // own grout-line gaps — so the real piped texture stays fully visible
+  // there, same as if nothing were covering it at all.
+  coverageFn = null,
 } = {}) {
   const angularSegments = bumpCount * 12;
   const heightSegments = 24;
@@ -129,16 +167,7 @@ export function buildMashedCircleFillingGeometry(radius, height, {
     return Math.sqrt(Math.max(0, 1 - Math.pow(Math.abs(sScaled), vShapePower)));
   };
 
-  if (pattern === 'diagonalSlashes') {
-    for (let i = 0; i < 13; i++) rand();
-  }
-
-  const bumpJitter = Array.from({ length: bumpCount }, () => ({
-    widthFrac: 0.86 + rand() * 0.3,
-    heightMul: 0.6 + rand() * 0.55,
-    vScale: Math.min(1, vScaleMin + rand() * (vScaleMax - vScaleMin)),
-    phase: (rand() - 0.4) * 0.12,
-  }));
+  const bumpJitter = precomputedJitter || makeMashedBumpJitter(bumpCount, vScaleMin, vScaleMax, rand, pattern);
 
   const shapePower = 4;
   const slashCount = 3;
@@ -167,6 +196,11 @@ export function buildMashedCircleFillingGeometry(radius, height, {
       if (pattern === 'diagonalSlashes') {
         const sScaled = THREE.MathUtils.clamp((2 * t - 1) / j.vScale, -1, 1);
         bulge += vEnv * dome * slashGroove(u, sScaled);
+      }
+
+      if (coverageFn) {
+        const weight = THREE.MathUtils.clamp(coverageFn(angle, y), 0, 1);
+        bulge *= 1 - weight;
       }
 
       const r = radius + bulge;

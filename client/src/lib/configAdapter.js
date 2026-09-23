@@ -33,11 +33,10 @@ function resolveColorWithId(colorId) {
 // in the UI as a read-only preview (see SugarColorSection.jsx) rather than
 // resolved here. Reused below for Surface Treatment's Glaze color too
 // (same "only one real mode resolves to a hex" shape).
-function resolveSugarColorHex(mode, colorId, overrideColorId) {
+function resolveSugarColorHex(mode, colorId) {
   if (mode !== 'colorOverride') return null;
-  const id = overrideColorId || colorId;
-  if (!id) return null;
-  const entry = SUGAR_COLORS.find((c) => c.id === id);
+  if (!colorId) return null;
+  const entry = SUGAR_COLORS.find((c) => c.id === colorId);
   return entry ? entry.hex : null;
 }
 
@@ -63,11 +62,8 @@ export function adaptConfigToLegacy(newConfig) {
   const isIndividual = structure.layerDesign === 'individual' && structure.layers > 1;
   const resolveContextSugarColor = (context, index = null, allowDefault = false) => {
     const value = sugarColorOverrides[index === null ? context : `${context}-${index}`] || sugarColorOverrides[context];
-    if (allowDefault && value?.mode === 'default') {
-      const flavorId = value.flavorColorId || (SUGAR_COLORS.some((c) => c.isFlavorMirror && c.id === value.colorId) ? value.colorId : 'vanilla');
-      return resolveColor(flavorId);
-    }
-    return resolveSugarColorHex(value?.mode || 'default', value?.colorId, value?.overrideColorId);
+    if (allowDefault && value?.mode === 'default' && value.colorId) return resolveColor(value.colorId);
+    return resolveSugarColorHex(value?.mode || 'default', value?.colorId);
   };
 
   const resolveContextSugarColorWithId = (context, index = null, allowDefault = false) => {
@@ -96,7 +92,7 @@ export function adaptConfigToLegacy(newConfig) {
     cakeColor = sponge.flavor || 'vanilla';
     layerColors = Array(layers).fill(cakeColor);
   }
-  
+
   // Ensure cakeColor is never undefined
   if (!cakeColor) {
     cakeColor = 'vanilla';
@@ -106,7 +102,7 @@ export function adaptConfigToLegacy(newConfig) {
   const fillingEnabled = filling.enabled || false;
   const fillingLayers = fillingEnabled ? (filling.layers || 1) : 0;  // Only use layers if enabled
   let fillingColor, layerFillings;
-  
+
   if (fillingEnabled) {
     // Only set filling colors if filling is actually enabled
     if (isIndividual) {
@@ -137,7 +133,7 @@ export function adaptConfigToLegacy(newConfig) {
   // from the filling would naturally match it. SUGAR_COLORS' first six
   // entries are exactly the flavor-mirror colors (same id as the flavor,
   // same hex CakeScene resolves for it — see SugarColorSection.jsx's
-  // "Default" mode, same trick), so resolveColor on fillingColor (the
+  // "Match Flavor" mode, same trick), so resolveColor on fillingColor (the
   // flavor id) gives the matching hex directly, no separate lookup
   // needed. piping.colorId is still preserved untouched in the stored
   // config either way — this only affects what render-facing hex gets
@@ -161,11 +157,11 @@ export function adaptConfigToLegacy(newConfig) {
   // falling back to their flat hex — see fillingPipingColorId below.
   const layerFillingSugarColorIds = Array.from({ length: layers }, (_, index) => resolveContextSugarColorWithId('filling', index)?.id || null);
   // Piping color always follows the Filling Flavor's own Sugar Color —
-  // the override hex when Color Override is set, otherwise the flavor's
+  // the override hex when Pick Color is set, otherwise the flavor's
   // natural color — for every Piping Design state, not just Mashed
   // Circles/Mashed Swirls. It used to fall back to the independent,
   // UI-unreachable piping.colorId (permanently 'vanilla') whenever tip
-  // wasn't one of those two, so picking a Default color for Mashed
+  // wasn't one of those two, so a color chosen via Pick Color for Mashed
   // Circles/Swirls never carried over to the None state — this keeps all
   // states in sync with a single source of truth.
   const fillingPipingColor = fillingSugarColorHex || resolveColor(fillingColor);
@@ -174,7 +170,7 @@ export function adaptConfigToLegacy(newConfig) {
   // SUGAR_COLORS id (not just its flat hex fallback) to build the actual
   // pattern/gradient/metallic material for Marble/Ombré/Rainbow Swirl/Gold
   // Shimmer/Watercolor Pastel Mix/Red-White Gradient; without it those six
-  // silently degrade to a flat swatch. In Default mode there's no override
+  // silently degrade to a flat swatch. In Match Flavor mode there's no override
   // id, but fillingColor (the flavor id, e.g. 'chocolate') IS itself a
   // valid SUGAR_COLORS id — see the flavor-mirror comment on SUGAR_COLORS
   // in cakeConfig.js — so it doubles as the id here with no extra lookup.
@@ -201,7 +197,7 @@ export function adaptConfigToLegacy(newConfig) {
   // resolveSugarColorHex above) — 'default' is intentionally left null;
   // CakeScene already falls back to the flavor-driven color whenever
   // surfaceFrostingColorHex is null, which is also exactly the color
-  // SugarColorSection shows as Default's read-only preview swatch, so
+  // SugarColorSection shows as Match Flavor's read-only preview swatch, so
   // renderer and UI agree without this adapter needing to do anything
   // extra for that case. When surfaceFrostingColorHex IS set, CakeScene
   // uses it as the complete frosting color, replacing the flavor's natural
@@ -217,7 +213,7 @@ export function adaptConfigToLegacy(newConfig) {
   const layerSurfaceFrostingColors = Array.from({ length: layers }, (_, index) => resolveContextSugarColor('exterior', index));
   const layerSurfaceFrostingColorIds = Array.from({ length: layers }, (_, index) => resolveContextSugarColorWithId('exterior', index)?.id || null);
   // Passed through separately (not yet read by CakeScene) so the person's
-  // chosen color for a future Color Override variant isn't lost — same
+  // chosen color for a future Pick Color variant isn't lost — same
   // "implemented: false but data-preserved" pattern as the unbuilt
   // SUGAR_COLORS pattern swatches.
   const sugarColorHex = sugarColor.colorId ? resolveColor(sugarColor.colorId) : null;
@@ -231,7 +227,7 @@ export function adaptConfigToLegacy(newConfig) {
   // choice for context 'surface' — same resolveContextSugarColor(...,
   // allowDefault=true) call Center/Edge/Side use, since Glaze has no
   // flavor of its own either and so also uses Sugar Color's pickable
-  // Default grid, not a read-only flavor swatch (see
+  // Match Flavor grid, not a read-only flavor swatch (see
   // SurfaceTreatmentSection.jsx/ToolPanel.jsx — the section's own
   // standalone Color grid that used to write surfaceTreatment.colorId
   // directly was a duplicate of Sugar Color and has been removed).
@@ -245,11 +241,23 @@ export function adaptConfigToLegacy(newConfig) {
   // buttercreamTexture above) — falls back to 'longGaps' so older saved
   // configs without a pattern field still render one of the six rather
   // than an unhandled id.
-  const surfaceTreatmentMode = surfaceTreatment.mode || null;
+  const surfaceTreatmentMode = isIndividual ? null : (surfaceTreatment.mode || null);
   const surfaceTreatmentColorHex = surfaceTreatmentMode === 'glaze'
     ? (resolveContextSugarColor('surface', null, true) || resolveColor('vanilla'))
     : null;
   const surfaceTreatmentPattern = surfaceTreatment.pattern || 'longGaps';
+  const layerSurfaceTreatmentModes = Array.from({ length: layers }, (_, index) => {
+    const treatment = surfaceTreatment.layerTreatments?.[index] || surfaceTreatment;
+    return treatment.mode || null;
+  });
+  const layerSurfaceTreatmentColors = Array.from({ length: layers }, (_, index) => (
+    layerSurfaceTreatmentModes[index] === 'glaze'
+      ? (resolveContextSugarColor('surface', index, true) || resolveColor('vanilla'))
+      : null
+  ));
+  const layerSurfaceTreatmentPatterns = Array.from({ length: layers }, (_, index) => (
+    (surfaceTreatment.layerTreatments?.[index] || surfaceTreatment).pattern || 'longGaps'
+  ));
 
   const centerSugarColorHex = resolveContextSugarColor('center', null, true);
   const centerDecorationColor = centerSugarColorHex || resolveColor(center.decorations?.colorId);
@@ -268,13 +276,25 @@ export function adaptConfigToLegacy(newConfig) {
   // Resolve all three slots regardless of mode; CakeScene only needs to
   // render whichever `edgeMode` says is active.
   const edgeMode = edge.mode || 'both';
-  const resolveEdgeSlot = (slot, context) => ({
+  const edgeActiveSlot = edge.activeSlot || (edgeMode === 'both' ? 'both' : 'top');
+  const resolveEdgeSlot = (slot, context) => {
+    const pipingColorData = resolveContextSugarColorWithId(context, null, true);
+    const secondaryColorData = resolveContextSugarColorWithId(`${context}Secondary`, null, true);
+    return {
     decorationSetId: slot?.decorations?.setId || null,
     decorationColor: resolveContextSugarColor(context, null, true) || resolveColor(slot?.decorations?.colorId),
     pipingTip: slot?.piping?.tip || null,
-    pipingColor: resolveContextSugarColor(context, null, true) || resolveColor(slot?.piping?.colorId),
-    pipingSecondaryColor: resolveContextSugarColor(`${context}Secondary`, null, true) || resolveColor(slot?.piping?.secondaryColorId || 'red'),
-  });
+    pipingColor: pipingColorData?.hex || resolveColor(slot?.piping?.colorId),
+    pipingColorId: pipingColorData?.id || slot?.piping?.colorId || null,
+    // Deluxe's Alternating designs only — resolves the same way
+    // pipingColor does (a dedicated Sugar Color context first, falling
+    // back to the stored colorId), just off `${context}Secondary` and
+    // secondaryColorId instead. Harmless for Classic designs, which
+    // never read this field.
+    pipingSecondaryColor: secondaryColorData?.hex || resolveColor(slot?.piping?.secondaryColorId || 'red'),
+    pipingSecondaryColorId: secondaryColorData?.id || slot?.piping?.secondaryColorId || null,
+    };
+  };
   const edgeTop = resolveEdgeSlot(edge.top, 'edgeTop');
   const edgeBottom = resolveEdgeSlot(edge.bottom, 'edgeBottom');
   const edgeBoth = resolveEdgeSlot(edge.both, 'edgeBoth');
@@ -301,9 +321,25 @@ export function adaptConfigToLegacy(newConfig) {
 
   const sideDecorationSetId = DECORATION_MODES.includes(sideMode) ? sideMode : null;
   const sideSugarColorHex = resolveContextSugarColor('side', null, true);
+  // Id counterpart of sideSugarColorHex — moved up here (was previously
+  // declared down by sideCheckeredColorId) since sideDecorationColorId
+  // below needs it too, and every other Side treatment's own colorId
+  // reuses this same 'side' context resolution.
+  const sideSugarColorData = resolveContextSugarColorWithId('side', null, true);
   const sideDecorationColor = sideDecorationSetId
     ? (sideSugarColorHex || resolveColor(side[sideDecorationSetId]?.colorId))
     : resolveColor(undefined);
+  // Id counterpart of sideDecorationColor — shared by every DECORATION_MODES
+  // treatment (Scatter Pearls, Piping Scrolls, Sunshine Play, Victorian
+  // Lambeth; Chevron Pattern has since split off its own dedicated
+  // sideChevronColorId above but is still nominally in this list). Same
+  // reasoning as sideCheckeredColorId: without this, getFrostingMaterial
+  // can't build the real pattern/gradient/metallic material for Marble/
+  // Ombré/Rainbow Swirl/Gold Shimmer/Watercolor Pastel Mix/Red-White
+  // Gradient, and those six silently degrade to a flat swatch.
+  const sideDecorationColorId = sideDecorationSetId
+    ? (sideSugarColorData?.id || side[sideDecorationSetId]?.colorId || null)
+    : null;
 
   const sideNoNameSetId = NO_NAME_MODES.includes(sideMode) ? sideMode : null;
   const sideNoNameColor = sideNoNameSetId
@@ -323,6 +359,15 @@ export function adaptConfigToLegacy(newConfig) {
   // color isn't lost once the checkered-square builder is updated to
   // accept a tint — see the follow-up note where this adapter is used.
   const sideCheckeredColor = sideSugarColorHex || resolveColor(side.checkeredPattern?.colorId);
+  // Id counterpart of sideCheckeredColor, same reasoning as
+  // fillingPipingColorId/surfaceFrostingColorId above — getFrostingMaterial
+  // needs the actual SUGAR_COLORS id (not just its flat hex fallback) to
+  // build the real pattern/gradient/metallic material for Marble/Ombré/
+  // Rainbow Swirl/Gold Shimmer/Watercolor Pastel Mix/Red-White Gradient;
+  // without it those six silently degrade to a flat swatch — which is
+  // ALSO what buildCheckerSquareMaterial (DecorationSets.jsx) built
+  // regardless, since it never accepted a colorId at all until now.
+  const sideCheckeredColorId = sideSugarColorData?.id || side.checkeredPattern?.colorId || null;
 
   // Triangle Pattern — duplicate of Checkered Pattern's exact resolution:
   // its own field regardless of mode (6 variants live under
@@ -332,11 +377,22 @@ export function adaptConfigToLegacy(newConfig) {
     ? (side.trianglePattern?.setId || null)
     : null;
   const sideTriangleColor = sideSugarColorHex || resolveColor(side.trianglePattern?.colorId);
+  // Id counterpart of sideTriangleColor — same reasoning as
+  // sideCheckeredColorId above (Triangle Pattern is a duplicate of
+  // Checkered Pattern's whole architecture, so it inherited the same gap).
+  const sideTriangleColorId = sideSugarColorData?.id || side.trianglePattern?.colorId || null;
 
   const sideChevronPatternSetId = sideMode === 'chevronPattern'
     ? (side.chevronPattern?.setId || 'multiColor')
     : null;
   const sideChevronColor = sideSugarColorHex || resolveColor(side.chevronPattern?.colorId);
+  // Id counterpart of sideChevronColor — only actually used by the
+  // 'twoTone'/single-color Chevron variants (see buildChevronSideStripes'
+  // per-row color logic in DecorationSets.jsx); 'multiColor' ignores both
+  // this and sideChevronColor entirely, cycling its own fixed palette
+  // instead — Color Override is already disabled for that variant in
+  // SideSection.jsx, so there's nothing to fix there.
+  const sideChevronColorId = sideSugarColorData?.id || side.chevronPattern?.colorId || null;
 
   const sideScatterPearlsSetId = sideMode === 'scatterPearls'
     ? (side.scatterPearls?.setId || 'randomScatter')
@@ -380,7 +436,7 @@ export function adaptConfigToLegacy(newConfig) {
     cakeSize,
     realSize,
     designMode: isIndividual ? 'individual' : 'uniform',
-    
+
     // Legacy colors
     cakeColor,
     frostingColor,
@@ -388,7 +444,7 @@ export function adaptConfigToLegacy(newConfig) {
     layerColors,
     layerFrostings,
     layerFillings,
-    
+
     // Legacy filling
     fillingEnabled,
     fillingLayers,
@@ -397,7 +453,7 @@ export function adaptConfigToLegacy(newConfig) {
     fillingPipingColorId,
     layerFillingSugarColors,
     layerFillingSugarColorIds,
-    
+
     // Exterior finish style (needed for rendering logic)
     exteriorFinishStyle: exteriorFinish.style || 'fullyFrosted',
     // Only meaningful to CakeScene when exteriorFinishStyle is
@@ -430,6 +486,9 @@ export function adaptConfigToLegacy(newConfig) {
     surfaceTreatmentMode,
     surfaceTreatmentColorHex,
     surfaceTreatmentPattern,
+    layerSurfaceTreatmentModes,
+    layerSurfaceTreatmentColors,
+    layerSurfaceTreatmentPatterns,
 
     // Center
     centerDecorationColor,
@@ -443,6 +502,7 @@ export function adaptConfigToLegacy(newConfig) {
 
     // Edge
     edgeMode,
+    edgeActiveSlot,
     edgeTop,
     edgeBottom,
     edgeBoth,
@@ -458,12 +518,16 @@ export function adaptConfigToLegacy(newConfig) {
     // un-rendered until that follow-up lands.
     sideDecorationSetId,
     sideDecorationColor,
+    sideDecorationColorId,
     sideCheckeredPatternSetId,
     sideCheckeredColor,
+    sideCheckeredColorId,
     sideTrianglePatternSetId,
     sideTriangleColor,
+    sideTriangleColorId,
     sideChevronPatternSetId,
     sideChevronColor,
+    sideChevronColorId,
     sideScatterPearlsSetId,
     sidePipingScrollsSetId,
     sideSunshinePlaySetId, // Sunshine Play's setId (Rainbow Arc is the only design today)
@@ -480,16 +544,16 @@ export function adaptConfigToLegacy(newConfig) {
     toppings: [],
     placedItems: combinedPlacedItems,
     plateVisible: newConfig.plateVisible !== undefined ? newConfig.plateVisible : true,
-    
+
     // Legacy sets (old tuxedo/skirt mechanism — superseded by
     // side.mode + side.whippedSkirt (Tuxedo itself was retired, see
     // Sunshine Play), kept only for any code path not yet migrated)
     activeSet: null,
     activeSetLayers: [],
-    
+
     // Preserve interior preview flag for rendering
     interiorPreview: newConfig.interiorPreview || false,
-    
+
     // Preserve new structure for future use
     _newConfig: newConfig,
   };
@@ -511,12 +575,12 @@ export function adaptConfigFromLegacy(legacyConfig) {
       layerDesign: isIndividual ? 'individual' : 'uniform',
     },
     realSize: legacyConfig.realSize || { diameter: 8, height: 5 },
-    
+
     sponge: {
       flavor: legacyConfig.cakeColor || 'vanilla',
       layerFlavors: legacyConfig.layerColors || [],
     },
-    
+
     filling: {
       enabled: legacyConfig.fillingEnabled || false,
       layers: legacyConfig.fillingLayers || 1,
@@ -527,7 +591,7 @@ export function adaptConfigFromLegacy(legacyConfig) {
         colorId: 'vanilla', // legacy configs never had a colorId — reset to default
       },
     },
-    
+
     exteriorFinish: {
       style: 'fullyFrosted', // Default for legacy configs
       flavor: legacyConfig.frostingColor || 'vanilla',
@@ -589,7 +653,7 @@ export function adaptConfigFromLegacy(legacyConfig) {
     },
 
     interiorPreview: false,
-    
+
     // Preserve legacy fields
     toppings: legacyConfig.toppings || [],
     plateVisible: legacyConfig.plateVisible !== undefined ? legacyConfig.plateVisible : true,

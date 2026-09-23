@@ -34,9 +34,6 @@ function ArmedItemControls({ armedDesign, armedRotation, armedTilt, setArmedRota
   return (
     <>
       <div>
-        <span className="text-xs text-muted-foreground mb-1.5 block">
-          Preview — this is what you're about to place
-        </span>
         <DecorationPreview
           designId={armedDesign.designId}
           orientation={armedDesign.orientation}
@@ -296,10 +293,6 @@ export default function CenterSection({ center, onChange, activeTool, onSelectTo
 
       {mode === 'decorations' && (
         <div className="space-y-4">
-          <span className="text-xs text-muted-foreground block">
-            Tap a design, then tap a spot on the cake's top to place it. Items can't be dropped past the edge treatment or on top of each other.
-          </span>
-
           <ArmedItemControls
             armedDesign={armedDesign}
             armedRotation={armedRotation}
@@ -370,10 +363,6 @@ export default function CenterSection({ center, onChange, activeTool, onSelectTo
 
           {textCategory === 'piping' && (
             <div className="space-y-3">
-              <span className="text-xs text-muted-foreground block">
-                Fixed lines that follow the cake's curve automatically — fastest way to get a name or message on in one go.
-              </span>
-
               {TEXT_SLOT_CONFIGS.map((slot) => {
                 const val = center.text?.[slot.id] !== undefined
                   ? (center.text[slot.id] || '')
@@ -416,19 +405,11 @@ export default function CenterSection({ center, onChange, activeTool, onSelectTo
                   ))}
                 </div>
               </div>
-              <p className="text-[10px] text-muted-foreground">
-                Laid flat on the top surface for now — stick/candle-mounted text
-                is a future addition, not yet built.
-              </p>
             </div>
           )}
 
           {textCategory === 'buttercream' && (
             <div className="space-y-4">
-              <span className="text-xs text-muted-foreground block">
-                Tap a letter, then tap a spot on the cake to place it — one at a time, like any other decoration. Slower to spell out than Piping Text, but each letter can go anywhere and won't clip into other decorations.
-              </span>
-
               <ArmedItemControls
                 armedDesign={armedDesign}
                 armedRotation={armedRotation}

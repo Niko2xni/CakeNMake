@@ -97,11 +97,154 @@ function createTeardropGeometry(radius = 0.045, heightScale = 1.8, thicknessScal
 }
 
 /**
+ * Answers "how much is this point on the tier's side wall covered by an
+ * active Victorian Lambeth element?" as a 0..1 weight, for Filling's own
+ * Piping Design to shave against — same purpose/smoothstep-edge reasoning
+ * as the other coverage functions in this codebase (see
+ * getCheckerCoverageFn's own comment in DecorationSets.jsx).
+ *
+ * Unlike Checkered/Chevron/Scatter Pearls/Piping Scrolls/Sunshine Play,
+ * this is a COARSER approximation, not a shape-for-shape match — Victorian
+ * Lambeth has by far the most going on (rope tiers with their own sag
+ * curves, an anchor rosette with petals and leaves, a volumetric draped
+ * curtain, fleur-de-lis teardrop clusters, low pearls, an offset rope
+ * tier, and up to 3 vertically-stacked bands depending on variant),
+ * enough that tracing every individual element precisely would mean
+ * duplicating most of this file's own geometry logic a second time as
+ * distance queries. Instead, each segment gets 3 representative regions:
+ * an anchor/rosette circle at its own currentAngle, one sagging band
+ * covering the curtain + rope network's combined vertical reach across
+ * the segment, and a low-pearl circle at midAngle — reusing this file's
+ * own segment/band loop structure (currentAngle/midAngle/anglePerSegment/
+ * bands) so the real periodic layout and per-variant visibility flags are
+ * respected, even though the shapes within each segment are simplified.
+ */
+export function getVictorianLambethCoverageFn(radius, height, opts = {}) {
+  const variant = opts.variant || 'classic';
+  const H = height;
+
+  const isDoubleBand = variant === 'doubleBand';
+  const isTripleBand = variant === 'tripleBand';
+  const isNoRosette = variant === 'noRosette';
+
+  const circumference = 2 * Math.PI * radius;
+  const targetSegmentWidth = isTripleBand ? 3.4 : 2.3;
+  const segmentCount = Math.max(6, Math.round(circumference / targetSegmentWidth));
+  const anglePerSegment = (Math.PI * 2) / segmentCount;
+
+  const VARIANT_FLAGS = {
+    classic:    { rosette: true,  topRopes: true,  lowerRope: true,  offsetRope: true,  lowPearl: true,  anchorPearl: true },
+    noRosette:  { rosette: false, topRopes: true,  lowerRope: true,  offsetRope: true,  lowPearl: true,  anchorPearl: true },
+    ropesOnly:  { rosette: false, topRopes: true,  lowerRope: true,  offsetRope: true,  lowPearl: true,  anchorPearl: true },
+    noRopes:    { rosette: true,  topRopes: false, lowerRope: false, offsetRope: false, lowPearl: false, anchorPearl: true },
+    doubleBand: { rosette: true,  topRopes: false, lowerRope: false, offsetRope: false, lowPearl: false, anchorPearl: true },
+    tripleBand: { rosette: true,  topRopes: false, lowerRope: false, offsetRope: false, lowPearl: false, anchorPearl: true },
+  };
+  const flags = VARIANT_FLAGS[variant] || VARIANT_FLAGS.classic;
+  const hasAnchor = flags.rosette || flags.anchorPearl;
+  const hasCurtainOrRopes = flags.topRopes || flags.lowerRope || flags.offsetRope || variant === 'noRopes' || isDoubleBand || isTripleBand;
+  const hasLowPearl = flags.lowPearl;
+
+  const BAND_SPACING = 0.36;
+  const NOROSETTE_BAND_SPACING = 0.20;
+  const bands = isTripleBand
+    ? [{ yOffset: 0 }, { yOffset: -H * BAND_SPACING }]
+    : isDoubleBand
+    ? [{ yOffset: 0 }, { yOffset: -H * BAND_SPACING }]
+    : isNoRosette
+    ? [{ yOffset: 0 }, { yOffset: -H * NOROSETTE_BAND_SPACING }]
+    : [{ yOffset: 0 }];
+  const applyTopLift = isNoRosette || variant === 'ropesOnly';
+  const TOP_LIFT = 0.05;
+
+  // elements: { type:'circle', angle, y, r } | { type:'curve', points:[[angle,y],...], r }
+  const elements = [];
+
+  for (let bandIdx = 0; bandIdx < bands.length; bandIdx++) {
+    const bandYOffset = bands[bandIdx].yOffset + (applyTopLift ? TOP_LIFT * H : 0);
+    const angleOffset = (bandIdx % 2 === 1) ? anglePerSegment / 2 : 0;
+
+    for (let i = 0; i < segmentCount; i++) {
+      const currentAngle = i * anglePerSegment + angleOffset;
+      const nextAngle = (i + 1) * anglePerSegment + angleOffset;
+      const midAngle = currentAngle + anglePerSegment / 2;
+
+      if (hasAnchor) {
+        // Rosette petals (scale 1.6x) plus the anchor pearl (radius
+        // 0.16) together reach roughly this far from currentAngle — a
+        // generous single circle standing in for the whole anchor node.
+        const anchorY = 0.42 * H + bandYOffset + (flags.topRopes ? -0.05 * H : 0);
+        elements.push({ type: 'circle', angle: currentAngle, y: anchorY, r: 0.38 });
+      }
+
+      if (hasCurtainOrRopes) {
+        // One sagging band standing in for the curtain drape AND/OR the
+        // rope tiers together (whichever are actually active for this
+        // variant) — real sag curve (PolarRopeCurve's own parabola
+        // formula), spanning the segment's real vertical extent from
+        // roughly the low pearl/rope3's own reach up to the top ropes'.
+        const topY = (flags.topRopes ? 0.40 : 0.34) * H + bandYOffset;
+        const bottomY = (flags.lowerRope || flags.offsetRope ? -0.16 : 0.16) * H + bandYOffset;
+        const sag = 0.20 * H;
+        const steps = 10;
+        const points = [];
+        for (let s = 0; s <= steps; s++) {
+          const t = s / steps;
+          const a = currentAngle + (nextAngle - currentAngle) * t;
+          const parabola = 4 * t * (1 - t);
+          const y = topY - sag * parabola;
+          points.push([a, y]);
+        }
+        elements.push({ type: 'curve', points, r: 0.18 + (topY - bottomY) * 0.15 });
+      }
+
+      if (hasLowPearl) {
+        const lowPearlY = -0.16 * H + bandYOffset;
+        elements.push({ type: 'circle', angle: midAngle, y: lowPearlY, r: 0.16 });
+      }
+    }
+  }
+
+  const smoothstep = (t) => {
+    const c = Math.min(1, Math.max(0, t));
+    return c * c * (3 - 2 * c);
+  };
+  const angleDelta = (a, b) => {
+    let d = Math.abs(a - b) % (Math.PI * 2);
+    if (d > Math.PI) d = Math.PI * 2 - d;
+    return d;
+  };
+
+  return (angle, localY) => {
+    let coverage = 0;
+    for (const el of elements) {
+      if (el.type === 'curve') {
+        for (const [px, py] of el.points) {
+          const arcDist = radius * angleDelta(angle, px);
+          const dY = localY - py;
+          const distInsideEdge = el.r - Math.sqrt(arcDist * arcDist + dY * dY);
+          if (distInsideEdge <= 0) continue;
+          coverage = Math.max(coverage, smoothstep(distInsideEdge / Math.max(0.03, el.r * 0.25)));
+          if (coverage >= 1) break;
+        }
+      } else {
+        const arcDist = radius * angleDelta(angle, el.angle);
+        const dY = localY - el.y;
+        const distInsideEdge = el.r - Math.sqrt(arcDist * arcDist + dY * dY);
+        if (distInsideEdge > 0) coverage = Math.max(coverage, smoothstep(distInsideEdge / Math.max(0.03, el.r * 0.25)));
+      }
+      if (coverage >= 1) return 1;
+    }
+    return coverage;
+  };
+}
+
+/**
  * Builds the complete Victorian Lambeth Piping side decoration as a THREE.Group,
  * wrapped around a cylinder of given radius and height.
- * 
+ *
  * Features ONE clean, volumetric 3D extruded curtain swag per segment.
- * 
+ *
  * @param {number} radius - Radius of the cake tier side wall.
  * @param {number} height - Height allocated for the tier decoration.
  * @param {string} icingColorHex - Main icing color.

@@ -21,21 +21,49 @@ import { SURFACE_TREATMENT_MODES, GLAZE_PATTERNS } from '@/lib/cakeConfig';
 // variants — see the Pattern picker below, which uses the same list-of-
 // variants shape ExteriorFinishSection's Buttercream Texture picker uses
 // for Ridged Comb/Ribbon Wrap.
-export default function SurfaceTreatmentSection({ surfaceTreatment, onChange }) {
-  const mode = surfaceTreatment.mode || null;
+export default function SurfaceTreatmentSection({ surfaceTreatment, onChange, isIndividual = false, activeLayer = 0 }) {
+  const sectionLabel = isIndividual ? `Tier ${activeLayer + 1} Glaze` : 'Surface Treatment';
+  const activeTreatment = isIndividual
+    ? (surfaceTreatment.layerTreatments?.[activeLayer] || surfaceTreatment)
+    : surfaceTreatment;
+  const mode = activeTreatment.mode || null;
   const glaze = SURFACE_TREATMENT_MODES.find((m) => m.id === 'glaze');
   const active = mode === 'glaze';
 
   const toggleGlaze = () => {
-    onChange({ ...surfaceTreatment, mode: active ? null : 'glaze' });
+    const nextTreatment = { ...activeTreatment, mode: active ? null : 'glaze' };
+    onChange(isIndividual
+      ? {
+          ...surfaceTreatment,
+          layerTreatments: Object.assign(
+            Array.from({ length: Math.max(2, surfaceTreatment.layerTreatments?.length || 0) }, (_, index) => (
+              surfaceTreatment.layerTreatments?.[index] || { mode: null, pattern: 'longGaps' }
+            )),
+            { [activeLayer]: nextTreatment },
+          ),
+        }
+      : nextTreatment);
   };
 
-  const updatePattern = (pattern) => onChange({ ...surfaceTreatment, pattern });
+  const updatePattern = (pattern) => {
+    const nextTreatment = { ...activeTreatment, pattern };
+    onChange(isIndividual
+      ? {
+          ...surfaceTreatment,
+          layerTreatments: Object.assign(
+            Array.from({ length: Math.max(2, surfaceTreatment.layerTreatments?.length || 0) }, (_, index) => (
+              surfaceTreatment.layerTreatments?.[index] || { mode: null, pattern: 'longGaps' }
+            )),
+            { [activeLayer]: nextTreatment },
+          ),
+        }
+      : nextTreatment);
+  };
 
   return (
     <div className="space-y-4">
       <div>
-        <span className="text-xs text-muted-foreground mb-2 block">Surface Treatment</span>
+        <span className="text-xs text-muted-foreground mb-2 block">{sectionLabel}</span>
         <button
           type="button"
           onClick={toggleGlaze}
@@ -62,26 +90,31 @@ export default function SurfaceTreatmentSection({ surfaceTreatment, onChange }) 
       {active && (
         <div>
           <span className="text-xs text-muted-foreground mb-2 block">Pattern</span>
-          <div className="space-y-2">
+          {/* Secondary tier: smaller grid-of-chips (same style as Sugar
+              Color's Match Flavor/Pick Color buttons and Exterior Finish's
+              Buttercream Texture — grid-cols-2, py-2/px-3/rounded-lg)
+              rather than a full-width px-4/py-3/rounded-xl row per option.
+              This only exists once Glaze is already toggled on above, so it
+              needs to read as a nested sub-choice, not another top-level
+              option list at the same visual weight as the Glaze toggle. */}
+          <div className="grid grid-cols-2 gap-2">
             {GLAZE_PATTERNS.map((pattern) => {
-              const isActive = (surfaceTreatment.pattern || 'longGaps') === pattern.id;
+              const isActive = (activeTreatment.pattern || 'longGaps') === pattern.id;
               return (
                 <button
                   key={pattern.id}
                   type="button"
                   onClick={() => updatePattern(pattern.id)}
-                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-left transition-all duration-200 border-2 ${
+                  className={`py-2 px-3 rounded-lg text-left transition-all duration-150 border-2 ${
                     isActive
                       ? 'bg-primary text-primary-foreground border-primary shadow-md'
-                      : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
+                      : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
                   }`}
                 >
-                  <div>
-                    <span className="text-xs font-semibold block">{pattern.label}</span>
-                    <span className={`text-[10px] mt-0.5 block ${isActive ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
-                      {pattern.description}
-                    </span>
-                  </div>
+                  <span className="block text-xs font-semibold">{pattern.label}</span>
+                  <span className={`block text-[10px] mt-0.5 ${isActive ? 'text-primary-foreground/80' : 'text-muted-foreground/70'}`}>
+                    {pattern.description}
+                  </span>
                 </button>
               );
             })}

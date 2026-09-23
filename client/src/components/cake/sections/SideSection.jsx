@@ -11,11 +11,12 @@ import {
 } from '@/lib/cakeConfig';
 import SugarColorSection from './SugarColorSection';
 
-export default function SideSection({ side, onChange, sugarColor, onSugarColorChange }) {
+export default function SideSection({ side, structure, activeLayer = 0, onChange, sugarColor, onSugarColorChange }) {
   const mode = side.mode || null;
+  const isIndividual = structure?.layerDesign === 'individual' && structure?.layers > 1;
+  const tierLabel = (label) => (isIndividual ? `Tier ${activeLayer + 1} ${label}` : label);
 
   const selectTreatment = (key) => onChange({ ...side, mode: key });
-  const clearTreatment = () => onChange({ ...side, mode: null });
 
   const selectCheckeredVariant = (setId) =>
     onChange({ ...side, mode: 'checkeredPattern', checkeredPattern: { ...side.checkeredPattern, setId } });
@@ -52,22 +53,14 @@ export default function SideSection({ side, onChange, sugarColor, onSugarColorCh
     <div className="space-y-6">
       {/* Side Treatment */}
       <div>
-        <div className="text-center mb-3">
-          <span className="text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">
-            Side Treatment
-          </span>
-        </div>
-
-        <NoneButton active={!mode} onClick={clearTreatment} />
-
-        <div className="space-y-4 mt-4">
+        <div className="space-y-4">
           {SIDE_TREATMENTS.map((t) => {
             const multiVariant = MULTI_VARIANT_MAP[t.id];
             if (multiVariant) {
               const currentSetId = side[multiVariant.stateKey]?.setId;
               return (
                 <React.Fragment key={t.id}>
-                  <OptionRow label={t.label}>
+                  <OptionRow label={tierLabel(t.label)}>
                     {multiVariant.sets.map((variant, i) => (
                       <Circle
                         key={variant.id}
@@ -84,24 +77,21 @@ export default function SideSection({ side, onChange, sugarColor, onSugarColorCh
                       sugarColor={sugarColor}
                       onChange={onSugarColorChange}
                       showDefaultColorPicker
+                      // Pick Color stays disabled (silently — Sugar
+                      // Color no longer renders an explanatory paragraph
+                      // for this, so Match Flavor's own content shows
+                      // normally instead of a warning) only for the sets
+                      // whose colors are still hard-coded rather than
+                      // threaded through: Chevron's Multi-Color, and
+                      // Sunshine Play's Assorted Star Burst. Assorted
+                      // Starry Rainbow and plain Rainbow Arc both thread
+                      // colorHex/colorId through fully now (see
+                      // sunshinePlayHelpers.js), so neither is disabled
+                      // here anymore — only Assorted Star Burst's fixed
+                      // ASSORTED_STAR_COLORS palette still is.
                       colorOverrideDisabled={
                         (t.id === 'chevronPattern' && currentSetId === 'multiColor') ||
-                        (t.id === 'sunshinePlay' && (
-                          currentSetId === 'rainbowArc' ||
-                          currentSetId === 'assortedStarBurst' ||
-                          currentSetId === 'assortedStarryRainbow'
-                        ))
-                      }
-                      colorOverrideDisabledReason={
-                        (t.id === 'sunshinePlay' && currentSetId === 'rainbowArc')
-                          ? 'Rainbow Arc uses its own fixed rainbow palette — Color Override has no effect on it.'
-                          : (t.id === 'sunshinePlay' && currentSetId === 'assortedStarBurst')
-                          ? 'Assorted Star Burst uses its own assorted color palette — Color Override has no effect on it.'
-                          : (t.id === 'sunshinePlay' && currentSetId === 'assortedStarryRainbow')
-                          ? 'Assorted Starry Rainbow uses fixed rainbow and assorted star palettes — Color Override has no effect on it.'
-                          : (t.id === 'chevronPattern' && currentSetId === 'multiColor')
-                          ? 'Multi-Color uses its own fixed palette per row — Color Override has no effect on it.'
-                          : ''
+                        (t.id === 'sunshinePlay' && currentSetId === 'assortedStarBurst')
                       }
                     />
                   )}
@@ -111,7 +101,7 @@ export default function SideSection({ side, onChange, sugarColor, onSugarColorCh
 
             return (
               <React.Fragment key={t.id}>
-                <OptionRow label={t.label}>
+                <OptionRow label={tierLabel(t.label)}>
                   <Circle active={mode === t.id} onClick={() => selectTreatment(t.id)} title={t.label}>
                     1
                   </Circle>
@@ -130,20 +120,6 @@ export default function SideSection({ side, onChange, sugarColor, onSugarColorCh
       </div>
 
     </div>
-  );
-}
-
-function NoneButton({ active, onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`w-full py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
-        active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'
-      }`}
-    >
-      None
-    </button>
   );
 }
 

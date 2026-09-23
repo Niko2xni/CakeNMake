@@ -1,486 +1,278 @@
-import React, { useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState } from 'react';
 import {
-  BORDER_PIPING_SOLID_VARIATIONS,
-  BRACELET_BEADS_VARIATIONS,
+  BEADED_TRIM_VARIATIONS_DELUXE,
+  BORDER_PIPING_VARIATIONS_DELUXE,
+  DOLLOPS_VARIATIONS_DELUXE,
+  WHIPPED_CREAM_VARIATIONS,
   FRUIT_CONFECTION_RIM_OPTIONS,
-  DOLLOPS_SOLID_VARIATIONS,
-  DOLLOPS_SOLID_CHERRY_VARIATIONS,
-  WHIPPED_CREAM_SOLID_VARIATIONS,
-  WHIPPED_CREAM_CHERRY_VARIATIONS,
-  PIPING_TIPS,
-  SUGAR_COLORS,
 } from '@/lib/cakeConfig';
 import SugarColorSection from './SugarColorSection';
 
 const EMPTY_SLOT = () => ({
   decorations: { setId: null, colorId: 'vanilla' },
-  piping: { tip: null, colorId: 'vanilla', secondaryColorId: 'red' },
+  piping: { tip: null, colorId: 'vanilla' },
 });
-
-const DOLLOP_SECTIONS = [
-  { title: 'Star Dollop', prefix: 'starDollop' },
-  { title: 'Round Tip Dollop', prefix: 'roundDollop' },
-  { title: 'Kiss-shaped Dollop', prefix: 'kissDollop' },
-].map((section) => ({
-  ...section,
-  options: [
-    ...DOLLOPS_SOLID_VARIATIONS.filter(({ id }) => id.startsWith(section.prefix)),
-    ...DOLLOPS_SOLID_CHERRY_VARIATIONS.filter(({ id }) => id.startsWith(section.prefix)),
-  ],
-}));
 
 // NOTE: single whole-cake setting for now, not per-tier — see
 // SurfaceSection's caveat. Top/Bottom/Both is a separate axis of variation
 // from per-tier Individual mode and is unaffected by it either way.
 export default function EdgeSection({
   edge,
+  structure,
+  activeLayer = 0,
   onChange,
-  layerCount = 1,
   onActiveSlotChange,
   sugarColor,
   onSugarColorChange,
 }) {
-  // Which of Top/Bottom is being VIEWED when in separate mode — local UI
-  // state only, not part of the shared config (Top/Bottom aren't "tiers").
-  const [activeSlot, setActiveSlot] = useState(
-    edge.mode === 'topBottomSeparate' ? 'top' : 'both'
-  );
+  const isIndividual = structure?.layerDesign === 'individual' && structure?.layers > 1;
+  const tierLabel = (label) => (isIndividual ? `Tier ${activeLayer + 1} ${label}` : label);
+  const activeSlot = edge.activeSlot || (edge.mode === 'both' ? 'both' : 'top');
+  const mode = edge.mode; // 'topBottomSeparate' | 'both'
 
-  const mode = edge.mode || 'both'; // 'topBottomSeparate' | 'both'
+  const switchToTop = () => {
+    onChange({ ...edge, mode: 'topBottomSeparate', activeSlot: 'top' });
+    onActiveSlotChange?.('top');
+  };
 
-  useEffect(() => {
-    if (edge.mode === 'both') {
-      setActiveSlot('both');
-    } else if (activeSlot === 'both') {
-      setActiveSlot('top');
-    }
-  }, [edge.mode]);
+  const switchToBottom = () => {
+    onChange({ ...edge, mode: 'topBottomSeparate', activeSlot: 'bottom' });
+    onActiveSlotChange?.('bottom');
+  };
 
-  const currentPlacement = mode === 'both' ? 'both' : activeSlot;
-
-  const handlePlacementChange = (targetPlacement) => {
-    if (targetPlacement === 'both') {
-      if (mode === 'both') return;
-      const currentActiveDesign = (activeSlot === 'bottom' ? edge.bottom : edge.top) || EMPTY_SLOT();
-      const inheritedDesign = edge.both?.piping?.tip
-        ? edge.both
-        : (currentActiveDesign.piping?.tip ? { ...currentActiveDesign } : (edge.both || EMPTY_SLOT()));
-
-      onChange({
-        ...edge,
-        mode: 'both',
-        both: inheritedDesign,
-      });
-      setActiveSlot('both');
-      onActiveSlotChange?.('both');
-    } else {
-      if (mode === 'topBottomSeparate' && activeSlot === targetPlacement) return;
-
-      let newTop = edge.top || EMPTY_SLOT();
-      let newBottom = edge.bottom || EMPTY_SLOT();
-
-      if (mode === 'both' && edge.both?.piping?.tip) {
-        if (!newTop.piping?.tip) newTop = { ...edge.both };
-        if (!newBottom.piping?.tip) newBottom = { ...edge.both };
-      }
-
-      onChange({
-        ...edge,
-        mode: 'topBottomSeparate',
-        top: newTop,
-        bottom: newBottom,
-      });
-      setActiveSlot(targetPlacement);
-      onActiveSlotChange?.(targetPlacement);
-    }
+  const switchToBoth = () => {
+    onChange({ ...edge, mode: 'both', activeSlot: 'both' });
+    onActiveSlotChange?.('both');
   };
 
   const currentSlotKey = mode === 'both' ? 'both' : activeSlot;
   const currentSlot = edge[currentSlotKey] || EMPTY_SLOT();
 
-  const isAlternating = typeof currentSlot.piping?.tip === 'string' && currentSlot.piping.tip.includes('Alt');
-  const overrideColors = SUGAR_COLORS.filter((c) => !c.isFlavorMirror);
-  const ALT_COLORS_PER_PAGE = 6;
-  const [altColorPage, setAltColorPage] = useState(0);
-  const altPageCount = Math.ceil(overrideColors.length / ALT_COLORS_PER_PAGE);
-  const visibleAltColors = overrideColors.slice(
-    altColorPage * ALT_COLORS_PER_PAGE,
-    (altColorPage + 1) * ALT_COLORS_PER_PAGE
-  );
-
-  const activeSecondaryColorId = currentSlot.piping?.secondaryColorId || 'red';
-  const activeSecondaryColor =
-    overrideColors.find((c) => c.id === activeSecondaryColorId) ||
-    SUGAR_COLORS.find((c) => c.id === activeSecondaryColorId) ||
-    overrideColors[0];
-
   const updateSlot = (changes) => {
     onChange({ ...edge, [currentSlotKey]: { ...currentSlot, ...changes } });
   };
 
-  const updateMiddle = (changes) => {
+  const updateSecondaryColor = (colorId, mode = 'colorOverride') => {
     onChange({
       ...edge,
-      middle: {
-        ...edge.middle,
+      [currentSlotKey]: {
+        ...currentSlot,
         piping: {
-          ...(edge.middle?.piping || { tip: null, colorId: 'vanilla' }),
-          ...changes,
+          ...currentSlot.piping,
+          secondaryColorId: colorId,
+          secondaryColorMode: mode,
         },
       },
     });
   };
 
-  const middleEdgeTips = PIPING_TIPS.filter(
-    ({ id }) => !['zigzag', 'wavePiping'].includes(id)
-  );
-
   return (
     <div className="space-y-4">
-      {/* Edge Placement */}
-      <div className="space-y-1.5">
-        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide block">
-          Placement
-        </span>
-        <div className="grid grid-cols-3 gap-1 bg-muted/40 rounded-xl p-1">
-          {[
-            { id: 'top', label: 'Top Edge', hasDot: mode === 'topBottomSeparate' && !!edge.top?.piping?.tip },
-            { id: 'bottom', label: 'Bottom Edge', hasDot: mode === 'topBottomSeparate' && !!edge.bottom?.piping?.tip },
-            { id: 'both', label: 'Both', hasDot: mode === 'both' && !!edge.both?.piping?.tip },
-          ].map((tab) => {
-            const isSelected = currentPlacement === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => handlePlacementChange(tab.id)}
-                className={`py-2 px-1 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer flex items-center justify-center gap-1.5 ${
-                  isSelected
-                    ? 'bg-card shadow-sm text-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <span className="truncate">{tab.label}</span>
-                {tab.hasDot && !isSelected && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
-                )}
-              </button>
-            );
-          })}
+      <div>
+        <div className="flex gap-1 bg-muted/40 rounded-xl p-1">
+          <button
+            type="button"
+            onClick={switchToTop}
+            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
+              mode === 'topBottomSeparate' && activeSlot === 'top'
+                ? 'bg-card shadow text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Top
+          </button>
+          <button
+            type="button"
+            onClick={switchToBottom}
+            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
+              mode === 'topBottomSeparate' && activeSlot === 'bottom'
+                ? 'bg-card shadow text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Bottom
+          </button>
+          <button
+            type="button"
+            onClick={switchToBoth}
+            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
+              mode === 'both'
+                ? 'bg-card shadow text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Both
+          </button>
         </div>
       </div>
 
       <div className="space-y-4">
-        <div className="text-center mb-2">
-          <span className="text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">
-            Edge Design
-          </span>
-        </div>
-
         <div className="space-y-3">
-          {/* Border Piping — grouped multi-variant row */}
-          <div>
-            <span className="text-xs font-semibold text-foreground/80 mb-1.5 block">
-              Border Piping
-            </span>
-            <div className="flex flex-wrap gap-2">
-              {BORDER_PIPING_SOLID_VARIATIONS.map((variant, i) => {
-                const active =
-                  (currentSlot.piping?.tip || currentSlot.decorations?.setId) === variant.id;
-                return (
-                  <button
-                    key={variant.id}
-                    type="button"
-                    onClick={() =>
-                      updateSlot({
-                        decorations: { ...currentSlot.decorations, setId: null },
-                        piping: { ...currentSlot.piping, tip: active ? null : variant.id },
-                      })
-                    }
-                    title={variant.label}
-                    className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
-                      active
-                        ? 'bg-primary text-primary-foreground border-primary shadow-md'
-                        : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
-                    }`}
-                  >
-                    {i + 1}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Bracelet Beads — grouped multi-variant row */}
-          <div>
-            <span className="text-xs font-semibold text-foreground/80 mb-1.5 block">
-              Bracelet Beads
-            </span>
-            <div className="flex flex-wrap gap-2">
-              {BRACELET_BEADS_VARIATIONS.map((variant, i) => {
-                const active =
-                  (currentSlot.piping?.tip || currentSlot.decorations?.setId) === variant.id;
-                return (
-                  <button
-                    key={variant.id}
-                    type="button"
-                    onClick={() =>
-                      updateSlot({
-                        decorations: { ...currentSlot.decorations, setId: null },
-                        piping: { ...currentSlot.piping, tip: active ? null : variant.id },
-                      })
-                    }
-                    title={variant.label}
-                    className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
-                      active
-                        ? 'bg-primary text-primary-foreground border-primary shadow-md'
-                        : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
-                    }`}
-                  >
-                    {i + 1}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Fruit & Confections Rim — direct non-piping borders */}
-          <div>
-            <span className="text-xs font-semibold text-foreground/80 mb-1.5 block">
-              Fruit & Confections Rim
-            </span>
-            <div className="flex flex-wrap gap-2">
-              {FRUIT_CONFECTION_RIM_OPTIONS.map((variant, i) => {
-                const active =
-                  (currentSlot.piping?.tip || currentSlot.decorations?.setId) === variant.id;
-                return (
-                  <button
-                    key={variant.id}
-                    type="button"
-                    onClick={() =>
-                      updateSlot({
-                        decorations: { ...currentSlot.decorations, setId: null },
-                        piping: { ...currentSlot.piping, tip: active ? null : variant.id },
-                      })
-                    }
-                    title={variant.label}
-                    className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
-                      active
-                        ? 'bg-primary text-primary-foreground border-primary shadow-md'
-                        : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
-                    }`}
-                  >
-                    {i + 1}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Whipped Cream Rosettes — solid & cherry variants */}
-          <div>
-            <span className="text-xs font-semibold text-foreground/80 mb-1.5 block">
-              Whipped Cream
-            </span>
-            <div className="flex flex-wrap gap-2">
-              {[
-                ...WHIPPED_CREAM_SOLID_VARIATIONS,
-                ...WHIPPED_CREAM_CHERRY_VARIATIONS,
-              ].map((variant, i) => {
-                const active =
-                  (currentSlot.piping?.tip || currentSlot.decorations?.setId) === variant.id;
-                return (
-                  <button
-                    key={variant.id}
-                    type="button"
-                    onClick={() =>
-                      updateSlot({
-                        decorations: { ...currentSlot.decorations, setId: null },
-                        piping: { ...currentSlot.piping, tip: active ? null : variant.id },
-                      })
-                    }
-                    title={variant.label}
-                    className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
-                      active
-                        ? 'bg-primary text-primary-foreground border-primary shadow-md'
-                        : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
-                    }`}
-                  >
-                    {i + 1}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {DOLLOP_SECTIONS.map((section) => (
-            <div key={section.prefix}>
-              <span className="text-xs font-semibold text-foreground/80 mb-1.5 block">
-                {section.title}
-              </span>
-              <div className="flex flex-wrap gap-2">
-                {section.options.map((variant, i) => {
-                  const active =
-                    (currentSlot.piping?.tip || currentSlot.decorations?.setId) === variant.id;
-                  return (
-                    <button
-                      key={variant.id}
-                      type="button"
-                      onClick={() =>
-                        updateSlot({
-                          decorations: { ...currentSlot.decorations, setId: null },
-                          piping: {
-                            ...currentSlot.piping,
-                            tip: active ? null : variant.id,
-                          },
-                        })
-                      }
-                      title={variant.label}
-                      className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
-                        active
-                          ? 'bg-primary text-primary-foreground border-primary shadow-md'
-                          : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
-                      }`}
-                    >
-                      {i + 1}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {layerCount >= 2 && (
-        <div className="pt-2 space-y-3 border-t border-border/50">
-          <div>
-            <span className="text-xs font-semibold text-foreground block">
-              Layer 1 Middle Edge
-            </span>
-            <span className="text-[11px] text-muted-foreground block">
-              Piping ring along the exposed edge of Layer 1.
-            </span>
-          </div>
-
           <div className="space-y-3">
-            {middleEdgeTips.map((tip) => {
-              const active = edge.middle?.piping?.tip === tip.id;
-              return (
-                <div key={tip.id}>
-                  <span className="text-xs font-semibold text-foreground/80 mb-1.5 block">
-                    {tip.label}
-                  </span>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => updateMiddle({ tip: active ? null : tip.id })}
-                      title={tip.label}
-                      className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
-                        active
-                          ? 'bg-primary text-primary-foreground border-primary shadow-md'
-                          : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
-                      }`}
-                    >
-                      {tip.label.slice(0, 1).toUpperCase()}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {mode && (
-        <div className="space-y-4 pt-2 border-t border-border/50">
-          <div className="space-y-1">
-            {isAlternating && (
-              <span className="text-xs font-semibold text-foreground/80 block">
-                Primary Color (Color 1)
-              </span>
-            )}
-            <SugarColorSection
+            <span className="text-xs font-semibold text-foreground block mb-2">{tierLabel('Border Piping')}</span>
+            <VariantRow
+              variants={BORDER_PIPING_VARIATIONS_DELUXE}
+              currentSlot={currentSlot}
+              updateSlot={updateSlot}
               sugarColor={sugarColor}
-              onChange={onSugarColorChange}
-              showDefaultColorPicker
+              onSugarColorChange={onSugarColorChange}
+              onSecondaryColorChange={updateSecondaryColor}
             />
           </div>
 
-          {isAlternating && (
-            <div className="pt-3 border-t border-border/50">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-muted-foreground">Alternating Color (Color 2)</span>
-                <span className="text-[10px] text-muted-foreground">
-                  {altColorPage + 1} / {altPageCount} · {Math.max(0, overrideColors.length - ((altColorPage + 1) * ALT_COLORS_PER_PAGE))} more
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {visibleAltColors.map((c) => {
-                  const isActive = activeSecondaryColorId === c.id;
-                  return (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() =>
-                        updateSlot({
-                          piping: { ...currentSlot.piping, secondaryColorId: c.id },
-                        })
-                      }
-                      title={`${c.label}${c.price ? ` (+₱${c.price})` : ''}`}
-                      className={`flex flex-col items-center gap-1.5 rounded-xl p-3 text-left transition-all duration-200 border-2 ${
-                        isActive
-                          ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-[1.02]'
-                          : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
-                      }`}
-                    >
-                      <span
-                        className="w-8 h-8 rounded-full border-2 border-black/10"
-                        style={{ background: c.swatchCss || c.hex }}
-                      />
-                      <span className="text-xs font-semibold">{c.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="flex items-center justify-center gap-3 mt-3">
-                <button
-                  type="button"
-                  onClick={() => setAltColorPage((page) => Math.max(0, page - 1))}
-                  disabled={altColorPage === 0}
-                  aria-label="Previous Alternating colors"
-                  className="w-8 h-8 rounded-full bg-muted text-muted-foreground disabled:opacity-30 hover:bg-muted/80"
-                >
-                  <ChevronLeft className="w-4 h-4 mx-auto" />
-                </button>
-                <div className="flex gap-1.5" aria-label={`Alternating color page ${altColorPage + 1} of ${altPageCount}`}>
-                  {Array.from({ length: altPageCount }).map((_, page) => (
-                    <span
-                      key={page}
-                      className={`w-1.5 h-1.5 rounded-full ${page === altColorPage ? 'bg-primary' : 'bg-muted-foreground/30'}`}
-                    />
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setAltColorPage((page) => Math.min(altPageCount - 1, page + 1))}
-                  disabled={altColorPage === altPageCount - 1}
-                  aria-label="Next Alternating colors"
-                  className="w-8 h-8 rounded-full bg-muted text-muted-foreground disabled:opacity-30 hover:bg-muted/80"
-                >
-                  <ChevronRight className="w-4 h-4 mx-auto" />
-                </button>
-              </div>
-              {activeSecondaryColor && (
-                <p className="text-[10px] text-muted-foreground mt-1.5">
-                  {activeSecondaryColor.label}{activeSecondaryColor.price ? ` — +₱${activeSecondaryColor.price}` : ''}
-                </p>
-              )}
-            </div>
-          )}
+          <VariantRow
+            label={tierLabel('Beaded Trim')}
+            variants={BEADED_TRIM_VARIATIONS_DELUXE}
+            currentSlot={currentSlot}
+            updateSlot={updateSlot}
+            sugarColor={sugarColor}
+            onSugarColorChange={onSugarColorChange}
+            onSecondaryColorChange={updateSecondaryColor}
+          />
+
+          <div>
+            <span className="text-xs font-semibold text-foreground block mb-2">{tierLabel('Dollops')}</span>
+            <VariantRow
+              variants={DOLLOPS_VARIATIONS_DELUXE}
+              currentSlot={currentSlot}
+              updateSlot={updateSlot}
+              sugarColor={sugarColor}
+              onSugarColorChange={onSugarColorChange}
+              onSecondaryColorChange={updateSecondaryColor}
+            />
+          </div>
+
+          <div>
+            <span className="text-xs font-semibold text-foreground block mb-2">{tierLabel('Whipped Cream Rosettes')}</span>
+            <VariantRow
+              variants={WHIPPED_CREAM_VARIATIONS}
+              currentSlot={currentSlot}
+              updateSlot={updateSlot}
+              sugarColor={sugarColor}
+              onSugarColorChange={onSugarColorChange}
+              onSecondaryColorChange={updateSecondaryColor}
+            />
+          </div>
+
+          <div>
+            <span className="text-xs font-semibold text-foreground block mb-2">{tierLabel('Edible Delicates')}</span>
+            <VariantRow
+              variants={FRUIT_CONFECTION_RIM_OPTIONS}
+              currentSlot={currentSlot}
+              updateSlot={updateSlot}
+              showSugarColor={false}
+              sugarColor={sugarColor}
+              onSugarColorChange={onSugarColorChange}
+              onSecondaryColorChange={updateSecondaryColor}
+            />
+          </div>
         </div>
-      )}
+      </div>
+
+    </div>
+  );
+}
+
+// Shared by every Deluxe grouped-variant row (Border Piping, Beaded Trim,
+// Dollops, Whipped Cream Rosettes, Edible Delicates) — same numbered circular-button
+// treatment Classic's own rows use, just parameterized so these rows
+// don't each repeat the same JSX block by hand.
+//
+// Sugar Color renders contextually once a design in that row is active —
+// not after the whole grid, and not once at the bottom of the page. For
+// Alternating designs, the same picker is reused for both color slots via
+// the 1st Color / 2nd Color toggle below.
+//
+// The color block is inserted after the LAST button of the active
+// design's own row (every ROW_SIZE-th button), not immediately after
+// the active button itself — these rows visually wrap into fixed groups
+// of six (1-6, 7-12, 13-18, ...), and breaking mid-row (e.g. right after
+// button 5) would split that group apart instead of leaving it intact
+// and only pushing the ROWS AFTER it down.
+const ROW_SIZE = 6;
+
+function VariantRow({ label, variants, currentSlot, updateSlot, showSugarColor = true, sugarColor, onSugarColorChange, onSecondaryColorChange }) {
+  const [activeColorSlot, setActiveColorSlot] = useState('primary');
+  const activeId = currentSlot.piping?.tip;
+  const activeIndex = variants.findIndex((v) => v.id === activeId);
+  let colorBlockInserted = false;
+  return (
+    <div>
+      {label && <span className="text-xs font-semibold text-foreground/80 mb-1.5 block">{label}</span>}
+      <div className="flex flex-wrap gap-2">
+        {variants.map((variant, i) => {
+          const active = i === activeIndex;
+          const isRowBoundary = (i + 1) % ROW_SIZE === 0 || i === variants.length - 1;
+          const showColorHere = showSugarColor && activeIndex !== -1 && !colorBlockInserted && i >= activeIndex && isRowBoundary;
+          if (showColorHere) colorBlockInserted = true;
+          return (
+            <React.Fragment key={variant.id}>
+              <button
+                type="button"
+                onClick={() =>
+                  updateSlot({
+                    decorations: { ...currentSlot.decorations, setId: null },
+                    piping: { ...currentSlot.piping, tip: active ? null : variant.id },
+                  })
+                }
+                title={variant.label}
+                className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
+                  active
+                    ? 'bg-primary text-primary-foreground border-primary shadow-md'
+                    : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
+                }`}
+              >
+                {i + 1}
+              </button>
+              {showColorHere && (
+                <div className="w-full basis-full pt-2">
+                  {typeof activeId === 'string' && activeId.includes('Alt') && (
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <button
+                        type="button"
+                        onClick={() => setActiveColorSlot('primary')}
+                        className={`py-2 px-3 rounded-lg text-left transition-all duration-150 border-2 ${
+                          activeColorSlot === 'primary'
+                            ? 'bg-primary text-primary-foreground border-primary shadow-md'
+                            : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
+                        }`}
+                      >
+                        <span className="block text-xs font-semibold">1st Color</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveColorSlot('secondary')}
+                        className={`py-2 px-3 rounded-lg text-left transition-all duration-150 border-2 ${
+                          activeColorSlot === 'secondary'
+                            ? 'bg-primary text-primary-foreground border-primary shadow-md'
+                            : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
+                        }`}
+                      >
+                        <span className="block text-xs font-semibold">2nd Color</span>
+                      </button>
+                    </div>
+                  )}
+                  <SugarColorSection
+                    sugarColor={activeColorSlot === 'primary'
+                      ? sugarColor
+                      : {
+                          mode: currentSlot.piping?.secondaryColorMode || 'colorOverride',
+                          colorId: currentSlot.piping?.secondaryColorId || 'red',
+                        }}
+                    onChange={activeColorSlot === 'primary'
+                      ? onSugarColorChange
+                      : (nextSugarColor) => onSecondaryColorChange(
+                          nextSugarColor.colorId || 'red',
+                          nextSugarColor.mode || 'colorOverride',
+                        )}
+                    showDefaultColorPicker
+                  />
+                </div>
+              )}
+            </React.Fragment>
+          );
+        })}
+      </div>
     </div>
   );
 }

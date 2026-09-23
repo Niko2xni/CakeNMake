@@ -55,14 +55,13 @@ export default function DesignerWorkSpace() {
   const [overlapWarning, setOverlapWarning] = useState(false);
   const overlapTimerRef = useRef(null);
 
-  // Undo / Redo history for Place tab
   const placeUndoStackRef = useRef([]);
   const placeRedoStackRef = useRef([]);
   const [placeHistoryVersion, setPlaceHistoryVersion] = useState(0);
 
   const titleRef = useRef(null);
   const cakeSceneRef = useRef(null);
-  
+
   // Auto-save state
   const [designId, setDesignId] = useState(null);
   const [saveStatus, setSaveStatus] = useState('saved'); // 'saved' | 'saving' | 'error'
@@ -81,9 +80,6 @@ export default function DesignerWorkSpace() {
       setDesignId(design._id);
       setHasUnsavedChanges(false);
       setSaveStatus('saved');
-      placeUndoStackRef.current = [];
-      placeRedoStackRef.current = [];
-      setPlaceHistoryVersion(v => v + 1);
     } catch (error) {
       console.error('Failed to load design:', error);
     }
@@ -100,7 +96,7 @@ export default function DesignerWorkSpace() {
   const saveDesign = useCallback(async ({ skipThumbnail = false } = {}) => {
     try {
       setSaveStatus('saving');
-      
+
       // Capture 3D scene thumbnail before saving (skip during background auto-save)
       let previewImageUrl = null;
       if (!skipThumbnail && cakeSceneRef.current) {
@@ -113,7 +109,7 @@ export default function DesignerWorkSpace() {
 
       // Convert new config format to legacy format for backend compatibility
       const legacyConfig = adaptConfigToLegacy(config);
-      
+
       const designData = {
         name: title,
         config: legacyConfig,
@@ -216,7 +212,7 @@ export default function DesignerWorkSpace() {
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
-    
+
     // Also save thumbnail on component unmount (when navigating away via React Router)
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
@@ -231,7 +227,7 @@ export default function DesignerWorkSpace() {
     setOrderComplete(true);
     setShowBakeryChat(true);
     setBakeryOpen(false);
-    
+
     // Explicitly update and save the design configuration and generate thumbnail
     const savedId = await saveDesign();
     if (savedId) {
@@ -340,8 +336,6 @@ export default function DesignerWorkSpace() {
   const handlePlace = useCallback((item) => {
     setPlaceItems(prevItems => {
       if (item?.slotId) {
-        // Slot-based placement (Place tab items, doodles): one item per
-        // slot, dropping into an already-occupied slot replaces it.
         const alreadyInSlot = prevItems.find(it => it.slotId === item.slotId);
         if (alreadyInSlot) {
           return prevItems.map(it =>
@@ -351,12 +345,6 @@ export default function DesignerWorkSpace() {
         return [...prevItems, { ...item, id: item.slotId }];
       }
 
-      // Freeform placement (Center tab's click-and-drop): there's no slot
-      // to key off of, so every drop needs its own generated id -- keying
-      // by item.slotId here would give every Center item the same
-      // (undefined) id, making the 2nd placement look like "already in
-      // slot undefined" and silently overwrite the 1st instead of adding
-      // alongside it.
       const id = `${item.type || 'item'}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       return [...prevItems, { ...item, id }];
     });
@@ -381,7 +369,7 @@ export default function DesignerWorkSpace() {
             }}
             className="font-display text-xl font-bold leading-tight tracking-tight border-none shadow-none bg-transparent p-0 h-auto w-[180px] focus-visible:ring-0 focus-visible:ring-offset-0 hover:bg-muted/50 rounded-md px-1 -ml-1"
           />
-          
+
           {/* Save status indicator */}
           <div className="flex items-center gap-1.5 text-xs">
             {saveStatus === 'saving' && (

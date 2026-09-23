@@ -1,8 +1,8 @@
 import React from 'react';
 
 /**
- * "Layer 1 | Layer 2" tab strip — which already-existing tier you're
- * currently editing, when Layer Design = Individual. Rendered ONCE in
+ * "Tier 1 | Tier 2" tab strip — which already-existing tier you're
+ * currently editing, when Tier Design = Individual. Rendered ONCE in
  * ToolPanel, above whichever section is active, rather than duplicated
  * inside every section that needs per-tier fields (Sponge, Filling,
  * Exterior Finish, and now Center/Edge/Side). See
@@ -26,7 +26,7 @@ export default function LayerTabStrip({ layers, activeLayer, onLayerChange }) {
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
-          Layer {i + 1}
+          Tier {i + 1}
         </button>
       ))}
     </div>

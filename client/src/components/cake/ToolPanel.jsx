@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Cake, Palette, Sparkles, RotateCcw, Layers, Building2, Wand2, ChevronDown, ChevronUp, Eye, EyeOff, Bot, Lock } from 'lucide-react';
+import { Cake, Palette, Sparkles, RotateCcw, Layers, Building2, ChevronDown, ChevronUp, Eye, EyeOff, Bot, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -15,18 +15,17 @@ import SurfaceTreatmentSection from './sections/SurfaceTreatmentSection';
 import CenterSection from './sections/CenterSection';
 import EdgeSection from './sections/EdgeSection';
 import SideSection from './sections/SideSection';
-import PlaceSection from './sections/PlaceSection';
 import LayerTabStrip from './sections/LayerTabStrip';
+import TierDesignControl from './sections/TierDesignControl';
 import AIChatPanel from './AIChatPanel';
 
 // Nav rework — see CAKE_SETS_REWORK_SPEC.md §2. Two rows of three
 // (Option 1, approved) rather than one cramped row of six.
 const TABS = [
-  { id: 'fundamentals', label: 'Fundamentals', icon: Building2 },
-  { id: 'center', label: 'Center', icon: Cake },
-  { id: 'edge', label: 'Edge', icon: Layers },
-  { id: 'side', label: 'Side', icon: Sparkles },
-  { id: 'place', label: 'Place', icon: Wand2 },
+  { id: 'fundamentals', label: 'Fundamentals', icon: Building2, zIndex: 10 },
+  { id: 'side', label: 'Side', icon: Sparkles, zIndex: 20 },
+  { id: 'center', label: 'Center', icon: Cake, zIndex: 30 },
+  { id: 'edge', label: 'Edge', icon: Layers, zIndex: 40 },
 ];
 
 export default function ToolPanel({
@@ -70,15 +69,50 @@ export default function ToolPanel({
   const nakedGatedLocked = effectiveExteriorStyle !== 'naked';
   const NAKED_GATED_SECTIONS = ['sponge', 'filling'];
 
+  // Refs to each collapsible section's own wrapper, keyed by section id —
+  // used to scroll a section into view right after IT opens, so expanding
+  // one doesn't leave its newly-revealed content sitting below the
+  // visible area of the scroll panel with no cue it appeared. Plain DOM
+  // refs (not refs into Collapsible itself) so this doesn't depend on
+  // whether that wrapped component forwards its ref.
+  const sectionRefs = useRef({});
+  const registerSectionRef = (key) => (el) => {
+    sectionRefs.current[key] = el;
+  };
+
   const toggleSection = (section) => {
     // Sponge Flavor and Filling can't be toggled open (or closed, but
     // they're already closed) while locked — Naked is the only Exterior
     // Finish style that unlocks them, see nakedGatedLocked above.
     if (NAKED_GATED_SECTIONS.includes(section) && nakedGatedLocked) return;
-    setExpandedSections(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
+    setExpandedSections(prev => {
+      const willOpen = !prev[section];
+      if (willOpen) {
+        // Double rAF: wait for the state update above to actually paint
+        // (the newly-expanded CollapsibleContent needs a layout pass
+        // before scrollIntoView has real content height to measure)
+        // before scrolling — this is what makes the scroll position
+        // track the new space the collapse just created, rather than
+        // staying put and leaving the freshly opened content partly or
+        // fully off-screen below the fold.
+        // block: 'start' (not 'nearest') so the landing point is always
+        // the section wrapper's own top border, consistently — 'nearest'
+        // could settle wherever needed the least scrolling, which meant
+        // the section's title text itself could end up sitting flush
+        // against the viewport edge instead of the section boundary.
+        // Each wrapper also carries a scroll-mt-4 class (see the five
+        // registerSectionRef divs below) — scroll-margin-top is what
+        // actually reserves the gap 'start' lands at; without it the
+        // title sits flush against the very top edge of the scroll area
+        // with zero breathing room, not just close to the border.
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            sectionRefs.current[section]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
+        });
+      }
+      return { ...prev, [section]: willOpen };
+    });
   };
 
   // If Exterior Finish moves off Naked while Sponge Flavor and/or
@@ -101,32 +135,65 @@ export default function ToolPanel({
   // Edge/Side aren't wired to per-tier indirection yet (flagged as a known
   // gap, see CAKE_SETS_REWORK_SPEC.md §11), so it's hidden on those tabs
   // rather than showing a control that wouldn't do anything there.
-  const showLayerStrip = isIndividual && tab === 'fundamentals';
+  const showLayerStrip = isIndividual && ['fundamentals', 'side', 'center', 'edge'].includes(tab);
 
   const toggleInteriorPreview = () => {
     onChange({ ...config, interiorPreview: !config.interiorPreview });
   };
 
-  // Surface Treatment (Glaze) has no flavor of its own to derive a Default
-  // color from — unlike Filling/Exterior Finish, which DO have their own
-  // flavor and so show a read-only "From Frosting Flavor" swatch here.
-  // Glaze is in the same position as Center/Edge/Side (no flavor of their
-  // own either), so its Default mode gets the same pickable Flavor Color
-  // grid those three use (showDefaultColorPicker) instead of quietly
-  // inheriting Exterior Finish's flavor.
-  const renderSugarColor = (context) => (
+  const handleStructureChange = (newStructure, newRealSize) => {
+    const tierCountChanged = newStructure.layers !== config.structure?.layers;
+    if (!tierCountChanged) {
+      onChange({ ...config, structure: newStructure, realSize: newRealSize });
+      return;
+    }
+
+    const centerItems = (config.place?.items || []).filter(
+      (item) => !(typeof item.type === 'string' && item.type.startsWith('center-'))
+    );
+    const legacyPlacedItems = (config.placedItems || []).filter(
+      (item) => !(typeof item.type === 'string' && item.type.startsWith('center-'))
+    );
+    onChange({
+      ...config,
+      structure: newStructure,
+      realSize: newRealSize,
+      place: { ...(config.place || {}), items: centerItems },
+      placedItems: legacyPlacedItems,
+    });
+  };
+
+  // Surface Treatment (Glaze) has no flavor of its own to derive a Match
+  // Flavor color from — unlike Filling/Exterior Finish, which DO have
+  // their own flavor and so show a read-only "From Frosting Flavor"
+  // swatch here. Glaze is in the same position as Center/Edge/Side (no
+  // flavor of their own either), so its Match Flavor mode gets the same
+  // pickable Flavor Color grid those three use (showDefaultColorPicker)
+  // instead of quietly inheriting Exterior Finish's flavor.
+  const renderSugarColor = (context) => {
+    const colorContext = isIndividual ? `${context}-${activeLayer}` : context;
+    return (
     <SugarColorSection
-      sugarColor={config.sugarColorOverrides?.[context] || DEFAULT_CONFIG.sugarColor}
+      sugarColor={config.sugarColorOverrides?.[colorContext] || DEFAULT_CONFIG.sugarColor}
       onChange={(newSugarColor) => onChange({
         ...config,
         sugarColorOverrides: {
           ...(config.sugarColorOverrides || {}),
-          [context]: newSugarColor,
+          [colorContext]: newSugarColor,
         },
       })}
       showDefaultColorPicker
+      // Glaze ('surface') is a thin poured coat, not a full buttercream
+      // build, so the six Pattern/multi-tone colors don't apply the way
+      // they do on Filling/Exterior Finish — see excludePatternColors'
+      // doc comment in SugarColorSection.jsx. Scoped to just this
+      // context rather than passed unconditionally, so if this same
+      // helper gets reused for Center/Edge/Side later, they aren't
+      // silently opted into the same restriction without being asked.
+      excludePatternColors={context === 'surface'}
     />
-  );
+    );
+  };
   const fillingSugarColor = config.sugarColorOverrides?.[isIndividual ? `filling-${activeLayer}` : 'filling'] || DEFAULT_CONFIG.sugarColor;
   const exteriorSugarColor = config.sugarColorOverrides?.[isIndividual ? `exterior-${activeLayer}` : 'exterior'] || DEFAULT_CONFIG.sugarColor;
 
@@ -207,18 +274,17 @@ export default function ToolPanel({
             </div>
           ) : (
             <>
-              {/* Tab switcher — two rows of three */}
-              <div className="grid grid-cols-3 gap-1 px-4 py-2 bg-muted/30">
-                {TABS.map(({ id, label, icon: Icon }) => (
+{/* Tab switcher — balanced 2x2 layout for the four remaining sections */}
+              <div className="grid grid-cols-2 gap-2 px-4 py-2 bg-muted/30">
+                {TABS.map(({ id, label, icon: Icon, zIndex }) => (
                   <button
                     key={id}
                     onClick={() => {
-                      if (id !== 'place') {
-                        onSelectTool?.(null);
-                      }
+                      onSelectTool?.(null);
                       setTab(id);
                     }}
-                    className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                    style={{ zIndex }}
+                    className={`relative flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-lg text-xs font-semibold transition-all duration-200 ${
                       tab === id
                         ? 'bg-card shadow text-foreground'
                         : 'text-muted-foreground hover:text-foreground'
@@ -230,18 +296,6 @@ export default function ToolPanel({
                 ))}
               </div>
 
-              {/* Shared layer strip — rendered ONCE here, not duplicated inside
-                  every section that needs it (see LayerTabStrip.jsx) */}
-              {showLayerStrip && (
-                <div className="px-4 pt-3">
-                  <LayerTabStrip
-                    layers={config.structure.layers}
-                    activeLayer={activeLayer}
-                    onLayerChange={setActiveLayer}
-                  />
-                </div>
-              )}
-
               {/* Scrollable content */}
               <ScrollArea className="flex-1">
             <motion.div
@@ -250,9 +304,26 @@ export default function ToolPanel({
               animate={{ opacity: 1 }}
               transition={{ duration: 0.2 }}
             >
+              {config.structure?.layers > 1 && tab !== 'center' && (
+                <>
+                  <TierDesignControl
+                    structure={config.structure}
+                    onChange={(newStructure) => onChange({ ...config, structure: newStructure })}
+                  />
+                  {showLayerStrip && (
+                    <LayerTabStrip
+                      layers={config.structure.layers}
+                      activeLayer={activeLayer}
+                      onLayerChange={setActiveLayer}
+                    />
+                  )}
+                </>
+              )}
+
               {tab === 'fundamentals' && (
                 <>
                   {/* 1. Cake Structure */}
+                  <div ref={registerSectionRef('structure')} className="scroll-mt-4">
                   <Collapsible
                     open={expandedSections.structure}
                     onOpenChange={() => toggleSection('structure')}
@@ -274,16 +345,11 @@ export default function ToolPanel({
                       <CakeStructureSection
                         structure={config.structure || DEFAULT_CONFIG.structure}
                         realSize={config.realSize}
-                        onChange={(newStructure, newRealSize) => {
-                          onChange({
-                            ...config,
-                            structure: newStructure,
-                            realSize: newRealSize
-                          });
-                        }}
+                        onChange={handleStructureChange}
                       />
                     </CollapsibleContent>
                   </Collapsible>
+                  </div>
 
                   <Separator className="opacity-50" />
 
@@ -292,6 +358,7 @@ export default function ToolPanel({
                       nakedGatedLocked above. Trigger is a real disabled
                       <button>, not just a styling change, so it can't be
                       opened via keyboard/click while locked either. */}
+                  <div ref={registerSectionRef('sponge')} className="scroll-mt-4">
                   <Collapsible
                     open={expandedSections.sponge && !nakedGatedLocked}
                     onOpenChange={() => toggleSection('sponge')}
@@ -343,12 +410,14 @@ export default function ToolPanel({
                       />
                     </CollapsibleContent>
                   </Collapsible>
+                  </div>
 
                   <Separator className="opacity-50" />
 
                   {/* 3. Filling — locked shut (and locked from opening)
                       until Exterior Finish's style is Naked, same
                       nakedGatedLocked gate as Sponge Flavor above. */}
+                  <div ref={registerSectionRef('filling')} className="scroll-mt-4">
                   <Collapsible
                     open={expandedSections.filling && !nakedGatedLocked}
                     onOpenChange={() => toggleSection('filling')}
@@ -402,10 +471,12 @@ export default function ToolPanel({
                       />
                     </CollapsibleContent>
                   </Collapsible>
+                  </div>
 
                   <Separator className="opacity-50" />
 
                   {/* 4. Exterior Finish */}
+                  <div ref={registerSectionRef('exteriorFinish')} className="scroll-mt-4">
                   <Collapsible
                     open={expandedSections.exteriorFinish}
                     onOpenChange={() => toggleSection('exteriorFinish')}
@@ -445,6 +516,7 @@ export default function ToolPanel({
                       />
                     </CollapsibleContent>
                   </Collapsible>
+                  </div>
 
                   <Separator className="opacity-50" />
 
@@ -458,6 +530,7 @@ export default function ToolPanel({
                       together with Surface Treatment rather than lingering
                       on screen as its own standalone block when this
                       section is closed. */}
+                  <div ref={registerSectionRef('surfaceTreatment')} className="scroll-mt-4">
                   <Collapsible
                     open={expandedSections.surfaceTreatment}
                     onOpenChange={() => toggleSection('surfaceTreatment')}
@@ -476,18 +549,33 @@ export default function ToolPanel({
                       )}
                     </CollapsibleTrigger>
                     <CollapsibleContent className="mt-3">
-                      <SurfaceTreatmentSection
-                        surfaceTreatment={config.surfaceTreatment || DEFAULT_CONFIG.surfaceTreatment}
-                        onChange={(newSurfaceTreatment) => {
-                          onChange({
-                            ...config,
-                            surfaceTreatment: newSurfaceTreatment
-                          });
-                        }}
-                      />
-                      {config.surfaceTreatment?.mode === 'glaze' && renderSugarColor('surface')}
+                      {/* Wrapped in the same space-y-4 container Filling/
+                          Exterior Finish use around their own SugarColorSection
+                          sibling — SurfaceTreatmentSection's own space-y-4
+                          only spaces ITS internal elements, it doesn't add
+                          any gap after itself, so without this wrapper
+                          Sugar Color sat flush against Pattern's last row
+                          instead of matching the spacing every other
+                          section's Sugar Color gets. */}
+                      <div className="space-y-4">
+                        <SurfaceTreatmentSection
+                          surfaceTreatment={config.surfaceTreatment || DEFAULT_CONFIG.surfaceTreatment}
+                          isIndividual={isIndividual}
+                          activeLayer={activeLayer}
+                          onChange={(newSurfaceTreatment) => {
+                            onChange({
+                              ...config,
+                              surfaceTreatment: newSurfaceTreatment
+                            });
+                          }}
+                        />
+                        {((isIndividual
+                          ? (config.surfaceTreatment?.layerTreatments?.[activeLayer]?.mode || config.surfaceTreatment?.mode)
+                          : config.surfaceTreatment?.mode) === 'glaze') && renderSugarColor('surface')}
+                      </div>
                     </CollapsibleContent>
                   </Collapsible>
+                  </div>
                 </>
               )}
 
@@ -513,6 +601,8 @@ export default function ToolPanel({
                 <>
                   <EdgeSection
                     edge={config.edge || DEFAULT_CONFIG.edge}
+                    structure={config.structure || DEFAULT_CONFIG.structure}
+                    activeLayer={activeLayer}
                     onChange={(newEdge) => onChange({ ...config, edge: newEdge })}
                     layerCount={config.structure?.layers || 1}
                     onActiveSlotChange={setActiveEdgeSlot}
@@ -529,6 +619,8 @@ export default function ToolPanel({
                 <>
                   <SideSection
                     side={config.side || DEFAULT_CONFIG.side}
+                    structure={config.structure || DEFAULT_CONFIG.structure}
+                    activeLayer={activeLayer}
                     onChange={(newSide) => onChange({ ...config, side: newSide })}
                     sugarColor={config.sugarColorOverrides?.side || DEFAULT_CONFIG.sugarColor}
                     onSugarColorChange={(newSugarColor) => onChange({
@@ -539,25 +631,6 @@ export default function ToolPanel({
                 </>
               )}
 
-              {tab === 'place' && (
-                <PlaceSection
-                  place={config.place || DEFAULT_CONFIG.place}
-                  onChange={(newPlace) => {
-                    if (onPlaceChange) {
-                      onPlaceChange(newPlace.items);
-                    } else {
-                      onChange({ ...config, place: newPlace });
-                    }
-                  }}
-                  onUndo={onPlaceUndo}
-                  onRedo={onPlaceRedo}
-                  canUndo={canPlaceUndo}
-                  canRedo={canPlaceRedo}
-                  activeTool={activeTool}
-                  onSelectTool={onSelectTool}
-                  topRadius={config.structure?.size === 'small' ? 3 : 4}
-                />
-              )}
             </motion.div>
           </ScrollArea>
 

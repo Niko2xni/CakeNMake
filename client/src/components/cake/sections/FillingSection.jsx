@@ -11,8 +11,8 @@ export default function FillingSection({ filling, structure, exteriorFinish, int
   const piping = filling.piping || DEFAULT_PIPING;
 
   const updateLayers = (layers) => {
-    onChange({ 
-      ...filling, 
+    onChange({
+      ...filling,
       enabled: layers > 0,  // Enable if layers > 0, disable if 0 (None)
       layers: layers > 0 ? layers : 1  // Keep layers value even when disabled
     });
@@ -47,7 +47,9 @@ export default function FillingSection({ filling, structure, exteriorFinish, int
           pill buttons — purely a visual match, the None/1/2/3 selection
           logic in updateLayers is unchanged. */}
       <div>
-        <span className="text-xs text-muted-foreground mb-2 block">Filling Layers</span>
+        <span className="text-xs text-muted-foreground mb-2 block">
+          {isIndividual ? `Tier ${activeLayer + 1} Filling Layers` : 'Filling Layers'}
+        </span>
         <div className="grid grid-cols-4 gap-2">
           {/* None option */}
           <button
@@ -108,11 +110,6 @@ export default function FillingSection({ filling, structure, exteriorFinish, int
             showColorPicker={false}
             shape="box"
           />
-          {(piping.tip === 'mashedCircles' || piping.tip === 'mashedSwirls') && (
-            <p className="text-[10px] text-muted-foreground -mt-2">
-              Piped in your Filling Flavor's own color — {isIndividual ? `Layer ${activeLayer + 1}'s` : 'the'} flavor below sets the color, no separate pick needed.
-            </p>
-          )}
 
           {/* Filling Flavor — the filling's own eating flavor. For most
               Piping Designs this is unrelated to Piping's decorative color
@@ -125,7 +122,7 @@ export default function FillingSection({ filling, structure, exteriorFinish, int
           >
           <div>
             <span className="text-xs text-muted-foreground mb-2 block">
-              {isIndividual ? `Layer ${activeLayer + 1} Filling Flavor` : 'Filling Flavor'}
+              {isIndividual ? `Tier ${activeLayer + 1} Filling Flavor` : 'Filling Flavor'}
             </span>
             <div className="grid grid-cols-2 gap-2">
               {FROSTING_FILLING_FLAVOR_ORDER.map((flavorId) => {
@@ -141,7 +138,7 @@ export default function FillingSection({ filling, structure, exteriorFinish, int
                         : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
                     }`}
                   >
-                    <div 
+                    <div
                       className="w-8 h-8 rounded-full border-2 border-black/10"
                       style={{ backgroundColor: flavor.colors.crumbBase }}
                     />

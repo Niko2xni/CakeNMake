@@ -1,6 +1,4 @@
 import * as THREE from 'three';
-import { buildBasketballCollar } from './basketball';
-
 let _sharedSoccerBumpTexture = null;
 export function getSharedSoccerBumpTexture() {
   if (_sharedSoccerBumpTexture) return _sharedSoccerBumpTexture;

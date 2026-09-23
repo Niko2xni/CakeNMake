@@ -37,7 +37,7 @@ const SIZE_PRICES = { big: 20, small: 10 };
 // Tier dimensions per size and layer count
 const SIZE_LABELS = {
   big:   { 1: '8"×5"', 2: '8"×5" + 6"×4"' },
-  small: { 1: '6"×5"', 2: '6"×5" + 5"×4"' },
+  small: { 1: '6"×4"', 2: '6"×4" + 4"×3"' },
 };
 
 const TOPPING_PRICES = {

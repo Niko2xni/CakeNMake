@@ -34,3 +34,39 @@ export function getSpongeDummyMap() {
   _spongeDummyMap.userData.sharedCache = true;
   return _spongeDummyMap;
 }
+
+/**
+ * Parse CSS gradient string to extract color stops
+ * @param {string} gradientCss - CSS gradient string (linear-gradient or conic-gradient)
+ * @returns {Array<{ color: string, position: number }>} Array of color stops
+ */
+export function parseGradientStops(gradientCss) {
+  try {
+    const match = gradientCss.match(/(?:linear|conic)-gradient\(([^)]+)\)/);
+    if (!match) return [];
+
+    const content = match[1];
+    const parts = content.split(',');
+    const colorParts = parts.slice(1);
+
+    const stops = [];
+    colorParts.forEach((part) => {
+      const trimmed = part.trim();
+      const colorMatch = trimmed.match(/#[0-9A-Fa-f]{6}/);
+      const positionMatch = trimmed.match(/(\d+)%/);
+
+      if (colorMatch) {
+        const color = colorMatch[0];
+        const position = positionMatch
+          ? parseInt(positionMatch[1], 10) / 100
+          : stops.length / (colorParts.length - 1);
+        stops.push({ color, position });
+      }
+    });
+
+    return stops;
+  } catch (e) {
+    console.error('Error parsing gradient CSS:', e);
+    return [];
+  }
+}

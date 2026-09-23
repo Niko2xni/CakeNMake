@@ -17,12 +17,33 @@
 // ---------------------------------------------------------------------------
 
 import * as THREE from 'three';
-import { getSpongeDummyMap, markShared } from './materialUtils';
+import { getSpongeDummyMap, markShared, parseGradientStops } from './materialUtils';
 import { buildGradientTexture } from './cakeTextures';
 import { SUGAR_COLORS } from '../../lib/cakeConfig';
 
+export { parseGradientStops };
+
 // ── Cache ──────────────────────────────────────────────────────────────────
 const frostingMaterialCache = {};
+
+/**
+ * Overwrites a geometry's UV attribute with a clean, guaranteed-linear
+ * top-to-bottom mapping (u is constant, v runs 0→1 over the geometry's own
+ * local Y bounding box).
+ */
+export function applyVerticalGradientUV(geometry) {
+  geometry.computeBoundingBox();
+  const { min, max } = geometry.boundingBox;
+  const height = Math.max(max.y - min.y, 1e-6);
+  const position = geometry.attributes.position;
+  const uv = new Float32Array(position.count * 2);
+  for (let idx = 0; idx < position.count; idx++) {
+    uv[idx * 2] = 0.5;
+    uv[idx * 2 + 1] = (position.getY(idx) - min.y) / height;
+  }
+  geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  return geometry;
+}
 
 /**
  * Returns a cached, shared frosting material for the given hex color.
@@ -37,63 +58,6 @@ export function getFrostingMaterial(hexColor, colorId = null) {
   }
   frostingMaterialCache[cacheKey] = markShared(createFrostingMaterial(hexColor, colorId));
   return frostingMaterialCache[cacheKey];
-}
-
-// ── Factory ────────────────────────────────────────────────────────────────
-
-/**
- * Parse CSS gradient string to extract color stops
- * @param {string} gradientCss - CSS gradient string (e.g., 'linear-gradient(180deg, #D6293E 0%, #DD5363 20%, ...)')
- * @returns {Array} Array of {color: hex, position: 0-1} objects
- */
-function parseGradientStops(gradientCss) {
-  try {
-    console.log('Parsing gradient CSS:', gradientCss);
-    // Extract the part between parentheses. Matches BOTH linear-gradient(...)
-    // (Marble/Ombré/Watercolor Pastel Mix/Red-White Gradient) and
-    // conic-gradient(...) (Rainbow Swirl) — the old linear-only regex meant
-    // Rainbow Swirl's swatchCss never matched here, colorStops stayed empty,
-    // and it silently fell through to the flat-hex fallback below instead
-    // of ever building a gradient texture. Both syntaxes share the same
-    // "first segment is the direction/angle, rest are color stops" shape
-    // (conic-gradient's first segment is "from 0deg" rather than a plain
-    // angle), so the parts.slice(1) skip further down still works unchanged
-    // for either.
-    const match = gradientCss.match(/(?:linear|conic)-gradient\(([^)]+)\)/);
-    if (!match) {
-      console.log('No gradient match found');
-      return [];
-    }
-
-    const content = match[1];
-    console.log('Gradient content:', content);
-    const parts = content.split(',');
-    console.log('Gradient parts:', parts);
-
-    // Skip the first part (direction: 180deg)
-    const colorParts = parts.slice(1);
-    console.log('Color parts:', colorParts);
-
-    const stops = [];
-    colorParts.forEach(part => {
-      const trimmed = part.trim();
-      const colorMatch = trimmed.match(/#[0-9A-Fa-f]{6}/);
-      const positionMatch = trimmed.match(/(\d+)%/);
-
-      if (colorMatch) {
-        const color = colorMatch[0];
-        const position = positionMatch ? parseInt(positionMatch[1]) / 100 : stops.length / (colorParts.length - 1);
-        stops.push({ color, position });
-        console.log('Added stop:', { color, position });
-      }
-    });
-
-    console.log('Final stops:', stops);
-    return stops;
-  } catch (e) {
-    console.error('Error parsing gradient CSS:', e);
-    return [];
-  }
 }
 
 function createFrostingMaterial(hexColor, colorId = null) {
@@ -242,17 +206,17 @@ float frostNoise(vec3 p) {
 {
   // ── 1. Spatula ridges (macro-texture) ──────────────────────────
   float upFactor = smoothstep(0.4, 0.8, abs(vFrostNormal.y));
-  
+
   // Side streaks
   vec3 spatCoord = vFrostPos * vec3(2.0, 12.0, 2.0);
   float spatFade = mix(1.0 - smoothstep(2.0, 5.0, length(fwidth(spatCoord))), 1.0, upFactor);
   float sideN = frostNoise(spatCoord) * 0.65 + frostNoise(spatCoord * 2.1 + 7.0) * 0.35;
-  
+
   // Top spiral swirl
   vec2 polar = vec2(length(vFrostPos.xz), atan(vFrostPos.z, vFrostPos.x));
   vec3 topCoord = vec3(polar.x * 15.0, polar.y * 3.0 + polar.x * 5.0, 0.0);
   float topN = frostNoise(topCoord) * 0.65 + frostNoise(topCoord * 2.1 + 7.0) * 0.35;
-  
+
   float spatN = mix(sideN, topN, upFactor);
   float spatula = (spatN - 0.5) * spatFade;  // centred around 0
 
@@ -275,7 +239,7 @@ float frostNoise(vec3 p) {
   gFrostHeight = 0.5 + spatula * 0.35 + pores * 0.15;
 
   // ── Diffuse color ──────────────────────────────────────────────
-  // Strictly no procedural noise applied to the diffuse color; 
+  // Strictly no procedural noise applied to the diffuse color;
   // all spatial/spatula detail is handled purely by normal perturbation.
   // For gradient colors, use the texture as-is; for solid colors, multiply by uFrostColor
   if (uIsGradient < 0.5) {
@@ -317,6 +281,28 @@ roughnessFactor = uIsMetallic > 0.5
         `#include <aomap_fragment>
 float proceduralAO = clamp(0.7 + gFrostHeight * 0.6, 0.0, 1.0);
 reflectedLight.indirectDiffuse *= proceduralAO;`
+      )
+
+      // --- Gold Shimmer sparkle ---
+      // Real PBR metalness relies almost entirely on light angle/
+      // environment reflections to read as "shiny" — the bumpy Mashed
+      // Circles/Mashed Swirls geometry has enough surface-normal variation
+      // to catch highlights from many angles and looked convincingly
+      // metallic, but the plain, nearly-flat filling profile "None" uses
+      // barely varies its normal at all, so the same material just looked
+      // dull there. This adds a small noise-thresholded emissive glint —
+      // independent of surface curvature or scene lighting — so Gold
+      // Shimmer reads as shimmery on any geometry it's applied to, not
+      // just the ones with enough natural bump variation to fake it.
+      .replace(
+        '#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>
+if (uIsMetallic > 0.5) {
+  vec3 sparkleCoord = vFrostPos * 40.0;
+  float sparkleN = frostNoise(sparkleCoord) * 0.5 + frostNoise(sparkleCoord * 1.7 + 91.0) * 0.5;
+  float glint = smoothstep(0.88, 0.97, sparkleN);
+  totalEmissiveRadiance += uFrostColor * glint * 1.4;
+}`
       );
 
     material.userData.shader = shader;

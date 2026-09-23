@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { getFrostingMaterial, applyVerticalGradientUV } from '../frostingMaterial';
 
 // ─── Bezier path definitions (tile space: u ∈ [0,1], v ∈ [-1,1]) ─────────────
 // Each sub-array is one cubic Bezier segment: [p0, cp1, cp2, p3].
@@ -314,19 +315,160 @@ function localMerge(geos) {
 }
 
 /**
- * Builds piping-scroll side decoration as a SINGLE Mesh for the requested cake radius / height / color.
+ * Answers "how much is this point on the tier's side wall covered by an
+ * active Piping Scrolls element (a scroll curve, a teardrop, or a dot)?"
+ * as a 0..1 weight, for Filling's own Piping Design to shave against —
+ * same purpose/smoothstep-edge reasoning as the coverage functions in
+ * DecorationSets.jsx (a hard 0/1 cutoff creases the continuous filling
+ * mesh — see getCheckerCoverageFn's own comment there for the full
+ * explanation).
+ *
+ * Piping Scrolls has no cell grid or point list to look up the way
+ * Checkered/Chevron/Scatter Pearls do — its shapes are cubic-Bezier
+ * scroll curves and quadratic-Bezier teardrops (see the *_BEZIERS/
+ * *_TEARDROPS constants above), repeated once per tile around the
+ * circumference. This samples each active variant's own real curve
+ * definitions (the exact same arrays buildPipingScrolls itself reads)
+ * into a short polyline of (u, v) tile-space points, converts each
+ * sampled point to real arc-length/Y units the same way
+ * MappedCurvePathCylinder/TeardropCurve do, and finds the closest one to
+ * the query point — an approximation of true point-to-curve distance,
+ * accurate enough at 16-24 samples per curve given how gentle these
+ * particular curves are (no sharp corners) and cheap enough to run per
+ * Filling vertex.
+ *
+ * Every element's own real radius (MIN_R..MAX_R taper for scrolls, the
+ * teardrops' own smaller taper, DOT_R for dots) is used as a flat radius
+ * rather than reproducing the taper exactly — MAX_R (or the teardrop
+ * equivalent) is a reasonable, mildly generous approximation, same
+ * flat-footprint tradeoff Scatter Pearls' own coverage function makes.
  */
-export function buildPipingScrolls(radius, height, colorHex, variant = 'waveRope') {
-  const material = new THREE.MeshStandardMaterial({
-    color:      colorHex,
-    roughness:  0.55,
-    metalness:  0.00,
-  });
+export function getPipingScrollsCoverageFn(radius, height, opts = {}) {
+  const variant = opts.variant || 'waveRope';
 
   const targetHeightScale = height / 1.6;
   const idealTileCount = (3.826 * radius) / targetHeightScale;
   const tileCount = Math.max(3, Math.ceil(idealTileCount));
-  
+  const heightScale = (3.826 * radius) / tileCount;
+  const arcWidth = (Math.PI * 2) / tileCount;
+
+  const sampleCubic = (bezier, steps = 24) => {
+    const [p0, p1, p2, p3] = bezier;
+    const pts = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const mt = 1 - t;
+      const u = mt * mt * mt * p0[0] + 3 * mt * mt * t * p1[0] + 3 * mt * t * t * p2[0] + t * t * t * p3[0];
+      const v = mt * mt * mt * p0[1] + 3 * mt * mt * t * p1[1] + 3 * mt * t * t * p2[1] + t * t * t * p3[1];
+      pts.push([u, v]);
+    }
+    return pts;
+  };
+
+  const sampleTeardrop = (td, steps = 16) => {
+    const [p0u, p0v, p1u, p1v, p2u, p2v] = td;
+    const pts = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const s = 1 - t;
+      const u = s * s * p0u + 2 * s * t * p1u + t * t * p2u;
+      const v = s * s * p0v + 2 * s * t * p1v + t * t * p2v;
+      pts.push([u, v]);
+    }
+    return pts;
+  };
+
+  // Each element: { points: [[u,v], ...], radius }.
+  const elements = [];
+  const addScrollElement = (beziers, radiusApprox = MAX_R) => {
+    for (const bez of beziers) elements.push({ points: sampleCubic(bez), radius: radiusApprox });
+  };
+  const addTeardropElement = (td, radiusApprox = MAX_R * 0.85) => {
+    elements.push({ points: sampleTeardrop(td), radius: radiusApprox });
+  };
+  const addDotElement = (u, v) => {
+    elements.push({ points: [[u, v]], radius: DOT_R });
+  };
+
+  if (variant === 'pairedScrolls') {
+    addScrollElement(PAIRED_LEFT_C_SCROLL_BEZIERS);
+    addScrollElement(PAIRED_RIGHT_C_SCROLL_BEZIERS);
+    addDotElement(0.32, -0.40);
+    addDotElement(0.38, 0.38);
+    addDotElement(0.68, -0.40);
+    addDotElement(0.62, 0.38);
+  } else if (variant === 'fleurDeLisRow') {
+    for (const td of FLEUR_DE_LIS_TEARDROPS) addTeardropElement(td);
+    addDotElement(0.50, -0.42);
+  } else if (variant === 'shellBorderRow') {
+    for (const td of SHELL_BORDER_TEARDROPS) addTeardropElement(td);
+    addDotElement(0.50, -0.38);
+  } else if (variant === 'vineAndTendrils') {
+    addScrollElement(VINE_SPINE_BEZIERS);
+    addScrollElement(VINE_TENDRIL_LEFT);
+    addScrollElement(VINE_TENDRIL_RIGHT);
+    addDotElement(0.32, 0.08);
+    addDotElement(0.68, -0.08);
+  } else if (variant === 'loopChain') {
+    addScrollElement(LOOP_CHAIN_BEZIERS);
+    addDotElement(0.50, 0.00);
+  } else {
+    // Default: 'waveRope'
+    addScrollElement(WAVE_ROPE_BEZIERS);
+    addDotElement(0.25, 0.45);
+    addDotElement(0.75, -0.45);
+  }
+
+  const smoothstep = (t) => {
+    const c = Math.min(1, Math.max(0, t));
+    return c * c * (3 - 2 * c);
+  };
+
+  return (angle, localY) => {
+    const wrappedAngle = ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    const tileIndex = Math.floor(wrappedAngle / arcWidth);
+
+    let coverage = 0;
+    // Also check the tile immediately before/after — a shape sitting near
+    // u≈0 or u≈1 in one tile can be nearer to the ADJACENT tile's own
+    // copy of that same shape (tiles repeat seamlessly around the whole
+    // circumference) than to its own tile's copy.
+    for (const dTile of [0, -1, 1]) {
+      const tileStartAngle = (tileIndex + dTile) * arcWidth;
+      const localArc = radius * (wrappedAngle - tileStartAngle);
+      for (const el of elements) {
+        for (const [u, v] of el.points) {
+          const dArc = localArc - radius * u * arcWidth;
+          const dY = localY - v * heightScale;
+          const dist = Math.sqrt(dArc * dArc + dY * dY);
+          const distInsideEdge = el.radius - dist;
+          if (distInsideEdge <= 0) continue;
+          const smoothWidth = Math.max(0.015, el.radius * 0.3);
+          coverage = Math.max(coverage, smoothstep(distInsideEdge / smoothWidth));
+          if (coverage >= 1) return 1;
+        }
+      }
+    }
+    return coverage;
+  };
+}
+
+/**
+ * Builds piping-scroll side decoration as a SINGLE Mesh for the requested cake radius / height / color.
+ */
+export function buildPipingScrolls(radius, height, colorHex, colorId, variant = 'waveRope') {
+  // Same fix as Checkered/Triangle/Chevron in DecorationSets.jsx — was a
+  // plain THREE.MeshStandardMaterial({ color }), no colorId, so all six
+  // pattern colors (Marble/Ombré/Rainbow Swirl/Gold Shimmer/Watercolor
+  // Pastel Mix/Red-White Gradient) rendered as a flat swatch. Piped
+  // scrolls are meant to look like actual piped buttercream anyway, so
+  // getFrostingMaterial is the right fit here, same as those three.
+  const material = getFrostingMaterial(colorHex, colorId);
+
+  const targetHeightScale = height / 1.6;
+  const idealTileCount = (3.826 * radius) / targetHeightScale;
+  const tileCount = Math.max(3, Math.ceil(idealTileCount));
+
   const heightScale = (3.826 * radius) / tileCount;
   const arcWidth    = (Math.PI * 2) / tileCount;
   const baseY       = 0;
@@ -427,5 +569,14 @@ export function buildPipingScrolls(radius, height, colorHex, variant = 'waveRope
   }
 
   const merged = localMerge(allGeos);
+  // No uv attribute existed on this geometry at all before — harmless for
+  // the flat colorHex-only material this used to always get, but
+  // getFrostingMaterial's gradient colors (everything except Gold
+  // Shimmer, which is metalness/roughness only and doesn't sample a
+  // texture) sample a texture via UV, and with nothing to sample against
+  // they rendered as a flat, wrong single color. Same fix as the Mashed
+  // Circles/Mashed Swirls filling-piping geometry and DecorationSets.jsx's
+  // Triangle/Chevron geometries.
+  applyVerticalGradientUV(merged);
   return new THREE.Mesh(merged, material);
 }

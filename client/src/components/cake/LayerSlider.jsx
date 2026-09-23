@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 // Tier dimensions per size and layer count — shown as a hint below the controls
 const TIER_DIMS = {
   big:   { 1: '8"×5"', 2: '8"×5" + 6"×4"' },
-  small: { 1: '6"×5"', 2: '6"×5" + 5"×4"' },
+  small: { 1: '6"×4"', 2: '6"×4" + 4"×3"' },
 };
 
 export default function LayerSlider({ layers, onChange, cakeSize = 'big', onSizeChange }) {
@@ -17,7 +17,7 @@ export default function LayerSlider({ layers, onChange, cakeSize = 'big', onSize
         <div className="flex gap-2">
           {[
             { key: 'big',   label: '8×5', dims: '8"×5"' },
-            { key: 'small', label: '6×5', dims: '6"×5"' },
+            { key: 'small', label: '6×4', dims: '6"×4"' },
           ].map(({ key, label, dims }) => (
             <button
               key={key}

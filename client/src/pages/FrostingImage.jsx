@@ -67,8 +67,7 @@ export default function FrostingImage({ className = '' }) {
 
 
 import * as THREE from 'three';
-import { GLAZE_PATTERN_CARVES } from '../components/cake/cakeConstants';
-import { buildGlazeGeometry } from '../components/cake/frostingGeometry';
+import { GLAZE_PATTERN_CARVES } from './cakeConstants'; //[cite: 6, 8]
 
 /**
  * Enhanced Glaze Material with Physical Clearcoat & Procedural Optical Depth

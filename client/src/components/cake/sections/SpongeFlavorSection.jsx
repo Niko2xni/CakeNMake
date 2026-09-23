@@ -1,7 +1,7 @@
 import React from 'react';
 import { FLAVORS, FLAVOR_ORDER } from '@/lib/cakeFlavors';
 
-export default function SpongeFlavorSection({ sponge, structure, activeLayer, onLayerChange, onChange }) {
+export default function SpongeFlavorSection({ sponge, structure, activeLayer, onChange }) {
   const isIndividual = structure.layerDesign === 'individual' && structure.layers > 1;
 
   const updateFlavor = (flavor) => {
@@ -23,29 +23,10 @@ export default function SpongeFlavorSection({ sponge, structure, activeLayer, on
 
   return (
     <div className="space-y-4">
-      {/* Layer selector for individual mode */}
-      {isIndividual && (
-        <div className="flex gap-1 bg-muted/40 rounded-xl p-1">
-          {Array.from({ length: structure.layers }).map((_, i) => (
-            <button
-              key={i}
-              onClick={() => onLayerChange(i)}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
-                activeLayer === i
-                  ? 'bg-card shadow text-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Layer {i + 1}
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* Flavor Selection */}
       <div>
         <span className="text-xs text-muted-foreground mb-2 block">
-          {isIndividual ? `Layer ${activeLayer + 1} Flavor` : 'Sponge Flavor'}
+          {isIndividual ? `Tier ${activeLayer + 1} Flavor` : 'Sponge Flavor'}
         </span>
         <div className="grid grid-cols-2 gap-2">
           {FLAVOR_ORDER.map((flavorId) => {
@@ -61,7 +42,7 @@ export default function SpongeFlavorSection({ sponge, structure, activeLayer, on
                     : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
                 }`}
               >
-                <div 
+                <div
                   className="w-8 h-8 rounded-full border-2 border-black/10"
                   style={{ backgroundColor: flavor.colors.crumbBase }}
                 />

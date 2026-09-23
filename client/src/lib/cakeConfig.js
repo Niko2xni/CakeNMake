@@ -17,7 +17,7 @@
 // region the way Center/Edge/Side do (a person doesn't go "add something to
 // the Surface," they're answering "what does the whole coating look like,"
 // which is a continuation of Fundamentals' Exterior Finish question). Its
-// color content (Default / Color Override) lives under Fundamentals as
+// color content (Match Flavor / Pick Color) lives under Fundamentals as
 // `sugarColor`. Glaze and Textured Buttercream started out folded into
 // `sugarColor.mode` alongside those two, and briefly had their own
 // `surfaceTreatment` field/section once Textured Buttercream got real
@@ -125,8 +125,6 @@ export const DEFAULT_CONFIG = {
   sugarColor: {
     mode: 'default',
     colorId: null,
-    flavorColorId: 'vanilla',
-    overrideColorId: 'red',
   },
   // Each contextual Sugar Color picker owns its own selection so changing
   // one decorated region does not recolor the rest of the cake.
@@ -147,6 +145,10 @@ export const DEFAULT_CONFIG = {
     mode: null,
     colorId: null,
     pattern: 'longGaps', // one of GLAZE_PATTERNS ids — only relevant when mode === 'glaze'
+    layerTreatments: [
+      { mode: null, pattern: 'longGaps' },
+      { mode: null, pattern: 'longGaps' },
+    ],
   },
 
   // 5. Center — top surface. Decorations and Text are mutually EXCLUSIVE
@@ -165,9 +167,10 @@ export const DEFAULT_CONFIG = {
   // just hidden.
   edge: {
     mode: 'both', // 'topBottomSeparate' | 'both'
-    top:    { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla', secondaryColorId: 'red' } },
-    bottom: { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla', secondaryColorId: 'red' } },
-    both:   { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla', secondaryColorId: 'red' } },
+    activeSlot: 'both', // 'top' | 'bottom' | 'both' — single source of truth for which edge slot is currently active
+    top:    { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla', secondaryColorId: 'red', secondaryColorMode: 'colorOverride' } },
+    bottom: { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla', secondaryColorId: 'red', secondaryColorMode: 'colorOverride' } },
+    both:   { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla', secondaryColorId: 'red', secondaryColorMode: 'colorOverride' } },
     // Layer 1 shelf ring — only active on 2-layer cakes
     middle: { piping: { tip: null, colorId: 'vanilla', secondaryColorId: 'red' } },
   },
@@ -238,7 +241,7 @@ export const BUTTERCREAM_TEXTURES = [
 // Size options
 export const SIZE_OPTIONS = [
   { id: 'big', label: '8×5', dimensions: { diameter: 8, height: 5 } },
-  { id: 'small', label: '6×5', dimensions: { diameter: 6, height: 5 } },
+  { id: 'small', label: '6×4', dimensions: { diameter: 6, height: 4 } },
 ];
 
 // Layer options
@@ -263,87 +266,24 @@ export const PIPING_TIPS = [
   { id: 'shell', label: 'Shell Border' },
   { id: 'reverseShell', label: 'Reverse Shell' },
   { id: 'bead', label: 'Bead Piping' },
-  { id: 'pulledDot', label: 'Pulled Dot Piping' },
-  { id: 'elongatedShell', label: 'Elongated Shell Border' },
   { id: 'zigzag', label: 'Zigzag Piping' },
   { id: 'wavePiping', label: 'Wave Piping' },
   { id: 'star', label: 'Star' },
   { id: 'rope', label: 'Rope' },
   { id: 'ropeTwist', label: 'Rope Twist' },
   { id: 'ropeTwistClassic', label: 'Rope Twist (Classic)' },
-  { id: 'shellAlt', label: 'Shell Border - Alternating' },
-  { id: 'reverseShellAlt', label: 'Reverse Shell - Alternating' },
-  { id: 'beadAlt', label: 'Bead Piping - Alternating' },
-  { id: 'elongatedShellAlt', label: 'Elongated Shell Border - Alternating' },
-  { id: 'ropeTwistAlt', label: 'Rope Twist - Alternating' },
-  { id: 'ropeTwistClassicAlt', label: 'Rope Twist (Classic) - Alternating' },
   { id: 'round', label: 'Round' },
   { id: 'petal', label: 'Petal' },
   { id: 'leaf', label: 'Leaf' },
   { id: 'dropFlower', label: 'Drop Flower' },
   { id: 'lambeth', label: 'Lambeth Method' },
-  { id: 'starDollopContinuous', label: 'Continuous Star Dollop (20 pc)' },
-  { id: 'starDollop', label: 'Star Dollop (12 pc)' },
-  { id: 'starDollopSparse', label: 'Sparse Star Dollop (8 pc)' },
-  { id: 'roundDollop', label: 'Continuous Round Tip Dollop (20 pc)' },
-  { id: 'roundDollopMedium', label: 'Round Tip Dollop (12 pc)' },
-  { id: 'roundDollopSparse', label: 'Sparse Round Tip Dollop (8 pc)' },
-  { id: 'kissDollop', label: 'Continuous Kisses Dollop (20 pc)' },
-  { id: 'kissDollopMedium', label: 'Kisses Dollop (12 pc)' },
-  { id: 'kissDollopSparse', label: 'Sparse Kisses Dollop (8 pc)' },
-  { id: 'starDollopContinuousCherry', label: 'Continuous Star Dollop (20 pc) with Cherry' },
-  { id: 'starDollopCherry', label: 'Star Dollop (12 pc) with Cherry' },
-  { id: 'starDollopSparseCherry', label: 'Sparse Star Dollop (8 pc) with Cherry' },
-  { id: 'roundDollopCherry', label: 'Continuous Round Tip Dollop (20 pc) with Cherry' },
-  { id: 'roundDollopMediumCherry', label: 'Round Tip Dollop (12 pc) with Cherry' },
-  { id: 'roundDollopSparseCherry', label: 'Sparse Round Tip Dollop (8 pc) with Cherry' },
-  { id: 'starDollopContinuousAlt', label: 'Continuous Star Dollop (20 pc) - Alternating' },
-  { id: 'starDollopAlt', label: 'Star Dollop (12 pc) - Alternating' },
-  { id: 'starDollopSparseAlt', label: 'Sparse Star Dollop (8 pc) - Alternating' },
-  { id: 'roundDollopAlt', label: 'Continuous Round Tip Dollop (20 pc) - Alternating' },
-  { id: 'roundDollopMediumAlt', label: 'Round Tip Dollop (12 pc) - Alternating' },
-  { id: 'roundDollopSparseAlt', label: 'Sparse Round Tip Dollop (8 pc) - Alternating' },
-  { id: 'kissDollopAlt', label: 'Continuous Kisses Dollop (20 pc) - Alternating' },
-  { id: 'kissDollopMediumAlt', label: 'Kisses Dollop (12 pc) - Alternating' },
-  { id: 'kissDollopSparseAlt', label: 'Sparse Kisses Dollop (8 pc) - Alternating' },
-  { id: 'starDollopContinuousAltCherry', label: 'Continuous Star Dollop (20 pc) - Alternating with Cherry' },
-  { id: 'starDollopAltCherry', label: 'Star Dollop (12 pc) - Alternating with Cherry' },
-  { id: 'starDollopSparseAltCherry', label: 'Sparse Star Dollop (8 pc) - Alternating with Cherry' },
-  { id: 'roundDollopAltCherry', label: 'Continuous Round Tip Dollop (20 pc) - Alternating with Cherry' },
-  { id: 'roundDollopMediumAltCherry', label: 'Round Tip Dollop (12 pc) - Alternating with Cherry' },
-  { id: 'roundDollopSparseAltCherry', label: 'Sparse Round Tip Dollop (8 pc) - Alternating with Cherry' },
+  { id: 'starDollop', label: 'Star Dollop' },
+  { id: 'starDollopSparse', label: 'Sparse Star Dollop' },
+  { id: 'starDollopContinuous', label: 'Continuous Star Dollop' },
   { id: 'starScallop', label: 'Star Scallop' },
   { id: 'starScallopSoft', label: 'Soft Star Scallop' },
   { id: 'starScallopDollops', label: 'Scallop with Dollops' },
   { id: 'starScallopLayered', label: 'Layered Star Scallop' },
-  { id: 'whippedCreamRosetteContinuous', label: 'Whipped Cream Rosettes (Continuous)' },
-  { id: 'whippedCreamRosette', label: 'Whipped Cream Rosettes (12 pc)' },
-  { id: 'whippedCreamRosetteSparse', label: 'Whipped Cream Rosettes (Sparse)' },
-  { id: 'whippedCreamRosetteContinuousCherry', label: 'Whipped Cream Rosettes with Cherry (Continuous)' },
-  { id: 'whippedCreamRosetteCherry', label: 'Whipped Cream Rosettes with Cherry (12 pc)' },
-  { id: 'whippedCreamRosetteSparseCherry', label: 'Sparse Whipped Cream Rosettes with Cherry (8 pc)' },
-  { id: 'whippedCreamRosetteContinuousStrawberry', label: 'Whipped Cream Rosettes with Strawberry (Continuous)' },
-  { id: 'whippedCreamRosetteStrawberry', label: 'Whipped Cream Rosettes with Strawberry (12 pc)' },
-  { id: 'whippedCreamRosetteSparseStrawberry', label: 'Sparse Whipped Cream Rosettes with Strawberry (8 pc)' },
-  { id: 'starDollopContinuousStrawberry', label: 'Continuous Star Dollop (20 pc) with Strawberry' },
-  { id: 'starDollopStrawberry', label: 'Star Dollop (12 pc) with Strawberry' },
-  { id: 'starDollopSparseStrawberry', label: 'Sparse Star Dollop (8 pc) with Strawberry' },
-  { id: 'roundDollopStrawberry', label: 'Continuous Round Tip Dollop (20 pc) with Strawberry' },
-  { id: 'roundDollopMediumStrawberry', label: 'Round Tip Dollop (12 pc) with Strawberry' },
-  { id: 'roundDollopSparseStrawberry', label: 'Sparse Round Tip Dollop (8 pc) with Strawberry' },
-  { id: 'starDollopContinuousAltStrawberry', label: 'Continuous Star Dollop (20 pc) - Alternating with Strawberry' },
-  { id: 'starDollopAltStrawberry', label: 'Star Dollop (12 pc) - Alternating with Strawberry' },
-  { id: 'starDollopSparseAltStrawberry', label: 'Sparse Star Dollop (8 pc) - Alternating with Strawberry' },
-  { id: 'roundDollopAltStrawberry', label: 'Continuous Round Tip Dollop (20 pc) - Alternating with Strawberry' },
-  { id: 'roundDollopMediumAltStrawberry', label: 'Round Tip Dollop (12 pc) - Alternating with Strawberry' },
-  { id: 'roundDollopSparseAltStrawberry', label: 'Sparse Round Tip Dollop (8 pc) - Alternating with Strawberry' },
-  { id: 'strawberryRim', label: 'Fresh Strawberries Rim 🍓' },
-  { id: 'hersheysKissRim', label: "Hershey's Kisses Rim 🍫" },
-  { id: 'ferreroRocherRim', label: 'Ferrero Rocher Rim 🌰' },
-  { id: 'oreoRim', label: 'Oreo Rim 🍪' },
-  { id: 'cherryRim', label: 'Cherry Rim 🍒' },
-  { id: 'basketballRim', label: 'Basketball Rim 🏀' },
-  { id: 'soccerBallRim', label: 'Soccer Ball Rim ⚽' },
 ];
 
 // ─── Filling Piping Designs — Filling's own piping vocabulary, split out
@@ -398,19 +338,24 @@ export const SIZE_OPTIONS_CUSTOM = [
 //      kept for visual familiarity (e.g. piping that "looks vanilla")
 //   2. Plain accents (4)  — basic non-flavor accents
 //   3. Designer palette (8) — richer tones, previously Frosting Color only
-//   4. Pattern/multi-tone (5) — whole-surface patterns, not flat colors;
+//   4. Pattern/multi-tone (6) — whole-surface patterns, not flat colors;
 //      `implemented: false` means not rendered yet, not "can't be" — same
 //      cake mesh, just no code reads these ids yet (see `swatchCss`/
-//      `metallic` for how the picker itself still shows something distinct)
+//      `metallic` for how the picker itself still shows something distinct).
+//      All six are also tagged `isPattern: true` (Red-White Gradient
+//      included, despite being `implemented: true`) so SugarColorSection.jsx
+//      can hide just this group for a context that only wants flat colors
+//      — Surface Treatment's Glaze does this via `excludePatternColors`,
+//      leaving it with the 12 flat colors from groups 2-3 only.
 export const SUGAR_COLORS = [
   // Flavor-mirror — tagged isFlavorMirror so SugarColorSection.jsx can
-  // exclude them from Color Override's own palette (picking "Color
-  // Override → Vanilla" is redundant with what Default mode already gives
+  // exclude them from Pick Color's own palette (picking "Pick Color →
+  // Vanilla" is redundant with what Match Flavor mode already gives
   // you from Exterior Finish's flavor) without duplicating this id list in
-  // a second file. Everything else that reads SUGAR_COLORS — Default's own
-  // preview swatch, SetPicker/Center/Place's decoration and piping color
-  // grids, and every `colorId: 'vanilla'` default elsewhere in this file —
-  // is unaffected and still sees these six normally.
+  // a second file. Everything else that reads SUGAR_COLORS — Match
+  // Flavor's own preview swatch, SetPicker/Center/Place's decoration and
+  // piping color grids, and every `colorId: 'vanilla'` default elsewhere
+  // in this file — is unaffected and still sees these six normally.
   { id: 'vanilla', label: 'Vanilla', hex: FLAVORS.vanilla.colors.crumbBase, price: 0, implemented: true, isFlavorMirror: true },
   { id: 'chocolate', label: 'Chocolate', hex: FLAVORS.chocolate.colors.crumbBase, price: 0, implemented: true, isFlavorMirror: true },
   { id: 'strawberry', label: 'Strawberry', hex: FLAVORS.strawberry.colors.crumbBase, price: 0, implemented: true, isFlavorMirror: true },
@@ -433,27 +378,36 @@ export const SUGAR_COLORS = [
   { id: 'gold', label: 'Gold', hex: '#C9A24B', price: 80, implemented: true },
   // Pattern/multi-tone — not flat colors, implemented: false
   {
-    id: 'marble', label: 'Marble', hex: '#D8D8D8', price: 100, implemented: false,
-    swatchCss: 'linear-gradient(135deg, #2B2B2B 0%, #FBFBF8 35%, #2B2B2B 60%, #FBFBF8 100%)',
+    id: 'marble', label: 'Marble', hex: '#D8D8D8', price: 100, implemented: false, isPattern: true,
+    // One continuous black -> gray -> gray -> white sweep (180deg, matching
+    // Ombré/Red-White Gradient's vertical convention), not the old
+    // dark-light-dark-light repeat. That repeat looked marbled as a tiny
+    // 2D swatch icon, but applyVerticalGradientUV/getFrostingMaterial map
+    // these same stops straight onto the cake's actual height — a repeat
+    // reappears there as a hard light->dark seam partway up the piece
+    // instead of one smooth wash. Same "evenly-stepped, no reversal"
+    // shape as redWhiteGradient below, with 35%-55% held at the same gray
+    // to read as a deliberate marbled plateau rather than a flat ramp.
+    swatchCss: 'linear-gradient(180deg, #1A1A1A 0%, #8C8C8C 35%, #8C8C8C 55%, #FBFBF8 85%, #FBFBF8 100%)',
   },
   {
-    id: 'ombre', label: 'Ombré', hex: '#C7B7EA', price: 100, implemented: false,
+    id: 'ombre', label: 'Ombré', hex: '#C7B7EA', price: 100, implemented: false, isPattern: true,
     swatchCss: 'linear-gradient(180deg, #F5A9C0 0%, #C7B7EA 50%, #A6D8EA 100%)',
   },
   {
-    id: 'rainbowSwirl', label: 'Rainbow Swirl', hex: '#E8A9D8', price: 100, implemented: false,
+    id: 'rainbowSwirl', label: 'Rainbow Swirl', hex: '#E8A9D8', price: 100, implemented: false, isPattern: true,
     swatchCss: 'conic-gradient(from 0deg, #E24B4A, #EF9F27, #97C459, #378ADD, #7F77DD, #E24B4A)',
   },
   {
-    id: 'goldShimmer', label: 'Gold Shimmer', hex: '#D4AF37', price: 100, implemented: false,
+    id: 'goldShimmer', label: 'Gold Shimmer', hex: '#D4AF37', price: 100, implemented: false, isPattern: true,
     metallic: true, // needs metalness/roughness tuning, not just a flat/gradient color
   },
   {
-    id: 'watercolorPastel', label: 'Watercolor Pastel Mix', hex: '#EAD9EA', price: 100, implemented: false,
+    id: 'watercolorPastel', label: 'Watercolor Pastel Mix', hex: '#EAD9EA', price: 100, implemented: false, isPattern: true,
     swatchCss: 'linear-gradient(120deg, #F5A9C0 0%, #A6D8EA 35%, #FAEEDA 70%, #C7EAD8 100%)',
   },
   {
-    id: 'redWhiteGradient', label: 'Red-White Gradient', hex: '#FF8080', price: 100, implemented: true,
+    id: 'redWhiteGradient', label: 'Red-White Gradient', hex: '#FF8080', price: 100, implemented: true, isPattern: true,
     swatchCss: 'linear-gradient(180deg, #FAFAFA 0%, #E2D2D4 20%, #D4A1A7 40%, #CD6974 60%, #C92E40 80%, #A01828 100%)', // evenly-stepped luminance (~L28-42 per 20%) so the wash reads as one continuous fade instead of a white->pink jump, a flat plateau, then pink->red jump
   },
 ];
@@ -466,8 +420,13 @@ export const SUGAR_COLORS = [
 // be two more entries in this list — see SURFACE_TREATMENT_MODES below for
 // where they live now.
 export const SUGAR_COLOR_MODES = [
-  { id: 'default', label: 'Default', implemented: true },
-  { id: 'colorOverride', label: 'Color Override', implemented: true },
+  // Labels only — ids stay 'default'/'colorOverride' so nothing
+  // downstream (SugarColorSection's mode checks, configAdapter.js's
+  // resolveSugarColorHex, etc.) needs to change. "Match Flavor" is the
+  // derived-from-taste mode (Vanilla flavor -> vanilla-colored coating);
+  // "Pick Color" is the free, taste-independent color choice.
+  { id: 'default', label: 'Match Flavor', implemented: true },
+  { id: 'colorOverride', label: 'Pick Color', implemented: true },
 ];
 
 // ─── Surface Treatment modes — combinable overlay layers, independent of
@@ -560,7 +519,6 @@ export const TRIANGLE_PATTERN_SETS = [
 // loop parses back apart when rendering (see buildAndAddDecoration call
 // there) -- designId itself must never contain '-'.
 export const CENTER_PLACEABLE_DESIGNS = [
-  { designId: 'floralCluster', orientation: null, label: 'Floral Rosette', toolId: 'center-floralCluster-default' },
   { designId: 'strawberry', orientation: null, label: 'Strawberry', toolId: 'center-strawberry-default' },
   { designId: 'cherry', orientation: null, label: 'Cherry', toolId: 'center-cherry-default' },
   { designId: 'ferreroRocher', orientation: null, label: 'Ferrero Rocher', toolId: 'center-ferreroRocher-default' },
@@ -571,29 +529,6 @@ export const CENTER_PLACEABLE_DESIGNS = [
   { designId: 'soccerball', orientation: null, label: 'Soccer Ball', toolId: 'center-soccerball-default' },
 ];
 
-export const WHIPPED_CREAM_SOLID_VARIATIONS = [
-  { id: 'whippedCreamRosetteContinuous', label: 'Whipped Cream Rosettes (Continuous ~20 pc)' },
-  { id: 'whippedCreamRosette', label: 'Whipped Cream Rosettes (12 pc)' },
-  { id: 'whippedCreamRosetteSparse', label: 'Sparse Whipped Cream Rosettes (8 pc)' },
-];
-
-export const WHIPPED_CREAM_CHERRY_VARIATIONS = [
-  { id: 'whippedCreamRosetteContinuousCherry', label: 'Whipped Cream Rosettes with Cherry (Continuous ~20 pc)' },
-  { id: 'whippedCreamRosetteCherry', label: 'Whipped Cream Rosettes with Cherry (12 pc)' },
-  { id: 'whippedCreamRosetteSparseCherry', label: 'Sparse Whipped Cream Rosettes with Cherry (8 pc)' },
-];
-
-export const WHIPPED_CREAM_STRAWBERRY_VARIATIONS = [
-  { id: 'whippedCreamRosetteContinuousStrawberry', label: 'Whipped Cream Rosettes with Strawberry (Continuous ~20 pc)' },
-  { id: 'whippedCreamRosetteStrawberry', label: 'Whipped Cream Rosettes with Strawberry (12 pc)' },
-  { id: 'whippedCreamRosetteSparseStrawberry', label: 'Sparse Whipped Cream Rosettes with Strawberry (8 pc)' },
-];
-
-export const WHIPPED_CREAM_VARIATIONS = [
-  ...WHIPPED_CREAM_SOLID_VARIATIONS,
-  ...WHIPPED_CREAM_CHERRY_VARIATIONS,
-  ...WHIPPED_CREAM_STRAWBERRY_VARIATIONS,
-];
 // Buttercream Text: individual hardened-buttercream letters, placed one at
 // a time exactly like any other Center design above (same 'center-{id}-
 // default' toolId format, same click-to-arm flow, same freeform placement
@@ -634,92 +569,21 @@ export const BUTTERCREAM_LETTERS = [...BUTTERCREAM_LETTERS_UPPER, ...BUTTERCREAM
 
 export const BRACELET_BEADS_VARIATIONS = [
   { id: 'beadedTrim', label: 'Beaded Trim' },
+  // Same underlying geometry as Beaded Trim (buildBeadedTrimRing in
+  // DecorationSets.jsx), just a different bead-size rhythm per design —
+  // see BEADED_TRIM_PATTERNS_DELUXE in CakeScene.jsx for how each id
+  // maps to a pattern. Trio cycles Small → Big → Medium around the ring
+  // rather than a straight Small → Medium → Big ramp — a repeating
+  // ascending-size sequence reads as a lopsided gradient once it wraps
+  // all the way around a circle, not a balanced pattern; breaking the
+  // order keeps the eye from settling into "biggest bead is always three
+  // spots after the smallest."
+  // Kept here (not deleted with the rest of the Classic-only roster)
+  // because BEADED_TRIM_VARIATIONS_DELUXE below spreads this in as its
+  // own base set — Deluxe's own Beaded Trim options genuinely depend on
+  // it, even though EdgeSection.jsx no longer imports it directly.
+  { id: 'beadedTrimTrio', label: 'Trio Beaded Trim' },
   { id: 'beadedTrimPetite', label: 'Petite Beaded Trim' },
-  { id: 'beadedTrimSpacer', label: 'Spacer Beaded Trim' },
-  { id: 'beadedTrimMorseDotDashDot', label: 'Morse Dot-Dash-Dot (Bead-Line-Bead)' },
-  { id: 'beadedTrimMorseDotDash', label: 'Morse Alternating (Dot-Dash)' },
-  { id: 'beadedTrimMorseDotDotDash', label: 'Morse Double-Dot Dash (2 Beads-Line)' },
-];
-
-export const FRUIT_CONFECTION_RIM_OPTIONS = [
-  { id: 'strawberryRim', label: 'Fresh Strawberries Rim 🍓' },
-  { id: 'hersheysKissRim', label: "Hershey's Kisses Rim 🍫" },
-  { id: 'ferreroRocherRim', label: 'Ferrero Rocher Rim 🌰' },
-  { id: 'cherryRim', label: 'Cherry Rim 🍒' },
-  { id: 'basketballRim', label: 'Basketball Rim 🏀' },
-  { id: 'soccerBallRim', label: 'Soccer Ball Rim ⚽' },
-];
-
-export const DOLLOPS_SOLID_VARIATIONS = [
-  { id: 'starDollopContinuous', label: 'Continuous Star Dollop (20 pc)' },
-  { id: 'starDollop', label: 'Star Dollop (12 pc)' },
-  { id: 'starDollopSparse', label: 'Sparse Star Dollop (8 pc)' },
-  { id: 'roundDollop', label: 'Continuous Round Tip Dollop (20 pc)' },
-  { id: 'roundDollopMedium', label: 'Round Tip Dollop (12 pc)' },
-  { id: 'roundDollopSparse', label: 'Sparse Round Tip Dollop (8 pc)' },
-  { id: 'kissDollop', label: 'Continuous Kisses Dollop (20 pc)' },
-  { id: 'kissDollopMedium', label: 'Kisses Dollop (12 pc)' },
-  { id: 'kissDollopSparse', label: 'Sparse Kisses Dollop (8 pc)' },
-];
-
-export const DOLLOPS_SOLID_CHERRY_VARIATIONS = [
-  { id: 'starDollopContinuousCherry', label: 'Continuous Star Dollop (20 pc) with Cherry' },
-  { id: 'starDollopCherry', label: 'Star Dollop (12 pc) with Cherry' },
-  { id: 'starDollopSparseCherry', label: 'Sparse Star Dollop (8 pc) with Cherry' },
-  { id: 'roundDollopCherry', label: 'Continuous Round Tip Dollop (20 pc) with Cherry' },
-  { id: 'roundDollopMediumCherry', label: 'Round Tip Dollop (12 pc) with Cherry' },
-  { id: 'roundDollopSparseCherry', label: 'Sparse Round Tip Dollop (8 pc) with Cherry' },
-  { id: 'kissDollopCherry', label: 'Continuous Kisses Dollop (20 pc) with Cherry' },
-  { id: 'kissDollopMediumCherry', label: 'Kisses Dollop (12 pc) with Cherry' },
-  { id: 'kissDollopSparseCherry', label: 'Sparse Kisses Dollop (8 pc) with Cherry' },
-];
-
-export const DOLLOPS_SOLID_STRAWBERRY_VARIATIONS = [
-  { id: 'starDollopContinuousStrawberry', label: 'Continuous Star Dollop (20 pc) with Strawberry' },
-  { id: 'starDollopStrawberry', label: 'Star Dollop (12 pc) with Strawberry' },
-  { id: 'starDollopSparseStrawberry', label: 'Sparse Star Dollop (8 pc) with Strawberry' },
-  { id: 'roundDollopStrawberry', label: 'Continuous Round Tip Dollop (20 pc) with Strawberry' },
-  { id: 'roundDollopMediumStrawberry', label: 'Round Tip Dollop (12 pc) with Strawberry' },
-  { id: 'roundDollopSparseStrawberry', label: 'Sparse Round Tip Dollop (8 pc) with Strawberry' },
-];
-
-export const DOLLOPS_ALTERNATING_VARIATIONS = [
-  { id: 'starDollopContinuousAlt', label: 'Continuous Star Dollop (20 pc) - Alternating' },
-  { id: 'starDollopAlt', label: 'Star Dollop (12 pc) - Alternating' },
-  { id: 'starDollopSparseAlt', label: 'Sparse Star Dollop (8 pc) - Alternating' },
-  { id: 'roundDollopAlt', label: 'Continuous Round Tip Dollop (20 pc) - Alternating' },
-  { id: 'roundDollopMediumAlt', label: 'Round Tip Dollop (12 pc) - Alternating' },
-  { id: 'roundDollopSparseAlt', label: 'Sparse Round Tip Dollop (8 pc) - Alternating' },
-  { id: 'kissDollopAlt', label: 'Continuous Kisses Dollop (20 pc) - Alternating' },
-  { id: 'kissDollopMediumAlt', label: 'Kisses Dollop (12 pc) - Alternating' },
-  { id: 'kissDollopSparseAlt', label: 'Sparse Kisses Dollop (8 pc) - Alternating' },
-];
-
-export const DOLLOPS_ALTERNATING_CHERRY_VARIATIONS = [
-  { id: 'starDollopContinuousAltCherry', label: 'Continuous Star Dollop (20 pc) - Alternating with Cherry' },
-  { id: 'starDollopAltCherry', label: 'Star Dollop (12 pc) - Alternating with Cherry' },
-  { id: 'starDollopSparseAltCherry', label: 'Sparse Star Dollop (8 pc) - Alternating with Cherry' },
-  { id: 'roundDollopAltCherry', label: 'Continuous Round Tip Dollop (20 pc) - Alternating with Cherry' },
-  { id: 'roundDollopMediumAltCherry', label: 'Round Tip Dollop (12 pc) - Alternating with Cherry' },
-  { id: 'roundDollopSparseAltCherry', label: 'Sparse Round Tip Dollop (8 pc) - Alternating with Cherry' },
-];
-
-export const DOLLOPS_ALTERNATING_STRAWBERRY_VARIATIONS = [
-  { id: 'starDollopContinuousAltStrawberry', label: 'Continuous Star Dollop (20 pc) - Alternating with Strawberry' },
-  { id: 'starDollopAltStrawberry', label: 'Star Dollop (12 pc) - Alternating with Strawberry' },
-  { id: 'starDollopSparseAltStrawberry', label: 'Sparse Star Dollop (8 pc) - Alternating with Strawberry' },
-  { id: 'roundDollopAltStrawberry', label: 'Continuous Round Tip Dollop (20 pc) - Alternating with Strawberry' },
-  { id: 'roundDollopMediumAltStrawberry', label: 'Round Tip Dollop (12 pc) - Alternating with Strawberry' },
-  { id: 'roundDollopSparseAltStrawberry', label: 'Sparse Round Tip Dollop (8 pc) - Alternating with Strawberry' },
-];
-
-export const DOLLOPS_VARIATIONS = [
-  ...DOLLOPS_SOLID_VARIATIONS,
-  ...DOLLOPS_SOLID_CHERRY_VARIATIONS,
-  ...DOLLOPS_SOLID_STRAWBERRY_VARIATIONS,
-  ...DOLLOPS_ALTERNATING_VARIATIONS,
-  ...DOLLOPS_ALTERNATING_CHERRY_VARIATIONS,
-  ...DOLLOPS_ALTERNATING_STRAWBERRY_VARIATIONS,
 ];
 
 export const SCALLOPS_VARIATIONS = [
@@ -729,14 +593,33 @@ export const SCALLOPS_VARIATIONS = [
   { id: 'starScallopLayered', label: 'Layered Star Scallop' },
 ];
 
-export const ROPE_TWIST_VARIATIONS = [
-  { id: 'ropeTwist', label: 'Rope Twist' },
-  { id: 'ropeTwistClassic', label: 'Rope Twist (Classic)' },
+export const EDGE_DECORATION_SETS = [
+  { id: 'curtain', label: 'Curtain' },
+  ...BRACELET_BEADS_VARIATIONS,
 ];
 
-export const SHELL_VARIATIONS = [
-  { id: 'shell', label: 'Shell Border' },
-  { id: 'reverseShell', label: 'Reverse Shell' },
+// ─── Edge Design roster ────────────────────────────────────────────────
+// This used to be labeled "Deluxe" and coexist with a separate Classic
+// roster behind a toggle — Classic (SHELL_VARIATIONS, the old
+// DOLLOPS_VARIATIONS, ROPE_TWIST_VARIATIONS, STANDALONE_EDGE_PIPING_
+// OPTIONS, and the edge.designSet toggle itself) has been deleted; this
+// is the only Edge Design roster now.
+
+export const PIPING_TIPS_DELUXE = [
+  ...PIPING_TIPS,
+  { id: 'elongatedShell', label: 'Elongated Shell Border' },
+];
+
+export const BEADED_TRIM_VARIATIONS_DELUXE = [
+  // Trio filtered out here rather than removed from BRACELET_BEADS_
+  // VARIATIONS itself — that array is also spread into
+  // EDGE_DECORATION_SETS elsewhere, so trimming it directly would remove
+  // Trio from there too, which wasn't asked for.
+  ...BRACELET_BEADS_VARIATIONS.filter((v) => v.id !== 'beadedTrimTrio'),
+  { id: 'beadedTrimGrand', label: 'Grand Beaded Trim' },
+  { id: 'beadedTrimMorseDotDashDot', label: 'Morse Dot-Dash-Dot (Bead-Line-Bead)' },
+  { id: 'beadedTrimMorseDotDash', label: 'Morse Alternating (Dot-Dash)' },
+  { id: 'beadedTrimMorseDotDotDash', label: 'Morse Double-Dot Dash (2 Beads-Line)' },
 ];
 
 export const BORDER_PIPING_SOLID_VARIATIONS = [
@@ -757,17 +640,113 @@ export const BORDER_PIPING_ALTERNATING_VARIATIONS = [
   { id: 'elongatedShellAlt', label: 'Elongated Shell Border - Alternating' },
 ];
 
-export const BORDER_PIPING_VARIATIONS = [
+// Alternating variants need a second color (piping.secondaryColorId,
+// already added to the edge default state above) — EdgeSection's Deluxe
+// tab shows a second color picker whenever the active id ends in "Alt".
+export const BORDER_PIPING_VARIATIONS_DELUXE = [
   ...BORDER_PIPING_SOLID_VARIATIONS,
   ...BORDER_PIPING_ALTERNATING_VARIATIONS,
 ];
 
-export const STANDALONE_EDGE_PIPING_OPTIONS = PIPING_TIPS
-  .filter(({ id }) => ['rope', 'petal', 'dropFlower'].includes(id));
+export const DOLLOPS_SOLID_VARIATIONS_DELUXE = [
+  { id: 'starDollopContinuous', label: 'Continuous Star Dollop (20 pc)' },
+  { id: 'starDollop', label: 'Star Dollop (12 pc)' },
+  { id: 'starDollopSparse', label: 'Sparse Star Dollop (8 pc)' },
+  { id: 'roundDollop', label: 'Continuous Round Tip Dollop (20 pc)' },
+  { id: 'roundDollopMedium', label: 'Round Tip Dollop (12 pc)' },
+  { id: 'roundDollopSparse', label: 'Sparse Round Tip Dollop (8 pc)' },
+];
 
-export const EDGE_DECORATION_SETS = [
-  { id: 'curtain', label: 'Curtain' },
-  ...BRACELET_BEADS_VARIATIONS,
+export const DOLLOPS_SOLID_CHERRY_VARIATIONS_DELUXE = [
+  { id: 'starDollopContinuousCherry', label: 'Continuous Star Dollop (20 pc) with Cherry' },
+  { id: 'starDollopCherry', label: 'Star Dollop (12 pc) with Cherry' },
+  { id: 'starDollopSparseCherry', label: 'Sparse Star Dollop (8 pc) with Cherry' },
+  { id: 'roundDollopCherry', label: 'Continuous Round Tip Dollop (20 pc) with Cherry' },
+  { id: 'roundDollopMediumCherry', label: 'Round Tip Dollop (12 pc) with Cherry' },
+  { id: 'roundDollopSparseCherry', label: 'Sparse Round Tip Dollop (8 pc) with Cherry' },
+];
+
+export const DOLLOPS_SOLID_STRAWBERRY_VARIATIONS_DELUXE = [
+  { id: 'starDollopContinuousStrawberry', label: 'Continuous Star Dollop (20 pc) with Strawberry' },
+  { id: 'starDollopStrawberry', label: 'Star Dollop (12 pc) with Strawberry' },
+  { id: 'starDollopSparseStrawberry', label: 'Sparse Star Dollop (8 pc) with Strawberry' },
+  { id: 'roundDollopStrawberry', label: 'Continuous Round Tip Dollop (20 pc) with Strawberry' },
+  { id: 'roundDollopMediumStrawberry', label: 'Round Tip Dollop (12 pc) with Strawberry' },
+  { id: 'roundDollopSparseStrawberry', label: 'Sparse Round Tip Dollop (8 pc) with Strawberry' },
+];
+
+export const DOLLOPS_ALTERNATING_VARIATIONS_DELUXE = [
+  { id: 'starDollopContinuousAlt', label: 'Continuous Star Dollop (20 pc) - Alternating' },
+  { id: 'starDollopAlt', label: 'Star Dollop (12 pc) - Alternating' },
+  { id: 'starDollopSparseAlt', label: 'Sparse Star Dollop (8 pc) - Alternating' },
+  { id: 'roundDollopAlt', label: 'Continuous Round Tip Dollop (20 pc) - Alternating' },
+  { id: 'roundDollopMediumAlt', label: 'Round Tip Dollop (12 pc) - Alternating' },
+  { id: 'roundDollopSparseAlt', label: 'Sparse Round Tip Dollop (8 pc) - Alternating' },
+];
+
+export const DOLLOPS_ALTERNATING_CHERRY_VARIATIONS_DELUXE = [
+  { id: 'starDollopContinuousAltCherry', label: 'Continuous Star Dollop (20 pc) - Alternating with Cherry' },
+  { id: 'starDollopAltCherry', label: 'Star Dollop (12 pc) - Alternating with Cherry' },
+  { id: 'starDollopSparseAltCherry', label: 'Sparse Star Dollop (8 pc) - Alternating with Cherry' },
+  { id: 'roundDollopAltCherry', label: 'Continuous Round Tip Dollop (20 pc) - Alternating with Cherry' },
+  { id: 'roundDollopMediumAltCherry', label: 'Round Tip Dollop (12 pc) - Alternating with Cherry' },
+  { id: 'roundDollopSparseAltCherry', label: 'Sparse Round Tip Dollop (8 pc) - Alternating with Cherry' },
+];
+
+export const DOLLOPS_ALTERNATING_STRAWBERRY_VARIATIONS_DELUXE = [
+  { id: 'starDollopContinuousAltStrawberry', label: 'Continuous Star Dollop (20 pc) - Alternating with Strawberry' },
+  { id: 'starDollopAltStrawberry', label: 'Star Dollop (12 pc) - Alternating with Strawberry' },
+  { id: 'starDollopSparseAltStrawberry', label: 'Sparse Star Dollop (8 pc) - Alternating with Strawberry' },
+  { id: 'roundDollopAltStrawberry', label: 'Continuous Round Tip Dollop (20 pc) - Alternating with Strawberry' },
+  { id: 'roundDollopMediumAltStrawberry', label: 'Round Tip Dollop (12 pc) - Alternating with Strawberry' },
+  { id: 'roundDollopSparseAltStrawberry', label: 'Sparse Round Tip Dollop (8 pc) - Alternating with Strawberry' },
+];
+
+export const DOLLOPS_VARIATIONS_DELUXE = [
+  ...DOLLOPS_SOLID_VARIATIONS_DELUXE,
+  ...DOLLOPS_SOLID_CHERRY_VARIATIONS_DELUXE,
+  ...DOLLOPS_SOLID_STRAWBERRY_VARIATIONS_DELUXE,
+  ...DOLLOPS_ALTERNATING_VARIATIONS_DELUXE,
+  ...DOLLOPS_ALTERNATING_CHERRY_VARIATIONS_DELUXE,
+  ...DOLLOPS_ALTERNATING_STRAWBERRY_VARIATIONS_DELUXE,
+];
+
+export const WHIPPED_CREAM_SOLID_VARIATIONS = [
+  { id: 'whippedCreamRosetteContinuous', label: 'Whipped Cream Rosettes (Continuous ~20 pc)' },
+  { id: 'whippedCreamRosette', label: 'Whipped Cream Rosettes (12 pc)' },
+];
+
+export const WHIPPED_CREAM_CHERRY_VARIATIONS = [
+  { id: 'whippedCreamRosetteContinuousCherry', label: 'Whipped Cream Rosettes with Cherry (Continuous ~20 pc)' },
+  { id: 'whippedCreamRosetteCherry', label: 'Whipped Cream Rosettes with Cherry (12 pc)' },
+];
+
+export const WHIPPED_CREAM_STRAWBERRY_VARIATIONS = [
+  { id: 'whippedCreamRosetteContinuousStrawberry', label: 'Whipped Cream Rosettes with Strawberry (Continuous ~20 pc)' },
+  { id: 'whippedCreamRosetteStrawberry', label: 'Whipped Cream Rosettes with Strawberry (12 pc)' },
+];
+
+export const WHIPPED_CREAM_VARIATIONS = [
+  ...WHIPPED_CREAM_SOLID_VARIATIONS,
+  ...WHIPPED_CREAM_CHERRY_VARIATIONS,
+  ...WHIPPED_CREAM_STRAWBERRY_VARIATIONS,
+];
+
+export const FRUIT_CONFECTION_RIM_OPTIONS = [
+  { id: 'strawberryRim', label: 'Fresh Strawberries Rim 🍓' },
+  { id: 'hersheysKissRim', label: "Hershey's Kisses Rim 🍫" },
+  { id: 'ferreroRocherRim', label: 'Ferrero Rocher Rim 🌰' },
+  { id: 'cherryRim', label: 'Cherry Rim 🍒' },
+  { id: 'basketballRim', label: 'Basketball Rim 🏀' },
+  { id: 'soccerBallRim', label: 'Soccer Ball Rim ⚽' },
+];
+
+// Whipped Cream Rosettes' own Plain/With Cherry/With Strawberry blended
+// together with Fruit / Confection Rim into one combined roster — same
+// "one continuously-numbered row" treatment Border Piping and Dollops
+// already got.
+export const WHIPPED_CREAM_AND_RIM_VARIATIONS_DELUXE = [
+  ...WHIPPED_CREAM_VARIATIONS,
   ...FRUIT_CONFECTION_RIM_OPTIONS,
 ];
 

@@ -270,7 +270,14 @@ export function buildGlazeGeometry(radius, height, topDomeHeight, rand, opts = {
       let r = capRadius;
       if (ridgeProfileFn && ridgeHugStrength > 0) {
         const edgeFade = smoothstep(0, edgeFadeDist, y - bottomY);
-        r += ridgeProfileFn(y) * ridgeHugStrength * edgeFade;
+        // angle passed as a second argument — existing Y-only profile
+        // functions (Ridge Comb's makeRidgeProfileFn output) simply
+        // ignore it, JS doesn't error on unused extra arguments, so this
+        // is fully backward compatible. Lets a profile fn be genuinely
+        // angle-aware instead of returning one shared displacement for
+        // the whole angular sweep at a given height — see CakeScene.jsx's
+        // Mashed Circles/Mashed Swirls hugging for the case that needs it.
+        r += ridgeProfileFn(y, angle) * ridgeHugStrength * edgeFade;
       }
 
       positions.push(r * cosA, y, r * sinA);

@@ -14,8 +14,8 @@ export const CAKE_SCALE = 2;
 export const REAL_DIMENSIONS = {
   small: {
     tiers: [
-      { diameter: 6, height: 5 }, // 6x5 base tier
-      { diameter: 4, height: 4 }, // 4x4 second tier
+      { diameter: 6, height: 4 }, // 6x4 base tier
+      { diameter: 4, height: 3 }, // 4x3 second tier
     ],
   },
   big: {
