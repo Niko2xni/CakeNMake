@@ -4,9 +4,39 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import Chats from './Chats';
 
+const chatMocks = vi.hoisted(() => ({ sendMessage: vi.fn() }));
+
 vi.mock('@/lib/AuthContext', () => ({
   useAuth: () => ({
     user: { displayName: 'Jane Doe', email: 'jane@example.com' },
+  }),
+}));
+
+vi.mock('@/hooks/useChat', () => ({
+  useChat: () => ({
+    activeConversation: {
+      id: 'conversation-1',
+      status: 'open',
+      platform: { name: 'Mamshie Bakery' },
+    },
+    error: '',
+    hasMore: false,
+    loading: false,
+    loadingMessages: false,
+    loadOlder: vi.fn(),
+    messages: [
+      {
+        id: 'message-1',
+        sender: 'user',
+        senderRole: 'customer',
+        type: 'text',
+        createdAt: new Date(),
+        pinned: true,
+        text: 'Reference: https://pinterest.com/pin/cake-inspo-2201',
+      },
+    ],
+    sendMessage: chatMocks.sendMessage,
+    setMessages: vi.fn(),
   }),
 }));
 

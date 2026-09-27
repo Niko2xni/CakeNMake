@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 
 import ClientNavbar from '@/components/client/ClientNavbar';
+import { useChat } from '@/hooks/useChat';
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB - audio & documents (no separate limit was specified for these)
 const MAX_IMAGE_SIZE = 25 * 1024 * 1024;
@@ -90,12 +91,6 @@ function getRelativeTime(date) {
   if (diffDay < 7) return `${diffDay}d`;
   const diffWeek = Math.floor(diffDay / 7);
   return `${diffWeek}w`;
-}
-
-function todayAt(hours, minutes) {
-  const d = new Date();
-  d.setHours(hours, minutes, 0, 0);
-  return d;
 }
 
 function getSnippet(m) {
@@ -279,32 +274,18 @@ function CustomScrollbar({ className = '', contentClassName = '', children }) {
   );
 }
 
-const seedMessages = [
-  { id: 1, sender: 'bakery', type: 'text', createdAt: todayAt(10, 2), pinned: false,
-    text: `Hi! Thanks for messaging ${BAKERY_NAME} 🧁 How can we help with your order today?` },
-  { id: 2, sender: 'user', type: 'text', createdAt: todayAt(10, 5), pinned: false,
-    text: 'Hello! I wanted to check on the birthday cake I ordered for Saturday.' },
-  { id: 3, sender: 'bakery', type: 'text', createdAt: todayAt(10, 5), pinned: false,
-    text: 'Of course, let me pull up your order now.' },
-  { id: 4, sender: 'bakery', type: 'image', createdAt: todayAt(10, 6), pinned: true,
-    text: "Here's the design we finalized for your cake 🎂", illustration: true },
-  { id: 5, sender: 'user', type: 'text', createdAt: todayAt(10, 10), pinned: false,
-    text: 'Oh that looks amazing! Could we make the frosting a little less sweet?' },
-  { id: 6, sender: 'bakery', type: 'text', createdAt: todayAt(10, 11), pinned: true,
-    text: "Absolutely, we'll lower the sugar in the frosting. No problem at all." },
-  { id: 7, sender: 'user', type: 'text', createdAt: todayAt(10, 15), pinned: false,
-    text: 'Perfect, here are a couple of references I found: https://pinterest.com/pin/cake-inspo-2201' },
-  { id: 8, sender: 'user', type: 'file', createdAt: todayAt(10, 16), pinned: false,
-    fileName: 'cake-inspiration.pdf', fileSize: 482000, fileUrl: null },
-  { id: 9, sender: 'bakery', type: 'text', createdAt: todayAt(10, 17), pinned: false,
-    text: "Got it, thank you! We'll use these as reference." },
-  { id: 10, sender: 'user', type: 'like', createdAt: todayAt(10, 17), pinned: false },
-  { id: 11, sender: 'bakery', type: 'text', createdAt: todayAt(10, 20), pinned: true,
-    text: 'Your cake will be ready for pickup at 2:00 PM this Saturday. See you then!' },
-];
-
 export default function Chats() {
-  const [messages, setMessages] = useState(seedMessages);
+  const {
+    activeConversation,
+    error: chatError,
+    hasMore,
+    loading: chatLoading,
+    loadingMessages,
+    loadOlder,
+    messages,
+    sendMessage,
+    setMessages,
+  } = useChat({ autoCreate: true });
   const [inputText, setInputText] = useState('');
   const [uploadError, setUploadError] = useState(null);
   const [showInfo, setShowInfo] = useState(false);
@@ -378,7 +359,6 @@ export default function Chats() {
   const [lastActiveAt] = useState(new Date(Date.now() - 5 * 60000));
   const [statusText, setStatusText] = useState('Active now');
 
-  const nextIdRef = useRef(12);
   const fileInputRef = useRef(null);
   const bottomRef = useRef(null);
   const messagesScrollRef = useRef(null);
@@ -521,49 +501,27 @@ export default function Chats() {
     return () => window.removeEventListener('resize', updateStripThumb);
   }, [mediaModalIndex, mediaMessages.length]);
 
-  function appendMessage(msg) {
-    const id = nextIdRef.current++;
-    setMessages((prev) => [...prev, { id, createdAt: new Date(), pinned: false, ...msg }]);
-  }
-
-  function handleSendText() {
+  async function handleSendText() {
     const text = inputText.trim();
     if (!text && pendingAttachments.length === 0) return;
 
     if (pendingAttachments.length > 0) {
-      pendingAttachments.forEach((att, idx) => {
-        const isLast = idx === pendingAttachments.length - 1;
-        appendMessage({
-          sender: 'user',
-          type: att.kind === 'image' ? 'image' : att.kind === 'video' ? 'video' : 'file',
-          fileName: att.fileName,
-          fileSize: att.fileSize,
-          fileUrl: att.fileUrl,
-          duration: att.duration,
-          text: isLast && text ? text : undefined,
-          replyTo: isLast && replyingTo
-          ? { id: replyingTo.id, sender: replyingTo.sender, snippet: replyingTo.snippet, mediaType: replyingTo.mediaType, mediaUrl: replyingTo.mediaUrl, illustration: replyingTo.illustration }
-          : undefined,
-        });
-      });
-      setPendingAttachments([]);
-    } else {
-      appendMessage({
-        sender: 'user',
-        type: 'text',
-        text,
-        replyTo: replyingTo
-        ? { id: replyingTo.id, sender: replyingTo.sender, snippet: replyingTo.snippet, mediaType: replyingTo.mediaType, mediaUrl: replyingTo.mediaUrl, illustration: replyingTo.illustration }
-        : undefined,
-      });
+      setUploadError('Attachments are temporarily disabled while secure chat uploads are being configured.');
+      return;
     }
 
     setInputText('');
-    setReplyingTo(null);
+    try {
+      await sendMessage(text, { replyTo: replyingTo?.id || null });
+      setReplyingTo(null);
+    } catch (error) {
+      setInputText(text);
+      setUploadError(error.message || 'Your message could not be sent.');
+    }
   }
 
   function handleSendLike() {
-    appendMessage({ sender: 'user', type: 'like' });
+    sendMessage('👍').catch((error) => setUploadError(error.message || 'Your message could not be sent.'));
   }
 
   function handleKeyDown(e) {
@@ -588,6 +546,10 @@ export default function Chats() {
   // Validates the file and adds it to the staging row above the composer.
   // Nothing gets sent to the conversation until the person hits Send/Enter.
   function stageFile(file) {
+    if (import.meta.env.VITE_CHAT_ATTACHMENTS_ENABLED !== 'true') {
+      setUploadError('Attachments are temporarily disabled while secure chat uploads are being configured.');
+      return;
+    }
     const ext = getFileExtension(file.name);
     if (BLOCKED_EXTENSIONS.includes(ext)) {
       setUploadError(`"${file.name}" can't be sent — that file type isn't allowed.`);
@@ -1041,7 +1003,7 @@ export default function Chats() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h1 className="font-bold text-gray-900 leading-tight truncate">
-                      {BAKERY_NAME}
+                      {activeConversation?.platform?.name || BAKERY_NAME}
                     </h1>
                     <p className="text-xs text-gray-500 leading-tight">
                       {statusText}
@@ -1068,6 +1030,13 @@ export default function Chats() {
 
             {/* Messages */}
             <div className="relative flex-1 min-h-0" onClick={focusComposer}>
+              {(chatLoading || (loadingMessages && messages.length === 0)) && (
+                <div className="absolute inset-0 z-20 bg-white/70 flex items-center justify-center text-sm text-gray-500">Loading messages…</div>
+              )}
+              {chatError && <div className="px-4 py-2 text-xs text-red-600 bg-red-50" role="alert">{chatError}</div>}
+              {hasMore && (
+                <button type="button" onClick={loadOlder} className="absolute top-2 left-1/2 -translate-x-1/2 z-20 text-xs bg-white border border-pink-100 rounded-full px-3 py-1 text-pink-600 shadow-sm">Load earlier messages</button>
+              )}
               <div className="cn-chat-scrollbar absolute top-0 right-0 h-full w-4 flex flex-col z-10">
                 <button
                   onClick={scrollMessagesUp}
@@ -1471,8 +1440,9 @@ export default function Chats() {
                 />
                 <button
                   onClick={handleAttachClick}
+                  disabled
                   aria-label="Attach a photo, video, or file"
-                  title="Attach a photo, video, or file"
+                  title="Secure attachments are coming soon"
                   className="cn-chat-attach flex-shrink-0 h-10 rounded-full flex items-center justify-center gap-2 text-pink-500 hover:bg-pink-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-300"
                 >
                   <ImageIcon className="w-5 h-5" />
@@ -1485,13 +1455,15 @@ export default function Chats() {
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder={`Message ${BAKERY_NAME}`}
-                  maxLength={20000}
+                  disabled={!activeConversation || activeConversation.status === 'closed'}
+                  placeholder={activeConversation?.status === 'closed' ? 'This conversation is closed' : `Message ${activeConversation?.platform?.name || BAKERY_NAME}`}
+                  maxLength={4000}
                   className="flex-1 px-4 py-2.5 rounded-full bg-pink-50/70 border border-pink-100 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-300 focus:border-transparent"
                 />
 
                 <button
                   onClick={handleSendLike}
+                  disabled={!activeConversation || activeConversation.status === 'closed'}
                   aria-label="Send a quick like"
                   title="Send a quick like"
                   className="cn-chat-quick-like flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-pink-500 hover:bg-pink-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-300"
@@ -1501,7 +1473,7 @@ export default function Chats() {
 
                 <button
                   onClick={handleSendText}
-                  disabled={!inputText.trim() && pendingAttachments.length === 0}
+                  disabled={!activeConversation || activeConversation.status === 'closed' || (!inputText.trim() && pendingAttachments.length === 0)}
                   aria-label="Send message"
                   title="Press Enter to send"
                   className="cn-chat-send flex-shrink-0 h-10 rounded-full text-white flex items-center justify-center gap-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-300"

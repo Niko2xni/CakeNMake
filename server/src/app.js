@@ -3,6 +3,8 @@ const cors = require("cors");
 const designRoutes = require("./routes/designRoutes");
 const authRoutes = require("./routes/authRoutes");
 const accountRoutes = require('./routes/accountRoutes');
+const conversationRoutes = require('./routes/conversationRoutes');
+const { corsOptions } = require('./config/origins');
 
 const app = express();
 
@@ -12,7 +14,7 @@ if (process.env.NODE_ENV === 'production') {
     app.set('trust proxy', 1);
 }
 
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 
 app.get("/", (req, res) => {
@@ -23,6 +25,7 @@ app.get("/", (req, res) => {
 app.use("/api/designs", designRoutes);
 app.use("/api/auth", authRoutes);
 app.use('/api/account', accountRoutes);
+app.use('/api/conversations', conversationRoutes);
 
 const reservationRoutes = require('./routes/reservationRoutes');
 app.use('/api/bakery/reservations', reservationRoutes);
