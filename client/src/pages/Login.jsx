@@ -207,21 +207,13 @@ export default function Login() {
                 type="button"
                 variant="ghost"
                 className="h-9 px-0 text-sm font-medium text-muted-foreground hover:text-foreground"
-                onClick={async () => {
-                  try {
-                    if (email) {
-                      await authApi.cancelEmailOtp(email);
-                    }
-                  } catch (cancelError) {
-                    console.warn('Could not cancel the current OTP:', cancelError);
-                  } finally {
-                    setOtpSent(false);
-                    setOtp("");
-                    setOtpExpiresAt(null);
-                    setOtpTimeLeft(0);
-                    setStatusMessage("");
-                    setError("");
-                  }
+                onClick={() => {
+                  setOtpSent(false);
+                  setOtp("");
+                  setOtpExpiresAt(null);
+                  setOtpTimeLeft(0);
+                  setStatusMessage("");
+                  setError("");
                 }}
               >
                 ← Back

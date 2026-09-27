@@ -8,6 +8,8 @@ const RESEND_COOLDOWN_MS = 60 * 1000;
 const MAX_ATTEMPTS = 5;
 const EMAIL_REQUEST_LIMIT = 5;
 const IP_REQUEST_LIMIT = 20;
+const EMAIL_VERIFY_LIMIT = 10;
+const IP_VERIFY_LIMIT = 50;
 const RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
 
 const otpStore = new OtpStore();
@@ -98,9 +100,17 @@ async function requestOtp({ email, purpose = 'login', ip = 'unknown', metadata =
   return { email: normalizedEmail, expiresAt };
 }
 
-async function verifyOtp({ email, code, purpose = 'login' }) {
+async function verifyOtp({ email, code, purpose = 'login', ip = 'unknown' }) {
   const normalizedEmail = normalizeEmail(email);
   const normalizedCode = String(code || '').trim();
+  const [emailLimit, ipLimit] = await Promise.all([
+    otpStore.consumeLimit(`verify-email:${purpose}`, normalizedEmail, EMAIL_VERIFY_LIMIT, RATE_LIMIT_WINDOW_SECONDS),
+    otpStore.consumeLimit(`verify-ip:${purpose}`, String(ip || 'unknown'), IP_VERIFY_LIMIT, RATE_LIMIT_WINDOW_SECONDS),
+  ]);
+  if (!emailLimit.allowed || !ipLimit.allowed) {
+    throw serviceError('Too many verification attempts. Please try again later.', 'OTP_VERIFY_RATE_LIMITED', 429);
+  }
+
   const request = await otpStore.get(purpose, normalizedEmail);
 
   if (!/^\d{6}$/.test(normalizedCode) || !request) {
@@ -108,30 +118,28 @@ async function verifyOtp({ email, code, purpose = 'login' }) {
   }
 
   if (Date.now() > request.expiresAt || request.attempts >= MAX_ATTEMPTS) {
-    await otpStore.delete(purpose, normalizedEmail);
+    await otpStore.consumeIfCurrent(purpose, normalizedEmail, request.passwordHash);
     throw serviceError('The verification code is invalid or expired.', 'INVALID_OR_EXPIRED_OTP', 400);
   }
 
   const matches = await bcrypt.compare(normalizedCode, request.passwordHash);
   if (!matches) {
-    const attempts = await otpStore.incrementAttempts(purpose, normalizedEmail);
-    if (attempts >= MAX_ATTEMPTS) await otpStore.delete(purpose, normalizedEmail);
+    await otpStore.incrementAttempts(purpose, normalizedEmail, request.passwordHash, MAX_ATTEMPTS);
     throw serviceError('The verification code is invalid or expired.', 'INVALID_OR_EXPIRED_OTP', 400);
   }
 
-  await otpStore.delete(purpose, normalizedEmail);
+  const consumed = await otpStore.consumeIfCurrent(purpose, normalizedEmail, request.passwordHash);
+  if (!consumed) {
+    throw serviceError('The verification code is invalid or expired.', 'INVALID_OR_EXPIRED_OTP', 400);
+  }
   return { email: normalizedEmail, metadata: request.metadata || {} };
-}
-
-async function cancelOtp({ email, purpose = 'login' }) {
-  const normalizedEmail = normalizeEmail(email);
-  await otpStore.delete(purpose, normalizedEmail);
 }
 
 module.exports = {
   OTP_TTL_MS,
   MAX_ATTEMPTS,
-  cancelOtp,
+  EMAIL_VERIFY_LIMIT,
+  IP_VERIFY_LIMIT,
   mailConfigured,
   normalizeEmail,
   requestOtp,

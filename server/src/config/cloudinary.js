@@ -6,82 +6,68 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-/**
- * Extract public ID from Cloudinary URL
- * @param {string} url - Cloudinary image URL
- * @returns {string|null} - Public ID or null if not a Cloudinary URL
- */
-const extractPublicId = (url) => {
-  if (!url) return null;
-  
+const thumbnailPrefix = (firebaseUid, designId) =>
+  `cakenmake/users/${firebaseUid}/designs/${designId}/`;
+
+const createThumbnailUploadSignature = ({ firebaseUid, designId }) => {
+  const timestamp = Math.floor(Date.now() / 1000);
+  const folder = thumbnailPrefix(firebaseUid, designId).replace(/\/$/, '');
+  const signature = cloudinary.utils.api_sign_request(
+    { folder, timestamp },
+    process.env.CLOUDINARY_API_SECRET
+  );
+
+  return {
+    apiKey: process.env.CLOUDINARY_API_KEY,
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    folder,
+    signature,
+    timestamp,
+  };
+};
+
+const verifyThumbnailAsset = async ({ firebaseUid, designId, publicId, secureUrl }) => {
+  const expectedPrefix = thumbnailPrefix(firebaseUid, designId);
+  if (typeof publicId !== 'string' || !publicId.startsWith(expectedPrefix)) return null;
+
+  let parsedUrl;
   try {
-    // Cloudinary URL format: https://res.cloudinary.com/cloud_name/image/upload/v1234567890/public_id.jpg
-    const urlObj = new URL(url);
-    const pathParts = urlObj.pathname.split('/');
-    
-    // Find the upload folder and get everything after it
-    const uploadIndex = pathParts.indexOf('upload');
-    if (uploadIndex === -1 || uploadIndex === pathParts.length - 1) {
-      return null;
-    }
-    
-    // Get the public ID (everything after 'upload')
-    const publicIdWithExtension = pathParts.slice(uploadIndex + 1).join('/');
-    
-    // Remove version number if present (starts with 'v' followed by digits)
-    let publicIdWithoutVersion = publicIdWithExtension;
-    const versionMatch = publicIdWithExtension.match(/^v\d+\//);
-    if (versionMatch) {
-      publicIdWithoutVersion = publicIdWithExtension.substring(versionMatch[0].length);
-    }
-    
-    // Remove file extension
-    const lastDotIndex = publicIdWithoutVersion.lastIndexOf('.');
-    if (lastDotIndex !== -1) {
-      return publicIdWithoutVersion.substring(0, lastDotIndex);
-    }
-    
-    return publicIdWithoutVersion;
-  } catch (error) {
-    console.error('Error extracting public ID from URL:', error);
+    parsedUrl = new URL(secureUrl);
+  } catch {
     return null;
   }
+
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  if (parsedUrl.protocol !== 'https:' || parsedUrl.hostname !== 'res.cloudinary.com') return null;
+  if (!parsedUrl.pathname.startsWith(`/${cloudName}/image/upload/`)) return null;
+
+  const resource = await cloudinary.api.resource(publicId, { resource_type: 'image' });
+  if (resource.public_id !== publicId || resource.resource_type !== 'image') return null;
+
+  return { publicId, secureUrl: resource.secure_url || secureUrl };
 };
 
-/**
- * Delete image from Cloudinary by URL
- * @param {string} url - Cloudinary image URL
- * @returns {Promise<boolean>} - True if deletion succeeded or URL was null, false otherwise
- */
-const deleteImageByUrl = async (url) => {
-  if (!url) {
-    console.log('[DEBUG] deleteImageByUrl - No URL provided, returning true');
-    return true;
-  }
-  
+const deleteTrustedThumbnail = async ({ asset, firebaseUid, designId }) => {
+  const expectedPrefix = thumbnailPrefix(firebaseUid, designId);
+  if (!asset?.trusted || asset.ownerUid !== firebaseUid) return false;
+  if (!asset.publicId?.startsWith(expectedPrefix)) return false;
+
   try {
-    console.log('[DEBUG] deleteImageByUrl - Attempting to delete:', url);
-    const publicId = extractPublicId(url);
-    if (!publicId) {
-      console.warn('[DEBUG] deleteImageByUrl - Could not extract public ID from URL:', url);
-      return false;
-    }
-    
-    console.log('[DEBUG] deleteImageByUrl - Extracted public ID:', publicId);
-    const result = await cloudinary.uploader.destroy(publicId);
-    console.log('[DEBUG] deleteImageByUrl - Cloudinary deletion result:', result);
-    
-    if (result.result === 'ok' || result.result === 'not found') {
-      console.log('[DEBUG] deleteImageByUrl - Deletion successful');
-      return true;
-    }
-    
-    console.warn('[DEBUG] deleteImageByUrl - Cloudinary deletion failed:', result);
-    return false;
+    const result = await cloudinary.uploader.destroy(asset.publicId, {
+      invalidate: true,
+      resource_type: 'image',
+    });
+    return result.result === 'ok' || result.result === 'not found';
   } catch (error) {
-    console.error('[ERROR] deleteImageByUrl - Error deleting image from Cloudinary:', error);
+    console.error('Trusted Cloudinary thumbnail cleanup failed:', error.message);
     return false;
   }
 };
 
-module.exports = { cloudinary, deleteImageByUrl };
+module.exports = {
+  cloudinary,
+  createThumbnailUploadSignature,
+  deleteTrustedThumbnail,
+  thumbnailPrefix,
+  verifyThumbnailAsset,
+};

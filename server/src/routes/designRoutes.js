@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+const authenticate = require('../middleware/authenticate');
+const { loadAppUser } = require('../middleware/authorize');
 const {
   getDesigns,
   getDesignById,
@@ -8,8 +10,13 @@ const {
   deleteDesign,
   moveToTrash,
   restoreFromTrash,
-  permanentlyDelete
+  permanentlyDelete,
+  createThumbnailUploadSignature,
+  attachThumbnail
 } = require('../controllers/designController');
+
+router.use(authenticate);
+router.use(loadAppUser);
 
 // GET /api/designs - Get all designs for a user
 router.get('/', getDesigns);
@@ -19,6 +26,9 @@ router.get('/:id', getDesignById);
 
 // POST /api/designs - Create a new design
 router.post('/', createDesign);
+
+router.post('/:id/thumbnail/upload-signature', createThumbnailUploadSignature);
+router.patch('/:id/thumbnail', attachThumbnail);
 
 // PUT /api/designs/:id - Update a design
 router.put('/:id', updateDesign);

@@ -12,7 +12,7 @@ vi.mock('@/lib/firebase', () => ({
   },
 }));
 
-import { accountApi, bakeryApi } from './api';
+import { accountApi, bakeryApi, designApi } from './api';
 
 describe('authenticated account API', () => {
   beforeEach(() => {
@@ -90,6 +90,20 @@ describe('authenticated account API', () => {
     const [url, options] = fetchMock.mock.calls[0];
     expect(url).toMatch(/\/api\/bakery\/reservations\?status=confirmed$/);
     expect(url).not.toContain('platformSlug');
+    expect(options.headers.Authorization).toBe('Bearer firebase-id-token');
+  });
+
+  it('authenticates design requests without sending a client-controlled owner', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue([]),
+    });
+
+    await designApi.getDesigns();
+
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toMatch(/\/api\/designs\?isTrashed=false$/);
+    expect(url).not.toContain('userId');
     expect(options.headers.Authorization).toBe('Bearer firebase-id-token');
   });
 });

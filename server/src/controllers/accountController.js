@@ -153,6 +153,7 @@ async function verifyEmailLinkOtp(req, res) {
             email: req.body.email,
             code: req.body.code,
             purpose: 'link-email',
+            ip: req.ip,
         });
 
         if (metadata.firebaseUid !== req.auth.uid) {

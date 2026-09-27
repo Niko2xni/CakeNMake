@@ -172,10 +172,7 @@ export default function DesignerWorkSpace() {
       const thumbnail = cakeSceneRef.current.captureThumbnail();
       if (thumbnail) {
         console.log('[DEBUG] saveThumbnail - Thumbnail captured, uploading');
-        const thumbnailUrl = await designApi.uploadImage(thumbnail);
-        console.log('[DEBUG] saveThumbnail - Thumbnail uploaded:', thumbnailUrl);
-        console.log('[DEBUG] saveThumbnail - Updating design with thumbnail');
-        await designApi.updateDesign(targetDesignId, { thumbnail: thumbnailUrl });
+        await designApi.uploadImage(targetDesignId, thumbnail);
         console.log('[DEBUG] saveThumbnail - Design updated successfully');
       } else {
         console.log('[DEBUG] saveThumbnail - Thumbnail is null/empty');

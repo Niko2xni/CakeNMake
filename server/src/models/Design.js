@@ -12,7 +12,14 @@ const designSchema = new mongoose.Schema({
   },
   userId: {
     type: String,
-    required: true
+    default: null
+  },
+  owner: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+    immutable: true,
+    index: true
   },
   thumbnail: {
     type: String,
@@ -21,6 +28,13 @@ const designSchema = new mongoose.Schema({
   thumbnailFallback: {
     type: String,
     default: null
+  },
+  thumbnailAsset: {
+    secureUrl: { type: String, default: null },
+    publicId: { type: String, default: null },
+    ownerUid: { type: String, default: null },
+    uploadedAt: { type: Date, default: null },
+    trusted: { type: Boolean, default: false }
   },
   lastEdited: {
     type: Date,
@@ -53,6 +67,8 @@ const designSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
+
+designSchema.index({ owner: 1, isTrashed: 1, lastEdited: -1 });
 
 // Update lastEdited timestamp before saving
 designSchema.pre('save', function() {

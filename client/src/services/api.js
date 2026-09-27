@@ -49,11 +49,6 @@ export const authApi = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email }),
   }),
-  cancelEmailOtp: (email) => requestJson(`${API_BASE_URL}/auth/email/cancel-otp`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email }),
-  }),
   verifyEmailOtp: (email, code) => requestJson(`${API_BASE_URL}/auth/email/verify-otp`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -80,115 +75,82 @@ export const accountApi = {
   }),
 };
 
-// Get user ID from localStorage (simplified auth)
-const getUserId = () => {
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
-  return user.email || 'guest-user';
-};
-
 // Design API calls
 export const designApi = {
   // Get all designs for current user
   getDesigns: async ({ trashOnly = false } = {}) => {
-    const userId = getUserId();
-    const response = await fetch(`${API_BASE_URL}/designs?userId=${userId}&isTrashed=${trashOnly}`);
-    if (!response.ok) throw new Error('Failed to fetch designs');
-    return response.json();
+    return requestAuthenticatedJson(`${API_BASE_URL}/designs?isTrashed=${trashOnly}`);
   },
 
   // Get a single design by ID
   getDesignById: async (id) => {
-    const response = await fetch(`${API_BASE_URL}/designs/${id}`);
-    if (!response.ok) throw new Error('Failed to fetch design');
-    return response.json();
+    return requestAuthenticatedJson(`${API_BASE_URL}/designs/${id}`);
   },
 
   // Create a new design
   createDesign: async (designData) => {
-    const userId = getUserId();
-    const payload = { ...designData, userId };
-    console.log('Sending design data:', payload);
-
-    const response = await fetch(`${API_BASE_URL}/designs`, {
+    return requestAuthenticatedJson(`${API_BASE_URL}/designs`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(designData)
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Server error response:', errorText);
-      throw new Error('Failed to create design');
-    }
-
-    return response.json();
   },
 
   // Update an existing design
   updateDesign: async (id, designData) => {
-    console.log('Updating design:', id, 'with data:', designData);
-    const response = await fetch(`${API_BASE_URL}/designs/${id}`, {
+    return requestAuthenticatedJson(`${API_BASE_URL}/designs/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(designData)
     });
-    if (!response.ok) throw new Error('Failed to update design');
-    const result = await response.json();
-    console.log('Update result:', result);
-    return result;
   },
 
   // Delete a design
   deleteDesign: async (id) => {
-    const response = await fetch(`${API_BASE_URL}/designs/${id}`, {
+    return requestAuthenticatedJson(`${API_BASE_URL}/designs/${id}`, {
       method: 'DELETE'
     });
-    if (!response.ok) throw new Error('Failed to delete design');
-    return response.json();
   },
 
   // Move design to trash
   moveToTrash: async (id) => {
-    const response = await fetch(`${API_BASE_URL}/designs/${id}/trash`, {
+    return requestAuthenticatedJson(`${API_BASE_URL}/designs/${id}/trash`, {
       method: 'POST'
     });
-    if (!response.ok) throw new Error('Failed to move to trash');
-    return response.json();
   },
 
   // Restore design from trash
   restoreFromTrash: async (id) => {
-    const response = await fetch(`${API_BASE_URL}/designs/${id}/restore`, {
+    return requestAuthenticatedJson(`${API_BASE_URL}/designs/${id}/restore`, {
       method: 'POST'
     });
-    if (!response.ok) throw new Error('Failed to restore from trash');
-    return response.json();
   },
 
   // Permanently delete design
   permanentlyDelete: async (id) => {
-    const response = await fetch(`${API_BASE_URL}/designs/${id}/permanent`, {
+    return requestAuthenticatedJson(`${API_BASE_URL}/designs/${id}/permanent`, {
       method: 'DELETE'
     });
-    if (!response.ok) throw new Error('Failed to permanently delete');
-    return response.json();
   },
 
   // Upload image to Cloudinary
-  uploadImage: async (base64Image) => {
+  uploadImage: async (designId, base64Image) => {
     // Ensure the base64 data has the data URL prefix
     const imageData = base64Image.startsWith('data:')
       ? base64Image
       : `data:image/png;base64,${base64Image}`;
 
+    const upload = await requestAuthenticatedJson(
+      `${API_BASE_URL}/designs/${designId}/thumbnail/upload-signature`,
+      { method: 'POST' }
+    );
     const formData = new FormData();
     formData.append('file', imageData);
-    formData.append('upload_preset', 'cakenmake_uploads');
-    // Note: format and quality parameters are not allowed with unsigned uploads
-    // These should be configured in the upload preset settings on Cloudinary dashboard
+    formData.append('api_key', upload.apiKey);
+    formData.append('timestamp', String(upload.timestamp));
+    formData.append('signature', upload.signature);
+    formData.append('folder', upload.folder);
 
     const response = await fetch(
-      `https://api.cloudinary.com/v1_1/de5zq27ye/image/upload`,
+      `https://api.cloudinary.com/v1_1/${encodeURIComponent(upload.cloudName)}/image/upload`,
       {
         method: 'POST',
         body: formData
@@ -201,7 +163,10 @@ export const designApi = {
       throw new Error('Failed to upload image');
     }
     const data = await response.json();
-    return data.secure_url;
+    return requestAuthenticatedJson(`${API_BASE_URL}/designs/${designId}/thumbnail`, {
+      method: 'PATCH',
+      body: JSON.stringify({ publicId: data.public_id, secureUrl: data.secure_url }),
+    });
   }
 };
 

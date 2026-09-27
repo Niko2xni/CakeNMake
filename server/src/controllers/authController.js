@@ -1,6 +1,5 @@
 const { firebaseAdminAuth, firebaseAdminConfigured } = require('../config/firebaseAdmin');
 const {
-  cancelOtp,
   requestOtp,
   verifyOtp,
 } = require('../services/emailOtpService');
@@ -33,15 +32,6 @@ exports.requestEmailOtp = async (req, res) => {
   }
 };
 
-exports.cancelEmailOtp = async (req, res) => {
-  try {
-    await cancelOtp({ email: req.body.email, purpose: 'login' });
-    return res.json({ message: 'The active verification code was cleared.' });
-  } catch (error) {
-    return sendServiceError(res, error, 'We could not cancel the verification code.');
-  }
-};
-
 exports.verifyEmailOtp = async (req, res) => {
   if (!firebaseAdminConfigured || !firebaseAdminAuth) {
     return res.status(503).json({
@@ -55,6 +45,7 @@ exports.verifyEmailOtp = async (req, res) => {
       email: req.body.email,
       code: req.body.code,
       purpose: 'login',
+      ip: req.ip,
     });
 
     let user;

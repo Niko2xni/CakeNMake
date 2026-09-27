@@ -1,243 +1,229 @@
+const mongoose = require('mongoose');
 const Design = require('../models/Design');
-const { deleteImageByUrl } = require('../config/cloudinary');
+const {
+  createThumbnailUploadSignature: buildThumbnailUploadSignature,
+  deleteTrustedThumbnail,
+  verifyThumbnailAsset,
+} = require('../config/cloudinary');
 
-// Get all designs for a user
+function legacyEmail(req) {
+  if (!req.auth?.emailVerified) return '';
+  return String(req.user?.email || req.auth?.email || '').trim().toLowerCase();
+}
+
+function ownerFilter(req) {
+  const filters = [{ owner: req.user._id }];
+  const email = legacyEmail(req);
+  if (email) filters.push({ owner: null, userId: email });
+  return filters.length === 1 ? filters[0] : { $or: filters };
+}
+
+function ownedDesignFilter(req, id = req.params.id) {
+  return { _id: id, ...ownerFilter(req) };
+}
+
+function invalidDesignId(req, res) {
+  if (mongoose.isValidObjectId(req.params.id)) return false;
+  res.status(400).json({ message: 'Invalid design ID' });
+  return true;
+}
+
+function notFound(res) {
+  return res.status(404).json({ message: 'Design not found' });
+}
+
 exports.getDesigns = async (req, res) => {
   try {
-    const { userId, isTrashed = 'false' } = req.query;
-    const trashOnly = isTrashed === 'true';
-    const designs = await Design.find({ userId, isTrashed: trashOnly })
+    const trashOnly = req.query.isTrashed === 'true';
+    const designs = await Design.find({ ...ownerFilter(req), isTrashed: trashOnly })
       .sort({ lastEdited: -1 })
       .limit(trashOnly ? 5 : 3);
-    res.json(designs);
+    return res.json(designs);
   } catch (error) {
     console.error('Error fetching designs:', error);
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({ message: 'Failed to load designs' });
   }
 };
 
-// Get a single design by ID
 exports.getDesignById = async (req, res) => {
+  if (invalidDesignId(req, res)) return;
   try {
-    const design = await Design.findById(req.params.id);
-    if (!design) {
-      return res.status(404).json({ message: 'Design not found' });
-    }
-    res.json(design);
+    const design = await Design.findOne(ownedDesignFilter(req));
+    return design ? res.json(design) : notFound(res);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error fetching design:', error);
+    return res.status(500).json({ message: 'Failed to load design' });
   }
 };
 
-// Create a new design
 exports.createDesign = async (req, res) => {
   try {
-    const { name, config, userId, lastEstimate } = req.body;
-    
-    console.log('Creating design with data:', { name, userId, hasConfig: !!config });
-    
-    // Auto-generate name if not provided
-    let designName = name || 'Untitled';
-    if (!name) {
-      const count = await Design.countDocuments({ userId });
-      designName = `Untitled ${count + 1}`;
+    const { config, lastEstimate } = req.body;
+    if (!config || typeof config !== 'object' || Array.isArray(config)) {
+      return res.status(400).json({ message: 'A valid design configuration is required' });
     }
+    let name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
+    if (!name) {
+      const count = await Design.countDocuments(ownerFilter(req));
+      name = `Untitled ${count + 1}`;
+    }
+    if (name.length > 100) return res.status(400).json({ message: 'Design name is too long' });
 
     const design = new Design({
-      name: designName,
+      name,
       config,
-      userId,
-      lastEstimate: lastEstimate || undefined
+      owner: req.user._id,
+      lastEstimate: lastEstimate || undefined,
     });
-
-    const savedDesign = await design.save();
-    console.log('Design saved successfully:', savedDesign._id);
-    res.status(201).json(savedDesign);
+    return res.status(201).json(await design.save());
   } catch (error) {
     console.error('Error creating design:', error);
-    res.status(400).json({ message: error.message });
+    return res.status(400).json({ message: 'Failed to create design' });
   }
 };
 
-// Update a design
 exports.updateDesign = async (req, res) => {
+  if (invalidDesignId(req, res)) return;
   try {
-    const { name, config, thumbnail, lastEstimate } = req.body;
-    const design = await Design.findById(req.params.id);
-
-    if (!design) {
-      return res.status(404).json({ message: 'Design not found' });
+    const updates = {};
+    if (req.body.name !== undefined) {
+      if (typeof req.body.name !== 'string' || !req.body.name.trim() || req.body.name.trim().length > 100) {
+        return res.status(400).json({ message: 'Enter a design name of no more than 100 characters' });
+      }
+      updates.name = req.body.name.trim();
     }
-
-    // Store original state for rollback
-    const originalThumbnail = design.thumbnail;
-    const originalFallback = design.thumbnailFallback;
-
-    console.log('[DEBUG] updateDesign - Design ID:', req.params.id);
-    console.log('[DEBUG] updateDesign - Original thumbnail:', originalThumbnail);
-    console.log('[DEBUG] updateDesign - Original fallback:', originalFallback);
-    console.log('[DEBUG] updateDesign - New thumbnail provided:', thumbnail);
-
-    if (thumbnail && thumbnail !== originalThumbnail) {
-      // New thumbnail provided: delete old thumbnails to prevent stacking
-      // Delete old current thumbnail
-      if (originalThumbnail) {
-        console.log('[DEBUG] updateDesign - Deleting old current thumbnail:', originalThumbnail);
-        const deleteResult = await deleteImageByUrl(originalThumbnail);
-        console.log('[DEBUG] updateDesign - Old current deletion result:', deleteResult);
+    if (req.body.config !== undefined) {
+      if (!req.body.config || typeof req.body.config !== 'object' || Array.isArray(req.body.config)) {
+        return res.status(400).json({ message: 'Invalid design configuration' });
       }
-      // Delete old fallback if exists
-      if (originalFallback) {
-        console.log('[DEBUG] updateDesign - Deleting old fallback:', originalFallback);
-        const deleteResult = await deleteImageByUrl(originalFallback);
-        console.log('[DEBUG] updateDesign - Old fallback deletion result:', deleteResult);
-      }
-      
-      // Set new thumbnail, no fallback (to prevent stacking)
-      design.thumbnail = thumbnail;
-      design.thumbnailFallback = null;
-      console.log('[DEBUG] updateDesign - New thumbnail set, no fallback to prevent stacking');
-    } else if (!thumbnail) {
-      // No new thumbnail: clear fallback and delete from Cloudinary
-      if (originalFallback) {
-        console.log('[DEBUG] updateDesign - Clearing fallback:', originalFallback);
-        const deleteResult = await deleteImageByUrl(originalFallback);
-        console.log('[DEBUG] updateDesign - Fallback deletion result:', deleteResult);
-        design.thumbnailFallback = null;
-      } else {
-        console.log('[DEBUG] updateDesign - No fallback to clear');
-      }
-    } else {
-      console.log('[DEBUG] updateDesign - Thumbnail unchanged, no rotation needed');
+      updates.config = req.body.config;
     }
+    if (req.body.lastEstimate !== undefined) updates.lastEstimate = req.body.lastEstimate;
 
-    // Update other fields
-    if (name) design.name = name;
-    if (config) design.config = config;
-    if (lastEstimate) design.lastEstimate = lastEstimate;
-
-    const updatedDesign = await design.save();
-    console.log('[DEBUG] updateDesign - Design saved successfully');
-
-    res.json(updatedDesign);
+    const design = await Design.findOneAndUpdate(
+      ownedDesignFilter(req),
+      { $set: updates },
+      { new: true, runValidators: true }
+    );
+    return design ? res.json(design) : notFound(res);
   } catch (error) {
-    console.error('[ERROR] updateDesign - Error updating design:', error);
-    res.status(400).json({ message: error.message });
+    console.error('Error updating design:', error);
+    return res.status(400).json({ message: 'Failed to update design' });
   }
 };
 
-// Delete a design
-exports.deleteDesign = async (req, res) => {
+async function removeOwnedDesign(req, res, message) {
+  if (invalidDesignId(req, res)) return;
   try {
-    console.log('[DEBUG] deleteDesign - Attempting to delete design ID:', req.params.id);
-    const design = await Design.findById(req.params.id);
-    if (!design) {
-      console.log('[DEBUG] deleteDesign - Design not found');
-      return res.status(404).json({ message: 'Design not found' });
-    }
-
-    console.log('[DEBUG] deleteDesign - Design found. Thumbnail:', design.thumbnail, 'Fallback:', design.thumbnailFallback);
-
-    // Delete both thumbnails from Cloudinary before deleting from database
-    if (design.thumbnail) {
-      console.log('[DEBUG] deleteDesign - Deleting thumbnail from Cloudinary');
-      await deleteImageByUrl(design.thumbnail);
-    }
-    if (design.thumbnailFallback) {
-      console.log('[DEBUG] deleteDesign - Deleting fallback from Cloudinary');
-      await deleteImageByUrl(design.thumbnailFallback);
-    }
-
-    await Design.findByIdAndDelete(req.params.id);
-    console.log('[DEBUG] deleteDesign - Design deleted from database');
-    res.json({ message: 'Design deleted successfully' });
-  } catch (error) {
-    console.error('[ERROR] deleteDesign - Error deleting design:', error);
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// Move design to trash
-exports.moveToTrash = async (req, res) => {
-  try {
-    const design = await Design.findById(req.params.id);
-    if (!design) {
-      return res.status(404).json({ message: 'Design not found' });
-    }
-
-    // Check if trash is full (max 5 items)
-    const trashedCount = await Design.countDocuments({ 
-      userId: design.userId, 
-      isTrashed: true 
+    const design = await Design.findOneAndDelete(ownedDesignFilter(req));
+    if (!design) return notFound(res);
+    await deleteTrustedThumbnail({
+      asset: design.thumbnailAsset,
+      firebaseUid: req.auth.uid,
+      designId: design._id.toString(),
     });
+    return res.json({ message });
+  } catch (error) {
+    console.error('Error deleting design:', error);
+    return res.status(500).json({ message: 'Failed to delete design' });
+  }
+}
 
+exports.deleteDesign = (req, res) => removeOwnedDesign(req, res, 'Design deleted successfully');
+exports.permanentlyDelete = (req, res) => removeOwnedDesign(req, res, 'Design permanently deleted');
+
+exports.moveToTrash = async (req, res) => {
+  if (invalidDesignId(req, res)) return;
+  try {
+    const design = await Design.findOne(ownedDesignFilter(req));
+    if (!design) return notFound(res);
+    const filter = ownerFilter(req);
+    const trashedCount = await Design.countDocuments({ ...filter, isTrashed: true });
     if (trashedCount >= 5) {
-      // Find and permanently delete the oldest trashed design
-      const oldestTrashed = await Design.findOne({
-        userId: design.userId,
-        isTrashed: true
-      }).sort({ trashedAt: 1 });
-      
-      if (oldestTrashed) {
-        await Design.findByIdAndDelete(oldestTrashed._id);
+      const oldest = await Design.findOneAndDelete({ ...filter, isTrashed: true }, { sort: { trashedAt: 1 } });
+      if (oldest) {
+        await deleteTrustedThumbnail({
+          asset: oldest.thumbnailAsset,
+          firebaseUid: req.auth.uid,
+          designId: oldest._id.toString(),
+        });
       }
     }
-
     design.isTrashed = true;
     design.trashedAt = new Date();
-    await design.save();
-
-    res.json(design);
+    return res.json(await design.save());
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error moving design to trash:', error);
+    return res.status(500).json({ message: 'Failed to move design to trash' });
   }
 };
 
-// Restore design from trash
 exports.restoreFromTrash = async (req, res) => {
+  if (invalidDesignId(req, res)) return;
   try {
-    const design = await Design.findById(req.params.id);
-    if (!design) {
-      return res.status(404).json({ message: 'Design not found' });
-    }
-
+    const design = await Design.findOne(ownedDesignFilter(req));
+    if (!design) return notFound(res);
     design.isTrashed = false;
     design.trashedAt = null;
-    await design.save();
-
-    res.json(design);
+    return res.json(await design.save());
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error restoring design:', error);
+    return res.status(500).json({ message: 'Failed to restore design' });
   }
 };
 
-// Permanently delete design
-exports.permanentlyDelete = async (req, res) => {
+exports.createThumbnailUploadSignature = async (req, res) => {
+  if (invalidDesignId(req, res)) return;
   try {
-    console.log('[DEBUG] permanentlyDelete - Attempting to permanently delete design ID:', req.params.id);
-    const design = await Design.findById(req.params.id);
-    if (!design) {
-      console.log('[DEBUG] permanentlyDelete - Design not found');
-      return res.status(404).json({ message: 'Design not found' });
-    }
-
-    console.log('[DEBUG] permanentlyDelete - Design found. Thumbnail:', design.thumbnail, 'Fallback:', design.thumbnailFallback);
-
-    // Delete both thumbnails from Cloudinary before deleting from database
-    if (design.thumbnail) {
-      console.log('[DEBUG] permanentlyDelete - Deleting thumbnail from Cloudinary');
-      await deleteImageByUrl(design.thumbnail);
-    }
-    if (design.thumbnailFallback) {
-      console.log('[DEBUG] permanentlyDelete - Deleting fallback from Cloudinary');
-      await deleteImageByUrl(design.thumbnailFallback);
-    }
-
-    await Design.findByIdAndDelete(req.params.id);
-    console.log('[DEBUG] permanentlyDelete - Design permanently deleted from database');
-    res.json({ message: 'Design permanently deleted' });
+    const design = await Design.findOne(ownedDesignFilter(req)).select('_id');
+    if (!design) return notFound(res);
+    return res.json(buildThumbnailUploadSignature({
+      firebaseUid: req.auth.uid,
+      designId: design._id.toString(),
+    }));
   } catch (error) {
-    console.error('[ERROR] permanentlyDelete - Error permanently deleting design:', error);
-    res.status(500).json({ message: error.message });
+    console.error('Error creating thumbnail upload signature:', error);
+    return res.status(500).json({ message: 'Failed to authorize thumbnail upload' });
   }
 };
+
+exports.attachThumbnail = async (req, res) => {
+  if (invalidDesignId(req, res)) return;
+  try {
+    const design = await Design.findOne(ownedDesignFilter(req));
+    if (!design) return notFound(res);
+    const verified = await verifyThumbnailAsset({
+      firebaseUid: req.auth.uid,
+      designId: design._id.toString(),
+      publicId: req.body.publicId,
+      secureUrl: req.body.secureUrl,
+    });
+    if (!verified) return res.status(400).json({ message: 'Invalid thumbnail asset' });
+
+    const previousAsset = design.thumbnailAsset?.trusted
+      ? design.thumbnailAsset.toObject?.() || design.thumbnailAsset
+      : null;
+    design.thumbnail = verified.secureUrl;
+    design.thumbnailFallback = null;
+    design.thumbnailAsset = {
+      ...verified,
+      ownerUid: req.auth.uid,
+      uploadedAt: new Date(),
+      trusted: true,
+    };
+    const saved = await design.save();
+    if (previousAsset?.publicId && previousAsset.publicId !== verified.publicId) {
+      await deleteTrustedThumbnail({
+        asset: previousAsset,
+        firebaseUid: req.auth.uid,
+        designId: design._id.toString(),
+      });
+    }
+    return res.json(saved);
+  } catch (error) {
+    console.error('Error attaching thumbnail:', error);
+    return res.status(400).json({ message: 'Failed to attach thumbnail' });
+  }
+};
+
+exports.ownerFilter = ownerFilter;

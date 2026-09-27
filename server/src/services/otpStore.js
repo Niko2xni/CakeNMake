@@ -89,7 +89,7 @@ class OtpStore {
     });
   }
 
-  async incrementAttempts(purpose, email) {
+  async incrementAttempts(purpose, email, expectedPasswordHash, maxAttempts = Number.MAX_SAFE_INTEGER) {
     const key = this.otpKey(purpose, email);
     return this.runRedis(async (redis) => {
       if (redis) {
@@ -97,11 +97,16 @@ class OtpStore {
           local raw = redis.call('GET', KEYS[1])
           if not raw then return nil end
           local value = cjson.decode(raw)
+          if value.passwordHash ~= ARGV[1] then return nil end
           value.attempts = (value.attempts or 0) + 1
-          redis.call('SET', KEYS[1], cjson.encode(value), 'KEEPTTL')
+          if value.attempts >= tonumber(ARGV[2]) then
+            redis.call('DEL', KEYS[1])
+          else
+            redis.call('SET', KEYS[1], cjson.encode(value), 'KEEPTTL')
+          end
           return value.attempts
         `;
-        return redis.eval(script, 1, key);
+        return redis.eval(script, 1, key, expectedPasswordHash, maxAttempts);
       }
 
       const entry = memoryRecords.get(key);
@@ -109,8 +114,36 @@ class OtpStore {
         memoryRecords.delete(key);
         return null;
       }
+      if (entry.value.passwordHash !== expectedPasswordHash) return null;
       entry.value.attempts = (entry.value.attempts || 0) + 1;
+      if (entry.value.attempts >= maxAttempts) memoryRecords.delete(key);
       return entry.value.attempts;
+    });
+  }
+
+  async consumeIfCurrent(purpose, email, expectedPasswordHash) {
+    const key = this.otpKey(purpose, email);
+    return this.runRedis(async (redis) => {
+      if (redis) {
+        const script = `
+          local raw = redis.call('GET', KEYS[1])
+          if not raw then return 0 end
+          local value = cjson.decode(raw)
+          if value.passwordHash ~= ARGV[1] then return 0 end
+          redis.call('DEL', KEYS[1])
+          return 1
+        `;
+        return Number(await redis.eval(script, 1, key, expectedPasswordHash)) === 1;
+      }
+
+      const entry = memoryRecords.get(key);
+      if (!entry || entry.expiresAt <= Date.now()) {
+        memoryRecords.delete(key);
+        return false;
+      }
+      if (entry.value.passwordHash !== expectedPasswordHash) return false;
+      memoryRecords.delete(key);
+      return true;
     });
   }
 
