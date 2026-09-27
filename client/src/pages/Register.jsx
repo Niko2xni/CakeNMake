@@ -4,11 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserPlus, Mail, Lock, Loader2 } from "lucide-react";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
 import { auth, firebaseConfigured, googleProvider, missingFirebaseConfigMessage } from "@/lib/firebase";
-import { createUserWithEmailAndPassword, signInWithPopup } from "firebase/auth";
+import { createUserWithEmailAndPassword, sendEmailVerification, signInWithPopup, signOut } from "firebase/auth";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -17,8 +16,7 @@ export default function Register() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showOtp, setShowOtp] = useState(false);
-  const [otpCode, setOtpCode] = useState("");
+  const [verificationSent, setVerificationSent] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -30,35 +28,14 @@ export default function Register() {
     setLoading(true);
     try {
       if (!firebaseConfigured) throw new Error(missingFirebaseConfigMessage);
-      await createUserWithEmailAndPassword(auth, email, password);
-      navigate("/login-success");
+      const credential = await createUserWithEmailAndPassword(auth, email, password);
+      await sendEmailVerification(credential.user, { url: `${window.location.origin}/login` });
+      await signOut(auth);
+      setVerificationSent(true);
     } catch (err) {
       setError(err.message || "Registration failed");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleVerify = async () => {
-    setError("");
-    setLoading(true);
-    try {
-      if (!firebaseConfigured) throw new Error(missingFirebaseConfigMessage);
-      await createUserWithEmailAndPassword(auth, email, password);
-      navigate("/login-success");
-    } catch (err) {
-      setError(err.message || "Invalid verification code");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResend = async () => {
-    setError("");
-    try {
-      setError("Email verification is handled by Firebase after account creation.");
-    } catch (err) {
-      setError(err.message || "Failed to resend code");
     }
   };
 
@@ -76,56 +53,19 @@ export default function Register() {
     }
   };
 
-  if (showOtp) {
+  if (verificationSent) {
     return (
       <AuthLayout
         icon={Mail}
-        title="Verify your email"
-        subtitle={`We sent a code to ${email}`}
+        title="Check your email"
+        subtitle={`We sent a verification link to ${email}`}
       >
-        {error && (
-          <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-            {error}
-          </div>
-        )}
-        <div className="flex justify-center mb-6">
-          <InputOTP
-            maxLength={6}
-            value={otpCode}
-            onChange={setOtpCode}
-            autoFocus
-            autoComplete="one-time-code"
-          >
-            <InputOTPGroup>
-              <InputOTPSlot index={0} />
-              <InputOTPSlot index={1} />
-              <InputOTPSlot index={2} />
-              <InputOTPSlot index={3} />
-              <InputOTPSlot index={4} />
-              <InputOTPSlot index={5} />
-            </InputOTPGroup>
-          </InputOTP>
-        </div>
-        <Button
-          className="w-full h-12 font-medium"
-          onClick={handleVerify}
-          disabled={loading || otpCode.length < 6}
-        >
-          {loading ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Verifying...
-            </>
-          ) : (
-            "Verify"
-          )}
-        </Button>
-        <p className="text-center text-sm text-muted-foreground mt-4">
-          Didn't receive the code?{" "}
-          <button onClick={handleResend} className="text-primary font-medium hover:underline">
-            Resend
-          </button>
+        <p className="text-center text-sm text-muted-foreground mb-6">
+          Open the link in that message before signing in. Unverified password accounts cannot access the application.
         </p>
+        <Button className="w-full h-12 font-medium" onClick={() => navigate('/login')}>
+          Go to log in
+        </Button>
       </AuthLayout>
     );
   }

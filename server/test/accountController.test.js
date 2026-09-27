@@ -73,6 +73,23 @@ test('syncAccount creates a customer from verified Firebase claims', async () =>
   assert.equal(capturedUpdate.$set.status, undefined);
 });
 
+test('syncAccount rejects an unverified password account', async () => {
+  mock.method(User, 'findOne', async () => null);
+  const updateMock = mock.method(User, 'findOneAndUpdate', async () => {
+    assert.fail('unverified password accounts must not be synchronized');
+  });
+
+  const res = createResponse();
+  await syncAccount(createRequest({
+    emailVerified: false,
+    provider: 'password',
+  }), res);
+
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.body.code, 'EMAIL_VERIFICATION_REQUIRED');
+  assert.equal(updateMock.mock.callCount(), 0);
+});
+
 test('syncAccount preserves backend-managed fields for an existing user', async () => {
   const existingUser = {
     firebaseUid: 'firebase-user-1',

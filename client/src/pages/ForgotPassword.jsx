@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Mail, ArrowLeft, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
+import { auth, firebaseConfigured, missingFirebaseConfigMessage } from "@/lib/firebase";
+import { sendPasswordResetEmail } from "firebase/auth";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -15,11 +17,12 @@ export default function ForgotPassword() {
     e.preventDefault();
     setLoading(true);
     try {
-      // Simplified password reset - in production, this would call your backend API
-      // For now, we'll simulate successful request
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (!firebaseConfigured) throw new Error(missingFirebaseConfigMessage);
+      await sendPasswordResetEmail(auth, email, {
+        url: `${window.location.origin}/login`,
+      });
     } catch {
-      // Always show success regardless
+      // Keep the response generic so this page cannot be used to enumerate accounts.
     } finally {
       setLoading(false);
       setSent(true);

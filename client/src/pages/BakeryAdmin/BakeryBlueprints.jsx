@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { FileText, Download, Eye, Calendar, User } from 'lucide-react';
+import { FileText, Download, Eye, Calendar } from 'lucide-react';
 import CustomScrollbar from '@/components/shared/CustomScrollbar';
+import { safeExternalUrl } from '@/lib/safe-url';
 
 const seedBlueprints = [
   {
@@ -62,7 +63,8 @@ export default function BakeryBlueprints() {
       <CustomScrollbar className="flex-1" contentClassName="p-4 space-y-2">
         {blueprints.map((b) => {
           const meta = STATUS_META[b.status] || STATUS_META.confirmed;
-          const hasBlueprint = !!b.blueprintUrl;
+          const blueprintUrl = safeExternalUrl(b.blueprintUrl);
+          const hasBlueprint = Boolean(blueprintUrl);
           return (
             <div
               key={b.id}
@@ -94,7 +96,7 @@ export default function BakeryBlueprints() {
                 {hasBlueprint ? (
                   <>
                     <a
-                      href={b.blueprintUrl}
+                      href={blueprintUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full border border-pink-200 text-pink-600 hover:bg-pink-50 transition-colors"
@@ -104,7 +106,7 @@ export default function BakeryBlueprints() {
                     </a>
 
                     <a
-                      href={b.blueprintUrl}
+                      href={blueprintUrl}
                       download
                       className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full bg-pink-500 text-white hover:bg-pink-600 transition-colors"
                     >

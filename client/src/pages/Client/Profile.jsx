@@ -6,6 +6,8 @@ import { accountApi } from '@/services/api';
 import { User, Facebook, Globe, Mail, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { linkWithPopup, reload, unlink, updateProfile } from 'firebase/auth';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { safeMediaUrl } from '@/lib/safe-url';
+import { validateUploadedFile } from '@/lib/file-validation';
 
 const SOCIAL_CONFIG = {
   'email-otp': {
@@ -68,7 +70,7 @@ export default function Profile() {
     || (providerData || []).find((profile) => profile.email || profile.photoURL)
     || null;
   const synchronizedPhotoURL = user?.photoURL || providerProfile?.photoURL || account?.photoURL || null;
-  const displayPhotoURL = photoOverride === undefined ? synchronizedPhotoURL : photoOverride;
+  const displayPhotoURL = safeMediaUrl(photoOverride === undefined ? synchronizedPhotoURL : photoOverride);
   const fallbackDisplayName = user?.displayName || user?.email?.split('@')[0]?.replace(/[._-]/g, ' ') || 'Cake Lover';
   const displayName = nameValue.trim() || fallbackDisplayName;
   const email = user?.email || providerProfile?.email || account?.email || '';
@@ -124,9 +126,16 @@ export default function Profile() {
       return;
     }
 
-    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
-    if (!allowedTypes.includes(selectedFile.type)) {
-      setPhotoError('Please choose a PNG, JPG, or WebP image.');
+    const fileError = validateUploadedFile(selectedFile, {
+      allowedTypes: {
+        'image/png': ['png'],
+        'image/jpeg': ['jpg', 'jpeg'],
+        'image/webp': ['webp'],
+      },
+      maxBytes: 5 * 1024 * 1024,
+    });
+    if (fileError) {
+      setPhotoError(fileError);
       event.target.value = '';
       return;
     }
@@ -135,8 +144,9 @@ export default function Profile() {
       setPhotoError('');
       setIsUploadingPhoto(true);
 
-      const avatarRef = ref(storage, `avatars/${user.uid}/${Date.now()}-${selectedFile.name}`);
-      await uploadBytes(avatarRef, selectedFile);
+      const extension = selectedFile.name.split('.').pop().toLowerCase();
+      const avatarRef = ref(storage, `avatars/${user.uid}/${Date.now()}.${extension}`);
+      await uploadBytes(avatarRef, selectedFile, { contentType: selectedFile.type });
 
       const photoURL = await getDownloadURL(avatarRef);
       await updateProfile(user, { photoURL });

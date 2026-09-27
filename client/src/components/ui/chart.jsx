@@ -10,6 +10,14 @@ const THEMES = {
   dark: ".dark"
 }
 
+const SAFE_CSS_TOKEN = /^[a-zA-Z][a-zA-Z0-9_-]*$/
+const UNSAFE_CSS_VALUE = /[;{}<>\\"']/
+
+function safeCssColor(value) {
+  if (typeof value !== "string" || !value.trim() || UNSAFE_CSS_VALUE.test(value)) return null
+  return value.trim()
+}
+
 const ChartContext = React.createContext(null)
 
 function useChart() {
@@ -24,7 +32,8 @@ function useChart() {
 
 const ChartContainer = React.forwardRef(({ id, className, children, config, ...props }, ref) => {
   const uniqueId = React.useId()
-  const chartId = `chart-${id || uniqueId.replace(/:/g, "")}`
+  const requestedId = typeof id === "string" && SAFE_CSS_TOKEN.test(id) ? id : null
+  const chartId = `chart-${requestedId || uniqueId.replace(/:/g, "")}`
 
   return (
     (<ChartContext.Provider value={{ config }}>
@@ -50,31 +59,31 @@ const ChartStyle = ({
   id,
   config
 }) => {
-  const colorConfig = Object.entries(config).filter(([, config]) => config.theme || config.color)
+  const colorConfig = Object.entries(config)
+    .filter(([key, itemConfig]) => SAFE_CSS_TOKEN.test(key) && (itemConfig.theme || itemConfig.color))
 
   if (!colorConfig.length) {
     return null
   }
 
-  return (
-    (<style
-      dangerouslySetInnerHTML={{
-        __html: Object.entries(THEMES)
+  const css = Object.entries(THEMES)
           .map(([theme, prefix]) => `
-${prefix} [data-chart=${id}] {
+${prefix} [data-chart="${id}"] {
 ${colorConfig
 .map(([key, itemConfig]) => {
 const color =
   itemConfig.theme?.[theme] ||
   itemConfig.color
-return color ? `  --color-${key}: ${color};` : null
+const safeColor = safeCssColor(color)
+return safeColor ? `  --color-${key}: ${safeColor};` : null
 })
+.filter(Boolean)
 .join("\n")}
 }
 `)
-          .join("\n"),
-      }} />)
-  );
+          .join("\n")
+
+  return <style>{css}</style>;
 }
 
 const ChartTooltip = RechartsPrimitive.Tooltip

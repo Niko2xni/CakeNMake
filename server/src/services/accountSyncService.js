@@ -77,6 +77,13 @@ async function synchronizeAccount(claims) {
   }
 
   const identity = await resolveFirebaseIdentity(claims);
+  if (identity.providers.includes('password') && !identity.emailVerified) {
+    const error = new Error('Verify your email address before signing in.');
+    error.code = 'EMAIL_VERIFICATION_REQUIRED';
+    error.status = 403;
+    throw error;
+  }
+
   const synchronizedFields = {
     emailVerified: identity.emailVerified,
     lastLoginAt: new Date(),

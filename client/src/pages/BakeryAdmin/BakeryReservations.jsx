@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, ChevronRight, X, Calendar, Banknote, FileText, MessageCircle, User } from 'lucide-react';
 import CustomScrollbar from '@/components/shared/CustomScrollbar';
+import { safeExternalUrl } from '@/lib/safe-url';
 import { bakeryApi } from '@/services/api'; // adjust path if api.js lives elsewhere
 
 
@@ -219,9 +220,9 @@ export default function BakeryReservations() {
               </div>
 
               <div className="space-y-2 pt-2 border-t border-pink-100">
-                {selected.blueprintUrl ? (
+                {safeExternalUrl(selected.blueprintUrl) ? (
                   <a
-                    href={selected.blueprintUrl}
+                    href={safeExternalUrl(selected.blueprintUrl)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 text-sm rounded-xl border border-pink-100 px-3 py-2.5 hover:bg-pink-50 transition-colors"

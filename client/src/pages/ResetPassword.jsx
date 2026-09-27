@@ -1,20 +1,48 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Lock, Loader2, AlertTriangle } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
+import { auth, firebaseConfigured, missingFirebaseConfigMessage } from "@/lib/firebase";
+import { confirmPasswordReset, verifyPasswordResetCode } from "firebase/auth";
 
 export default function ResetPassword() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const resetToken = searchParams.get("token");
+  const resetCode = searchParams.get("oobCode");
+  const resetMode = searchParams.get("mode");
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(true);
+  const [codeIsValid, setCodeIsValid] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    const verifyCode = async () => {
+      if (!firebaseConfigured || resetMode !== 'resetPassword' || !resetCode) {
+        if (active) setVerifying(false);
+        return;
+      }
+
+      try {
+        await verifyPasswordResetCode(auth, resetCode);
+        if (active) setCodeIsValid(true);
+      } catch {
+        if (active) setCodeIsValid(false);
+      } finally {
+        if (active) setVerifying(false);
+      }
+    };
+
+    verifyCode();
+    return () => { active = false; };
+  }, [resetCode, resetMode]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -25,9 +53,8 @@ export default function ResetPassword() {
     }
     setLoading(true);
     try {
-      // Simplified password reset - in production, this would call your backend API
-      // For now, we'll simulate successful reset
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (!firebaseConfigured) throw new Error(missingFirebaseConfigMessage);
+      await confirmPasswordReset(auth, resetCode, newPassword);
       navigate("/login");
     } catch (err) {
       setError(err.message || "Failed to reset password");
@@ -36,7 +63,15 @@ export default function ResetPassword() {
     }
   };
 
-  if (!resetToken) {
+  if (verifying) {
+    return (
+      <AuthLayout icon={Lock} title="Checking reset link" subtitle="Please wait">
+        <Loader2 className="w-6 h-6 mx-auto animate-spin" />
+      </AuthLayout>
+    );
+  }
+
+  if (!codeIsValid) {
     return (
       <AuthLayout
         icon={AlertTriangle}

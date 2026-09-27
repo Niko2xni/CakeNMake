@@ -22,8 +22,8 @@ import {
 import ClientNavbar from '@/components/client/ClientNavbar';
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB - audio & documents (no separate limit was specified for these)
-const MAX_IMAGE_SIZE = 100 * 1024 * 1024; // 100 MB
-const MAX_VIDEO_SIZE = 500 * 1024 * 1024; // 500 MB
+const MAX_IMAGE_SIZE = 25 * 1024 * 1024;
+const MAX_VIDEO_SIZE = 100 * 1024 * 1024;
 const MAX_VIDEO_DURATION = 10 * 60; // 10 minutes, in seconds
 const URL_REGEX = /(https?:\/\/[^\s]+)/g;
 
@@ -42,10 +42,15 @@ function getFileExtension(filename) {
 // Returns 'image' | 'video' | 'audio' | 'document' | null (null = unsupported)
 function getFileKind(file) {
   const ext = getFileExtension(file.name);
-  if (IMAGE_EXTENSIONS.includes(ext)) return 'image';
-  if (VIDEO_EXTENSIONS.includes(ext)) return 'video';
-  if (AUDIO_EXTENSIONS.includes(ext)) return 'audio';
-  if (DOCUMENT_EXTENSIONS.includes(ext)) return 'document';
+  const mime = file.type?.toLowerCase();
+  if (IMAGE_EXTENSIONS.includes(ext) && ['image/png', 'image/jpeg'].includes(mime)) return 'image';
+  if (VIDEO_EXTENSIONS.includes(ext) && ['video/mp4', 'video/quicktime', 'video/x-matroska', 'video/x-msvideo', 'video/x-flv'].includes(mime)) return 'video';
+  if (AUDIO_EXTENSIONS.includes(ext) && ['audio/wav', 'audio/x-wav', 'audio/mpeg'].includes(mime)) return 'audio';
+  if (DOCUMENT_EXTENSIONS.includes(ext) && [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  ].includes(mime)) return 'document';
   return null;
 }
 
@@ -596,11 +601,11 @@ export default function Chats() {
     }
 
     if (kind === 'image' && file.size > MAX_IMAGE_SIZE) {
-      setUploadError('This image is over 100 MB. Try a smaller one.');
+      setUploadError('This image is over 25 MB. Try a smaller one.');
       return;
     }
     if (kind === 'video' && file.size > MAX_VIDEO_SIZE) {
-      setUploadError('This video is over 500 MB. Try a smaller one.');
+      setUploadError('This video is over 100 MB. Try a smaller one.');
       return;
     }
     if ((kind === 'audio' || kind === 'document') && file.size > MAX_FILE_SIZE) {

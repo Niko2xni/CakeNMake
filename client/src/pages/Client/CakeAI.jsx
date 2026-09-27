@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { Bot, Sparkles, Send, Plus, Paperclip, X, MessageSquare, History, MoreHorizontal, Trash2, Pencil } from 'lucide-react';
 import ClientNavbar from '@/components/client/ClientNavbar';
+import { validateUploadedFile } from '@/lib/file-validation';
 
 // Wrap any vertical scrollable content with this instead of the browser's native scrollbar.
 function CustomScrollbar({ className = '', contentClassName = '', children }) {
@@ -146,6 +147,7 @@ function CustomScrollbar({ className = '', contentClassName = '', children }) {
 export default function CakeAI() {
   const [message, setMessage] = useState('');
   const [attachedFiles, setAttachedFiles] = useState([]);
+  const [attachmentError, setAttachmentError] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   
   // Chat History States
@@ -257,16 +259,30 @@ export default function CakeAI() {
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const newFiles = Array.from(e.dataTransfer.files);
-      setAttachedFiles(prev => [...prev, ...newFiles]);
+      addFiles(Array.from(e.dataTransfer.files));
     }
   };
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files.length > 0) {
-      const newFiles = Array.from(e.target.files);
-      setAttachedFiles(prev => [...prev, ...newFiles]);
+      addFiles(Array.from(e.target.files));
+      e.target.value = '';
     }
+  };
+
+  const addFiles = (files) => {
+    const accepted = [];
+    let firstError = '';
+    files.forEach((file) => {
+      const fileError = validateUploadedFile(file);
+      if (fileError) {
+        firstError ||= `${file.name}: ${fileError}`;
+      } else {
+        accepted.push(file);
+      }
+    });
+    setAttachmentError(firstError);
+    if (accepted.length) setAttachedFiles((current) => [...current, ...accepted]);
   };
 
   const removeFile = (indexToRemove) => {
@@ -589,6 +605,10 @@ export default function CakeAI() {
               </div>
             )}
 
+            {attachmentError && (
+              <p className="px-3 pb-2 text-xs text-red-600" role="alert">{attachmentError}</p>
+            )}
+
             <div className="cn-ai-composer-actions flex items-center justify-between border-t">
               <div>
                 <button
@@ -606,6 +626,7 @@ export default function CakeAI() {
                   onChange={handleFileChange} 
                   className="hidden" 
                   multiple
+                  accept="image/jpeg,image/png,image/webp,application/pdf"
                 />
               </div>
 

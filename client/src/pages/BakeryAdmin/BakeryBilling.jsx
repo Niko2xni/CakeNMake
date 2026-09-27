@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CreditCard, Sparkles, Receipt, ArrowUpRight, Check, AlertCircle, RefreshCw } from 'lucide-react';
 import CustomScrollbar from '@/components/shared/CustomScrollbar';
 import { billingApi } from '@/services/api'; // Adjust path based on your API setup
+import { safeExternalUrl } from '@/lib/safe-url';
 
 function formatPeso(amount) {
   return `₱${Number(amount || 0).toLocaleString()}`;
@@ -152,7 +153,9 @@ export default function BakeryBilling() {
                   {invoices.length === 0 ? (
                     <p className="text-xs text-gray-400 italic py-4 text-center">No past payment statements found.</p>
                   ) : (
-                    invoices.map((invoice) => (
+                    invoices.map((invoice) => {
+                      const invoiceUrl = safeExternalUrl(invoice.pdfUrl);
+                      return (
                       <div key={invoice.id} className="rounded-xl border border-pink-100 p-3 flex items-center justify-between bg-white hover:bg-pink-50/20 transition-colors">
                         <div>
                           <p className="text-xs font-semibold text-gray-800">{invoice.invoiceNum || 'INV-001'}</p>
@@ -160,17 +163,21 @@ export default function BakeryBilling() {
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-gray-900">{formatPeso(invoice.amount)}</span>
-                          <a 
-                            href={invoice.pdfUrl || '#'} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="p-1 rounded-full text-gray-400 hover:bg-pink-50 hover:text-pink-500 transition-colors"
-                          >
-                            <ArrowUpRight className="w-3.5 h-3.5" />
-                          </a>
+                          {invoiceUrl && (
+                            <a
+                              href={invoiceUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1 rounded-full text-gray-400 hover:bg-pink-50 hover:text-pink-500 transition-colors"
+                              aria-label={`Open invoice ${invoice.invoiceNum || ''}`.trim()}
+                            >
+                              <ArrowUpRight className="w-3.5 h-3.5" />
+                            </a>
+                          )}
                         </div>
                       </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
