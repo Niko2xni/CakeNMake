@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { X, ChevronLeft, ChevronRight, Search, Home, LayoutTemplate, Cake, Heart, PartyPopper, Palette } from 'lucide-react';
 import ClientNavbar from '@/components/client/ClientNavbar';
+import classicBirthdayImage from '@/assets/cake1-choice.png';
+import weddingEleganceImage from '@/assets/cake2-choice.png';
+import funPartyImage from '@/assets/cake3-choice.png';
+import romanticRoseImage from '@/assets/templates/romantic-rose.png';
+import oceanBreezeImage from '@/assets/templates/ocean-breeze.png';
+import gardenFreshImage from '@/assets/templates/garden-fresh.png';
+import midnightChocolateImage from '@/assets/templates/midnight-chocolate.png';
 
 const TEMPLATES = [
   {
@@ -11,12 +18,7 @@ const TEMPLATES = [
       'A timeless birthday cake with soft buttercream layers, playful piping, and a candle-ready top tier. Customizable with any flavor combination and color scheme.',
     price: '$45',
     specs: ['Buttercream Cake', 'Frosting: Vanilla Buttercream'],
-    views: [
-      { url: 'https://picsum.photos/seed/classic-birthday-thumb/400/500', label: 'Front View' },
-      { url: 'https://picsum.photos/seed/classic-birthday-1/400/500', label: 'Side View' },
-      { url: 'https://picsum.photos/seed/classic-birthday-2/400/500', label: 'Top View' },
-      { url: 'https://picsum.photos/seed/classic-birthday-3/400/500', label: 'Detail View' },
-    ],
+    views: [],
   },
   {
     id: 2,
@@ -26,12 +28,7 @@ const TEMPLATES = [
       'A multi-tier showpiece finished in smooth white fondant with delicate sugar flowers. Designed to anchor the dessert table at your reception.',
     price: '$180',
     specs: ['Fondant Cake', 'Frosting: White Fondant'],
-    views: [
-      { url: 'https://picsum.photos/seed/wedding-elegance-thumb/400/500', label: 'Front View' },
-      { url: 'https://picsum.photos/seed/wedding-elegance-1/400/500', label: 'Side View' },
-      { url: 'https://picsum.photos/seed/wedding-elegance-2/400/500', label: 'Top View' },
-      { url: 'https://picsum.photos/seed/wedding-elegance-3/400/500', label: 'Detail View' },
-    ],
+    views: [],
   },
   {
     id: 3,
@@ -41,12 +38,7 @@ const TEMPLATES = [
       'A bright, confetti-packed cake built for birthdays and celebrations that call for a little chaos. Loaded with sprinkles inside and out.',
     price: '$50',
     specs: ['Buttercream Cake', 'Frosting: Rainbow Buttercream'],
-    views: [
-      { url: 'https://picsum.photos/seed/fun-party-thumb/400/500', label: 'Front View' },
-      { url: 'https://picsum.photos/seed/fun-party-1/400/500', label: 'Side View' },
-      { url: 'https://picsum.photos/seed/fun-party-2/400/500', label: 'Top View' },
-      { url: 'https://picsum.photos/seed/fun-party-3/400/500', label: 'Detail View' },
-    ],
+    views: [],
   },
   {
     id: 4,
@@ -56,12 +48,7 @@ const TEMPLATES = [
       'Hand-piped buttercream roses cascade across a soft blush base. A romantic choice for anniversaries, engagements, or Valentine\u2019s Day.',
     price: '$65',
     specs: ['Buttercream Cake', 'Frosting: Rose Buttercream'],
-    views: [
-      { url: 'https://picsum.photos/seed/romantic-rose-thumb/400/500', label: 'Front View' },
-      { url: 'https://picsum.photos/seed/romantic-rose-1/400/500', label: 'Side View' },
-      { url: 'https://picsum.photos/seed/romantic-rose-2/400/500', label: 'Top View' },
-      { url: 'https://picsum.photos/seed/romantic-rose-3/400/500', label: 'Detail View' },
-    ],
+    views: [],
   },
   {
     id: 5,
@@ -71,12 +58,7 @@ const TEMPLATES = [
       'Cool blue ombre layers with a wave-like buttercream texture, finished with a scattering of edible pearls. A refreshing pick for summer events.',
     price: '$55',
     specs: ['Buttercream Cake', 'Frosting: Blue Ombre Buttercream'],
-    views: [
-      { url: 'https://picsum.photos/seed/ocean-breeze-thumb/400/500', label: 'Front View' },
-      { url: 'https://picsum.photos/seed/ocean-breeze-1/400/500', label: 'Side View' },
-      { url: 'https://picsum.photos/seed/ocean-breeze-2/400/500', label: 'Top View' },
-      { url: 'https://picsum.photos/seed/ocean-breeze-3/400/500', label: 'Detail View' },
-    ],
+    views: [],
   },
   {
     id: 6,
@@ -86,12 +68,7 @@ const TEMPLATES = [
       'Earthy tones and hand-crafted sugar botanicals give this cake a natural, garden-grown feel. Pairs well with lemon, honey, or vanilla bean fillings.',
     price: '$60',
     specs: ['Buttercream Cake', 'Frosting: Honey Buttercream'],
-    views: [
-      { url: 'https://picsum.photos/seed/garden-fresh-thumb/400/500', label: 'Front View' },
-      { url: 'https://picsum.photos/seed/garden-fresh-1/400/500', label: 'Side View' },
-      { url: 'https://picsum.photos/seed/garden-fresh-2/400/500', label: 'Top View' },
-      { url: 'https://picsum.photos/seed/garden-fresh-3/400/500', label: 'Detail View' },
-    ],
+    views: [],
   },
   {
     id: 7,
@@ -101,12 +78,7 @@ const TEMPLATES = [
       'Deep chocolate layers wrapped in a glossy dark ganache drip. Built for chocolate lovers who want something bold and decadent.',
     price: '$58',
     specs: ['Ganache Cake', 'Frosting: Dark Chocolate Ganache'],
-    views: [
-      { url: 'https://picsum.photos/seed/midnight-chocolate-thumb/400/500', label: 'Front View' },
-      { url: 'https://picsum.photos/seed/midnight-chocolate-1/400/500', label: 'Side View' },
-      { url: 'https://picsum.photos/seed/midnight-chocolate-2/400/500', label: 'Top View' },
-      { url: 'https://picsum.photos/seed/midnight-chocolate-3/400/500', label: 'Detail View' },
-    ],
+    views: [],
   },
   {
     id: 8,
@@ -116,12 +88,7 @@ const TEMPLATES = [
       'Layers of vanilla sponge with a fresh strawberry buttercream and a ring of glazed berries on top. A bright, fruity pick for spring and summer occasions.',
     price: '$52',
     specs: ['Buttercream Cake', 'Frosting: Strawberry Buttercream'],
-    views: [
-      { url: 'https://picsum.photos/seed/strawberry-delight-thumb/400/500', label: 'Front View' },
-      { url: 'https://picsum.photos/seed/strawberry-delight-1/400/500', label: 'Side View' },
-      { url: 'https://picsum.photos/seed/strawberry-delight-2/400/500', label: 'Top View' },
-      { url: 'https://picsum.photos/seed/strawberry-delight-3/400/500', label: 'Detail View' },
-    ],
+    views: [],
   },
 ];
 
@@ -134,12 +101,7 @@ const TEMPLATES_ROW_2 = [
       'A light lemon sponge layered with a citrus buttercream and candied lemon peel. A refreshing choice for spring gatherings and afternoon celebrations.',
     price: '$48',
     specs: ['Buttercream Cake', 'Frosting: Lemon Buttercream'],
-    views: [
-      { url: 'https://picsum.photos/seed/lemon-zest-thumb/400/500', label: 'Front View' },
-      { url: 'https://picsum.photos/seed/lemon-zest-1/400/500', label: 'Side View' },
-      { url: 'https://picsum.photos/seed/lemon-zest-2/400/500', label: 'Top View' },
-      { url: 'https://picsum.photos/seed/lemon-zest-3/400/500', label: 'Detail View' },
-    ],
+    views: [],
   },
   {
     id: 10,
@@ -149,12 +111,7 @@ const TEMPLATES_ROW_2 = [
       'Espresso-soaked layers wrapped in a coffee buttercream with a scatter of toffee bits on top. Built for the coffee lover in the room.',
     price: '$55',
     specs: ['Buttercream Cake', 'Frosting: Coffee Buttercream'],
-    views: [
-      { url: 'https://picsum.photos/seed/coffee-toffee-thumb/400/500', label: 'Front View' },
-      { url: 'https://picsum.photos/seed/coffee-toffee-1/400/500', label: 'Side View' },
-      { url: 'https://picsum.photos/seed/coffee-toffee-2/400/500', label: 'Top View' },
-      { url: 'https://picsum.photos/seed/coffee-toffee-3/400/500', label: 'Detail View' },
-    ],
+    views: [],
   },
   {
     id: 11,
@@ -164,12 +121,7 @@ const TEMPLATES_ROW_2 = [
       'Dark chocolate layers paired with a cool mint ganache and a dusting of chocolate shavings. A crisp, refreshing twist on a classic chocolate cake.',
     price: '$56',
     specs: ['Ganache Cake', 'Frosting: Mint Ganache'],
-    views: [
-      { url: 'https://picsum.photos/seed/mint-chocolate-thumb/400/500', label: 'Front View' },
-      { url: 'https://picsum.photos/seed/mint-chocolate-1/400/500', label: 'Side View' },
-      { url: 'https://picsum.photos/seed/mint-chocolate-2/400/500', label: 'Top View' },
-      { url: 'https://picsum.photos/seed/mint-chocolate-3/400/500', label: 'Detail View' },
-    ],
+    views: [],
   },
   {
     id: 12,
@@ -179,12 +131,7 @@ const TEMPLATES_ROW_2 = [
       'Soft vanilla layers finished with a salted caramel buttercream and a generous caramel drizzle running down the sides.',
     price: '$54',
     specs: ['Buttercream Cake', 'Frosting: Salted Caramel Buttercream'],
-    views: [
-      { url: 'https://picsum.photos/seed/caramel-drizzle-thumb/400/500', label: 'Front View' },
-      { url: 'https://picsum.photos/seed/caramel-drizzle-1/400/500', label: 'Side View' },
-      { url: 'https://picsum.photos/seed/caramel-drizzle-2/400/500', label: 'Top View' },
-      { url: 'https://picsum.photos/seed/caramel-drizzle-3/400/500', label: 'Detail View' },
-    ],
+    views: [],
   },
   {
     id: 13,
@@ -194,12 +141,7 @@ const TEMPLATES_ROW_2 = [
       'A vanilla bean cake layered with blueberry compote and a light blueberry buttercream, topped with a scatter of fresh berries.',
     price: '$53',
     specs: ['Buttercream Cake', 'Frosting: Blueberry Buttercream'],
-    views: [
-      { url: 'https://picsum.photos/seed/blueberry-bliss-thumb/400/500', label: 'Front View' },
-      { url: 'https://picsum.photos/seed/blueberry-bliss-1/400/500', label: 'Side View' },
-      { url: 'https://picsum.photos/seed/blueberry-bliss-2/400/500', label: 'Top View' },
-      { url: 'https://picsum.photos/seed/blueberry-bliss-3/400/500', label: 'Detail View' },
-    ],
+    views: [],
   },
   {
     id: 14,
@@ -209,12 +151,7 @@ const TEMPLATES_ROW_2 = [
       'A delicate pistachio sponge paired with a rose-infused buttercream and a scatter of crushed pistachios. A refined choice for upscale events.',
     price: '$62',
     specs: ['Buttercream Cake', 'Frosting: Pistachio Buttercream'],
-    views: [
-      { url: 'https://picsum.photos/seed/pistachio-rose-thumb/400/500', label: 'Front View' },
-      { url: 'https://picsum.photos/seed/pistachio-rose-1/400/500', label: 'Side View' },
-      { url: 'https://picsum.photos/seed/pistachio-rose-2/400/500', label: 'Top View' },
-      { url: 'https://picsum.photos/seed/pistachio-rose-3/400/500', label: 'Detail View' },
-    ],
+    views: [],
   },
   {
     id: 15,
@@ -224,12 +161,7 @@ const TEMPLATES_ROW_2 = [
       'A rich red velvet cake layered with a tangy cream cheese frosting and a smooth, velvety crumb. A timeless favorite for any occasion.',
     price: '$57',
     specs: ['Cream Cheese Cake', 'Frosting: Cream Cheese Frosting'],
-    views: [
-      { url: 'https://picsum.photos/seed/velvet-dream-thumb/400/500', label: 'Front View' },
-      { url: 'https://picsum.photos/seed/velvet-dream-1/400/500', label: 'Side View' },
-      { url: 'https://picsum.photos/seed/velvet-dream-2/400/500', label: 'Top View' },
-      { url: 'https://picsum.photos/seed/velvet-dream-3/400/500', label: 'Detail View' },
-    ],
+    views: [],
   },
   {
     id: 16,
@@ -239,16 +171,37 @@ const TEMPLATES_ROW_2 = [
       'A honey-sweetened almond cake with a light honey buttercream and toasted almond flakes pressed along the sides. Warm and comforting.',
     price: '$51',
     specs: ['Buttercream Cake', 'Frosting: Honey Almond Buttercream'],
-    views: [
-      { url: 'https://picsum.photos/seed/honey-almond-thumb/400/500', label: 'Front View' },
-      { url: 'https://picsum.photos/seed/honey-almond-1/400/500', label: 'Side View' },
-      { url: 'https://picsum.photos/seed/honey-almond-2/400/500', label: 'Top View' },
-      { url: 'https://picsum.photos/seed/honey-almond-3/400/500', label: 'Detail View' },
-    ],
+    views: [],
   },
 ];
 
-const ALL_TEMPLATES = [...TEMPLATES, ...TEMPLATES_ROW_2];
+const TEMPLATE_IMAGES = [
+  classicBirthdayImage,
+  weddingEleganceImage,
+  funPartyImage,
+  romanticRoseImage,
+  oceanBreezeImage,
+  gardenFreshImage,
+  midnightChocolateImage,
+  romanticRoseImage,
+  gardenFreshImage,
+  classicBirthdayImage,
+  weddingEleganceImage,
+  classicBirthdayImage,
+  oceanBreezeImage,
+  weddingEleganceImage,
+  romanticRoseImage,
+  gardenFreshImage,
+];
+
+const applyTemplateArtwork = (template) => ({
+  ...template,
+  views: [{ url: TEMPLATE_IMAGES[template.id - 1], label: `${template.name} preview` }],
+});
+
+const DISPLAY_TEMPLATES = TEMPLATES.map(applyTemplateArtwork);
+const DISPLAY_TEMPLATES_ROW_2 = TEMPLATES_ROW_2.map(applyTemplateArtwork);
+const ALL_TEMPLATES = [...DISPLAY_TEMPLATES, ...DISPLAY_TEMPLATES_ROW_2];
 
 const SLIDE_INTERVAL_MS = 1500;
 
@@ -546,8 +499,8 @@ export default function Templates({ onSelectTemplate }) {
     );
   }
 
-  const filteredTemplates = TEMPLATES.filter(matchesSearch);
-  const filteredTemplatesRow2 = TEMPLATES_ROW_2.filter(matchesSearch);
+  const filteredTemplates = DISPLAY_TEMPLATES.filter(matchesSearch);
+  const filteredTemplatesRow2 = DISPLAY_TEMPLATES_ROW_2.filter(matchesSearch);
 
   function handleSelectTemplate(template) {
     if (onSelectTemplate) {

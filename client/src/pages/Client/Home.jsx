@@ -195,7 +195,10 @@ export default function ClientHome() {
             <div className="cn-home-state is-error" role="alert">
               <AlertCircle aria-hidden="true" />
               <div><h3>Recent designs are unavailable</h3><p>{loadError}</p></div>
-              <button type="button" onClick={fetchRecentDesigns}><RefreshCw aria-hidden="true" /> Retry</button>
+              <div>
+                <button type="button" onClick={fetchRecentDesigns}><RefreshCw aria-hidden="true" /> Retry</button>
+                <Link to="/designer">Create a new cake</Link>
+              </div>
             </div>
           ) : recentDesigns.length === 0 ? (
             <div className="cn-home-state is-empty">

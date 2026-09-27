@@ -251,7 +251,7 @@
   display: block;
   width: fit-content;
   margin: 0 auto 18px;
-  color: var(--cn-cherry-dark);
+  color: var(--cn-rose-deep);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.15em;
@@ -563,7 +563,7 @@
 .cn-home-primary-action:focus-visible { outline: 3px solid rgba(var(--cn-brand-rgb), 0.22); outline-offset: 3px; }
 
 .cn-recent-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
-.cn-recent-heading > div > p { margin: 0 0 5px; color: var(--cn-cherry-dark); font-size: 9px; font-weight: 700; letter-spacing: 0.16em; }
+.cn-recent-heading > div > p { margin: 0 0 5px; color: var(--cn-rose-deep); font-size: 9px; font-weight: 700; letter-spacing: 0.16em; }
 .cn-recent-heading h2 { margin: 0; color: var(--cn-ink); font-family: 'Fraunces', serif; font-size: 30px; font-weight: 600; letter-spacing: -0.035em; }
 .cn-recent-heading > span { padding-bottom: 4px; color: var(--cn-muted); font-size: 11px; }
 
@@ -660,6 +660,7 @@
   text-align: left;
 }
 .cn-home-state > svg { flex: 0 0 auto; width: 28px; height: 28px; color: var(--cn-cherry); }
+.cn-home-state.is-error > svg { color: var(--cn-danger); }
 .cn-home-state h3 { margin: 0; color: var(--cn-ink); font-family: 'Fraunces', serif; font-size: 22px; }
 .cn-home-state p { margin: 3px 0 0; color: var(--cn-muted); font-size: 12px; }
 .cn-home-state > div:last-child { display: flex; gap: 9px; margin-left: 18px; }
@@ -724,6 +725,12 @@
   border-radius: 50%;
   background: rgba(var(--cn-brand-rgb), 0.1);
   color: var(--cn-cherry);
+}
+
+.cn-trash-error .cn-trash-status-icon,
+.cn-trash-dialog .cn-trash-dialog-icon {
+  background: rgba(var(--cn-danger-rgb), 0.1);
+  color: var(--cn-danger);
 }
 
 .cn-trash-empty h2,
@@ -1248,7 +1255,7 @@
 
 .cn-profile-eyebrow {
   margin: 0 0 9px;
-  color: var(--cn-cherry-dark);
+  color: var(--cn-rose-deep);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.17em;
@@ -1474,7 +1481,7 @@
 
 .cn-settings-header > p {
   margin: 0 0 9px 50px;
-  color: var(--cn-cherry-dark);
+  color: var(--cn-rose-deep);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.17em;
@@ -1790,10 +1797,10 @@
   gap: 4px;
   margin-bottom: 5px;
   padding: 3px 8px;
-  border: 1px solid rgba(var(--cn-brand-rgb), 0.2);
+  border: 1px solid var(--cn-line);
   border-radius: 999px;
-  background: rgba(var(--cn-brand-rgb), 0.07);
-  color: var(--cn-cherry-dark);
+  background: var(--cn-rose-pale);
+  color: var(--cn-rose-deep);
   font-size: 10px;
   font-weight: 700;
   line-height: 1;
@@ -1819,8 +1826,8 @@
 }
 
 .cn-chat-like-bubble {
-  border: 1px solid rgba(var(--cn-brand-rgb), 0.22);
-  background: rgba(var(--cn-brand-rgb), 0.08);
+  border: 1px solid var(--cn-line);
+  background: var(--cn-rose-pale);
 }
 
 .cn-chat-like-time {
@@ -1839,17 +1846,22 @@
   background: var(--cn-paper) !important;
 }
 
+.cn-chat-composer-row input:focus {
+  border-color: var(--cn-cherry) !important;
+  box-shadow: 0 0 0 2px rgba(var(--cn-brand-rgb), 0.08) !important;
+}
+
 .cn-chat-attach {
   padding: 0 13px;
   border: 1px solid var(--cn-line);
-  color: var(--cn-cherry-dark) !important;
+  color: var(--cn-rose-deep) !important;
   font-size: 12px;
   font-weight: 700;
 }
 
 .cn-chat-quick-like {
   border: 1px solid var(--cn-line);
-  color: var(--cn-cherry-dark) !important;
+  color: var(--cn-rose-deep) !important;
 }
 
 .cn-chat-send {
