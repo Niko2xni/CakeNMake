@@ -6,7 +6,13 @@ import { chatApi } from '@/services/chat-api';
 
 function formatTime(value) {
   if (!value) return '';
-  return new Date(value).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+function customerLabel(conversation) {
+  return conversation?.customer?.displayName || conversation?.customer?.email || 'Customer';
 }
 
 export default function BakeryChat() {
@@ -17,7 +23,9 @@ export default function BakeryChat() {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const bottomRef = useRef(null);
 
-  useEffect(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), [chat.messages.length]);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chat.messages.length]);
 
   async function submitMessage() {
     const text = inputText.trim();
@@ -64,7 +72,7 @@ export default function BakeryChat() {
             <button key={conversation.id} onClick={() => chat.setActiveConversationId(conversation.id)} className={`w-full flex items-center gap-3 px-4 py-3 text-left border-b border-pink-50 ${chat.activeConversationId === conversation.id ? 'bg-pink-50/60' : 'hover:bg-pink-50/40'}`}>
               <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0"><User className="w-5 h-5 text-gray-500" /></div>
               <div className="flex-1 min-w-0">
-                <div className="flex justify-between gap-2"><p className="text-sm font-semibold truncate">{conversation.customer.displayName || conversation.customer.email || 'Customer'}</p><span className="text-[10px] text-gray-400">{formatTime(conversation.lastMessageAt)}</span></div>
+                <div className="flex justify-between gap-2"><p className="text-sm font-semibold truncate">{customerLabel(conversation)}</p><span className="text-[10px] text-gray-400">{formatTime(conversation.lastMessageAt)}</span></div>
                 <p className="text-xs text-gray-500 truncate">{conversation.lastMessagePreview || 'New conversation'}</p>
                 <span className="text-[10px] text-gray-400 capitalize">{conversation.status}</span>
               </div>
@@ -82,14 +90,14 @@ export default function BakeryChat() {
             <header className="flex-shrink-0 border-b border-pink-100 px-6 py-3 flex items-center gap-3">
               <button type="button" className="cn-bakery-chat-back" aria-label="Back to conversations" onClick={() => chat.setActiveConversationId(null)}><ArrowLeft /></button>
               <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center"><User className="w-5 h-5 text-gray-500" /></div>
-              <div className="flex-1"><p className="font-semibold text-gray-900 text-sm">{chat.activeConversation.customer.displayName || chat.activeConversation.customer.email || 'Customer'}</p><p className="text-xs text-gray-500">{chat.activeConversation.platform.name}</p></div>
+              <div className="flex-1"><p className="font-semibold text-gray-900 text-sm">{customerLabel(chat.activeConversation)}</p><p className="text-xs text-gray-500">{chat.activeConversation.platform?.name || 'Bakery'}</p></div>
               <button type="button" onClick={toggleStatus} disabled={updatingStatus} className="text-xs px-3 py-1.5 rounded-full border border-pink-200 text-pink-600 disabled:opacity-50">{chat.activeConversation.status === 'open' ? 'Close chat' : 'Reopen chat'}</button>
             </header>
             <div className="flex-1 overflow-y-auto px-6 py-4 bg-gradient-to-br from-pink-50 via-rose-50 to-orange-50">
               {chat.hasMore && <button onClick={chat.loadOlder} disabled={chat.loadingMessages} className="block mx-auto mb-4 text-xs text-pink-600 hover:underline">{chat.loadingMessages ? 'Loading…' : 'Load earlier messages'}</button>}
               {chat.loadingMessages && chat.messages.length === 0 && <Loader2 className="w-5 h-5 mx-auto animate-spin text-pink-500" />}
               <div className="space-y-2">
-                {chat.messages.map((message) => {
+                {chat.messages.filter(Boolean).map((message) => {
                   const fromBakery = message.senderRole !== 'customer';
                   return <div key={message.id} className={`flex ${fromBakery ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[70%] px-4 py-2 rounded-2xl text-sm ${fromBakery ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white' : 'bg-white text-gray-800 shadow-sm border border-pink-100'} ${message.failed ? 'ring-2 ring-red-400' : ''}`}><p className="whitespace-pre-wrap break-words">{message.text}</p><p className={`text-[10px] mt-1 ${fromBakery ? 'text-white/70 text-right' : 'text-gray-400'}`}>{message.pending ? 'Sending…' : message.failed ? 'Failed' : formatTime(message.createdAt)}</p></div></div>;
                 })}
