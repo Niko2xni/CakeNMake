@@ -25,6 +25,16 @@ function uniqueMessages(messages) {
   return [...byId.values()].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 }
 
+export function sortConversationsByActivity(conversations) {
+  return [...conversations].sort((left, right) => {
+    const rightTime = new Date(right?.lastMessageAt || right?.createdAt || 0).getTime();
+    const leftTime = new Date(left?.lastMessageAt || left?.createdAt || 0).getTime();
+    const safeRightTime = Number.isNaN(rightTime) ? 0 : rightTime;
+    const safeLeftTime = Number.isNaN(leftTime) ? 0 : leftTime;
+    return safeRightTime - safeLeftTime || String(right?.id || '').localeCompare(String(left?.id || ''));
+  });
+}
+
 function clientMessageId() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID().replaceAll('-', '_');
   return `msg_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -51,6 +61,7 @@ export function useChat({ autoCreate = false } = {}) {
       const created = await chatApi.createConversation();
       list = [created.conversation];
     }
+    list = sortConversationsByActivity(list);
     setConversations(list);
     if (autoCreate && list.length > 0) setActiveConversationId((current) => current || list[0].id);
     return list;
@@ -113,11 +124,22 @@ export function useChat({ autoCreate = false } = {}) {
           ...current.filter((item) => item.clientMessageId !== message.clientMessageId),
           message,
         ]));
-        chatApi.markRead(message.conversationId).catch(() => {});
+        chatApi.markRead(message.conversationId)
+          .then(() => setConversations((current) => current.map((item) => item.id === message.conversationId ? { ...item, unreadCount: 0 } : item)))
+          .catch(() => {});
       }
+      setConversations((current) => sortConversationsByActivity(current.map((item) => item.id === message.conversationId
+        ? { ...item, lastMessageAt: message.createdAt, lastMessagePreview: message.text }
+        : item)));
       refreshConversations().catch(() => {});
     };
     const onConversationUpdated = () => refreshConversations().catch(() => {});
+    const onMessageRead = ({ conversationId, userId } = {}) => {
+      const accountId = String(account?.id || account?._id || '');
+      if (conversationId && userId === accountId) {
+        setConversations((current) => current.map((item) => item.id === conversationId ? { ...item, unreadCount: 0 } : item));
+      }
+    };
     const onConnect = () => {
       if (activeIdRef.current) currentSocket.emit('conversation:join', { conversationId: activeIdRef.current });
       refreshConversations().catch(() => {});
@@ -128,6 +150,7 @@ export function useChat({ autoCreate = false } = {}) {
       currentSocket = connectedSocket;
       currentSocket.on('message:new', onNewMessage);
       currentSocket.on('conversation:updated', onConversationUpdated);
+      currentSocket.on('message:read', onMessageRead);
       currentSocket.on('connect', onConnect);
       if (currentSocket.connected) onConnect();
     }).catch((socketError) => setError(socketError.message));
@@ -136,6 +159,7 @@ export function useChat({ autoCreate = false } = {}) {
       cancelled = true;
       currentSocket?.off('message:new', onNewMessage);
       currentSocket?.off('conversation:updated', onConversationUpdated);
+      currentSocket?.off('message:read', onMessageRead);
       currentSocket?.off('connect', onConnect);
     };
   }, [account, refreshConversations]);
