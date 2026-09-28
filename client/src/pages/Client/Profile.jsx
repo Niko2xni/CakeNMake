@@ -12,10 +12,10 @@ import { validateUploadedFile } from '@/lib/file-validation';
 const SOCIAL_CONFIG = {
   'email-otp': {
     provider: 'Email verification',
-    color: 'bg-rose-50',
+    color: 'bg-pink-50',
     icon: Mail,
     letter: '@',
-    letterClassName: 'text-[#BD3C47]',
+    letterClassName: 'text-[#EE4F84]',
   },
   'google.com': {
     provider: 'Google',
