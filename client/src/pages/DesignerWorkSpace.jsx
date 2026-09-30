@@ -235,12 +235,9 @@ export default function DesignerWorkSpace() {
     }
   };
 
-  const handleSendToBakery = async () => {
-    const savedId = await saveDesign();
-    if (savedId) {
-      await saveThumbnail(savedId);
-      setBakeryOpen(true);
-    }
+  const handleSendToBakery = () => {
+    // Demo checkout is available to guests and does not require a saved design.
+    setBakeryOpen(true);
   };
 
   // Helper that records previous place.items to undo stack before updating
@@ -431,7 +428,6 @@ export default function DesignerWorkSpace() {
           {!orderComplete && (
             <Button
               onClick={handleSendToBakery}
-              disabled={saveStatus === 'saving'}
               className="flex items-center gap-2 rounded-xl font-semibold"
               size="sm"
             >
