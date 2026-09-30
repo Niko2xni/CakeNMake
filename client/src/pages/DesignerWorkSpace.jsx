@@ -9,7 +9,9 @@ import BakeryChatPanel from '@/components/bakery/BakeryChatPanel';
 import { Cake, Menu, X, Send, MessageCircle, Palette, Cloud, CloudOff, Loader2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { designApi } from '@/services/api';
+import { designApi, pricingApi } from '@/services/api';
+import { buildBlueprintDetails } from '@/lib/blueprintDetails';
+import { buildBlueprintPdfBlob } from '@/lib/blueprintPdf';
 import { DEFAULT_CONFIG } from '@/lib/cakeConfig';
 import { adaptConfigToLegacy, adaptConfigFromLegacy } from '@/lib/configAdapter';
 import useCakeQuote from '@/hooks/use-cake-quote';
@@ -23,7 +25,7 @@ export default function DesignerWorkSpace() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [config, setConfig] = useState(INITIAL_CONFIG);
-  const { quote, loading: quoteLoading, error: quoteError, versionChanged, dismissVersionChanged } = useCakeQuote(config);
+  const { quote, quotedConfig, loading: quoteLoading, error: quoteError, versionChanged, dismissVersionChanged } = useCakeQuote(config);
   const [panelOpen, setPanelOpen] = useState(false);
   const [activeTool, setActiveTool] = useState(null);
   const [title, setTitle] = useState('Unnamed 1');
@@ -42,6 +44,7 @@ export default function DesignerWorkSpace() {
   const titleRef = useRef(null);
   const cakeSceneRef = useRef(null);
   const blueprintViewsRef = useRef(null); // { hero, front, back, top, side } JPEG data URLs, set once on order complete
+  const submittedBlueprintRef = useRef(null);
 
   // Auto-save state
   const [designId, setDesignId] = useState(null);
@@ -223,6 +226,26 @@ export default function DesignerWorkSpace() {
     setShowBakeryChat(true);
     setBakeryOpen(false);
 
+    // Internal artifact for future bakery handoff. Never expose a customer URL.
+    if (!submittedBlueprintRef.current) {
+      const submittedConfig = structuredClone(config);
+      const submittedName = title;
+      const submittedQuote = quotedConfig === config && quote ? structuredClone(quote) : null;
+      const snapshot = { config: submittedConfig, designName: submittedName, views: blueprintViewsRef.current, quote: submittedQuote, pdf: null };
+      submittedBlueprintRef.current = snapshot;
+      try {
+        if (!snapshot.quote) snapshot.quote = await pricingApi.quoteCake(submittedConfig);
+      } catch (error) {
+        console.warn('Blueprint pricing unavailable:', error);
+      }
+      try {
+        snapshot.details = buildBlueprintDetails(snapshot.config, snapshot.quote, snapshot.designName);
+        snapshot.pdf = buildBlueprintPdfBlob({ views: snapshot.views, details: snapshot.details });
+      } catch (error) {
+        console.warn('Blueprint generation failed:', error);
+      }
+    }
+
     if (!account) return;
 
     // Explicitly update and save the design configuration and generate thumbnail
@@ -230,7 +253,7 @@ export default function DesignerWorkSpace() {
     if (savedId) {
       await saveThumbnail(savedId);
     }
-  }, [account, saveDesign, saveThumbnail]);
+  }, [account, config, title, quote, quotedConfig, saveDesign, saveThumbnail]);
 
   const handleSaveDesign = async () => {
     const savedId = await saveDesign();

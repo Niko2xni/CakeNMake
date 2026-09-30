@@ -3,6 +3,7 @@ import { pricingApi } from '@/services/api';
 
 export default function useCakeQuote(config) {
   const [quote, setQuote] = useState(null);
+  const [quotedConfig, setQuotedConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const previousVersionRef = useRef((() => {
@@ -36,6 +37,7 @@ export default function useCakeQuote(config) {
         previousVersionRef.current = next.pricingVersion;
         window.localStorage.setItem('cakenmake:last-pricing-version', String(next.pricingVersion));
         setQuote(next);
+        setQuotedConfig(config);
       } catch (quoteError) {
         if (!cancelled) setError(quoteError.message || 'The estimate is temporarily unavailable.');
       } finally {
@@ -45,5 +47,5 @@ export default function useCakeQuote(config) {
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [config, refreshKey]);
 
-  return { quote, loading, error, versionChanged, dismissVersionChanged: () => setVersionChanged(false) };
+  return { quote, quotedConfig, loading, error, versionChanged, dismissVersionChanged: () => setVersionChanged(false) };
 }

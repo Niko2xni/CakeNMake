@@ -141,23 +141,22 @@ export function addDetailsPages(doc, { sections = [], totalMinor = null, currenc
     y += 5;
 
     for (const item of items) {
-      ensureRoom(ROW_H);
-      const price = item.priceMinor == null ? 'Included' : money(item.priceMinor, currency);
+      const price = item.priceText || (item.priceMinor == null ? 'Included' : money(item.priceMinor, currency));
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);
       doc.setTextColor(60, 45, 45);
-      doc.text(item.label, MARGIN, y);
-      const labelW = doc.getTextWidth(item.label);
-
-      let detailEnd = MARGIN + labelW;
-      if (item.detail) {
-        doc.setTextColor(140, 120, 120);
-        doc.text(`  ${item.detail}`, MARGIN + labelW, y);
-        detailEnd += doc.getTextWidth(`  ${item.detail}`);
-      }
-
       const priceW = doc.getTextWidth(price);
+      const textLines = doc.splitTextToSize([item.label, item.detail].filter(Boolean).join('  '), PAGE_W - 2 * MARGIN - priceW - 8);
+      for (let line = 0; line < textLines.length; line++) {
+        ensureRoom(ROW_H);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(60, 45, 45);
+        doc.text(textLines[line], MARGIN, y);
+        if (line < textLines.length - 1) y += ROW_H;
+      }
+      const detailEnd = MARGIN + doc.getTextWidth(textLines[textLines.length - 1]);
       doc.setTextColor(item.priceMinor == null ? 150 : 60, item.priceMinor == null ? 135 : 45, item.priceMinor == null ? 135 : 45);
       doc.text(price, PAGE_W - MARGIN, y, { align: 'right' });
 
