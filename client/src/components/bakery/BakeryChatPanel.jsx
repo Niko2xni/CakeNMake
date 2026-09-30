@@ -4,15 +4,33 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { useChat } from '@/hooks/useChat';
+import { useAuth } from '@/lib/AuthContext';
+import BakeryChat from './BakeryChat';
 
 export default function BakeryChatPanel({ onNotificationChange }) {
+  const { account, isAuthenticated } = useAuth();
+  if (!isAuthenticated || !account) {
+    return (
+      <div className="flex flex-col h-full min-h-0 overflow-hidden bg-card rounded-2xl shadow-xl border border-border/50 p-5">
+        <p className="shrink-0 text-xs text-muted-foreground mb-4">Demo chat — messages are simulated.</p>
+        <BakeryChat />
+      </div>
+    );
+  }
+  return <AuthenticatedBakeryChatPanel onNotificationChange={onNotificationChange} />;
+}
+
+function AuthenticatedBakeryChatPanel({ onNotificationChange }) {
+  const { account } = useAuth();
   const chat = useChat({ autoCreate: true });
   const [input, setInput] = useState('');
   const [sendError, setSendError] = useState('');
   const [sending, setSending] = useState(false);
   const bottomRef = useRef(null);
 
-  useEffect(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), [chat.messages.length]);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView?.({ behavior: 'smooth' });
+  }, [chat.messages.length]);
   useEffect(() => {
     onNotificationChange?.(chat.activeConversation?.unreadCount || 0);
   }, [chat.activeConversation?.unreadCount, onNotificationChange]);
@@ -48,7 +66,10 @@ export default function BakeryChatPanel({ onNotificationChange }) {
         {(chat.loading || chat.loadingMessages) && chat.messages.length === 0 && <Loader2 className="w-5 h-5 mx-auto animate-spin" />}
         {chat.hasMore && <button onClick={chat.loadOlder} className="block mx-auto text-[11px] text-primary hover:underline">Load earlier messages</button>}
         {chat.messages.map((message) => {
-          const isBakery = message.senderRole !== 'customer';
+          const senderId = message.senderProfile?.id || message.senderProfile?._id;
+          const accountId = account?.id || account?._id;
+          const isOwnMessage = senderId && accountId && String(senderId) === String(accountId);
+          const isBakery = !isOwnMessage && message.senderRole !== 'customer';
           return (
             <div key={message.id} className={`flex gap-2 ${isBakery ? 'justify-start' : 'justify-end'}`}>
               {isBakery && <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center shrink-0 mt-0.5"><Store className="w-3 h-3 text-primary-foreground" /></div>}

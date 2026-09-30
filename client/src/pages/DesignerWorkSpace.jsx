@@ -13,11 +13,13 @@ import { designApi } from '@/services/api';
 import { DEFAULT_CONFIG } from '@/lib/cakeConfig';
 import { adaptConfigToLegacy, adaptConfigFromLegacy } from '@/lib/configAdapter';
 import useCakeQuote from '@/hooks/use-cake-quote';
+import { useAuth } from '@/lib/AuthContext';
 
 // Use the new bakery-style config structure
 const INITIAL_CONFIG = DEFAULT_CONFIG;
 
 export default function DesignerWorkSpace() {
+  const { account } = useAuth();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [config, setConfig] = useState(INITIAL_CONFIG);
@@ -221,12 +223,14 @@ export default function DesignerWorkSpace() {
     setShowBakeryChat(true);
     setBakeryOpen(false);
 
+    if (!account) return;
+
     // Explicitly update and save the design configuration and generate thumbnail
     const savedId = await saveDesign();
     if (savedId) {
       await saveThumbnail(savedId);
     }
-  }, [saveDesign, saveThumbnail]);
+  }, [account, saveDesign, saveThumbnail]);
 
   const handleSaveDesign = async () => {
     const savedId = await saveDesign();

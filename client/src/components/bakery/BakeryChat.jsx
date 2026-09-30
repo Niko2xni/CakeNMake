@@ -17,7 +17,7 @@ export default function BakeryChat({ onClose }) {
   const bottomRef = useRef(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    bottomRef.current?.scrollIntoView?.({ behavior: 'smooth' });
   }, [messages]);
 
   const send = () => {
@@ -39,8 +39,8 @@ export default function BakeryChat({ onClose }) {
   };
 
   return (
-    <div>
-      <div className="flex items-center gap-2.5 mb-4">
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="flex items-center gap-2.5 mb-4 shrink-0">
         <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
           <Store className="w-4 h-4 text-primary-foreground" />
         </div>
@@ -51,7 +51,7 @@ export default function BakeryChat({ onClose }) {
       </div>
 
       {/* Messages */}
-      <div className="space-y-3 max-h-[280px] overflow-y-auto pr-1 mb-4">
+      <div className="flex-1 min-h-0 space-y-3 overflow-y-auto pr-1 mb-4">
         {messages.map((msg, i) => {
           const isBakery = msg.role === 'bakery';
           return (
@@ -79,7 +79,7 @@ export default function BakeryChat({ onClose }) {
       </div>
 
       {/* Input */}
-      <div className="flex gap-2 items-end border-t border-border/40 pt-3">
+      <div className="flex gap-2 items-end shrink-0 border-t border-border/40 pt-3">
         <Textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
