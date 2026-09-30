@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Cake, Palette, Sparkles, RotateCcw, Layers, Building2, ChevronDown, ChevronUp, Eye, EyeOff, Bot, Lock } from 'lucide-react';
+import { Cake, Palette, Sparkles, RotateCcw, Layers, Building2, ChevronDown, ChevronUp, Eye, EyeOff, Bot, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -39,6 +39,7 @@ export default function ToolPanel({
   onPlaceRedo,
   canPlaceUndo,
   canPlaceRedo,
+  quote,
 }) {
   const [modeUi, setModeUi] = useState('design'); // 'design' | 'ai'
   const [tab, setTab] = useState('fundamentals');
@@ -54,20 +55,33 @@ export default function ToolPanel({
   });
 
   const isIndividual = config.structure?.layerDesign === 'individual' && config.structure?.layers > 1;
+
+  // Fully Frosted and Textured Buttercream both physically cover the
+  // sponge and filling — a change made to either while one of these
+  // styles is active has zero visible effect in the 3D preview (you'd
+  // have to switch to Naked to actually see it). Sponge Flavor/Filling
+  // are no longer locked shut for this (see the removed nakedGatedLocked
+  // gate), so instead this drives a small "yes, that was applied" toast
+  // — see notifyFrostedChange below — reassuring the person their choice
+  // registered even though nothing on the cake visibly moved.
   const activeExteriorStyle = isIndividual
     ? (config.exteriorFinish?.layerStyles || [])[activeLayer]
     : config.exteriorFinish?.style;
+  const isFrostedExterior = activeExteriorStyle === 'fullyFrosted' || activeExteriorStyle === 'texturedButtercream';
 
-  // Sponge Flavor AND Filling both stay locked shut until Exterior
-  // Finish's style is 'naked' — falls back to 'naked' (DEFAULT_CONFIG's
-  // own default) when nothing's been chosen yet, so both sections start
-  // open on a fresh cake rather than locked before the person has
-  // touched anything. Both sections share this same gate (rather than
-  // each getting its own flag) since the rule — and its Exterior Finish
-  // dependency — is identical for the two of them.
-  const effectiveExteriorStyle = activeExteriorStyle || 'naked';
-  const nakedGatedLocked = effectiveExteriorStyle !== 'naked';
-  const NAKED_GATED_SECTIONS = ['sponge', 'filling'];
+  // { id, label } | null. `id` (not just presence) as the AnimatePresence
+  // key, so firing a second notice while the first is still visible (e.g.
+  // quickly changing Sponge Flavor twice) restarts the animation instead
+  // of the second change being silently absorbed into the still-showing
+  // first toast.
+  const [frostedNotice, setFrostedNotice] = useState(null);
+  const frostedNoticeTimeoutRef = useRef(null);
+  const notifyFrostedChange = (label) => {
+    setFrostedNotice({ id: Date.now(), label });
+    clearTimeout(frostedNoticeTimeoutRef.current);
+    frostedNoticeTimeoutRef.current = setTimeout(() => setFrostedNotice(null), 2400);
+  };
+  useEffect(() => () => clearTimeout(frostedNoticeTimeoutRef.current), []);
 
   // Refs to each collapsible section's own wrapper, keyed by section id —
   // used to scroll a section into view right after IT opens, so expanding
@@ -81,10 +95,6 @@ export default function ToolPanel({
   };
 
   const toggleSection = (section) => {
-    // Sponge Flavor and Filling can't be toggled open (or closed, but
-    // they're already closed) while locked — Naked is the only Exterior
-    // Finish style that unlocks them, see nakedGatedLocked above.
-    if (NAKED_GATED_SECTIONS.includes(section) && nakedGatedLocked) return;
     setExpandedSections(prev => {
       const willOpen = !prev[section];
       if (willOpen) {
@@ -114,20 +124,6 @@ export default function ToolPanel({
       return { ...prev, [section]: willOpen };
     });
   };
-
-  // If Exterior Finish moves off Naked while Sponge Flavor and/or
-  // Filling happen to be open, force them closed rather than leaving
-  // stale expanded state that toggleSection's guard above would then
-  // refuse to ever open again from.
-  useEffect(() => {
-    if (nakedGatedLocked) {
-      setExpandedSections(prev => (
-        (prev.sponge || prev.filling)
-          ? { ...prev, sponge: false, filling: false }
-          : prev
-      ));
-    }
-  }, [nakedGatedLocked]);
 
   // The shared layer strip (extracted from what used to be duplicated
   // inline markup in Sponge/Filling/Exterior Finish) only actually
@@ -196,9 +192,46 @@ export default function ToolPanel({
   };
   const fillingSugarColor = config.sugarColorOverrides?.[isIndividual ? `filling-${activeLayer}` : 'filling'] || DEFAULT_CONFIG.sugarColor;
   const exteriorSugarColor = config.sugarColorOverrides?.[isIndividual ? `exterior-${activeLayer}` : 'exterior'] || DEFAULT_CONFIG.sugarColor;
+  const sideSugarColorContext = isIndividual ? `side-${activeLayer}` : 'side';
 
   return (
-    <div className="flex flex-col h-full bg-card rounded-2xl shadow-xl border border-border/50 overflow-hidden">
+    <div className="relative flex flex-col h-full bg-card rounded-2xl shadow-xl border border-border/50 overflow-hidden">
+      {/* "Applied — hidden under frosting" confirmation. Sponge Flavor and
+          Filling changes have no visible effect once Fully Frosted or
+          Textured Buttercream covers them (see isFrostedExterior above),
+          so this is the only feedback the person gets that their choice
+          actually registered. Anchored to the PANEL's own left edge
+          (relative on the root above), not the viewport, so it reads as
+          "this panel/these controls" rather than a generic site-wide
+          toast. `key={frostedNotice.id}` — not just conditional rendering
+          — so firing a second one while the first is still visible (e.g.
+          two quick flavor taps) restarts the slide-in instead of being
+          silently swallowed by the still-mounted first instance. */}
+      <AnimatePresence>
+        {frostedNotice && (
+          <motion.div
+            key={frostedNotice.id}
+            initial={{ x: -80, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: -80, opacity: 0 }}
+            transition={{ type: 'spring', damping: 22, stiffness: 300 }}
+            className="absolute left-0 bottom-5 z-50 flex items-center gap-2 max-w-[210px] rounded-r-full bg-primary py-2 pl-3 pr-4 text-primary-foreground shadow-lg"
+          >
+            <motion.span
+              animate={{ scale: [1, 1.3, 1] }}
+              transition={{ duration: 0.6, repeat: 1 }}
+              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary-foreground/20"
+            >
+              <Check className="h-3 w-3" />
+            </motion.span>
+            <div className="leading-tight">
+              <p className="text-[11px] font-semibold">{frostedNotice.label}</p>
+              <p className="text-[9px] text-primary-foreground/75">Hidden under frosting</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Mode switcher header */}
       <div className="px-4 pt-4 pb-3 flex items-center gap-2">
         <button
@@ -270,7 +303,7 @@ export default function ToolPanel({
         >
           {modeUi === 'ai' ? (
             <div className="flex-1 p-4 min-h-0 flex flex-col">
-              <AIChatPanel />
+              <AIChatPanel config={config} onChange={onChange} quote={quote} />
             </div>
           ) : (
             <>
@@ -304,7 +337,7 @@ export default function ToolPanel({
               animate={{ opacity: 1 }}
               transition={{ duration: 0.2 }}
             >
-              {config.structure?.layers > 1 && tab !== 'center' && (
+              {config.structure?.layers > 1 && tab !== 'center' && tab !== 'edge' && (
                 <>
                   <TierDesignControl
                     structure={config.structure}
@@ -353,41 +386,25 @@ export default function ToolPanel({
 
                   <Separator className="opacity-50" />
 
-                  {/* 2. Sponge Flavor — locked shut (and locked from
-                      opening) until Exterior Finish's style is Naked, see
-                      nakedGatedLocked above. Trigger is a real disabled
-                      <button>, not just a styling change, so it can't be
-                      opened via keyboard/click while locked either. */}
+                  {/* 2. Sponge Flavor */}
                   <div ref={registerSectionRef('sponge')} className="scroll-mt-4">
                   <Collapsible
-                    open={expandedSections.sponge && !nakedGatedLocked}
+                    open={expandedSections.sponge}
                     onOpenChange={() => toggleSection('sponge')}
                   >
-                    <CollapsibleTrigger
-                      disabled={nakedGatedLocked}
-                      className={`flex items-center justify-between w-full ${
-                        nakedGatedLocked ? 'opacity-50 cursor-not-allowed' : ''
-                      }`}
-                    >
+                    <CollapsibleTrigger className="flex items-center justify-between w-full">
                       <div className="flex items-center gap-2">
                         <Cake className="w-4 h-4 text-primary/60" />
                         <span className="text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">
                           Sponge Flavor
                         </span>
                       </div>
-                      {nakedGatedLocked ? (
-                        <Lock className="w-3.5 h-3.5 text-muted-foreground" />
-                      ) : expandedSections.sponge ? (
+                      {expandedSections.sponge ? (
                         <ChevronUp className="w-4 h-4 text-muted-foreground" />
                       ) : (
                         <ChevronDown className="w-4 h-4 text-muted-foreground" />
                       )}
                     </CollapsibleTrigger>
-                    {nakedGatedLocked && (
-                      <p className="text-[10px] text-muted-foreground mt-1.5">
-                        Set Exterior Finish to Naked to unlock Sponge Flavor.
-                      </p>
-                    )}
                     <CollapsibleContent className="mt-3">
                       <SpongeFlavorSection
                         sponge={config.sponge || DEFAULT_CONFIG.sponge}
@@ -406,6 +423,7 @@ export default function ToolPanel({
                             ...config,
                             sponge: newSponge
                           });
+                          if (isFrostedExterior) notifyFrostedChange('Sponge Flavor updated');
                         }}
                       />
                     </CollapsibleContent>
@@ -414,39 +432,25 @@ export default function ToolPanel({
 
                   <Separator className="opacity-50" />
 
-                  {/* 3. Filling — locked shut (and locked from opening)
-                      until Exterior Finish's style is Naked, same
-                      nakedGatedLocked gate as Sponge Flavor above. */}
+                  {/* 3. Filling */}
                   <div ref={registerSectionRef('filling')} className="scroll-mt-4">
                   <Collapsible
-                    open={expandedSections.filling && !nakedGatedLocked}
+                    open={expandedSections.filling}
                     onOpenChange={() => toggleSection('filling')}
                   >
-                    <CollapsibleTrigger
-                      disabled={nakedGatedLocked}
-                      className={`flex items-center justify-between w-full ${
-                        nakedGatedLocked ? 'opacity-50 cursor-not-allowed' : ''
-                      }`}
-                    >
+                    <CollapsibleTrigger className="flex items-center justify-between w-full">
                       <div className="flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-primary/60" />
                         <span className="text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">
                           Filling
                         </span>
                       </div>
-                      {nakedGatedLocked ? (
-                        <Lock className="w-3.5 h-3.5 text-muted-foreground" />
-                      ) : expandedSections.filling ? (
+                      {expandedSections.filling ? (
                         <ChevronUp className="w-4 h-4 text-muted-foreground" />
                       ) : (
                         <ChevronDown className="w-4 h-4 text-muted-foreground" />
                       )}
                     </CollapsibleTrigger>
-                    {nakedGatedLocked && (
-                      <p className="text-[10px] text-muted-foreground mt-1.5">
-                        Set Exterior Finish to Naked to unlock Filling.
-                      </p>
-                    )}
                     <CollapsibleContent className="mt-3">
                       <FillingSection
                         filling={config.filling || DEFAULT_CONFIG.filling}
@@ -467,6 +471,7 @@ export default function ToolPanel({
                             ...config,
                             filling: newFilling
                           });
+                          if (isFrostedExterior) notifyFrostedChange('Filling updated');
                         }}
                       />
                     </CollapsibleContent>
@@ -609,7 +614,20 @@ export default function ToolPanel({
                     sugarColor={config.sugarColorOverrides?.[config.edge?.mode === 'both' ? 'edgeBoth' : `edge${activeEdgeSlot[0].toUpperCase()}${activeEdgeSlot.slice(1)}`] || DEFAULT_CONFIG.sugarColor}
                     onSugarColorChange={(newSugarColor) => {
                       const context = config.edge?.mode === 'both' ? 'edgeBoth' : `edge${activeEdgeSlot[0].toUpperCase()}${activeEdgeSlot.slice(1)}`;
-                      onChange({ ...config, sugarColorOverrides: { ...(config.sugarColorOverrides || {}), [context]: newSugarColor } });
+                      const nextOverrides = { ...(config.sugarColorOverrides || {}), [context]: newSugarColor };
+                      // "All" (2-tier cakes) reuses this same edgeBoth
+                      // context for Top+Bottom's color, exactly as Both
+                      // always has — but All also fills the Middle seam
+                      // (see EdgeSection.jsx), so mirror the same color
+                      // choice into edgeMiddle too, keeping it visually in
+                      // sync without the person having to set it twice.
+                      // Harmless no-op on a 1-tier cake, or whenever Top or
+                      // Bottom (not Both) is the one being edited — Middle
+                      // only ever renders once edge.middle.piping.tip is
+                      // set, which only Middle's own tab or All's tip
+                      // mirroring ever does.
+                      if (context === 'edgeBoth') nextOverrides.edgeMiddle = newSugarColor;
+                      onChange({ ...config, sugarColorOverrides: nextOverrides });
                     }}
                   />
                 </>
@@ -622,10 +640,10 @@ export default function ToolPanel({
                     structure={config.structure || DEFAULT_CONFIG.structure}
                     activeLayer={activeLayer}
                     onChange={(newSide) => onChange({ ...config, side: newSide })}
-                    sugarColor={config.sugarColorOverrides?.side || DEFAULT_CONFIG.sugarColor}
+                    sugarColor={config.sugarColorOverrides?.[sideSugarColorContext] || config.sugarColorOverrides?.side || DEFAULT_CONFIG.sugarColor}
                     onSugarColorChange={(newSugarColor) => onChange({
                       ...config,
-                      sugarColorOverrides: { ...(config.sugarColorOverrides || {}), side: newSugarColor },
+                      sugarColorOverrides: { ...(config.sugarColorOverrides || {}), [sideSugarColorContext]: newSugarColor },
                     })}
                   />
                 </>

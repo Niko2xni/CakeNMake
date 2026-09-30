@@ -10,7 +10,90 @@
  * Validates: Requirements 3.1, 3.2, 3.3, 3.4, 3.5
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+vi.mock('./cakeFonts', () => ({
+  getPacificoFont: () => null,
+  getHandwrittenFont: () => null,
+  areFontsReady: () => false,
+  onFontsReady: () => () => {},
+}));
+
+import {
+  getEdgeSlotsToRender,
+  getMiddlePipingRadius,
+  getTierGlazeProfileOptions,
+  makeFillingBandHugFn,
+} from './CakeScene';
+
+describe('CakeScene edge and Glaze helpers', () => {
+  it('renders both stored Edge slots in separate mode and preserves Both mode', () => {
+    const edgeTop = { pipingTip: 'top-design' };
+    const edgeBottom = { pipingTip: 'bottom-design' };
+    const separateSlots = getEdgeSlotsToRender({
+      edgeMode: 'topBottomSeparate', edgeTop, edgeBottom, edgeBoth: null,
+      topY: 2, topRadius: 3, baseRadius: 4, glazeProtrusion: 0.5,
+    });
+
+    expect(separateSlots.map(({ slot }) => slot)).toEqual([edgeTop, edgeBottom]);
+    expect(separateSlots.map(({ isBottom }) => isBottom)).toEqual([false, true]);
+
+    const edgeBoth = { pipingTip: 'shared-design' };
+    const bothSlots = getEdgeSlotsToRender({
+      edgeMode: 'both', edgeTop: null, edgeBottom: null, edgeBoth,
+      topY: 2, topRadius: 3, baseRadius: 4, glazeProtrusion: 0,
+    });
+    expect(bothSlots.map(({ slot }) => slot)).toEqual([edgeBoth, edgeBoth]);
+    expect(getMiddlePipingRadius(2)).toBeCloseTo(2.2);
+  });
+
+  it('hugs a Filling band at its own tier origin', () => {
+    const profile = makeFillingBandHugFn(
+      [{
+        y: 10.1,
+        isSwirl: false,
+        bumpCount: 1,
+        bumpJitter: [{ phase: 0, widthFrac: 1, heightMul: 1, vScale: 1 }],
+      }],
+      10,
+      2,
+      0.2,
+    );
+
+    expect(profile(0.1, Math.PI)).toBeCloseTo(0.15);
+    expect(profile(0.1, 0)).toBeCloseTo(-0.24);
+  });
+
+  it('uses the same ridge-following Glaze settings for each tier', () => {
+    const options = getTierGlazeProfileOptions({
+      descriptor: { hasFrosting: true, totalHeight: 4, radius: 3, frostMeshY: 0, fillingBands: [] },
+      exteriorFinishStyle: 'texturedButtercream',
+      buttercreamTexture: 'ridged',
+      fillingPipingTip: null,
+      fillingHeight: 0.2,
+      carve: { wave: false },
+    });
+
+    expect(options.ridgeProfileFn).toBeTypeOf('function');
+    expect(options.coatThickness).toBeCloseTo(0.15);
+    expect(options.edgeFadeDist).toBeCloseTo(1.26);
+    expect(options.sideSamples).toBeGreaterThan(140);
+  });
+
+  it('uses a clearanced flat Glaze coat for Vertical Piping', () => {
+    const options = getTierGlazeProfileOptions({
+      descriptor: { hasFrosting: true, totalHeight: 4, radius: 3, frostMeshY: 0, fillingBands: [] },
+      exteriorFinishStyle: 'texturedButtercream',
+      buttercreamTexture: 'verticalPiping',
+      fillingPipingTip: null,
+      fillingHeight: 0.2,
+      carve: { wave: false },
+    });
+
+    expect(options.ridgeProfileFn).toBeNull();
+    expect(options.coatThickness).toBeCloseTo(0.1725);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Helper — generate N random integer (width, height) pairs in [1, 4096]

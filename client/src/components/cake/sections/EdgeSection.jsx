@@ -13,9 +13,14 @@ const EMPTY_SLOT = () => ({
   piping: { tip: null, colorId: 'vanilla' },
 });
 
-// NOTE: single whole-cake setting for now, not per-tier — see
-// SurfaceSection's caveat. Top/Bottom/Both is a separate axis of variation
-// from per-tier Individual mode and is unaffected by it either way.
+const EMPTY_MIDDLE_SLOT = () => ({
+  piping: { tip: null, colorId: 'vanilla', secondaryColorId: 'red' },
+});
+
+// NOTE: Top/Bottom/Both stay a single whole-cake setting (not per-tier) —
+// see SurfaceSection's caveat. Middle/All below are new, tier-COUNT-aware
+// (2 tiers unlocks them) but are equally whole-cake, unrelated to Tier
+// Design's per-tier Individual mode.
 export default function EdgeSection({
   edge,
   structure,
@@ -24,9 +29,18 @@ export default function EdgeSection({
   onActiveSlotChange,
   sugarColor,
   onSugarColorChange,
+  layerCount,
 }) {
   const isIndividual = structure?.layerDesign === 'individual' && structure?.layers > 1;
   const tierLabel = (label) => (isIndividual ? `Tier ${activeLayer + 1} ${label}` : label);
+
+  // Middle/All only make sense once there's an actual seam between two
+  // tiers to place a ring at — on a 1-tier cake there's nothing physically
+  // "middle" about, so the toggle row stays exactly Top/Bottom/Both, the
+  // way it's always worked.
+  const tiers = layerCount ?? structure?.layers ?? 1;
+  const hasMiddle = tiers >= 2;
+
   const activeSlot = edge.activeSlot || (edge.mode === 'both' ? 'both' : 'top');
   const mode = edge.mode; // 'topBottomSeparate' | 'both'
 
@@ -35,21 +49,53 @@ export default function EdgeSection({
     onActiveSlotChange?.('top');
   };
 
+  const switchToMiddle = () => {
+    onChange({ ...edge, mode: 'topBottomSeparate', activeSlot: 'middle' });
+    onActiveSlotChange?.('middle');
+  };
+
   const switchToBottom = () => {
     onChange({ ...edge, mode: 'topBottomSeparate', activeSlot: 'bottom' });
     onActiveSlotChange?.('bottom');
   };
 
-  const switchToBoth = () => {
-    onChange({ ...edge, mode: 'both', activeSlot: 'both' });
-    onActiveSlotChange?.('both');
-  };
+  // Both (1 tier) and All (2 tiers) are the exact same underlying data —
+  // edge.mode: 'both' has always meant "render edge.both at Top AND
+  // Bottom" (see CakeScene.jsx), which is still correct for All; the two
+  // buttons are never shown at the same time (hasMiddle picks exactly
+  // one), so there's no ambiguity in reusing 'both' as the mode value for
+  // both labels. All's extra behavior — also filling the Middle seam —
+  // is layered on separately below (updateBorderPipingSlot's mirroring,
+  // and ToolPanel.jsx's onSugarColorChange mirroring the color), not by
+  // inventing a second mode string.
+  const isMiddleActive = hasMiddle && activeSlot === 'middle';
+  const isAllActive = hasMiddle && mode === 'both';
 
-  const currentSlotKey = mode === 'both' ? 'both' : activeSlot;
-  const currentSlot = edge[currentSlotKey] || EMPTY_SLOT();
+  const currentSlotKey = mode === 'both' ? 'both' : (isMiddleActive ? 'middle' : activeSlot);
+  const currentSlot = isMiddleActive
+    ? (edge.middle || EMPTY_MIDDLE_SLOT())
+    : (edge[currentSlotKey] || EMPTY_SLOT());
 
   const updateSlot = (changes) => {
     onChange({ ...edge, [currentSlotKey]: { ...currentSlot, ...changes } });
+  };
+
+  // While Both mode is active, Border Piping choices also mirror to the
+  // Middle seam. Color is mirrored separately through Sugar Color's context.
+  const updateBorderPipingSlot = (changes) => {
+    const nextSlot = { ...currentSlot, ...changes };
+    if (isAllActive && changes.piping) {
+      onChange({
+        ...edge,
+        [currentSlotKey]: nextSlot,
+        middle: {
+          ...(edge.middle || EMPTY_MIDDLE_SLOT()),
+          piping: { ...(edge.middle?.piping || EMPTY_MIDDLE_SLOT().piping), tip: nextSlot.piping.tip },
+        },
+      });
+      return;
+    }
+    onChange({ ...edge, [currentSlotKey]: nextSlot });
   };
 
   const updateSecondaryColor = (colorId, mode = 'colorOverride') => {
@@ -69,11 +115,11 @@ export default function EdgeSection({
   return (
     <div className="space-y-4">
       <div>
-        <div className="flex gap-1 bg-muted/40 rounded-xl p-1">
+        <div className={`grid ${hasMiddle ? 'grid-cols-3' : 'grid-cols-2'} gap-1 bg-muted/40 rounded-xl p-1`}>
           <button
             type="button"
             onClick={switchToTop}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
+            className={`py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
               mode === 'topBottomSeparate' && activeSlot === 'top'
                 ? 'bg-card shadow text-foreground'
                 : 'text-muted-foreground hover:text-foreground'
@@ -81,10 +127,25 @@ export default function EdgeSection({
           >
             Top
           </button>
+
+          {hasMiddle && (
+            <button
+              type="button"
+              onClick={switchToMiddle}
+              className={`py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
+                isMiddleActive
+                  ? 'bg-card shadow text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Middle
+            </button>
+          )}
+
           <button
             type="button"
             onClick={switchToBottom}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
+            className={`py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
               mode === 'topBottomSeparate' && activeSlot === 'bottom'
                 ? 'bg-card shadow text-foreground'
                 : 'text-muted-foreground hover:text-foreground'
@@ -92,24 +153,14 @@ export default function EdgeSection({
           >
             Bottom
           </button>
-          <button
-            type="button"
-            onClick={switchToBoth}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
-              mode === 'both'
-                ? 'bg-card shadow text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Both
-          </button>
+
         </div>
       </div>
 
-      <div className="space-y-4">
-        <div className="space-y-3">
+      {isMiddleActive ? (
+        <div className="space-y-4">
           <div className="space-y-3">
-            <span className="text-xs font-semibold text-foreground block mb-2">{tierLabel('Border Piping')}</span>
+            <span className="text-xs font-semibold text-foreground block mb-2">Border Piping</span>
             <VariantRow
               variants={BORDER_PIPING_VARIATIONS_DELUXE}
               currentSlot={currentSlot}
@@ -118,45 +169,43 @@ export default function EdgeSection({
               onSugarColorChange={onSugarColorChange}
               onSecondaryColorChange={updateSecondaryColor}
             />
-          </div>
 
-          <VariantRow
-            label={tierLabel('Beaded Trim')}
-            variants={BEADED_TRIM_VARIATIONS_DELUXE}
-            currentSlot={currentSlot}
-            updateSlot={updateSlot}
-            sugarColor={sugarColor}
-            onSugarColorChange={onSugarColorChange}
-            onSecondaryColorChange={updateSecondaryColor}
-          />
-
-          <div>
-            <span className="text-xs font-semibold text-foreground block mb-2">{tierLabel('Dollops')}</span>
             <VariantRow
-              variants={DOLLOPS_VARIATIONS_DELUXE}
+              label="Beaded Trim"
+              variants={BEADED_TRIM_VARIATIONS_DELUXE}
               currentSlot={currentSlot}
               updateSlot={updateSlot}
               sugarColor={sugarColor}
               onSugarColorChange={onSugarColorChange}
               onSecondaryColorChange={updateSecondaryColor}
             />
-          </div>
 
-          <div>
-            <span className="text-xs font-semibold text-foreground block mb-2">{tierLabel('Whipped Cream Rosettes')}</span>
-            <VariantRow
-              variants={WHIPPED_CREAM_VARIATIONS}
-              currentSlot={currentSlot}
-              updateSlot={updateSlot}
-              sugarColor={sugarColor}
-              onSugarColorChange={onSugarColorChange}
-              onSecondaryColorChange={updateSecondaryColor}
-            />
-          </div>
+            <div>
+              <span className="text-xs font-semibold text-foreground block mb-2">Dollops</span>
+              <VariantRow
+                variants={DOLLOPS_VARIATIONS_DELUXE}
+                currentSlot={currentSlot}
+                updateSlot={updateSlot}
+                sugarColor={sugarColor}
+                onSugarColorChange={onSugarColorChange}
+                onSecondaryColorChange={updateSecondaryColor}
+              />
+            </div>
 
-          <div>
-            <span className="text-xs font-semibold text-foreground block mb-2">{tierLabel('Edible Delicates')}</span>
+            <div>
+              <span className="text-xs font-semibold text-foreground block mb-2">Whipped Cream Rosettes</span>
+              <VariantRow
+                variants={WHIPPED_CREAM_VARIATIONS}
+                currentSlot={currentSlot}
+                updateSlot={updateSlot}
+                sugarColor={sugarColor}
+                onSugarColorChange={onSugarColorChange}
+                onSecondaryColorChange={updateSecondaryColor}
+              />
+            </div>
+
             <VariantRow
+              label="Edible Delicates"
               variants={FRUIT_CONFECTION_RIM_OPTIONS}
               currentSlot={currentSlot}
               updateSlot={updateSlot}
@@ -167,7 +216,75 @@ export default function EdgeSection({
             />
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="space-y-3">
+            <div className="space-y-3">
+              <span className="text-xs font-semibold text-foreground block mb-2">{tierLabel('Border Piping')}</span>
+              <VariantRow
+                variants={BORDER_PIPING_VARIATIONS_DELUXE}
+                currentSlot={currentSlot}
+                updateSlot={updateBorderPipingSlot}
+                sugarColor={sugarColor}
+                onSugarColorChange={onSugarColorChange}
+                onSecondaryColorChange={updateSecondaryColor}
+              />
+              {isAllActive && (
+                <p className="text-[10px] text-muted-foreground -mt-1">
+                  Also applied to the Middle seam. Beaded Trim, Dollops, Whipped Cream Rosettes and Edible Delicates below apply to Top &amp; Bottom only — switch to the Middle tab to give the seam its own design.
+                </p>
+              )}
+            </div>
+
+            <VariantRow
+              label={tierLabel('Beaded Trim')}
+              variants={BEADED_TRIM_VARIATIONS_DELUXE}
+              currentSlot={currentSlot}
+              updateSlot={updateSlot}
+              sugarColor={sugarColor}
+              onSugarColorChange={onSugarColorChange}
+              onSecondaryColorChange={updateSecondaryColor}
+            />
+
+            <div>
+              <span className="text-xs font-semibold text-foreground block mb-2">{tierLabel('Dollops')}</span>
+              <VariantRow
+                variants={DOLLOPS_VARIATIONS_DELUXE}
+                currentSlot={currentSlot}
+                updateSlot={updateSlot}
+                sugarColor={sugarColor}
+                onSugarColorChange={onSugarColorChange}
+                onSecondaryColorChange={updateSecondaryColor}
+              />
+            </div>
+
+            <div>
+              <span className="text-xs font-semibold text-foreground block mb-2">{tierLabel('Whipped Cream Rosettes')}</span>
+              <VariantRow
+                variants={WHIPPED_CREAM_VARIATIONS}
+                currentSlot={currentSlot}
+                updateSlot={updateSlot}
+                sugarColor={sugarColor}
+                onSugarColorChange={onSugarColorChange}
+                onSecondaryColorChange={updateSecondaryColor}
+              />
+            </div>
+
+            <div>
+              <span className="text-xs font-semibold text-foreground block mb-2">{tierLabel('Edible Delicates')}</span>
+              <VariantRow
+                variants={FRUIT_CONFECTION_RIM_OPTIONS}
+                currentSlot={currentSlot}
+                updateSlot={updateSlot}
+                showSugarColor={false}
+                sugarColor={sugarColor}
+                onSugarColorChange={onSugarColorChange}
+                onSecondaryColorChange={updateSecondaryColor}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

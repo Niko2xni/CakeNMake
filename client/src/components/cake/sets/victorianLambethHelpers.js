@@ -120,6 +120,10 @@ function createTeardropGeometry(radius = 0.045, heightScale = 1.8, thicknessScal
  * respected, even though the shapes within each segment are simplified.
  */
 export function getVictorianLambethCoverageFn(radius, height, opts = {}) {
+  // Glaze needs the windows to follow the REAL piping (see
+  // getVictorianLambethGlazeCoverageFn below); Filling keeps the coarser
+  // approximation this function was written with, unchanged.
+  if (opts.forGlaze) return getVictorianLambethGlazeCoverageFn(radius, height, opts);
   const variant = opts.variant || 'classic';
   const H = height;
 
@@ -234,6 +238,309 @@ export function getVictorianLambethCoverageFn(radius, height, opts = {}) {
         if (distInsideEdge > 0) coverage = Math.max(coverage, smoothstep(distInsideEdge / Math.max(0.03, el.r * 0.25)));
       }
       if (coverage >= 1) return 1;
+    }
+    return coverage;
+  };
+}
+
+/**
+ * Glaze's shape-for-shape counterpart of getVictorianLambethCoverageFn.
+ *
+ * Filling only needs a rough "something is here" cue, which is why the
+ * function above stands in a whole segment with three simplified regions.
+ * Glaze is different: its windows are what the viewer SEES around each
+ * piece of piping, so they have to follow the real elements — otherwise
+ * the glaze is cut into shapes that don't match the design and the piping
+ * is left half-buried (Classic: a swag-shaped hole that doesn't match the
+ * curtain, ropes that run across un-shaved coat).
+ *
+ * This walks the exact same layout buildVictorianLambeth uses (same
+ * VARIANT_FLAGS values, segmentCount, bands, angleOffset, bandYOffset and
+ * per-element Y formulas) and emits one region per real element:
+ *   - rope tiers      -> capsule along the actual PolarRopeCurve path
+ *   - curtain drape   -> the actual sagging band (height + sag per variant)
+ *   - rosette         -> center disc + the two side leaves (ellipses)
+ *   - pearls          -> circles at their real size
+ *   - fleur-de-lis    -> its three real teardrops (tilted ellipses),
+ *                        hanging (bottom) or flipped upward (top), per band
+ * Angles are in the mesh's own sin/cos convention, `localY` is relative to
+ * the Lambeth group's origin (CakeScene.jsx adds the build call's +0.2).
+ * Each region's fully-open core is at least the element's real size, with a
+ * small margin and edge ramp outside it (same idea as the small-star fix in
+ * Sunshine Play): a hard 0/1 edge would tear the continuous glaze mesh.
+ *
+ * Elements are bucketed by angle so a query only tests the handful of
+ * regions near it — this runs once per glaze vertex.
+ */
+export function getVictorianLambethGlazeCoverageFn(radius, height, opts = {}) {
+  const variant = opts.variant || 'classic';
+  const H = height;
+  const verticalScale = H / 5.0;
+
+  const isDoubleBand = variant === 'doubleBand';
+  const isTripleBand = variant === 'tripleBand';
+  const isNoRosette = variant === 'noRosette';
+
+  const circumference = 2 * Math.PI * radius;
+  const targetSegmentWidth = isTripleBand ? 3.4 : 2.3;
+  const segmentCount = Math.max(6, Math.round(circumference / targetSegmentWidth));
+  const anglePerSegment = (Math.PI * 2) / segmentCount;
+
+  // Mirrors buildVictorianLambeth's VARIANT_FLAGS (keep in sync).
+  const VARIANT_FLAGS = {
+    classic:    { rosette: true,  topRopes: true,  lowerRope: true,  offsetRope: true,  lowPearl: true,  fleur: true,  curtain: true,  anchorPearl: true, topFleur: false },
+    noRosette:  { rosette: false, topRopes: true,  lowerRope: true,  offsetRope: true,  lowPearl: true,  fleur: false, curtain: false, anchorPearl: true, topFleur: false },
+    ropesOnly:  { rosette: false, topRopes: true,  lowerRope: true,  offsetRope: true,  lowPearl: true,  fleur: false, curtain: false, anchorPearl: true, topFleur: false },
+    noRopes:    { rosette: true,  topRopes: false, lowerRope: false, offsetRope: false, lowPearl: false, fleur: true,  curtain: true,  anchorPearl: true, topFleur: false },
+    doubleBand: { rosette: true,  topRopes: false, lowerRope: false, offsetRope: false, lowPearl: false, fleur: false, curtain: true,  anchorPearl: true, topFleur: false },
+    tripleBand: { rosette: true,  topRopes: false, lowerRope: false, offsetRope: false, lowPearl: false, fleur: false, curtain: true,  anchorPearl: true, topFleur: false },
+  };
+  const flags = VARIANT_FLAGS[variant] || VARIANT_FLAGS.classic;
+
+  const ANCHOR_PEARL_RADIUS = 0.16;
+  const ROPES_ONLY_EXTRA_DROP = 0.05;
+  const BAND_SPACING = 0.36;
+  const NOROSETTE_BAND_SPACING = 0.20;
+  const bands = isTripleBand
+    ? [
+        { yOffset: 0, angleOffset: 0, topFleur: true, bottomFleur: false },
+        { yOffset: -H * BAND_SPACING, angleOffset: anglePerSegment / 2, topFleur: true, bottomFleur: false },
+      ]
+    : isDoubleBand
+    ? [
+        { yOffset: 0, angleOffset: 0, topFleur: false, bottomFleur: false },
+        { yOffset: -H * BAND_SPACING, angleOffset: anglePerSegment / 2, topFleur: false, bottomFleur: false },
+      ]
+    : isNoRosette
+    ? [
+        { yOffset: 0, angleOffset: 0, topFleur: false, bottomFleur: false },
+        { yOffset: -H * NOROSETTE_BAND_SPACING, angleOffset: anglePerSegment / 2, topFleur: false, bottomFleur: false },
+      ]
+    : [{ yOffset: 0, angleOffset: 0, topFleur: flags.topFleur, bottomFleur: flags.fleur }];
+  const applyTopLift = isNoRosette || variant === 'ropesOnly';
+  const TOP_LIFT = 0.05;
+
+  // ── Region list ─────────────────────────────────────────────────────
+  // 'ellipse': { angle, y, rx, ry, rot }   (rx/ry = fully-open half-axes)
+  // 'capsule': { pts: [[angle, y], ...], r }
+  // 'curtain': { mid, halfArc, cy, ch, sag }
+  const regions = [];
+  const OPEN_MARGIN = 1.25;
+
+  const addCircle = (angle, y, trueR) =>
+    regions.push({ type: 'ellipse', angle, y, rx: trueR, ry: trueR, rot: 0, margin: OPEN_MARGIN });
+  const addEllipse = (angle, y, rx, ry, rot = 0) =>
+    regions.push({ type: 'ellipse', angle, y, rx, ry, rot, margin: OPEN_MARGIN });
+
+  const addRope = (startAngle, endAngle, startY, endY, sag) => {
+    const pts = [];
+    const steps = 24;
+    for (let k = 0; k <= steps; k++) {
+      const t = k / steps;
+      const parabola = 4 * t * (1 - t);
+      pts.push([startAngle + (endAngle - startAngle) * t, startY + (endY - startY) * t - sag * parabola]);
+    }
+    // Tube radius 0.035, star fluting up to +18% -> 0.041 real reach.
+    regions.push({ type: 'capsule', pts, r: 0.041 });
+  };
+
+  // Teardrop: center (0,-0.02), left (-0.06,-0.12) tilted +PI/10, right
+  // (0.06,-0.12) tilted -PI/10, inside a group scaled (2, 2*vs, 2). Each
+  // teardrop's own half-extents: x ~ 0.0495, y ~ 0.081, scaled likewise.
+  const addFleur = (angle, baseY, flipped) => {
+    const sx = 2.0, sy = 2.0 * verticalScale;
+    const sign = flipped ? -1 : 1;
+    const tear = (lx, ly, tilt) => {
+      const yOff = sign * ly * sy;
+      const xOff = sign * lx * sx;
+      addEllipse(
+        angle + xOff / radius,
+        baseY + yOff,
+        0.0495 * sx,
+        0.081 * sy,
+        // Tilt in the arc/height plane. A flip about Z by PI keeps the
+        // ellipse's tilt sign (rotation by PI is its own mirror).
+        tilt
+      );
+    };
+    tear(0, -0.02, 0);
+    tear(-0.06, -0.12, Math.PI / 10);
+    tear(0.06, -0.12, -Math.PI / 10);
+  };
+
+  for (const band of bands) {
+    const bandY = band.yOffset + (applyTopLift ? TOP_LIFT * H : 0);
+    for (let i = 0; i < segmentCount; i++) {
+      const currentAngle = i * anglePerSegment + band.angleOffset;
+      const nextAngle = (i + 1) * anglePerSegment + band.angleOffset;
+      const midAngle = currentAngle + anglePerSegment / 2;
+
+      if (flags.rosette || flags.anchorPearl) {
+        const anchorY = 0.42 * H + bandY + (flags.topRopes ? -ROPES_ONLY_EXTRA_DROP * H : 0);
+        if (flags.rosette) {
+          // Swirl disc (petals, scaled 1.6) + two side leaves reaching
+          // ~0.78 either side of the anchor, lens-shaped, ~0.38 half-tall.
+          addCircle(currentAngle, anchorY, 0.42);
+          for (const side of [-1, 1]) {
+            addEllipse(currentAngle + (side * 0.43) / radius, anchorY, 0.36, 0.30, 0);
+          }
+        }
+        if (flags.anchorPearl) {
+          addCircle(currentAngle, anchorY - 0.08 * H, ANCHOR_PEARL_RADIUS);
+        }
+      }
+
+      if (band.bottomFleur) addFleur(currentAngle, -0.12 * H + bandY, false);
+      if (band.topFleur) addFleur(midAngle, 0.32 * H + bandY, true);
+
+      if (flags.curtain) {
+        regions.push({
+          type: 'curtain',
+          mid: midAngle,
+          halfArc: anglePerSegment / 2,
+          cy: 0.28 * H + bandY,
+          ch: isTripleBand ? 0.14 * H : 0.12 * H,
+          sag: isTripleBand ? 0.32 * H : 0.22 * H,
+        });
+      }
+
+      if (flags.topRopes) {
+        const ROPE_GAP = ANCHOR_PEARL_RADIUS * 0.4;
+        const ballCenterY = 0.34 * H - ROPES_ONLY_EXTRA_DROP * H;
+        addRope(currentAngle, nextAngle, ballCenterY + ROPE_GAP + bandY, ballCenterY + ROPE_GAP + bandY, 0.15 * H);
+        addRope(currentAngle, nextAngle, ballCenterY + bandY, ballCenterY + bandY, 0.22 * H);
+      }
+
+      const lowPearlY = -0.16 * H + bandY;
+      if (flags.lowerRope) {
+        const rope3Y = (flags.curtain ? 0.38 * H : 0.28 * H) + bandY;
+        addRope(currentAngle, nextAngle, rope3Y, rope3Y, rope3Y - lowPearlY);
+      }
+      if (flags.lowPearl) addCircle(midAngle, lowPearlY, 0.10);
+      if (flags.offsetRope) addRope(midAngle, midAngle + anglePerSegment, lowPearlY, lowPearlY, 0.22 * H);
+    }
+  }
+
+  // ── Bounds + angular buckets ────────────────────────────────────────
+  const TWO_PI = Math.PI * 2;
+  const wrapSigned = (a) => {
+    let d = a % TWO_PI;
+    if (d > Math.PI) d -= TWO_PI;
+    if (d < -Math.PI) d += TWO_PI;
+    return d;
+  };
+  const BIN_COUNT = Math.max(24, segmentCount * 6);
+  const binWidth = TWO_PI / BIN_COUNT;
+  const bins = Array.from({ length: BIN_COUNT }, () => []);
+
+  for (const el of regions) {
+    let aMin, aMax, yMin, yMax;
+    if (el.type === 'ellipse') {
+      const reach = Math.max(el.rx, el.ry) * el.margin + 0.06;
+      aMin = el.angle - reach / radius;
+      aMax = el.angle + reach / radius;
+      yMin = el.y - reach;
+      yMax = el.y + reach;
+    } else if (el.type === 'capsule') {
+      const reach = el.r * 1.6 + 0.05;
+      aMin = Infinity; aMax = -Infinity; yMin = Infinity; yMax = -Infinity;
+      for (const [a, y] of el.pts) {
+        aMin = Math.min(aMin, a); aMax = Math.max(aMax, a);
+        yMin = Math.min(yMin, y); yMax = Math.max(yMax, y);
+      }
+      aMin -= reach / radius; aMax += reach / radius; yMin -= reach; yMax += reach;
+    } else {
+      aMin = el.mid - el.halfArc; aMax = el.mid + el.halfArc;
+      yMin = el.cy - el.sag - el.ch / 2 - 0.12;
+      yMax = el.cy + el.ch / 2 + 0.12;
+    }
+    el.yMin = yMin;
+    el.yMax = yMax;
+    const first = Math.floor(aMin / binWidth);
+    const last = Math.floor(aMax / binWidth);
+    const span = Math.min(BIN_COUNT, last - first + 1);
+    for (let b = 0; b < span; b++) {
+      const idx = (((first + b) % BIN_COUNT) + BIN_COUNT) % BIN_COUNT;
+      bins[idx].push(el);
+    }
+  }
+
+  const smoothstep = (t) => {
+    const c = Math.min(1, Math.max(0, t));
+    return c * c * (3 - 2 * c);
+  };
+
+  const ellipseCoverage = (el, angle, localY) => {
+    const dx = radius * wrapSigned(angle - el.angle);
+    const dy = localY - el.y;
+    const cos = Math.cos(-el.rot);
+    const sin = Math.sin(-el.rot);
+    const rx = dx * cos - dy * sin;
+    const ry = dx * sin + dy * cos;
+    const wx = el.rx * el.margin;
+    const wy = el.ry * el.margin;
+    const q = Math.sqrt((rx / wx) * (rx / wx) + (ry / wy) * (ry / wy));
+    if (q >= 1) return 0;
+    const minAxis = Math.min(wx, wy);
+    const inside = (1 - q) * minAxis;
+    // Full strength once we are inside the element's own true size.
+    const ramp = Math.max(0.012, minAxis - Math.min(el.rx, el.ry));
+    return smoothstep(inside / ramp);
+  };
+
+  const capsuleCoverage = (el, angle, localY) => {
+    const windowR = el.r * 1.5;
+    const ramp = Math.max(0.012, windowR - el.r);
+    let best = Infinity;
+    const pts = el.pts;
+    for (let k = 0; k < pts.length - 1; k++) {
+      const [a0, y0] = pts[k];
+      const [a1, y1] = pts[k + 1];
+      const am = (a0 + a1) / 2;
+      const s0 = radius * (a0 - am);
+      const s1 = radius * (a1 - am);
+      const px = radius * wrapSigned(angle - am);
+      const vx = s1 - s0;
+      const vy = y1 - y0;
+      const len2 = vx * vx + vy * vy;
+      let t = len2 > 0 ? ((px - s0) * vx + (localY - y0) * vy) / len2 : 0;
+      t = Math.min(1, Math.max(0, t));
+      const cx = s0 + vx * t;
+      const cy = y0 + vy * t;
+      const d = Math.hypot(px - cx, localY - cy);
+      if (d < best) best = d;
+    }
+    if (best >= windowR) return 0;
+    return smoothstep((windowR - best) / ramp);
+  };
+
+  const curtainCoverage = (el, angle, localY) => {
+    const delta = wrapSigned(angle - el.mid);
+    if (Math.abs(delta) > el.halfArc) return 0;
+    const nx = delta / el.halfArc;
+    const centerY = el.cy - el.sag * (1 - nx * nx);
+    const dy = Math.abs(localY - centerY);
+    const RAMP = 0.06;
+    const windowHalf = el.ch / 2 + RAMP;
+    if (dy >= windowHalf) return 0;
+    return smoothstep((windowHalf - dy) / RAMP);
+  };
+
+  return (angle, localY) => {
+    const wrapped = ((angle % TWO_PI) + TWO_PI) % TWO_PI;
+    const bucket = bins[Math.min(BIN_COUNT - 1, Math.floor(wrapped / binWidth))];
+    let coverage = 0;
+    for (const el of bucket) {
+      if (localY < el.yMin || localY > el.yMax) continue;
+      const c = el.type === 'ellipse'
+        ? ellipseCoverage(el, wrapped, localY)
+        : el.type === 'capsule'
+        ? capsuleCoverage(el, wrapped, localY)
+        : curtainCoverage(el, wrapped, localY);
+      if (c > coverage) {
+        coverage = c;
+        if (coverage >= 1) return 1;
+      }
     }
     return coverage;
   };

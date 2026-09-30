@@ -1,8 +1,77 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import EdgeSection from './sections/EdgeSection';
+import SideSection from './sections/SideSection';
 import { computeEdgeTrimRadius, computeEdgeTrimY } from './DecorationSets';
+import {
+  BEADED_TRIM_VARIATIONS_DELUXE,
+  BORDER_PIPING_VARIATIONS_DELUXE,
+  CHECKERED_PATTERN_SETS,
+  DOLLOPS_VARIATIONS_DELUXE,
+  FRUIT_CONFECTION_RIM_OPTIONS,
+  SUGAR_COLORS,
+  WHIPPED_CREAM_VARIATIONS,
+} from '@/lib/cakeConfig';
+import { adaptConfigToLegacy } from '@/lib/configAdapter';
+
+function makeLayeredConfig(layerDesign) {
+  return {
+    structure: { size: 'big', layers: 2, layerDesign },
+    sponge: { flavor: 'vanilla' },
+    filling: { enabled: true, layers: 1, flavor: 'vanilla' },
+    exteriorFinish: { style: 'fullyFrosted', flavor: 'vanilla' },
+    sugarColorOverrides: {
+      filling: { mode: 'colorOverride', colorId: 'chocolate' },
+      'filling-0': { mode: 'colorOverride', colorId: 'strawberry' },
+      'filling-1': { mode: 'colorOverride', colorId: 'mocha' },
+      exterior: { mode: 'colorOverride', colorId: 'chocolate' },
+      'exterior-0': { mode: 'colorOverride', colorId: 'strawberry' },
+      'exterior-1': { mode: 'colorOverride', colorId: 'mocha' },
+    },
+  };
+}
+
+describe('Uniform and Individual tier state', () => {
+  const colorHex = (colorId) => SUGAR_COLORS.find((color) => color.id === colorId)?.hex;
+
+  it('uses shared colors for every tier in Uniform mode', () => {
+    const legacy = adaptConfigToLegacy(makeLayeredConfig('uniform'));
+
+    expect(legacy.layerFillingSugarColors).toEqual(Array(2).fill(colorHex('chocolate')));
+    expect(legacy.layerSurfaceFrostingColors).toEqual(Array(2).fill(colorHex('chocolate')));
+  });
+
+  it('preserves per-tier colors in Individual mode', () => {
+    const legacy = adaptConfigToLegacy(makeLayeredConfig('individual'));
+
+    expect(legacy.layerFillingSugarColors).toEqual([colorHex('strawberry'), colorHex('mocha')]);
+    expect(legacy.layerSurfaceFrostingColors).toEqual([colorHex('strawberry'), colorHex('mocha')]);
+  });
+
+  it('stores Side choices on the active tier without changing other tiers', () => {
+    const side = { mode: null, checkeredPattern: { setId: null } };
+    const onChange = vi.fn();
+    const variant = CHECKERED_PATTERN_SETS[0];
+
+    render(React.createElement(SideSection, {
+      side,
+      structure: { layers: 2, layerDesign: 'individual' },
+      activeLayer: 0,
+      onChange,
+      sugarColor: {},
+      onSugarColorChange: () => {},
+    }));
+
+    fireEvent.click(screen.getAllByTitle(variant.label)[0]);
+
+    const nextSide = onChange.mock.calls[0][0];
+    expect(nextSide.mode).toBeNull();
+    expect(nextSide.layerTreatments[0].mode).toBe('checkeredPattern');
+    expect(nextSide.layerTreatments[0].checkeredPattern.setId).toBe(variant.id);
+    expect(nextSide.layerTreatments[1]).toEqual(side);
+  });
+});
 
 describe('edge decoration placement', () => {
   it('embeds trim below the top face and keeps the inside-the-rim hug for frosting finishes', () => {
@@ -50,6 +119,9 @@ describe('edge decoration placement', () => {
       })
     );
 
+    expect(screen.getByRole('button', { name: 'Top', exact: true })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Bottom', exact: true })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Both', exact: true })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'None' })).not.toBeInTheDocument();
     expect(screen.getByTitle('Shell Border')).toBeInTheDocument();
     expect(screen.getByTitle('Reverse Shell')).toBeInTheDocument();
@@ -69,6 +141,53 @@ describe('edge decoration placement', () => {
     expect(screen.getByTitle('Star Dollop (12 pc)')).toBeInTheDocument();
     expect(screen.getByTitle('Sparse Star Dollop (8 pc)')).toBeInTheDocument();
     expect(screen.getByTitle('Continuous Star Dollop (20 pc)')).toBeInTheDocument();
+  });
+
+  it('offers Top, Middle, and Bottom without an All toggle on multi-tier cakes', () => {
+    render(
+      React.createElement(EdgeSection, {
+        edge: { mode: 'topBottomSeparate', activeSlot: 'top' },
+        structure: { layers: 2, layerDesign: 'uniform' },
+        onChange: () => {},
+      })
+    );
+
+    expect(screen.getByRole('button', { name: 'Top', exact: true })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Middle', exact: true })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Bottom', exact: true })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'All', exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Both', exact: true })).not.toBeInTheDocument();
+  });
+
+  it('offers every Edge design group when the Middle toggle is active', () => {
+    render(
+      React.createElement(EdgeSection, {
+        edge: {
+          mode: 'topBottomSeparate',
+          activeSlot: 'middle',
+          middle: { piping: { tip: null, colorId: 'vanilla' } },
+        },
+        structure: { layers: 2, layerDesign: 'uniform' },
+        onChange: () => {},
+        sugarColor: {},
+        onSugarColorChange: () => {},
+      })
+    );
+
+    expect(screen.getByText('Border Piping')).toBeInTheDocument();
+    expect(screen.queryByText('Middle Seam Designs')).not.toBeInTheDocument();
+    const whippedCreamLabel = screen.getByText('Whipped Cream Rosettes');
+    expect(whippedCreamLabel.classList).toContain('font-semibold');
+    expect(whippedCreamLabel.classList).toContain('text-foreground');
+
+    const allVariants = [
+      ...BORDER_PIPING_VARIATIONS_DELUXE,
+      ...BEADED_TRIM_VARIATIONS_DELUXE,
+      ...DOLLOPS_VARIATIONS_DELUXE,
+      ...WHIPPED_CREAM_VARIATIONS,
+      ...FRUIT_CONFECTION_RIM_OPTIONS,
+    ];
+    expect(allVariants.every(({ label }) => screen.getByTitle(label))).toBe(true);
   });
 
   it('generates dense accordion-pleated zigzag geometry with zero overhang', async () => {

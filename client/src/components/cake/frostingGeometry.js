@@ -160,6 +160,21 @@ export function buildGlazeGeometry(radius, height, topDomeHeight, rand, opts = {
     poolFloorY = 0,
     poolThreshold = 0.85,
     poolSamples = 14,
+    // (angle, y) -> 0..1. Where this returns 1, glaze's outer AND inner
+    // wall radius both collapse to the bare `radius` (no protrusion at
+    // all) at that sample point — letting an active Side pattern (which
+    // builds its own geometry further out, see CakeScene.jsx's
+    // sideDecorationRadius) become the actual outermost visible surface
+    // there, instead of glaze's own coat continuing to paint over it.
+    // Returns 0 (untouched, full coatThickness) for any uncovered point —
+    // gaps between a Checkered/Triangle Pattern's own cut shapes, say —
+    // so glaze still shows through exactly where the pattern doesn't
+    // cover, same "shave only where covered" contract spongeGeometry.js's
+    // buildMashedCircleFillingGeometry coverageFn already uses for
+    // Filling's own bumps. Both walls collapse toward the SAME target
+    // (bare `radius`) proportionally, so outer never ends up thinner
+    // than inner even at partial coverage.
+    coverageFn = null,
   } = opts;
 
   const bevelSize = 0.15;
@@ -267,9 +282,20 @@ export function buildGlazeGeometry(radius, height, topDomeHeight, rand, opts = {
       const yGlobal = A.y - (A.y - globalBottomY) * t;
       const y = Math.max(yGlobal, bottomY);
 
-      let r = capRadius;
+      // edgeFade: 0 right at this column's own tip (y === bottomY),
+      // ramping to 1 by edgeFadeDist above it. Previously only scaled the
+      // ridge-hug ADDITION below, leaving the BASE protrusion at a
+      // constant full coatThickness the entire way down every column —
+      // so each drip held full thickness right up to its cut point, then
+      // (via the outer/inner rim stitch) ended in a thick, rounded cross-
+      // section instead of pinching down close to the cake. Now scales
+      // the base protrusion too, so the coat tapers in toward `radius`
+      // (hugging close) as it nears its own tip, the way a real dripped
+      // coat thins out rather than holding constant thickness to a blunt,
+      // poofy end.
+      const edgeFade = smoothstep(0, edgeFadeDist, y - bottomY);
+      let r = radius + coatThickness * edgeFade;
       if (ridgeProfileFn && ridgeHugStrength > 0) {
-        const edgeFade = smoothstep(0, edgeFadeDist, y - bottomY);
         // angle passed as a second argument — existing Y-only profile
         // functions (Ridge Comb's makeRidgeProfileFn output) simply
         // ignore it, JS doesn't error on unused extra arguments, so this
@@ -278,6 +304,10 @@ export function buildGlazeGeometry(radius, height, topDomeHeight, rand, opts = {
         // the whole angular sweep at a given height — see CakeScene.jsx's
         // Mashed Circles/Mashed Swirls hugging for the case that needs it.
         r += ridgeProfileFn(y, angle) * ridgeHugStrength * edgeFade;
+      }
+      if (coverageFn) {
+        const coverage = THREE.MathUtils.clamp(coverageFn(angle, y), 0, 1);
+        r = radius + (r - radius) * (1 - coverage);
       }
 
       positions.push(r * cosA, y, r * sinA);
@@ -349,7 +379,18 @@ export function buildGlazeGeometry(radius, height, topDomeHeight, rand, opts = {
       const yGlobal = A.y - (A.y - globalBottomY) * t;
       const y = Math.max(yGlobal, bottomY);
 
-      const r = innerCapRadius;
+      // Same taper as the outer wall just above — keeps the inner wall
+      // proportionally inside the outer wall as both converge toward
+      // `radius` near the tip, instead of the inner wall staying at a
+      // fixed offset while only the outer wall thins (which would
+      // invert the shell — inner ending up outside outer — right at the
+      // point where it matters most).
+      const edgeFade = smoothstep(0, edgeFadeDist, y - bottomY);
+      let r = radius + (innerCapRadius - radius) * edgeFade;
+      if (coverageFn) {
+        const coverage = THREE.MathUtils.clamp(coverageFn(angle, y), 0, 1);
+        r = radius + (r - radius) * (1 - coverage);
+      }
 
       positions.push(r * cosA, y, r * sinA);
       uvs.push(uCoord, (H - y) / H);

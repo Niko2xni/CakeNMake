@@ -19,6 +19,7 @@ import {
   getCheckerCoverageFn,
   buildTriangleSideShapes,
   getTriangleCoverageFn,
+  getGlazeTriangleCoverageFn,
   buildScatterPearlsRing,
   getScatterPearlsCoverageFn,
   buildChevronSideStripes,
@@ -57,7 +58,6 @@ import {
   buildRibbonWrapButtercreamGeometry,
   buildVerticalPipingButtercreamGeometry,
 } from './frostingGeometry';
-import { getFillingMaterial } from './fillingMaterial';
 import { getSpongeMaterial } from './spongeMaterial';
 import {
   addPremadeDoodle,
@@ -75,6 +75,121 @@ import {
   buildSoccerBallMesh,
   addPipingPattern,
 } from './toppings';
+
+export function getEdgeSlotsToRender({
+  edgeMode,
+  edgeTop,
+  edgeBottom,
+  edgeBoth,
+  topY,
+  topRadius,
+  baseRadius,
+  glazeProtrusion,
+}) {
+  const clearance = glazeProtrusion || 0;
+  if (edgeMode === 'both') {
+    return [
+      { slot: edgeBoth, y: topY, radius: topRadius + clearance, isBottom: false },
+      { slot: edgeBoth, y: 0, radius: baseRadius + clearance, isBottom: true },
+    ];
+  }
+
+  return [
+    { slot: edgeTop, y: topY, radius: topRadius + clearance, isBottom: false },
+    { slot: edgeBottom, y: 0, radius: baseRadius + clearance, isBottom: true },
+  ];
+}
+
+export function getMiddlePipingRadius(topTierRadius) {
+  return Math.max(0.2, topTierRadius + 0.2);
+}
+
+export function makeFillingBandHugFn(bands, originY, meshBaseRadius, fillingHeight) {
+  const shapePower = 4;
+  const vShapePower = 4;
+  const slashCount = 3;
+  return (localY, angle) => {
+    let bulge = 0;
+    for (const band of bands) {
+      const centerY = band.y - originY;
+      const t = (localY - centerY) / fillingHeight + 0.5;
+      if (t < 0 || t > 1) continue;
+
+      const peakBulge = meshBaseRadius * (band.isSwirl ? 0.1 : 0.075);
+      const valleyRecess = meshBaseRadius * (band.isSwirl ? 0.155 : 0.12);
+      const bumpF = (angle / (Math.PI * 2)) * band.bumpCount;
+      const bumpIndex = Math.floor(bumpF) % band.bumpCount;
+      const jitter = band.bumpJitter[bumpIndex];
+      const localFrac = (bumpF - Math.floor(bumpF) - 0.5) - jitter.phase;
+      const halfWidth = 0.5 * jitter.widthFrac;
+      const u = Math.min(1, Math.max(-1, localFrac / halfWidth));
+      const dome = Math.sqrt(Math.max(0, 1 - Math.pow(Math.abs(u), shapePower)));
+      const signedBulge = (dome * peakBulge - (1 - dome) * valleyRecess) * jitter.heightMul;
+      const s = 2 * t - 1;
+      const sScaled = Math.min(1, Math.max(-1, s / jitter.vScale));
+      const vEnv = Math.sqrt(Math.max(0, 1 - Math.pow(Math.abs(sScaled), vShapePower)));
+      let bandBulge = vEnv * signedBulge;
+
+      if (band.isSwirl) {
+        const slashDepth = meshBaseRadius * 0.012;
+        const slashGroove = Math.sin((u + sScaled) * slashCount * Math.PI) * slashDepth;
+        bandBulge += vEnv * dome * slashGroove;
+      }
+
+      bulge += bandBulge;
+    }
+    return bulge;
+  };
+}
+
+export function getTierGlazeProfileOptions({
+  descriptor,
+  exteriorFinishStyle,
+  buttercreamTexture,
+  fillingPipingTip,
+  fillingHeight,
+  carve,
+}) {
+  let ridgeProfileFn = null;
+  let ridgeSpacing = null;
+  let edgeFadeCycles = 4.5;
+  let coatThickness;
+  let sideSamples;
+  let edgeFadeDist;
+
+  if (descriptor.hasFrosting && exteriorFinishStyle === 'texturedButtercream') {
+    const thicknessBoost = 1.5;
+    if (buttercreamTexture === 'verticalPiping') {
+      coatThickness = (0.095 + 0.02) * thicknessBoost;
+    } else if (buttercreamTexture === 'ribbonWrap') {
+      ridgeSpacing = 0.26;
+      ridgeProfileFn = makeRidgeProfileFn(descriptor.totalHeight, 0.05, ridgeSpacing, 3.5, 4);
+      sideSamples = Math.max(160, computeRidgeCount(descriptor.totalHeight, ridgeSpacing, 4) * 24);
+      coatThickness = 0.08 * thicknessBoost;
+    } else {
+      ridgeSpacing = 0.42;
+      edgeFadeCycles = 3;
+      ridgeProfileFn = makeRidgeProfileFn(descriptor.totalHeight, 0.07, ridgeSpacing, 1, 3);
+      sideSamples = Math.max(140, computeRidgeCount(descriptor.totalHeight, ridgeSpacing, 3) * 20);
+      coatThickness = 0.1 * thicknessBoost;
+    }
+
+    if (ridgeProfileFn && !carve.wave) {
+      edgeFadeDist = ridgeSpacing * edgeFadeCycles;
+    }
+  } else if (fillingPipingTip === 'mashedCircles' || fillingPipingTip === 'mashedSwirls') {
+    ridgeProfileFn = makeFillingBandHugFn(
+      descriptor.fillingBands,
+      descriptor.frostMeshY,
+      descriptor.radius * 0.95,
+      fillingHeight,
+    );
+    sideSamples = Math.max(140, Math.ceil((descriptor.totalHeight / fillingHeight) * 10));
+    coatThickness = 0.08;
+  }
+
+  return { ridgeProfileFn, sideSamples, coatThickness, edgeFadeDist };
+}
 
 // Builds one decoration item (any of the 9 Center designs) into targetGroup
 // at local (x,y,z). Hoisted to module scope (rather than living inside
@@ -538,6 +653,147 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       if (ghostGroupRef.current) ghostGroupRef.current.visible = prevGhostVisible;
 
       return dataUrl;
+    },
+
+    // Cake Blueprint captures. Built-in and automatic — the designer page
+    // calls this once, when the Send to Bakery order succeeds; users never
+    // trigger it themselves. Returns
+    //   { hero, front, back, top, side }   (JPEG data URLs, or null)
+    // - hero: Start Page. One big three-quarter shot (top + front + side
+    //   visible together), full A4 page.
+    // - front/back/top/side: Angle Page. Each is the shape of one cell of
+    //   the 2x2 grid (half the page wide, half tall — A4's own 1:sqrt(2)
+    //   ratio holds), so nothing is cropped or stretched in the PDF.
+    //
+    // Framing is tier-aware and measured, not guessed: the camera distance
+    // is found by projecting the cake's real round footprint (a ring of
+    // points at the bottom and top of the cake, radius from its bounds —
+    // grows with every tier and decoration) and backing off until all of
+    // it sits inside the frame. The viewing elevation also drops as the
+    // cake gets taller: a short 1-tier cake needs a higher angle to show
+    // its top decoration, while a tall stack would hide its upper tier if
+    // looked at too steeply.
+    //
+    // Renders through the SAME WebGLRenderer as the live view (a render
+    // target would skip ACES tone mapping and the colors would drift from
+    // what the person designed), so the canvas is briefly resized, drawn
+    // once per shot, then restored — all synchronously, so no frame is
+    // ever painted at the temporary size.
+    captureBlueprintViews: ({ quality = 0.92 } = {}) => {
+      const renderer = rendererRef.current;
+      const scene = sceneRef.current;
+      const cakeGroup = cakeGroupRef.current;
+      if (!renderer || !scene || !cakeGroup) return null;
+
+      const tiers = Math.max(1, Number(cakeConfigRef.current?.layers) || 1);
+      const deg = THREE.MathUtils.degToRad;
+      const pick = (one, two, many) => deg(tiers <= 1 ? one : tiers === 2 ? two : many);
+
+      const GRID = { width: 930, height: 1315 };
+      const HERO = { width: 1240, height: 1754 };
+      const gridTilt = pick(13, 8, 5);
+      const shots = [
+        // Three-quarter: turned 40° toward the right so front AND side show,
+        // raised enough that the top face reads too.
+        { name: 'hero', ...HERO, azimuth: deg(40), tilt: pick(26, 20, 15) },
+        { name: 'front', ...GRID, azimuth: 0, tilt: gridTilt },
+        { name: 'back', ...GRID, azimuth: Math.PI, tilt: gridTilt },
+        { name: 'top', ...GRID, azimuth: 0, tilt: Math.PI / 2 },
+        { name: 'side', ...GRID, azimuth: Math.PI / 2, tilt: gridTilt },
+      ];
+
+      const prevSlotsVisible = slotsGroupRef.current ? slotsGroupRef.current.visible : true;
+      const prevGhostVisible = ghostGroupRef.current ? ghostGroupRef.current.visible : true;
+      const prevClipStates = coveringMaterialsRef.current.map((mat) => mat.clippingPlanes);
+      const prevRotation = cakeGroup.rotation.clone();
+      const prevSize = renderer.getSize(new THREE.Vector2());
+      const prevPixelRatio = renderer.getPixelRatio();
+      const result = {};
+
+      try {
+        // Same clean-up captureThumbnail does: interior-preview clipping,
+        // slot markers and the placement ghost never belong in a blueprint
+        // (and must not inflate the framing bounds either).
+        coveringMaterialsRef.current.forEach((mat) => { mat.clippingPlanes = []; });
+        if (slotsGroupRef.current) slotsGroupRef.current.visible = false;
+        if (ghostGroupRef.current) ghostGroupRef.current.visible = false;
+        cakeGroup.rotation.set(0, 0, 0);
+        cakeGroup.updateMatrixWorld(true);
+
+        const box = new THREE.Box3().setFromObject(cakeGroup);
+        if (box.isEmpty()) return null;
+        const center = box.getCenter(new THREE.Vector3());
+        const dims = box.getSize(new THREE.Vector3());
+        const ringRadius = Math.max(dims.x, dims.z) / 2;
+        const minRadius = Math.max(dims.x, dims.y, dims.z) / 2; // camera must stay outside this
+
+        // Round footprint: a ring at the bottom and one at the top.
+        const points = [];
+        for (let i = 0; i < 32; i++) {
+          const a = (i / 32) * Math.PI * 2;
+          for (const y of [box.min.y, box.max.y]) {
+            points.push(new THREE.Vector3(center.x + Math.cos(a) * ringRadius, y, center.z + Math.sin(a) * ringRadius));
+          }
+        }
+
+        const FIT = 0.94; // fill the frame, keep a sliver of margin
+        const fov = 30;
+        const projected = new THREE.Vector3();
+        const camera = new THREE.PerspectiveCamera(fov, 1, 0.1, 300);
+
+        renderer.setPixelRatio(1);
+
+        for (const shot of shots) {
+          camera.aspect = shot.width / shot.height;
+          camera.up.set(0, shot.tilt >= Math.PI / 2 ? 0 : 1, shot.tilt >= Math.PI / 2 ? -1 : 0);
+          const horizontalFactor = Math.cos(shot.tilt);
+          const dir = new THREE.Vector3(
+            Math.sin(shot.azimuth) * horizontalFactor,
+            Math.sin(shot.tilt),
+            Math.cos(shot.azimuth) * horizontalFactor
+          );
+
+          const place = (d) => {
+            camera.position.copy(center).addScaledVector(dir, d);
+            camera.lookAt(center);
+            camera.updateProjectionMatrix();
+            camera.updateMatrixWorld(true);
+          };
+          const fits = (d) => {
+            place(d);
+            return points.every((p) => {
+              projected.copy(p).project(camera);
+              return Math.abs(projected.x) <= FIT && Math.abs(projected.y) <= FIT && projected.z < 1;
+            });
+          };
+
+          // Smallest distance at which the whole footprint fits (bisection —
+          // fitting only gets easier the farther back the camera goes).
+          let lo = minRadius;
+          let hi = minRadius * 40;
+          for (let i = 0; i < 28; i++) {
+            const mid = (lo + hi) / 2;
+            if (fits(mid)) hi = mid; else lo = mid;
+          }
+          place(hi);
+
+          renderer.setSize(shot.width, shot.height, false);
+          renderer.render(scene, camera);
+          result[shot.name] = renderer.domElement.toDataURL('image/jpeg', quality);
+        }
+      } catch (err) {
+        console.warn('Blueprint capture failed:', err);
+        return null;
+      } finally {
+        renderer.setPixelRatio(prevPixelRatio);
+        renderer.setSize(prevSize.x, prevSize.y, false);
+        cakeGroup.rotation.copy(prevRotation);
+        coveringMaterialsRef.current.forEach((mat, i) => { mat.clippingPlanes = prevClipStates[i]; });
+        if (slotsGroupRef.current) slotsGroupRef.current.visible = prevSlotsVisible;
+        if (ghostGroupRef.current) ghostGroupRef.current.visible = prevGhostVisible;
+      }
+
+      return result;
     }
   }));
 
@@ -609,7 +865,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       sideVictorianLambethSetId = 'classic',
       sideNoNameSetId = null,
       centerText = '', centerTextTop = '', centerTextMiddle = '', centerTextBottom = '', centerTextSpacing = 0.28, centerTextFont = 'default',
-      edgeMode = 'both', edgeActiveSlot = 'top', edgeTop = null, edgeBottom = null, edgeBoth = null,
+      edgeMode = 'both', edgeTop = null, edgeBottom = null, edgeBoth = null,
       edgeMiddle = null,
       sideDecorationColor = '#F6DEAB', sideDecorationColorId = null,
       sideCheckeredColor = '#F6DEAB', sideCheckeredColorId = null,
@@ -617,8 +873,29 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       sideChevronColor = '#F6DEAB', sideChevronColorId = null,
       sideNoNameColor = '#F6DEAB',
       sideDecorationSetId = null, sideDecorationVariant = 0,
+      layerSideTreatments = [],
     } = cakeConfig;
     const isIndividual = designMode === 'individual' && layers > 1;
+    const sharedSideTreatment = {
+      sideDecorationSetId,
+      sideDecorationColor,
+      sideDecorationColorId,
+      sideCheckeredPatternSetId,
+      sideCheckeredColor,
+      sideCheckeredColorId,
+      sideTrianglePatternSetId,
+      sideTriangleColor,
+      sideTriangleColorId,
+      sideChevronPatternSetId,
+      sideChevronColor,
+      sideChevronColorId,
+      sideScatterPearlsSetId,
+      sidePipingScrollsSetId,
+      sideSunshinePlaySetId,
+      sideVictorianLambethSetId,
+      sideNoNameSetId,
+      sideNoNameColor,
+    };
 
     // Seed the PRNG from stable config properties so the random visual details
     // (candle colors, drip heights, sprinkle positions) are consistent across
@@ -666,47 +943,6 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
     // fraction of it — pass the calling mesh's own base radius (before
     // any bulge) so the peaks/valleys scale correctly against IT specifically,
     // not always the frosting shell's.
-    const makeFillingBandHugFn = (bands, originY, meshBaseRadius) => {
-      const shapePower = 4;
-      const vShapePower = 4;
-      const slashCount = 3;
-      return (localY, angle) => {
-        let bulge = 0;
-        for (const band of bands) {
-          const centerY = band.y - originY;
-          const t = (localY - centerY) / FILLING_H + 0.5;
-          if (t < 0 || t > 1) continue;
-
-          const peakBulge = meshBaseRadius * (band.isSwirl ? 0.1 : 0.075);
-          const valleyRecess = meshBaseRadius * (band.isSwirl ? 0.155 : 0.12);
-
-          const bumpF = (angle / (Math.PI * 2)) * band.bumpCount;
-          const bumpIndex = Math.floor(bumpF) % band.bumpCount;
-          const j = band.bumpJitter[bumpIndex];
-
-          const localFrac = (bumpF - Math.floor(bumpF) - 0.5) - j.phase;
-          const halfWidth = 0.5 * j.widthFrac;
-          const u = Math.min(1, Math.max(-1, localFrac / halfWidth));
-          const dome = Math.sqrt(Math.max(0, 1 - Math.pow(Math.abs(u), shapePower)));
-          const signedBulge = (dome * peakBulge - (1 - dome) * valleyRecess) * j.heightMul;
-
-          const s = 2 * t - 1;
-          const sScaled = Math.min(1, Math.max(-1, s / j.vScale));
-          const vEnv = Math.sqrt(Math.max(0, 1 - Math.pow(Math.abs(sScaled), vShapePower)));
-          let bandBulge = vEnv * signedBulge;
-
-          if (band.isSwirl) {
-            const slashDepth = meshBaseRadius * 0.012;
-            const slashGroove = Math.sin((u + sScaled) * slashCount * Math.PI) * slashDepth;
-            bandBulge += vEnv * dome * slashGroove;
-          }
-
-          bulge += bandBulge;
-        }
-        return bulge;
-      };
-    };
-
     if (plateVisible !== false) {
       const plate = new THREE.Mesh(
         new THREE.CylinderGeometry(PLATE_RADIUS, PLATE_RIM, 0.15, 64),
@@ -761,9 +997,53 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
     // the TOP tier's bands — there can be more than one if Filling Layers
     // > 1.
     let lastFillingBands = [];
+    // Same "carry the last iteration's value out" pattern as lastRadius/
+    // lastFrostColor above — Center Tab (computeSlotPosition) and Edge
+    // Tab (edgeSlotsToRender) both place/build after this loop ends, and
+    // per the layer-ordering direction below (Filling < Glaze < Side <
+    // Center < Edge), they need to clear whatever the topmost tier's own
+    // Glaze protrusion is, the same way sideDecorStandoff/
+    // sideDecorationRadius already do inside the loop. Declared here so
+    // it exists even when the loop's own `glazeMaxProtrusion` (used
+    // in-loop by Side) never runs a 'glaze' iteration at all.
+    let lastGlazeMaxProtrusion = 0;
+    // Same reasoning as lastGlazeMaxProtrusion just above — Glaze is
+    // built once, after the loop, from the topmost tier's own values.
+    // activeSideCoverageFn (checkerCoverageFn etc.'s own returned
+    // wrapper) expects its Y argument as "absoluteY", which it converts
+    // internally via absoluteY - (currentY + height/2) — see
+    // checkerOriginY's own definition below. buildGlazeGeometry's
+    // internal `y` is tier-base-relative (0 at the tier's own base,
+    // matching how the built mesh is positioned at currentY afterward —
+    // see glaze.position.y = descriptor.currentY further below), so the
+    // correct absoluteY to pass is `currentY + y`, NOT `y - height/2` —
+    // that would double up the wrapper's own centering and silently
+    // shift every sampled row down by half the tier's height.
+    let lastActiveSideCoverageFn = null;
+    let lastCurrentY = 0;
     const layerGlazeDescriptors = [];
 
     for (let i = 0; i < layerCount; i++) {
+      const tierSide = isIndividual ? layerSideTreatments[i] : null;
+      const sideDecorationSetId = tierSide ? tierSide.sideDecorationSetId : sharedSideTreatment.sideDecorationSetId;
+      const sideDecorationColor = tierSide ? tierSide.sideDecorationColor : sharedSideTreatment.sideDecorationColor;
+      const sideDecorationColorId = tierSide ? tierSide.sideDecorationColorId : sharedSideTreatment.sideDecorationColorId;
+      const sideCheckeredPatternSetId = tierSide ? tierSide.sideCheckeredPatternSetId : sharedSideTreatment.sideCheckeredPatternSetId;
+      const sideCheckeredColor = tierSide ? tierSide.sideCheckeredColor : sharedSideTreatment.sideCheckeredColor;
+      const sideCheckeredColorId = tierSide ? tierSide.sideCheckeredColorId : sharedSideTreatment.sideCheckeredColorId;
+      const sideTrianglePatternSetId = tierSide ? tierSide.sideTrianglePatternSetId : sharedSideTreatment.sideTrianglePatternSetId;
+      const sideTriangleColor = tierSide ? tierSide.sideTriangleColor : sharedSideTreatment.sideTriangleColor;
+      const sideTriangleColorId = tierSide ? tierSide.sideTriangleColorId : sharedSideTreatment.sideTriangleColorId;
+      const sideChevronPatternSetId = tierSide ? tierSide.sideChevronPatternSetId : sharedSideTreatment.sideChevronPatternSetId;
+      const sideChevronColor = tierSide ? tierSide.sideChevronColor : sharedSideTreatment.sideChevronColor;
+      const sideChevronColorId = tierSide ? tierSide.sideChevronColorId : sharedSideTreatment.sideChevronColorId;
+      const sideScatterPearlsSetId = tierSide ? tierSide.sideScatterPearlsSetId : sharedSideTreatment.sideScatterPearlsSetId;
+      const sidePipingScrollsSetId = tierSide ? tierSide.sidePipingScrollsSetId : sharedSideTreatment.sidePipingScrollsSetId;
+      const sideSunshinePlaySetId = tierSide ? tierSide.sideSunshinePlaySetId : sharedSideTreatment.sideSunshinePlaySetId;
+      const sideVictorianLambethSetId = tierSide ? tierSide.sideVictorianLambethSetId : sharedSideTreatment.sideVictorianLambethSetId;
+      const sideNoNameSetId = tierSide ? tierSide.sideNoNameSetId : sharedSideTreatment.sideNoNameSetId;
+      const sideNoNameColor = tierSide ? tierSide.sideNoNameColor : sharedSideTreatment.sideNoNameColor;
+
       // Layer 1: base dimensions, Layer 2: smaller dimensions
       let radius, height;
       if (i === 0) {
@@ -800,6 +1080,17 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
 
       // Sponge Body (main interior cake body) - use procedural texture system
       const spongeMat = cakeKey ? getSpongeMaterial(cakeKey) : null;
+
+      if (isIndividual && sideNoNameSetId === 'drip') {
+        const tierTopY = currentY + height + (frostColor && exteriorFinishStyle !== 'naked' ? FROST_H : 0) + 0.05;
+        const dripRing = buildDripRing(radius, sideNoNameColor, rand);
+        dripRing.position.y = tierTopY;
+        dripRing.material.clippingPlanes = interiorPreview ? INTERIOR_PREVIEW_CLIP_PLANES : [];
+        dripRing.material.clipIntersection = true;
+        dripRing.material.clipShadows = true;
+        coveringMaterialsRef.current.push(dripRing.material);
+        group.add(dripRing);
+      }
 
       // Build sponge sections separated by filling layers
       let spongeCurrentY = currentY;
@@ -869,6 +1160,8 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       const glazeMaxProtrusion = (tierSurfaceTreatmentMode === 'glaze')
         ? 0.04
         : 0;
+      lastGlazeMaxProtrusion = glazeMaxProtrusion;
+      lastCurrentY = currentY;
 
       // Hoisted up here (out of its original spot right before the
       // Checkered Pattern block) so Filling can shave its own Piping
@@ -895,6 +1188,20 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         })();
         return base + glazeMaxProtrusion;
       })();
+
+      // Glaze windows (glaze* coverage functions + Chevron's) apply on a
+      // Naked cake AND a Fully Frosted one. Filling-only coverage (the
+      // checkerCoverageFn/triangleCoverageFn/... chain) stays Naked-only —
+      // Filling piping doesn't exist under frosting (see configAdapter's
+      // regionsHidden). Textured Buttercream is deliberately excluded: it
+      // has its own ridge geometry/clearances.
+      const glazeWindowStyleOk = exteriorFinishStyle === 'naked' || exteriorFinishStyle === 'fullyFrosted';
+      // The wall radius the Side decorations actually sit at: mirrors
+      // sideDecorationRadius (declared further down, so it can't be read
+      // from here) — frosted tiers add the 0.06 shell, naked ones recess
+      // 0.02, both plus Glaze's own clearance. Checkered/Triangle already
+      // use `radius + sideDecorStandoff`, which is frosting-aware itself.
+      const glazeDecoRadius = ((frostColor && exteriorFinishStyle !== 'naked') ? radius + 0.06 : radius - 0.02) + glazeMaxProtrusion;
 
       // (angle, localY) -> 0..1 coverage weight for Filling's own Piping
       // Design to shave its bumps against, when this tier's Checkered
@@ -931,6 +1238,63 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           const checkerAngle = Math.PI / 2 - fillingAngle;
           const checkerLocalY = absoluteY - checkerOriginY;
           return rawCoverageFn(checkerAngle, checkerLocalY);
+        };
+      })();
+
+      // Glaze's own Checkered coverage — covers ALL SIX variants (Full
+      // Pattern, Left Diagonal, X Pattern, Right Diagonal, Parallel Lines
+      // Outer/Inner), unlike checkerCoverageFn above, which is
+      // deliberately wholeCake-only because it exists for FILLING: only
+      // Full Pattern shaves Filling's Mashed Circles/Swirls bumps to its
+      // own footprint; the other five leave Filling untouched so their
+      // gaps show it (see the comment on the Checkered mesh build
+      // further below). Glaze has no such exception — a Checkered square
+      // should stay visible on top of it whichever variant placed it —
+      // so it gets its own function instead of loosening Filling's.
+      //
+      // pattern/gapDashPeriod are mapped EXACTLY as the mesh build
+      // below maps them (patternForId, and gapDashPeriod: xPattern ? 2
+      // : 1 — computeCheckerLayout defaults gapDashPeriod to 2, so
+      // omitting it here would keep dashed gap cells the mesh doesn't
+      // render on Left/Right Diagonal), and effectiveRadius is the same
+      // radius + sideDecorStandoff the mesh uses, since radius drives
+      // the column count — any difference would misalign the two grids
+      // progressively around the circumference. Same adapter (angle
+      // reflection + origin shift) as checkerCoverageFn, so everything
+      // downstream (the Glaze call sites' own counter-reflection and
+      // currentY + y) applies unchanged.
+      const glazeCheckerCoverageFn = (() => {
+        if (!glazeWindowStyleOk) return null;
+        const glazePatternForId = {
+          wholeCake: 'full',
+          sidesOnly: 'leftDiagonal',
+          xPattern: 'leftDiagonal',
+          rightDiagonal: 'rightDiagonal',
+          parallelOuter: 'parallelOuter',
+          parallelInner: 'parallelInner',
+        }[sideCheckeredPatternSetId];
+        if (!glazePatternForId) return null;
+        const effectiveRadius = radius + sideDecorStandoff;
+        const rawCoverageFn = getCheckerCoverageFn(effectiveRadius, height, {
+          pattern: glazePatternForId,
+          gapDashPeriod: sideCheckeredPatternSetId === 'xPattern' ? 2 : 1,
+        });
+        const checkerOriginY = currentY + height / 2;
+        // NOTE: deliberately NO Math.PI/2 reflection here (unlike
+        // checkerCoverageFn above, which serves Filling). Glaze's two
+        // call sites already pass (Math.PI/2 - glazeAngle) into this
+        // function, and the checker mesh places cells at x = sin(c),
+        // z = cos(c) while Glaze's lathe uses x = cos(a), z = sin(a), so
+        // the correct checker angle is c = PI/2 - a — i.e. exactly
+        // what arrives here. Reflecting again (the old code) cancelled it
+        // back to c = a, mirroring the windows. On Full Pattern / Parallel
+        // Lines a mirrored checkerboard still looks like a checkerboard,
+        // so it read as roughly right; on Left Diagonal / X Pattern /
+        // Right Diagonal the windows visibly landed on the wrong cells
+        // (verified numerically: 0 of N squares covered before, N of N after).
+        return (glazeArg, absoluteY) => {
+          const checkerLocalY = absoluteY - checkerOriginY;
+          return rawCoverageFn(glazeArg, checkerLocalY);
         };
       })();
 
@@ -973,6 +1337,43 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         };
       })();
 
+      // Glaze's own Triangle Pattern coverage — same relationship to
+      // triangleCoverageFn as glazeCheckerCoverageFn has to
+      // checkerCoverageFn, for the same two reasons:
+      //  1. Angle: triangleCoverageFn (built for Filling) reflects the
+      //     angle (Math.PI/2 - a) to convert Filling's convention into
+      //     the mesh's sin/cos one. Glaze's two call sites ALREADY apply
+      //     that reflection before calling in, so reusing
+      //     triangleCoverageFn double-reflected and mirrored every
+      //     window — invisible on Full Pattern / Parallel Lines, but
+      //     Left Diagonal / X / Right Diagonal windows landed on the
+      //     wrong cells. This one takes the already-reflected angle
+      //     as-is.
+      //  2. Shape: uses getGlazeTriangleCoverageFn (real triangular
+      //     silhouette, smoothed edge) instead of getTriangleCoverageFn's
+      //     rectangular 0/1 cell footprint, so the glaze is cut into
+      //     triangles rather than boxes around them.
+      // Pattern/gapDashPeriod/radius mapping is identical to the mesh
+      // build's own (patternForId etc.).
+      const glazeTriangleCoverageFn = (() => {
+        if (!glazeWindowStyleOk) return null;
+        const glazeTrianglePatternForId = {
+          wholeCake: 'full',
+          sidesOnly: 'leftDiagonal',
+          xPattern: 'leftDiagonal',
+          rightDiagonal: 'rightDiagonal',
+          parallelOuter: 'parallelOuter',
+          parallelInner: 'parallelInner',
+        }[sideTrianglePatternSetId];
+        if (!glazeTrianglePatternForId) return null;
+        const rawCoverageFn = getGlazeTriangleCoverageFn(radius + sideDecorStandoff, height, {
+          pattern: glazeTrianglePatternForId,
+          gapDashPeriod: sideTrianglePatternSetId === 'xPattern' ? 2 : 1,
+        });
+        const triangleOriginY = currentY + height / 2;
+        return (glazeArg, absoluteY) => rawCoverageFn(glazeArg, absoluteY - triangleOriginY);
+      })();
+
       // Same idea as checkerCoverageFn/triangleCoverageFn above — Chevron
       // uses the exact same sin/cos placement convention (see
       // buildChevronRowGeometry's `rOut * sinA, y, rOut * cosA`), so the
@@ -987,9 +1388,9 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       // whenever exteriorFinishStyle isn't 'texturedButtercream').
       // height * 0.92 matches that same real call site exactly.
       const chevronCoverageFn = (() => {
-        if (exteriorFinishStyle !== 'naked') return null;
+        if (!glazeWindowStyleOk) return null;
         if (sideDecorationSetId !== 'chevronPattern') return null;
-        const chevronEffectiveRadius = radius - 0.02 + glazeMaxProtrusion;
+        const chevronEffectiveRadius = glazeDecoRadius;
         const chevronHeight = height * 0.92;
         const rawCoverageFn = getChevronCoverageFn(chevronEffectiveRadius, chevronHeight, {
           setId: sideChevronPatternSetId || 'multiColor',
@@ -1021,6 +1422,34 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         };
       })();
 
+      // Glaze's own Scatter Pearls coverage — same relationship to
+      // scatterPearlsCoverageFn as glazeCheckerCoverageFn has to
+      // checkerCoverageFn. scatterPearlsCoverageFn (built for Filling)
+      // reflects the angle (Math.PI/2 - a) into the pearls' sin/cos mesh
+      // convention, but Glaze's two call sites ALREADY apply that same
+      // reflection before calling in, so reusing it cancelled the two
+      // and read the glaze's raw angle as if it were the mesh's —
+      // mirroring every window around the cake. Diamond Grid happened to
+      // survive because its columns are mirror-symmetric; every other
+      // variant (and Horizontal Rows whenever its column count isn't a
+      // multiple of 4) drifted off its pearls. This version takes the
+      // already-reflected angle as-is. Radius/height/variant mirror
+      // scatterPearlsCoverageFn (and the real build call) exactly, so
+      // Big Pearls' collision-rejected layout — which depends on radius —
+      // is the identical one the mesh draws. Everything here is fixed-
+      // seed/deterministic: no per-render randomness.
+      const glazeScatterPearlsCoverageFn = (() => {
+        if (!glazeWindowStyleOk) return null;
+        if (sideDecorationSetId !== 'scatterPearls') return null;
+        const pearlsEffectiveRadius = glazeDecoRadius;
+        const pearlsHeight = height * 0.92;
+        const rawCoverageFn = getScatterPearlsCoverageFn(pearlsEffectiveRadius, pearlsHeight, {
+          variant: sideScatterPearlsSetId || 'randomScatter',
+        });
+        const pearlsOriginY = currentY + height / 2;
+        return (glazeArg, absoluteY) => rawCoverageFn(glazeArg, absoluteY - pearlsOriginY);
+      })();
+
       // Piping Scrolls/Sunshine Play/Victorian Lambeth all use
       // ridgedTextureRadius and height * 0.85 at their real build call
       // sites further below — in the naked case gated on here,
@@ -1044,6 +1473,35 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         };
       })();
 
+      // Glaze's own Piping Scrolls coverage — same relationship to
+      // pipingScrollsCoverageFn as glazeCheckerCoverageFn has to
+      // checkerCoverageFn. pipingScrollsCoverageFn (built for Filling)
+      // reflects the angle (Math.PI/2 - a) into the scrolls' sin/cos
+      // mesh convention, but Glaze's two call sites ALREADY apply that
+      // same reflection before calling in, so reusing it cancelled the
+      // two: every window was read at the glaze's raw angle instead of
+      // the mesh's, i.e. mirrored around the cake. That left the
+      // window shapes correct but sitting off the piping (Fleur-de-lis,
+      // Shell Border: visibly shifted; Wave Rope: nearly-overlapping)
+      // or, for the designs whose piping is asymmetric (Paired Opposing
+      // Scrolls, Vine and Tendrils, Interlocking Loop Chain), leaving
+      // the piping mostly buried under an un-shaved coat with only
+      // slivers showing at window edges. This version takes the
+      // already-reflected angle as-is. Radius/height/variant mirror
+      // pipingScrollsCoverageFn and the real buildPipingScrolls call
+      // exactly.
+      const glazePipingScrollsCoverageFn = (() => {
+        if (!glazeWindowStyleOk) return null;
+        if (sideDecorationSetId !== 'pipingScrolls') return null;
+        const scrollsEffectiveRadius = glazeDecoRadius;
+        const scrollsHeight = height * 0.85;
+        const rawCoverageFn = getPipingScrollsCoverageFn(scrollsEffectiveRadius, scrollsHeight, {
+          variant: sidePipingScrollsSetId || 'waveRope',
+        });
+        const scrollsOriginY = currentY + height / 2;
+        return (glazeArg, absoluteY) => rawCoverageFn(glazeArg, absoluteY - scrollsOriginY);
+      })();
+
       const sunshinePlayCoverageFn = (() => {
         if (exteriorFinishStyle !== 'naked') return null;
         if (sideDecorationSetId !== 'sunshinePlay') return null;
@@ -1060,15 +1518,45 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         };
       })();
 
+      // Glaze's own Sunshine Play coverage — same relationship to
+      // sunshinePlayCoverageFn as glazeCheckerCoverageFn has to
+      // checkerCoverageFn. sunshinePlayCoverageFn (built for Filling)
+      // reflects the angle (Math.PI/2 - a) into the decoration's own
+      // sin/cos mesh convention, but Glaze's two call sites ALREADY apply
+      // that same reflection before calling in, so reusing it cancelled
+      // the two and read every window at the mirrored angle — a correctly
+      // shaped window (rainbow arc, cloud, stars) landing beside its
+      // decoration instead of under it. This version takes the already-
+      // reflected angle as-is. Radius/height/variant mirror
+      // sunshinePlayCoverageFn and the real buildSunshinePlay call
+      // exactly.
+      const glazeSunshinePlayCoverageFn = (() => {
+        if (!glazeWindowStyleOk) return null;
+        if (sideDecorationSetId !== 'sunshinePlay') return null;
+        const sunshineEffectiveRadius = glazeDecoRadius;
+        const sunshineHeight = height * 0.85;
+        const rawCoverageFn = getSunshinePlayCoverageFn(sunshineEffectiveRadius, sunshineHeight, {
+          variant: sideSunshinePlaySetId || 'rainbowArc',
+          // Glaze-only: full star footprint + margin, and Starry Rainbow's
+          // scattered sky stars (see getSunshinePlayCoverageFn).
+          forGlaze: true,
+        });
+        const sunshineOriginY = currentY + height / 2;
+        return (glazeArg, absoluteY) => rawCoverageFn(glazeArg, absoluteY - sunshineOriginY);
+      })();
+
+      const lambethHeight = height * 0.9;
+      const lambethStandoff = 0.02;
+      const lambethVerticalOffset = 0.1;
+
       const victorianLambethCoverageFn = (() => {
         if (exteriorFinishStyle !== 'naked') return null;
         if (sideDecorationSetId !== 'victorianLambeth') return null;
-        const lambethEffectiveRadius = radius - 0.02 + glazeMaxProtrusion;
-        const lambethHeight = height * 0.85;
+        const lambethEffectiveRadius = radius - 0.02 + glazeMaxProtrusion + lambethStandoff;
         const rawCoverageFn = getVictorianLambethCoverageFn(lambethEffectiveRadius, lambethHeight, {
           variant: sideVictorianLambethSetId || 'classic',
         });
-        const lambethOriginY = currentY + height / 2;
+        const lambethOriginY = currentY + height / 2 + lambethVerticalOffset;
         return (fillingAngle, absoluteY) => {
           const lambethAngle = Math.PI / 2 - fillingAngle;
           const lambethLocalY = absoluteY - lambethOriginY;
@@ -1090,6 +1578,22 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         scatterPearlsCoverageFn || pipingScrollsCoverageFn ||
         sunshinePlayCoverageFn || victorianLambethCoverageFn || null
       );
+      // Glaze's own selection: same chain as activeSideCoverageFn above,
+      // except Checkered contributes glazeCheckerCoverageFn (all six
+      // variants) instead of checkerCoverageFn (wholeCake only, because
+      // Filling needs it that way). Kept as a separate variable rather
+      // than widening activeSideCoverageFn itself, since Filling reads
+      // that one directly (see the buildMashedGeometry call below) and
+      // must keep NOT shaving its bumps under the other five variants.
+      // Only one Side treatment can be active at a time
+      // (side.mode is single-valued), so at most one term in this chain
+      // is ever non-null and the order doesn't matter.
+      const glazeSideCoverageFn = (
+        glazeCheckerCoverageFn || glazeTriangleCoverageFn || chevronCoverageFn ||
+        glazeScatterPearlsCoverageFn || glazePipingScrollsCoverageFn ||
+        glazeSunshinePlayCoverageFn || null
+      );
+      lastActiveSideCoverageFn = glazeSideCoverageFn;
 
       for (let s = 0; s < (fillingEnabled ? fillingLayers + 1 : 1); s++) {
         const isTopSection = s === (fillingEnabled ? fillingLayers + 1 : 1) - 1;
@@ -1179,8 +1683,27 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
             // below) on top of the tier-level activeSideCoverageFn's
             // origin conversion — see that function's own comment for why
             // the angle also needs converting, not just the Y.
-            const coverageFn = activeSideCoverageFn
-              ? (angle, localY) => activeSideCoverageFn(angle, fillingY + localY)
+            // Naked + Filling + Glaze: the Filling bumps sit UNDER the glaze
+            // (Filling < Glaze < Side), and wherever a Side design has its
+            // window cut into the glaze, the bump has to stay flat too —
+            // otherwise it pokes out through that empty space right where
+            // the Side piping/pearls/squares are supposed to sit. Filling's
+            // own activeSideCoverageFn can't do that: it is Filling-only
+            // (e.g. Checkered contributes just Full Pattern, and the
+            // shape-accurate glaze windows don't exist there). So when this
+            // tier has Glaze on, use the SAME chain the glaze itself is cut
+            // with (glazeSideCoverageFn) — bumps and glaze then open and
+            // close on identical windows. Angle: glazeSideCoverageFn takes
+            // the glaze call sites' Math.PI/2 - angle; Filling's angle is the
+            // same convention as Glaze's raw angle (makeFillingBandHugFn
+            // feeds this mesh's own bump index from that angle), so the same
+            // Math.PI/2 - angle applies here. Without Glaze, behavior is
+            // exactly as before (activeSideCoverageFn, untouched).
+            const fillingSideCoverageFn = (tierSurfaceTreatmentMode === 'glaze' && glazeSideCoverageFn)
+              ? (angle, absoluteY) => glazeSideCoverageFn(Math.PI / 2 - angle, absoluteY)
+              : activeSideCoverageFn;
+            const coverageFn = fillingSideCoverageFn
+              ? (angle, localY) => fillingSideCoverageFn(angle, fillingY + localY)
               : null;
             const mashedGeometry = buildMashedGeometry(radius * 0.95, FILLING_H, { rand, precomputedJitter: bumpJitter, coverageFn });
             // Recompute UV.v as a clean top-to-bottom 0→1 ramp over this
@@ -1401,6 +1924,20 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           // Only 'xPattern' dashes the gap (the crossing look); Left
           // Diagonal and Right Diagonal both use a fully empty gap.
           gapDashPeriod: sideCheckeredPatternSetId === 'xPattern' ? 2 : 1,
+          // Ridge Comb/Ribbon Wrap/Vertical Piping: stop burying the
+          // box's back face into the wall (buildCheckerSideSquares'
+          // default -0.06 embed) — that wall isn't flat under these
+          // three, and their ridge peaks reach past a buried-0.06 back
+          // face, poking into the box (verified: pierces the box's own
+          // volume by 0.03–0.05 with the default embed, at every
+          // texture). +0.02 instead sits the box's back face just past
+          // each texture's own real peak (amplitude + angular wobble,
+          // taken straight from their geometry builders in
+          // frostingGeometry.js), with margin — same idea as Glaze's own
+          // per-texture coatThickness just below, but sized off the
+          // BACK face here since that's the one that was embedding into
+          // the peak, not the front.
+          embedOverride: exteriorFinishStyle === 'texturedButtercream' ? 0.02 : undefined,
           // Colored by Sugar Color's frostColor now (Side's per-treatment
           // color pickers were removed) — see the "Sugar Color applies
           // everywhere outside Fundamentals" pass. colorId lets
@@ -1458,6 +1995,10 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           gapDashPeriod: sideTrianglePatternSetId === 'xPattern' ? 2 : 1,
           color: sideTriangleColor,
           colorId: sideTriangleColorId,
+          // Same fix as Checkered's own build call above — see its
+          // comment for why Ridge Comb/Ribbon Wrap/Vertical Piping need
+          // this box to stop embedding into their bumpy wall.
+          embedOverride: exteriorFinishStyle === 'texturedButtercream' ? 0.02 : undefined,
         });
         triangleSide.position.y = currentY + height / 2;
         triangleSide.material.clippingPlanes = interiorPreview ? INTERIOR_PREVIEW_CLIP_PLANES : [];
@@ -1518,6 +2059,8 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         radius,
         height,
         currentY,
+        frostMeshY: lastFrostMeshY,
+        fillingBands: lastFillingBands,
         hasFrosting: lastHasFrosting,
         totalHeight: lastFrostTotalHeight,
         domeHeight: lastFrostDomeH,
@@ -1526,6 +2069,14 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           : surfaceTreatmentColorHex,
         mode: isIndividual ? (layerSurfaceTreatmentModes[i] || null) : surfaceTreatmentMode,
         pattern: isIndividual ? (layerSurfaceTreatmentPatterns[i] || 'longGaps') : surfaceTreatmentPattern,
+        // This tier's OWN Side coverage — not the topmost tier's — so a
+        // lower tier's glaze recedes under ITS OWN Side pattern, not
+        // whatever the top tier happens to have. glazeSideCoverageFn, not
+        // activeSideCoverageFn — the latter is Filling's (wholeCake-only
+        // for Checkered), see where glazeSideCoverageFn is defined. See
+        // the two buildGlazeGeometry call sites further below that
+        // consume this.
+        coverageFn: glazeSideCoverageFn,
       });
 
       if (sideDecorationSetId === 'pipingScrolls') {
@@ -1540,14 +2091,37 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         // that wraps/tiles around it like the others here — it positions
         // itself against ridgedTextureRadius internally, same standoff
         // logic as Piping Scrolls above.
-        const sunshine = buildSunshinePlay(ridgedTextureRadius, height * 0.85, sideDecorationColor, sideDecorationColorId, sideSunshinePlaySetId || 'rainbowArc');
+        const sunshine = buildSunshinePlay(
+          ridgedTextureRadius, height * 0.85, sideDecorationColor, sideDecorationColorId,
+          sideSunshinePlaySetId || 'rainbowArc', undefined,
+          {
+            // Cloudy Champ / Starry Rainbow / Assorted Starry Rainbow's
+            // clouds sit almost flush (0.002) against ridgedTextureRadius
+            // by design — correct for Naked/Fully Frosted, where the
+            // wall really is flat, but Textured Buttercream's wall isn't:
+            // its own ridge peak reaches past ridgedTextureRadius by a
+            // thin margin (0.016–0.028, verified against each texture's
+            // real geometry), so a ridge crest can poke past a cloud's
+            // flat face or graze its silhouette edge — same family of
+            // bug as Checkered/Triangle/Chevron's embed-into-the-ridge
+            // problem, just too little outward clearance instead of too
+            // much backward embed. Stars and the rainbow arc don't show
+            // this (their own standoffs already clear the ridge), so
+            // only clouds get pushed out further, via
+            // buildSunshinePlay's own cloudStandoff option — see its
+            // comment and buildCloudyChump's. +0.05 gives a real margin
+            // (0.064–0.076, verified) across all three textures with one
+            // shared number, rather than tuning per texture.
+            cloudStandoff: exteriorFinishStyle === 'texturedButtercream' ? 0.05 : undefined,
+          },
+        );
         sunshine.position.y = currentY + height / 2;
         group.add(sunshine);
       }
 
       if (sideDecorationSetId === 'victorianLambeth') {
-        const lambeth = buildVictorianLambeth(ridgedTextureRadius, height * 0.85, sideDecorationColor, undefined, sideVictorianLambethSetId || 'classic', sideDecorationColorId);
-        lambeth.position.y = currentY + height / 2 + 0.2;
+        const lambeth = buildVictorianLambeth(ridgedTextureRadius + lambethStandoff, lambethHeight, sideDecorationColor, undefined, sideVictorianLambethSetId || 'classic', sideDecorationColorId);
+        lambeth.position.y = currentY + height / 2 + lambethVerticalOffset;
         group.add(lambeth);
       }
 
@@ -1556,6 +2130,11 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           setId: sideChevronPatternSetId || 'multiColor',
           color: sideChevronColor,
           colorId: sideChevronColorId,
+          // Same fix as Checkered/Triangle's own build calls — see
+          // buildCheckerSideSquares' comment. Chevron's ribbons are a
+          // thick extruded shape with their own embed (CHEVRON_STANDOFF),
+          // same category of problem as those two, just a smaller number.
+          embedOverride: exteriorFinishStyle === 'texturedButtercream' ? 0.02 : undefined,
         });
         chevron.position.y = currentY + height / 2;
         group.add(chevron);
@@ -1595,7 +2174,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
     // frostColor itself is block-scoped inside the per-layer loop above,
     // and this renders after that loop ends) — Side's color picker for
     // this was removed.
-    if (sideNoNameSetId === 'drip') {
+    if (!isIndividual && sideNoNameSetId === 'drip') {
       const dripRing = buildDripRing(topRadius, sideNoNameColor, rand);
       dripRing.position.y = topY;
       dripRing.material.clippingPlanes = interiorPreview ? INTERIOR_PREVIEW_CLIP_PLANES : [];
@@ -1627,12 +2206,11 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
     // smooth shell (too little clearance: they'd poke through) or sit
     // disconnected above them (too much: no hugging). makeRidgeProfileFn
     // reproduces Ridge Comb's own Y-based ridge formula so Glaze's side
-    // wall can follow it point-for-point. Ribbon Wrap and Vertical Piping
-    // both skip hugging by request/design instead (Ribbon Wrap: Glaze is
-    // meant to ignore its ridges and sit as a plain flat coat; Vertical
-    // Piping: its ridges are angle-based, see
+    // wall can follow it point-for-point. Ribbon Wrap does the same with
+    // its own band formula (see its branch below). Vertical Piping skips
+    // hugging by design instead (its ridges are angle-based, see
     // buildVerticalPipingButtercreamGeometry, and hugging those isn't
-    // implemented) — both fall back to a flat clearance sized to fully
+    // implemented) — it falls back to a flat clearance sized to fully
     // clear that texture's own amplitude instead of following it.
     if (surfaceTreatmentMode === 'glaze') {
       const carve = GLAZE_PATTERN_CARVES[surfaceTreatmentPattern] || GLAZE_PATTERN_CARVES.longGaps;
@@ -1657,21 +2235,39 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         if (buttercreamTexture === 'verticalPiping') {
           coatThickness = (0.095 + 0.02) * texturedButtercreamGlazeThicknessBoost; // clears the piping lines' own amplitude + wobble, without hugging them
         } else if (buttercreamTexture === 'ribbonWrap') {
-          // Per request: Glaze over Ribbon Wrap no longer hugs the ribbon
-          // ridges — no ridgeProfileFn here (stays at its initial null),
-          // so buildGlazeGeometry renders a plain smooth coat at a flat
-          // clearance and ignores the ridge geometry underneath entirely,
-          // same as it already does for Naked/Fully Frosted. That means
-          // coatThickness alone has to clear Ribbon Wrap's own
-          // ridgeAmplitude (0.05) plus its own angular wobble
-          // (buildRibbonWrapButtercreamGeometry's 0.008+0.005, ~0.013
-          // worst case, ~0.063 total) EVERYWHERE now, not just as a floor
-          // at the carve edge the way a hugging bulge's fade zone needed —
-          // the boosted 0.08 * 1.5 = 0.12 below already clears that with
-          // real margin, so this is safe without also raising the base
-          // 0.08. ridgeSpacing/sideSamples are left unset too: both existed
-          // only to make the hugging geometry sample cleanly, and have
-          // nothing to do once there's no ridge profile to follow.
+          // Glaze hugs Ribbon Wrap's bands the same way it hugs Ridge
+          // Comb's ridges: makeRidgeProfileFn reproduces
+          // buildRibbonWrapButtercreamGeometry's own Y-based band formula
+          // point-for-point — same bevel/edge-fade, same
+          // ridgeAmplitude (0.05), same ridgeSpacing (0.26), same minimum
+          // ridge count (4), and the same sharpened band shape
+          // (sin*0.5+0.5)^3.5, which is what makes these read as narrow
+          // ribbons with flat gaps rather than Ridge Comb's rounded
+          // waves (shapePow 3.5 vs 1). If any of those five numbers
+          // change in buildRibbonWrapButtercreamGeometry, change them
+          // here too.
+          //
+          // (An earlier version deliberately skipped hugging here and
+          // rendered Glaze as a plain flat coat; hugging is now
+          // requested, so that special case is gone.)
+          ridgeSpacing = 0.26;
+          // Same fade-length reasoning as the 4.5 default at
+          // edgeFadeCycles: at 0.26 spacing that's ~1.17 of fade, a
+          // little SHORTER than Ridge Comb's 3 cycles at 0.42 (~1.26),
+          // so drips keep about the same amount of visibly textured
+          // length while still fading smoothly into the carve edge.
+          ridgeProfileFn = makeRidgeProfileFn(lastFrostTotalHeight, 0.05, ridgeSpacing, 3.5, 4);
+          // Ribbon Wrap's bands are much narrower than a full sine cycle
+          // (the ^3.5 shaping squeezes each crest into roughly a third of
+          // its period), so sample a bit denser per ridge than Ridge
+          // Comb's 20 to keep every crest smooth instead of faceted.
+          sideSamples = Math.max(160, computeRidgeCount(lastFrostTotalHeight, ridgeSpacing, 4) * 24);
+          // Floor at the carve edge — the hugging bulge fades to exactly
+          // 0 there on purpose, so a flat coatThickness alone has to clear
+          // Ribbon Wrap's own ridgeAmplitude (0.05) plus its angular
+          // wobble (buildRibbonWrapButtercreamGeometry's 0.008+0.005,
+          // ~0.013 worst case, ~0.063 total). The boosted 0.08 * 1.5 =
+          // 0.12 clears that with real margin, unchanged from before.
           coatThickness = 0.08 * texturedButtercreamGlazeThicknessBoost;
         } else {
           ridgeSpacing = 0.42;
@@ -1760,7 +2356,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         // can compensate for.
         const meshBaseRadius = lastRadius * 0.95;
 
-        ridgeProfileFn = makeFillingBandHugFn(lastFillingBands, lastFrostMeshY, meshBaseRadius);
+        ridgeProfileFn = makeFillingBandHugFn(lastFillingBands, lastFrostMeshY, meshBaseRadius, FILLING_H);
         // Default sideSamples (48) spreads evenly across the WHOLE tier
         // height — with FILLING_H typically a small slice of that, most
         // samples would land outside every band and the bump could go
@@ -1799,7 +2395,47 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         lastFrostTotalHeight,
         lastFrostDomeH,
         rand,
-        { coatThickness, ridgeProfileFn, sideSamples, carve, ridgeHugStrength, edgeFadeDist },
+        {
+          coatThickness, ridgeProfileFn, sideSamples, carve, ridgeHugStrength, edgeFadeDist,
+          // lastActiveSideCoverageFn (checkerCoverageFn etc.'s own
+          // returned wrapper) expects "absoluteY", converting internally
+          // via absoluteY - (currentY + height/2) — see checkerOriginY's
+          // own definition above. buildGlazeGeometry's `y` is already
+          // tier-base-relative (0 at this tier's own base — the mesh
+          // itself gets positioned at lastCurrentY afterward, same as
+          // glaze.position.y = descriptor.currentY further below), so
+          // the correct absoluteY here is lastCurrentY + y. (An earlier
+          // version of this subtracted lastHeight/2 instead, which
+          // double-applied the wrapper's own centering and silently
+          // shifted every sampled row down by half a tier's height —
+          // harmless-looking for interior rows, but it pushed the
+          // bottom-most row's query below row 0 entirely, always
+          // reading as "nothing here" regardless of what was actually
+          // there.)
+          //
+          // Math.PI/2 - angle: lastActiveSideCoverageFn internally
+          // applies this exact reflection to convert FILLING's angle
+          // convention into the checker/triangle mesh's native one (see
+          // checkerCoverageFn's own comment/definition above). Glaze's
+          // raw angle already matches the mesh's native convention (same
+          // Math.cos(angle)/Math.sin(angle) placement buildCheckerSideSquares
+          // itself uses) — feeding it straight into that wrapper without
+          // this counter-reflection first was a separate earlier bug: a
+          // reflection has a fixed point (here, near angle === π/4), so
+          // results looked approximately right near that point and
+          // increasingly wrong further from it. Since a reflection is
+          // its own inverse, applying the same Math.PI/2 - angle here
+          // cancels the wrapper's own reflection back out to the correct
+          // raw angle.
+          // Origin is the glaze mesh's own position (lastFrostMeshY), NOT
+          // lastCurrentY: they are identical on a Naked tier, but a frosted
+          // tier's shell (and this glaze copy of it) sits lower by
+          // FROST_CAP_H + tierSeamOverlap, which would otherwise shift
+          // every window down relative to the Side decoration.
+          coverageFn: lastActiveSideCoverageFn
+            ? (angle, y) => lastActiveSideCoverageFn(Math.PI / 2 - angle, lastFrostMeshY + y)
+            : undefined,
+        },
       );
       const glazeMat = makeGlazeMaterial(surfaceTreatmentColorHex);
       glazeMat.clippingPlanes = interiorPreview ? INTERIOR_PREVIEW_CLIP_PLANES : [];
@@ -1821,12 +2457,38 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         if (descriptor.mode !== 'glaze') continue;
 
         const carve = GLAZE_PATTERN_CARVES[descriptor.pattern] || GLAZE_PATTERN_CARVES.longGaps;
+        const tierGlazeOptions = getTierGlazeProfileOptions({
+          descriptor,
+          exteriorFinishStyle,
+          buttercreamTexture,
+          fillingPipingTip,
+          fillingHeight: FILLING_H,
+          carve,
+        });
         const glazeGeo = buildGlazeGeometry(
           descriptor.radius + (descriptor.hasFrosting ? 0.06 : 0),
           descriptor.totalHeight,
           descriptor.domeHeight,
           rand,
-          { carve },
+          {
+            carve,
+            ...tierGlazeOptions,
+            // This descriptor's OWN tier's coverage, not the topmost
+            // tier's — see the coverageFn field added where
+            // layerGlazeDescriptors is built. descriptor.frostMeshY + y
+            // (not y - descriptor.height/2, an earlier version's mistake
+            // that double-centered against the wrapper's own internal
+            // centering — see the topmost-tier call's full comment for
+            // why) gives the correct world-space absoluteY the wrapper
+            // expects. Math.PI/2 - angle: see the matching comment on
+            // the topmost-tier buildGlazeGeometry call above —
+            // descriptor.coverageFn is the SAME Filling-angle-adapted
+            // wrapper, needing the same counter-reflection to correctly
+            // read Glaze's raw angle.
+            coverageFn: descriptor.coverageFn
+              ? (angle, y) => descriptor.coverageFn(Math.PI / 2 - angle, descriptor.frostMeshY + y)
+              : undefined,
+          },
         );
         const glazeMat = makeGlazeMaterial(descriptor.color);
         glazeMat.clippingPlanes = interiorPreview ? INTERIOR_PREVIEW_CLIP_PLANES : [];
@@ -1834,7 +2496,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         glazeMat.clipShadows = true;
         coveringMaterialsRef.current.push(glazeMat);
         const glaze = new THREE.Mesh(glazeGeo, glazeMat);
-        glaze.position.y = descriptor.currentY;
+        glaze.position.y = descriptor.frostMeshY;
         glaze.castShadow = true;
         group.add(glaze);
       }
@@ -1846,12 +2508,30 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
     if (!isIndividual && surfaceTreatmentMode === 'glaze' && layerGlazeDescriptors.length > 1) {
       for (const descriptor of layerGlazeDescriptors.slice(0, -1)) {
         const carve = GLAZE_PATTERN_CARVES[descriptor.pattern] || GLAZE_PATTERN_CARVES.longGaps;
+        const tierGlazeOptions = getTierGlazeProfileOptions({
+          descriptor,
+          exteriorFinishStyle,
+          buttercreamTexture,
+          fillingPipingTip,
+          fillingHeight: FILLING_H,
+          carve,
+        });
         const glazeGeo = buildGlazeGeometry(
           descriptor.radius + (descriptor.hasFrosting ? 0.06 : 0),
           descriptor.totalHeight,
           descriptor.domeHeight,
           rand,
-          { carve },
+          {
+            carve,
+            ...tierGlazeOptions,
+            // Same fixes as the other two buildGlazeGeometry call sites
+            // above — see the topmost-tier one's full comment for both
+            // the descriptor.currentY + y (not y - descriptor.height/2)
+            // and Math.PI/2 - angle reasoning.
+            coverageFn: descriptor.coverageFn
+              ? (angle, y) => descriptor.coverageFn(Math.PI / 2 - angle, descriptor.frostMeshY + y)
+              : undefined,
+          },
         );
         const glazeMat = makeGlazeMaterial(descriptor.color);
         glazeMat.clippingPlanes = interiorPreview ? INTERIOR_PREVIEW_CLIP_PLANES : [];
@@ -1859,7 +2539,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         glazeMat.clipShadows = true;
         coveringMaterialsRef.current.push(glazeMat);
         const glaze = new THREE.Mesh(glazeGeo, glazeMat);
-        glaze.position.y = descriptor.currentY;
+        glaze.position.y = descriptor.frostMeshY;
         glaze.castShadow = true;
         group.add(glaze);
       }
@@ -2168,13 +2848,28 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       // This used to branch on edgeDesignSet into a separate, simpler
       // "Classic" path alongside this one — Classic (and the toggle
       // itself) has been deleted, this is the only Edge dispatch now.
-      const activeEdgeSlot = edgeMode === 'both' ? 'both' : (edgeActiveSlot || 'top');
-      const edgeSlotsToRender =
-        edgeMode === 'both'
-          ? [{ slot: edgeBoth, y: topY, radius: topRadius, isBottom: false }, { slot: edgeBoth, y: 0, radius: BASE_RADIUS, isBottom: true }]
-          : activeEdgeSlot === 'top'
-            ? [{ slot: edgeTop, y: topY, radius: topRadius, isBottom: false }]
-            : [{ slot: edgeBottom, y: 0, radius: BASE_RADIUS, isBottom: true }];
+      // + lastGlazeMaxProtrusion on every radius here — Edge Tab is
+      // outermost per the Filling < Glaze < Side < Center < Edge
+      // ordering (see the Surface Treatment > Glaze block's own comment),
+      // so its ring needs to clear Glaze's own protrusion the same way
+      // Side already does via sideDecorStandoff/sideDecorationRadius.
+      // Applied uniformly to both Top and Bottom (not just Top, where
+      // Glaze is actually built) for the same reason Side's clearance
+      // doesn't special-case per carve pattern — the "Long Drips" pattern
+      // alone can reach all the way to the base plate on a 1-tier cake,
+      // and reproducing every pattern's exact reach here isn't worth it
+      // for a few hundredths of a unit of extra clearance on the cases
+      // where it doesn't.
+      const edgeSlotsToRender = getEdgeSlotsToRender({
+        edgeMode,
+        edgeTop,
+        edgeBottom,
+        edgeBoth,
+        topY,
+        topRadius,
+        baseRadius: BASE_RADIUS,
+        glazeProtrusion: lastGlazeMaxProtrusion,
+      });
 
       const BEADED_TRIM_PATTERNS = {
         beadedTrim: 'classic',
@@ -2241,19 +2936,49 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         }
       }
 
-      // Edge > Middle (Layer 1 shelf piping ring for 2-layer cakes) —
-      // same Sugar Color colorization as the main Edge slots above.
+      // Edge > Middle (Layer 1 shelf design ring for 2-layer cakes).
       if (layerCount >= 2 && edgeMiddle?.pipingTip) {
-        const middlePipingMat = getFillingMaterial(edgeMiddle.pipingColor || lastFrostColor);
-        const middlePiping = buildPipingRing(edgeMiddle.pipingTip, middlePipingMat, {
-          radius: Math.max(0.2, layer1OuterRadius - 0.12),
-          y: ledgeY + 0.045,
-          rand,
-          scale: 3,
-        });
-        if (middlePiping) {
-          middlePiping.receiveShadow = true;
-          group.add(middlePiping);
+        const middleTip = edgeMiddle.pipingTip;
+        const middleRadius = getMiddlePipingRadius(topRadius);
+        const middleY = ledgeY + 0.045;
+        const middleBeadedPattern = BEADED_TRIM_PATTERNS[middleTip];
+        const middleFruitRimBuilder = FRUIT_RIM_BUILDERS[middleTip];
+
+        if (middleBeadedPattern) {
+          const middleTrim = buildBeadedTrimRing(
+            middleRadius,
+            edgeMiddle.pipingColor || lastFrostColor,
+            rand,
+            { pattern: middleBeadedPattern },
+          );
+          middleTrim.position.y = middleY;
+          middleTrim.receiveShadow = true;
+          group.add(middleTrim);
+        } else if (middleFruitRimBuilder) {
+          group.add(middleFruitRimBuilder(middleRadius, middleY, rand, { isBottom: false }));
+        } else {
+          const middlePipingMat = getFrostingMaterial(
+            edgeMiddle.pipingColor || lastFrostColor,
+            edgeMiddle.pipingColorId,
+          );
+          const isAltTip = typeof middleTip === 'string' && middleTip.includes('Alt');
+          const secondaryMat = isAltTip
+            ? getFrostingMaterial(
+                edgeMiddle.pipingSecondaryColor || '#D6293E',
+                edgeMiddle.pipingSecondaryColorId,
+              )
+            : null;
+          const middlePiping = buildPipingRing(middleTip, middlePipingMat, {
+            radius: middleRadius,
+            y: middleY,
+            rand,
+            scale: 3,
+            secondaryMaterial: secondaryMat,
+          });
+          if (middlePiping) {
+            middlePiping.receiveShadow = true;
+            group.add(middlePiping);
+          }
         }
       }
 
@@ -2262,7 +2987,11 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         let px, pz, py;
         const slot = item.slotId ? getSlotById(item.slotId) : null;
         if (slot) {
-          const pos = computeSlotPosition(slot, topRadius);
+          // + lastGlazeMaxProtrusion — Center Tab is outer to Glaze per
+          // the Filling < Glaze < Side < Center < Edge ordering (see the
+          // Surface Treatment > Glaze block's own comment), same
+          // clearance treatment Side and Edge already get.
+          const pos = computeSlotPosition(slot, topRadius + lastGlazeMaxProtrusion);
           px = pos.x;
           pz = pos.z;
         } else {

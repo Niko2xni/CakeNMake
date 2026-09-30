@@ -166,8 +166,10 @@ export const DEFAULT_CONFIG = {
   // which is currently active; the other's stored values are cleared, not
   // just hidden.
   edge: {
-    mode: 'both', // 'topBottomSeparate' | 'both'
-    activeSlot: 'both', // 'top' | 'bottom' | 'both' — single source of truth for which edge slot is currently active
+    mode: 'topBottomSeparate', // 'topBottomSeparate' | 'both' — changed to 'topBottomSeparate' for 1-tier independent Top/Bottom
+    activeSlot: 'top', // 'top' | 'bottom' | 'both' — single source of truth for which edge slot is currently active
+    topEnabled: false, // For 1-tier cakes, allows independent Top/Bottom configuration — starts disabled
+    bottomEnabled: false, // For 1-tier cakes, allows independent Top/Bottom configuration — starts disabled
     top:    { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla', secondaryColorId: 'red', secondaryColorMode: 'colorOverride' } },
     bottom: { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla', secondaryColorId: 'red', secondaryColorMode: 'colorOverride' } },
     both:   { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla', secondaryColorId: 'red', secondaryColorMode: 'colorOverride' } },

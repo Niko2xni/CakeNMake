@@ -39,6 +39,7 @@ export default function DesignerWorkSpace() {
 
   const titleRef = useRef(null);
   const cakeSceneRef = useRef(null);
+  const blueprintViewsRef = useRef(null); // { hero, front, back, top, side } JPEG data URLs, set once on order complete
 
   // Auto-save state
   const [designId, setDesignId] = useState(null);
@@ -204,6 +205,18 @@ export default function DesignerWorkSpace() {
   }, [hasUnsavedChanges, designId, saveThumbnail]);
 
   const handleOrderComplete = useCallback(async () => {
+    // Blueprint captures: Start Page hero + Angle Page (Front / Back / Top / Side). Taken exactly once, right
+    // when Send to Bakery succeeds and before any awaits, so the scene is
+    // still exactly what the customer ordered. Kept in a ref for the
+    // blueprint generator to pick up; users never see or trigger this.
+    if (!blueprintViewsRef.current && cakeSceneRef.current) {
+      try {
+        blueprintViewsRef.current = cakeSceneRef.current.captureBlueprintViews();
+      } catch (err) {
+        console.warn('Failed to capture blueprint views:', err);
+      }
+    }
+
     setOrderComplete(true);
     setShowBakeryChat(true);
     setBakeryOpen(false);

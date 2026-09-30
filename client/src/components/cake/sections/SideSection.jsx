@@ -12,32 +12,46 @@ import {
 import SugarColorSection from './SugarColorSection';
 
 export default function SideSection({ side, structure, activeLayer = 0, onChange, sugarColor, onSugarColorChange }) {
-  const mode = side.mode || null;
   const isIndividual = structure?.layerDesign === 'individual' && structure?.layers > 1;
   const tierLabel = (label) => (isIndividual ? `Tier ${activeLayer + 1} ${label}` : label);
+  const activeSide = isIndividual ? (side.layerTreatments?.[activeLayer] || side) : side;
 
-  const selectTreatment = (key) => onChange({ ...side, mode: key });
+  const updateSide = (nextSide) => {
+    if (!isIndividual) {
+      onChange(nextSide);
+      return;
+    }
+
+    const layerTreatments = Array.from(
+      { length: Math.max(structure.layers, side.layerTreatments?.length || 0) },
+      (_, index) => side.layerTreatments?.[index] || side,
+    );
+    layerTreatments[activeLayer] = nextSide;
+    onChange({ ...side, layerTreatments });
+  };
+
+  const selectTreatment = (key) => updateSide({ ...activeSide, mode: key });
 
   const selectCheckeredVariant = (setId) =>
-    onChange({ ...side, mode: 'checkeredPattern', checkeredPattern: { ...side.checkeredPattern, setId } });
+    updateSide({ ...activeSide, mode: 'checkeredPattern', checkeredPattern: { ...activeSide.checkeredPattern, setId } });
 
   const selectTriangleVariant = (setId) =>
-    onChange({ ...side, mode: 'trianglePattern', trianglePattern: { ...side.trianglePattern, setId } });
+    updateSide({ ...activeSide, mode: 'trianglePattern', trianglePattern: { ...activeSide.trianglePattern, setId } });
 
   const selectChevronVariant = (setId) =>
-    onChange({ ...side, mode: 'chevronPattern', chevronPattern: { ...side.chevronPattern, setId } });
+    updateSide({ ...activeSide, mode: 'chevronPattern', chevronPattern: { ...activeSide.chevronPattern, setId } });
 
   const selectScatterPearlsVariant = (setId) =>
-    onChange({ ...side, mode: 'scatterPearls', scatterPearls: { ...side.scatterPearls, setId } });
+    updateSide({ ...activeSide, mode: 'scatterPearls', scatterPearls: { ...activeSide.scatterPearls, setId } });
 
   const selectPipingScrollsVariant = (setId) =>
-    onChange({ ...side, mode: 'pipingScrolls', pipingScrolls: { ...side.pipingScrolls, setId } });
+    updateSide({ ...activeSide, mode: 'pipingScrolls', pipingScrolls: { ...activeSide.pipingScrolls, setId } });
 
   const selectSunshinePlayVariant = (setId) =>
-    onChange({ ...side, mode: 'sunshinePlay', sunshinePlay: { ...side.sunshinePlay, setId } });
+    updateSide({ ...activeSide, mode: 'sunshinePlay', sunshinePlay: { ...activeSide.sunshinePlay, setId } });
 
   const selectVictorianLambethVariant = (setId) =>
-    onChange({ ...side, mode: 'victorianLambeth', victorianLambeth: { ...side.victorianLambeth, setId } });
+    updateSide({ ...activeSide, mode: 'victorianLambeth', victorianLambeth: { ...activeSide.victorianLambeth, setId } });
 
   const MULTI_VARIANT_MAP = {
     checkeredPattern: { sets: CHECKERED_PATTERN_SETS, select: selectCheckeredVariant, stateKey: 'checkeredPattern' },
@@ -57,14 +71,14 @@ export default function SideSection({ side, structure, activeLayer = 0, onChange
           {SIDE_TREATMENTS.map((t) => {
             const multiVariant = MULTI_VARIANT_MAP[t.id];
             if (multiVariant) {
-              const currentSetId = side[multiVariant.stateKey]?.setId;
+              const currentSetId = activeSide[multiVariant.stateKey]?.setId;
               return (
                 <React.Fragment key={t.id}>
                   <OptionRow label={tierLabel(t.label)}>
                     {multiVariant.sets.map((variant, i) => (
                       <Circle
                         key={variant.id}
-                        active={mode === t.id && (currentSetId === variant.id || (!currentSetId && i === 0))}
+                        active={activeSide.mode === t.id && (currentSetId === variant.id || (!currentSetId && i === 0))}
                         onClick={() => multiVariant.select(variant.id)}
                         title={variant.label}
                       >
@@ -72,7 +86,7 @@ export default function SideSection({ side, structure, activeLayer = 0, onChange
                       </Circle>
                     ))}
                   </OptionRow>
-                  {mode === t.id && currentSetId && (
+                  {activeSide.mode === t.id && currentSetId && (
                     <SugarColorSection
                       sugarColor={sugarColor}
                       onChange={onSugarColorChange}
@@ -102,11 +116,11 @@ export default function SideSection({ side, structure, activeLayer = 0, onChange
             return (
               <React.Fragment key={t.id}>
                 <OptionRow label={tierLabel(t.label)}>
-                  <Circle active={mode === t.id} onClick={() => selectTreatment(t.id)} title={t.label}>
+                  <Circle active={activeSide.mode === t.id} onClick={() => selectTreatment(t.id)} title={t.label}>
                     1
                   </Circle>
                 </OptionRow>
-                {mode === t.id && (
+                {activeSide.mode === t.id && (
                   <SugarColorSection
                     sugarColor={sugarColor}
                     onChange={onSugarColorChange}

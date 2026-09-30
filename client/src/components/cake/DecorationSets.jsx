@@ -816,7 +816,20 @@ export function buildCheckerSideSquares(radius, height, opts = {}) {
   // every instance uses the exact same curved shape template). Squares
   // are plain flat/rigid boxes — no relationship to Filling's Piping
   // Design at all.
-  const standoffRadius = radius + CHECKER_THICKNESS / 2 + CHECKER_STANDOFF;
+  //
+  // opts.embedOverride replaces CHECKER_STANDOFF's -0.06 embed on request
+  // (CakeScene.jsx passes it under Ridge Comb/Ribbon Wrap/Vertical
+  // Piping): -0.06 buries the box's back face 0.06 into the WALL radius
+  // it's placed at, which hides the seam nicely against a flat wall, but
+  // those three textures' wall isn't flat — their own ridge peaks reach
+  // well past that buried-back-face radius, so part of the ridge
+  // geometry ends up INSIDE the box's volume, poking through at the
+  // box's edges. `radius` here already carries enough total clearance
+  // from the bare tier (CakeScene's sideDecorStandoff) that the box just
+  // needs to stop embedding — see the per-texture override values where
+  // this is called from.
+  const embed = opts.embedOverride ?? CHECKER_STANDOFF;
+  const standoffRadius = radius + CHECKER_THICKNESS / 2 + embed;
   const arcLength = standoffRadius * cellAngle * CHECKER_GAP_RATIO;
   const mat = buildCheckerSquareMaterial(opts.color, opts.colorId);
 
@@ -1103,6 +1116,57 @@ export function getTriangleCoverageFn(radius, height, opts = {}) {
   };
 }
 
+/**
+ * Glaze's own Triangle Pattern coverage — the triangle-shaped counterpart
+ * of getCheckerCoverageFn. Unlike getTriangleCoverageFn above (a 0/1
+ * bounding-box approximation, fine for Filling's flattening cue since it
+ * hides under an opaque shape), Glaze's windows are what the viewer
+ * actually SEES around each shape, so they need to follow the real
+ * triangular silhouette: full width at the base, tapering to a point at
+ * the apex (apex up) — exactly buildTriangleCellGeometry's own outline,
+ * including its TRIANGLE_GAP_RATIO shrink — otherwise the glaze would be
+ * cut into rectangular notches with bare sponge showing in the empty
+ * corners beside each triangle.
+ *
+ * Returns a smoothed 0..1 weight (ramp inside the silhouette's edge, same
+ * reasoning as getCheckerCoverageFn: a hard 0/1 tears the continuous
+ * glaze mesh between neighboring vertices). Uses the same
+ * computeTriangleLayout as the mesh, so the two can't drift apart.
+ * `localY` is center-anchored, same convention as buildTriangleSideShapes.
+ */
+export function getGlazeTriangleCoverageFn(radius, height, opts = {}) {
+  const { cells, cols, rows, cellAngle, cellHeight } = computeTriangleLayout(radius, height, opts);
+  const covered = new Set(cells.map(({ row, col }) => row * cols + col));
+  const half = TRIANGLE_GAP_RATIO / 2;
+  const smoothWidth = Math.min(half, 0.12);
+  const smoothstep = (t) => {
+    const c = Math.min(1, Math.max(0, t));
+    return c * c * (3 - 2 * c);
+  };
+
+  return (angle, localY) => {
+    const wrappedAngle = ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    const colF = wrappedAngle / cellAngle;
+    const rowF = (localY + height / 2) / cellHeight;
+    const col = Math.floor(colF);
+    const row = Math.floor(rowF);
+    if (row < 0 || row >= rows) return 0;
+    if (!covered.has(row * cols + col)) return 0;
+
+    const fx = Math.abs(colF - col - 0.5);
+    const fyFromBase = (rowF - row - 0.5) + half; // 0 at the base edge, 2*half at the apex
+    if (fyFromBase <= 0 || fyFromBase >= 2 * half) return 0;
+    const v = fyFromBase / (2 * half);            // 0 base .. 1 apex
+    const halfWidthHere = (1 - v) * half;         // tapers to a point
+    // Distance inside the nearest edge: the two slanted sides (measured
+    // horizontally, slightly generous vs. true perpendicular distance) or
+    // the flat base.
+    const inside = Math.min(halfWidthHere - fx, fyFromBase);
+    if (inside <= 0) return 0;
+    return smoothstep(inside / smoothWidth);
+  };
+}
+
 /** Raised triangles wrapped around a tier's side wall — exact same 6
  * patterns, exact same cell-selection logic as buildCheckerSideSquares
  * above (see that function's own doc comment for the full pattern
@@ -1116,7 +1180,11 @@ export function getTriangleCoverageFn(radius, height, opts = {}) {
 export function buildTriangleSideShapes(radius, height, opts = {}) {
   const { cells, cellAngle, cellHeight } = computeTriangleLayout(radius, height, opts);
 
-  const standoffRadius = radius + TRIANGLE_THICKNESS / 2 + TRIANGLE_STANDOFF;
+  // Same opts.embedOverride escape hatch as buildCheckerSideSquares — see
+  // its own comment for why Ridge Comb/Ribbon Wrap/Vertical Piping need
+  // this box to stop embedding into a wall that isn't actually flat.
+  const embed = opts.embedOverride ?? TRIANGLE_STANDOFF;
+  const standoffRadius = radius + TRIANGLE_THICKNESS / 2 + embed;
   const arcLength = standoffRadius * cellAngle * TRIANGLE_GAP_RATIO;
   const geo = buildTriangleCellGeometry(arcLength, cellHeight * TRIANGLE_GAP_RATIO, TRIANGLE_THICKNESS);
   // Same per-vertex arc-bend as Checkered's squares — identical formula,
@@ -1560,10 +1628,17 @@ const MULTI_COLOR_PALETTE = [
   '#E87B5E', // coral/orange (row 4 - top)
 ];
 
-function buildChevronRowGeometry(radius, rowY, rowHeight, numTeeth, thickness) {
+function buildChevronRowGeometry(radius, rowY, rowHeight, numTeeth, thickness, embedOverride) {
   const stepsPerTooth = 8;
   const totalSteps = numTeeth * stepsPerTooth;
-  const standoffR = radius + thickness / 2 + CHEVRON_STANDOFF;
+  // Same opts.embedOverride escape hatch as buildCheckerSideSquares/
+  // buildTriangleSideShapes — see buildCheckerSideSquares' comment.
+  // Chevron is a thick extruded ribbon (0.10) with its own -0.04 embed,
+  // so it has the exact same problem under Ridge Comb/Ribbon
+  // Wrap/Vertical Piping: verified, its back face was buried past those
+  // textures' own real ridge peaks by 0.02–0.03.
+  const embed = embedOverride ?? CHEVRON_STANDOFF;
+  const standoffR = radius + thickness / 2 + embed;
   const rIn = standoffR - thickness / 2;
   const rOut = standoffR + thickness / 2;
 
@@ -1748,7 +1823,7 @@ export function buildChevronSideStripes(radius, height, opts = {}) {
           side: THREE.DoubleSide
         });
 
-    const geo = buildChevronRowGeometry(radius, rowY, rowHeight, numTeeth, CHEVRON_THICKNESS);
+    const geo = buildChevronRowGeometry(radius, rowY, rowHeight, numTeeth, CHEVRON_THICKNESS, opts.embedOverride);
     const mesh = new THREE.Mesh(geo, mat);
     mesh.castShadow = true;
     mesh.receiveShadow = true;

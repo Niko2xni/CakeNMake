@@ -13,7 +13,7 @@ import { areFontsReady, onFontsReady } from '@/components/cake/cakeFonts';
 // way to just look at "what does this thing look like right now" without
 // hunting for a moment mid-drag. This is a static, always-visible view in
 // the panel itself instead.
-export default function DecorationPreview({ designId, orientation, rotationY = 0, rotationX = 0 }) {
+export default function DecorationPreview({ designId, orientation, rotationY = 0, rotationX = 0, rotationZ = 0 }) {
   const mountRef = useRef(null);
   const sceneRef = useRef(null);
   const rendererRef = useRef(null);
@@ -131,7 +131,7 @@ export default function DecorationPreview({ designId, orientation, rotationY = 0
     // obvious on Buttercream Text letters, which are flat and thin enough
     // in one direction that the base and the true center are noticeably
     // far apart.
-    const rotatedGroup = buildRotatedDecoration(designId, orientation, rotationX, rotationY, 1, '#F6DEAB', Math.random);
+    const rotatedGroup = buildRotatedDecoration(designId, orientation, rotationX, rotationY, 1, '#F6DEAB', Math.random, rotationZ);
     itemGroup.add(rotatedGroup);
 
     // Auto-fit: the designs vary hugely in size (a Chocolate Bear vs a
@@ -154,7 +154,7 @@ export default function DecorationPreview({ designId, orientation, rotationY = 0
     camera.updateProjectionMatrix();
 
     renderer.render(scene, camera);
-  }, [designId, orientation, rotationY, rotationX, fontsReady]);
+  }, [designId, orientation, rotationY, rotationX, rotationZ, fontsReady]);
 
   return <div ref={mountRef} className="w-full h-32 rounded-xl bg-muted/40 overflow-hidden" />;
 }
