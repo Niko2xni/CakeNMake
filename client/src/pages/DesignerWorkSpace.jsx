@@ -9,7 +9,7 @@ import BakeryChatPanel from '@/components/bakery/BakeryChatPanel';
 import { Cake, Menu, X, Send, MessageCircle, Palette, Cloud, CloudOff, Loader2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { designApi, pricingApi } from '@/services/api';
+import { blueprintApi, designApi, pricingApi } from '@/services/api';
 import { buildBlueprintDetails } from '@/lib/blueprintDetails';
 import { buildBlueprintPdfBlob } from '@/lib/blueprintPdf';
 import { DEFAULT_CONFIG } from '@/lib/cakeConfig';
@@ -209,7 +209,7 @@ export default function DesignerWorkSpace() {
     };
   }, [hasUnsavedChanges, designId, saveThumbnail]);
 
-  const handleOrderComplete = useCallback(async () => {
+  const handlePaymentComplete = useCallback(async (selectedDate) => {
     // Blueprint captures: Start Page hero + Angle Page (Front / Back / Top / Side). Taken exactly once, right
     // when Send to Bakery succeeds and before any awaits, so the scene is
     // still exactly what the customer ordered. Kept in a ref for the
@@ -222,29 +222,56 @@ export default function DesignerWorkSpace() {
       }
     }
 
-    setOrderComplete(true);
-    setShowBakeryChat(true);
-    setBakeryOpen(false);
-
     // Internal artifact for future bakery handoff. Never expose a customer URL.
     if (!submittedBlueprintRef.current) {
       const submittedConfig = structuredClone(config);
       const submittedName = title;
       const submittedQuote = quotedConfig === config && quote ? structuredClone(quote) : null;
-      const snapshot = { config: submittedConfig, designName: submittedName, views: blueprintViewsRef.current, quote: submittedQuote, pdf: null };
+      const snapshot = { config: submittedConfig, designName: submittedName, views: blueprintViewsRef.current, quote: submittedQuote, pdf: null,
+        submissionId: crypto.randomUUID(),
+        deliveryDate: `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`,
+        customerName: account?.displayName || 'Guest',
+      };
       submittedBlueprintRef.current = snapshot;
       try {
         if (!snapshot.quote) snapshot.quote = await pricingApi.quoteCake(submittedConfig);
       } catch (error) {
         console.warn('Blueprint pricing unavailable:', error);
       }
-      try {
-        snapshot.details = buildBlueprintDetails(snapshot.config, snapshot.quote, snapshot.designName);
-        snapshot.pdf = buildBlueprintPdfBlob({ views: snapshot.views, details: snapshot.details });
-      } catch (error) {
-        console.warn('Blueprint generation failed:', error);
-      }
     }
+
+    const snapshot = submittedBlueprintRef.current;
+    if (!snapshot.views) throw new Error('Could not capture the cake. Please reload and try again.');
+    if (!snapshot.pdf) {
+      snapshot.details = buildBlueprintDetails(snapshot.config, snapshot.quote, snapshot.designName);
+      snapshot.pdf = buildBlueprintPdfBlob({ views: snapshot.views, details: snapshot.details });
+    }
+    if (!snapshot.pdfBase64) {
+      snapshot.pdfBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1]);
+        reader.onerror = () => reject(new Error('Could not prepare your order. Please retry.'));
+        reader.readAsDataURL(snapshot.pdf);
+      });
+    }
+    const result = await blueprintApi.submit({
+      submissionId: snapshot.submissionId,
+      designName: snapshot.designName,
+      customerName: snapshot.customerName,
+      deliveryDate: snapshot.deliveryDate,
+      designSnapshot: snapshot.config,
+      quoteSnapshot: snapshot.quote,
+      pdfBase64: snapshot.pdfBase64,
+      paymentMode: 'simulated',
+      paymentCompleted: true,
+    });
+    if (result.status !== 'ready') throw new Error('Your order is still being processed. Please retry shortly.');
+  }, [account, config, title, quote, quotedConfig]);
+
+  const handleOrderComplete = useCallback(async () => {
+    setOrderComplete(true);
+    setShowBakeryChat(true);
+    setBakeryOpen(false);
 
     if (!account) return;
 
@@ -253,7 +280,7 @@ export default function DesignerWorkSpace() {
     if (savedId) {
       await saveThumbnail(savedId);
     }
-  }, [account, config, title, quote, quotedConfig, saveDesign, saveThumbnail]);
+  }, [account, saveDesign, saveThumbnail]);
 
   const handleSaveDesign = async () => {
     const savedId = await saveDesign();
@@ -633,6 +660,7 @@ export default function DesignerWorkSpace() {
             total={quote ? quote.totalMinor / 100 : 0}
             onClose={() => setBakeryOpen(false)}
             onOrderComplete={handleOrderComplete}
+            onPaymentComplete={handlePaymentComplete}
           />
         )}
       </AnimatePresence>

@@ -9,23 +9,43 @@ function generateRef(amount) {
   return `GC-${amount}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 }
 
-export default function GCashPayment({ total, selectedDate, onPaid, onBack }) {
+export default function GCashPayment({ total, selectedDate, onPaid, onBack, onPaymentComplete, onBusyChange }) {
   const downpayment = Math.ceil(total / 2);
   const [ref] = useState(() => generateRef(downpayment));
   const [paying, setPaying] = useState(false);
   const [done, setDone] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [submissionError, setSubmissionError] = useState('');
+
+  const submitOrder = async () => {
+    setSubmitting(true);
+    onBusyChange?.(true);
+    setSubmissionError('');
+    try {
+      await onPaymentComplete?.(selectedDate);
+      setSubmitted(true);
+    } catch (error) {
+      setSubmissionError(error.message || 'Could not send your order. Please retry.');
+    } finally {
+      setSubmitting(false);
+      onBusyChange?.(false);
+    }
+  };
 
   const handlePay = () => {
     setPaying(true);
+    onBusyChange?.(true);
     setTimeout(() => {
       setDone(true);
       setPaying(false);
+      void submitOrder();
     }, 1800);
   };
 
   return (
     <div>
-      <button onClick={onBack} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-4 transition-colors">
+      <button onClick={onBack} disabled={paying || done} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-4 transition-colors disabled:opacity-40">
         <ChevronLeft className="w-3.5 h-3.5" /> Back to calendar
       </button>
 
@@ -91,8 +111,10 @@ export default function GCashPayment({ total, selectedDate, onPaid, onBack }) {
         <div className="text-center py-2">
           <p className="text-2xl mb-1">🎉</p>
           <p className="font-heading font-bold text-sm text-green-600">Payment confirmed!</p>
-          <p className="text-xs text-muted-foreground mb-4">Your order has been sent to the bakery.</p>
-          <Button className="w-full" onClick={onPaid}>Open Bakery Chat</Button>
+          <p className="text-xs text-muted-foreground mb-4">{submitted ? 'Your order has been sent to the bakery.' : submitting ? 'Sending your order to the bakery…' : 'Your order has not been sent yet.'}</p>
+          {submissionError && <p role="alert" className="text-xs text-destructive mb-3">{submissionError}</p>}
+          {!submitted && !submitting && <Button className="w-full mb-2" onClick={submitOrder}>Retry sending order</Button>}
+          <Button className="w-full" onClick={onPaid} disabled={!submitted || submitting}>Open Bakery Chat</Button>
         </div>
       ) : (
         <Button className="w-full bg-[#007DFF] hover:bg-[#0068D9]" onClick={handlePay} disabled={paying}>

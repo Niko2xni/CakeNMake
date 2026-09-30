@@ -20,6 +20,14 @@ const requestJson = async (url, options) => {
   return parseJsonResponse(response);
 };
 
+export const blueprintApi = {
+  submit: (submission) => requestJson(`${API_BASE_URL}/blueprint-submissions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(submission),
+  }),
+};
+
 const requestAuthenticatedJson = async (url, options = {}) => {
   const currentUser = auth?.currentUser;
 
@@ -173,6 +181,8 @@ export const designApi = {
 
 
 export const bakeryApi = {
+  getBlueprints: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/blueprints`),
+  getBlueprintAccess: (id, download = false) => requestAuthenticatedJson(`${API_BASE_URL}/bakery/blueprints/${encodeURIComponent(id)}/access?download=${download}`),
   getReservations: async (status) => {
     const qs = status && status !== 'all' ? `?status=${encodeURIComponent(status)}` : '';
     return requestAuthenticatedJson(`${API_BASE_URL}/bakery/reservations${qs}`);

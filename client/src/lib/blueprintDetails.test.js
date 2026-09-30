@@ -15,8 +15,27 @@ describe('internal blueprint', () => {
     expect(details.totalMinor).toBe(195000);
     expect(details.sections.find((s) => s.title === 'Side').items[0].detail).toContain('Starry Rainbow');
     expect(details.sections.find((s) => s.title === 'Center').items[0].detail).toContain('Happy birthday');
-    expect(details.sections.at(-1).items[0].priceMinor).toBe(195000);
+    expect(details.sections[0].items[0].priceMinor).toBe(195000);
+    expect(details.sections.some((s) => s.title.startsWith('Pricing quote'))).toBe(false);
+    expect(details.sections.flatMap((s) => s.items).some((r) => r.priceText === 'See quote')).toBe(false);
     expect(buildBlueprintPdf({ details }).getNumberOfPages()).toBe(3);
+  });
+  it('combines structure charges and splits shared piping without losing cents', () => {
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.edge.top.piping.tip = 'shell';
+    config.edge.bottom.piping.tip = 'shell';
+    const quote = { totalMinor: 195501, lineItems: [
+      { componentKey: 'base.standard', lineTotalMinor: 110000 },
+      { componentKey: 'size.big', lineTotalMinor: 85000 },
+      { componentKey: 'edge.piping', lineTotalMinor: 501 },
+      { componentKey: 'sponge.vanilla', lineTotalMinor: 0 },
+    ] };
+    const details = buildBlueprintDetails(config, quote);
+    const rows = details.sections.flatMap((s) => s.items);
+    expect(rows.find((r) => r.label === 'Tiers').priceMinor).toBe(195000);
+    expect(rows.find((r) => r.label === 'Sponge Flavor').priceMinor).toBe(0);
+    expect(rows.reduce((sum, r) => sum + (r.priceMinor || 0), 0)).toBe(quote.totalMinor);
+    expect(details.sections.find((s) => s.title === 'Edge').items.map((r) => r.priceMinor)).toEqual([250, 251]);
   });
   it('uses tier-specific choices and omits inactive treatments', () => {
     const config = structuredClone(DEFAULT_CONFIG);

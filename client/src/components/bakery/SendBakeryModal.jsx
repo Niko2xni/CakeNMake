@@ -5,9 +5,11 @@ import { Button } from '@/components/ui/button';
 import DeliveryCalendar from './DeliveryCalendar';
 import GCashPayment from './GCashPayment';
 
-export default function SendBakeryModal({ config, total, onClose, onOrderComplete }) {
+export default function SendBakeryModal({ config, total, onClose, onOrderComplete, onPaymentComplete }) {
   const [step, setStep] = useState('calendar'); // 'calendar' | 'pay' | 'chat'
   const [selectedDate, setSelectedDate] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const close = () => { if (!busy) onClose(); };
 
   return (
     <motion.div
@@ -15,7 +17,7 @@ export default function SendBakeryModal({ config, total, onClose, onOrderComplet
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
-      onClick={onClose}
+      onClick={close}
     >
       <motion.div
         initial={{ opacity: 0, scale: 0.92, y: 24 }}
@@ -43,7 +45,7 @@ export default function SendBakeryModal({ config, total, onClose, onOrderComplet
               </div>
             </div>
           </div>
-          <button onClick={onClose} className="rounded-full p-1.5 hover:bg-muted transition-colors">
+          <button onClick={close} disabled={busy} className="rounded-full p-1.5 hover:bg-muted transition-colors disabled:opacity-40">
             <X className="w-4 h-4 text-muted-foreground" />
           </button>
         </div>
@@ -71,6 +73,8 @@ export default function SendBakeryModal({ config, total, onClose, onOrderComplet
                   total={total}
                   selectedDate={selectedDate}
                   onPaid={() => { onOrderComplete?.(); onClose(); }}
+                  onPaymentComplete={onPaymentComplete}
+                  onBusyChange={setBusy}
                   onBack={() => setStep('calendar')}
                 />
               </motion.div>

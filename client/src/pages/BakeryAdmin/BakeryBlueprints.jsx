@@ -1,127 +1,76 @@
-import React, { useState } from 'react';
-import { FileText, Download, Eye, Calendar } from 'lucide-react';
-import CustomScrollbar from '@/components/shared/CustomScrollbar';
+import React, { useEffect, useState } from 'react';
+import { bakeryApi } from '@/services/api';
 import { safeExternalUrl } from '@/lib/safe-url';
-
-const seedBlueprints = [
-  {
-    id: 1,
-    customerName: 'Maria Santos',
-    pickupDate: '2025-02-01',
-    totalPrice: 2700,
-    status: 'confirmed',
-    blueprintUrl: null,
-    createdAt: '2025-01-28',
-  },
-  {
-    id: 2,
-    customerName: 'Jose Reyes',
-    pickupDate: '2025-02-03',
-    totalPrice: 3700,
-    status: 'in_production',
-    blueprintUrl: null,
-    createdAt: '2025-01-29',
-  },
-  {
-    id: 3,
-    customerName: 'Ana Cruz',
-    pickupDate: '2025-01-25',
-    totalPrice: 1700,
-    status: 'completed',
-    blueprintUrl: 'https://example.com/sample-blueprint.pdf',
-    createdAt: '2025-01-20',
-  },
-];
-
-const STATUS_META = {
-  pending_payment: { label: 'Awaiting Payment', color: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
-  confirmed: { label: 'Confirmed', color: 'bg-blue-50 text-blue-700 border-blue-200' },
-  in_production: { label: 'In Production', color: 'bg-pink-50 text-pink-700 border-pink-200' },
-  completed: { label: 'Completed', color: 'bg-green-50 text-green-700 border-green-200' },
-};
-
-function formatDate(str) {
-  return new Date(str).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-function formatPeso(n) {
-  return `₱${Number(n || 0).toLocaleString()}`;
-}
+import CustomScrollbar from '@/components/shared/CustomScrollbar';
 
 export default function BakeryBlueprints() {
-  const [blueprints] = useState(seedBlueprints);
-
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [refresh, setRefresh] = useState(0);
+  const [busy, setBusy] = useState(null);
+  const [preview, setPreview] = useState(null);
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      try {
+        const result = await bakeryApi.getBlueprints();
+        if (active) { setRecords(result); setError(''); }
+      } catch (err) { if (active) setError(err.message); }
+      finally { if (active) setLoading(false); }
+    }
+    void load();
+    const timer = setInterval(load, 30000);
+    return () => { active = false; clearInterval(timer); };
+  }, [refresh]);
+  async function access(record, download) {
+    setBusy(record.id);
+    setError('');
+    try {
+      const result = await bakeryApi.getBlueprintAccess(record.id, download);
+      const url = safeExternalUrl(result.url);
+      if (!url) throw new Error('Invalid PDF access link.');
+      if (download) {
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `${record.id}.pdf`;
+        anchor.rel = 'noopener noreferrer';
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+      } else setPreview({ url, title: record.designName });
+    } catch (err) { setError(err.message); }
+    finally { setBusy(null); }
+  }
   return (
     <div className="h-full rounded-2xl border border-pink-100 shadow-xl bg-white flex flex-col overflow-hidden">
-      <header className="flex-shrink-0 border-b border-pink-100 px-6 py-4">
-        <h1 className="text-lg font-bold text-gray-900">Blueprints</h1>
-        <p className="text-sm text-gray-500">
-          Production PDF documents — generated automatically after payment confirmation
-        </p>
+      <header className="shrink-0 border-b border-pink-100 px-6 py-4 flex justify-between items-center">
+        <div><h1 className="text-lg font-bold">Blueprints</h1><p className="text-sm text-gray-500">Production PDFs submitted after simulated payment confirmation</p></div>
+        <button onClick={() => setRefresh((n) => n + 1)} className="text-sm text-pink-600">Refresh</button>
       </header>
-
       <CustomScrollbar className="flex-1" contentClassName="p-4 space-y-2">
-        {blueprints.map((b) => {
-          const meta = STATUS_META[b.status] || STATUS_META.confirmed;
-          const blueprintUrl = safeExternalUrl(b.blueprintUrl);
-          const hasBlueprint = Boolean(blueprintUrl);
-          return (
-            <div
-              key={b.id}
-              className="flex items-center gap-4 rounded-xl border border-pink-100 px-4 py-3"
-            >
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                hasBlueprint ? 'bg-pink-50' : 'bg-gray-50'
-              }`}>
-                <FileText className={`w-6 h-6 ${hasBlueprint ? 'text-pink-500' : 'text-gray-300'}`} />
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="text-sm font-semibold text-gray-900">{b.customerName}</p>
-                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${meta.color}`}>
-                    {meta.label}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500">
-                  <span className="flex items-center gap-1">
-                    <Calendar className="w-3 h-3" />
-                    Pickup {formatDate(b.pickupDate)}
-                  </span>
-                  <span>{formatPeso(b.totalPrice)}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {hasBlueprint ? (
-                  <>
-                    <a
-                      href={blueprintUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full border border-pink-200 text-pink-600 hover:bg-pink-50 transition-colors"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      View
-                    </a>
-
-                    <a
-                      href={blueprintUrl}
-                      download
-                      className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full bg-pink-500 text-white hover:bg-pink-600 transition-colors"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      Download
-                    </a>
-                  </>
-                ) : (
-                  <span className="text-xs text-gray-400 italic">Generating...</span>
-                )}
-              </div>
+        {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+        {loading && <p>Loading blueprints…</p>}
+        {!loading && !error && !records.length && <p className="text-sm text-gray-500">No blueprints submitted yet.</p>}
+        {records.map((record) => (
+          <div key={record.id} className="flex flex-wrap items-center gap-4 rounded-xl border border-pink-100 px-4 py-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex gap-2 items-center"><p className="text-sm font-semibold">{record.customerName}</p><span className="text-xs text-pink-600">{{ ready: 'Ready', uploading: 'Uploading', failed: 'Failed' }[record.status] || record.status}</span></div>
+              <p className="text-sm text-gray-600 truncate">{record.designName}</p>
+              <p className="text-xs text-gray-500 mt-1">Delivery {new Date(record.deliveryDate).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })} · {record.totalMinor == null ? 'Estimate unavailable' : new Intl.NumberFormat('en-PH', { style: 'currency', currency: record.currency }).format(record.totalMinor / 100)}</p>
+              {record.status === 'failed' && <p className="text-xs text-red-600">{record.failureReason || 'PDF upload failed.'}</p>}
             </div>
-          );
-        })}
+            {record.status === 'ready' && <div className="flex gap-2">
+              <button disabled={busy === record.id} onClick={() => access(record, false)} className="text-xs px-3 py-1.5 rounded-full border border-pink-200 text-pink-600 disabled:opacity-50">View</button>
+              <button disabled={busy === record.id} onClick={() => access(record, true)} className="text-xs px-3 py-1.5 rounded-full bg-pink-500 text-white disabled:opacity-50">Download</button>
+            </div>}
+          </div>
+        ))}
       </CustomScrollbar>
+      {preview && <div role="dialog" aria-modal="true" aria-label="Blueprint PDF preview" className="fixed inset-0 z-50 bg-black/50 p-6 flex flex-col">
+        <div className="bg-white px-4 py-3 flex justify-between rounded-t-xl"><p>{preview.title}</p><button onClick={() => setPreview(null)}>Close preview</button></div>
+        <iframe title="Blueprint PDF" src={preview.url} className="flex-1 w-full bg-white rounded-b-xl" />
+      </div>}
     </div>
   );
 }
