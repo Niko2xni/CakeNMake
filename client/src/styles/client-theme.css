@@ -60,7 +60,8 @@
   pointer-events: none;
 }
 
-.cn-app-page > *:not(.cn-sidebar) {
+/* Low specificity lets utility and component positioning override this default. */
+:where(.cn-app-page > *:not(.cn-sidebar):not(.fixed):not(.absolute):not(.sticky)) {
   position: relative;
   z-index: 1;
 }
