@@ -259,7 +259,8 @@ export function getVictorianLambethCoverageFn(radius, height, opts = {}) {
  * per-element Y formulas) and emits one region per real element:
  *   - rope tiers      -> capsule along the actual PolarRopeCurve path
  *   - curtain drape   -> the actual sagging band (height + sag per variant)
- *   - rosette         -> center disc + the two side leaves (ellipses)
+ *   - rosette         -> center disc + the two side leaves (true leaf-
+ *                        shaped windows following the leaf's width profile)
  *   - pearls          -> circles at their real size
  *   - fleur-de-lis    -> its three real teardrops (tilted ellipses),
  *                        hanging (bottom) or flipped upward (top), per band
@@ -324,6 +325,7 @@ export function getVictorianLambethGlazeCoverageFn(radius, height, opts = {}) {
   // 'ellipse': { angle, y, rx, ry, rot }   (rx/ry = fully-open half-axes)
   // 'capsule': { pts: [[angle, y], ...], r }
   // 'curtain': { mid, halfArc, cy, ch, sag }
+  // 'leaf':    { angle, y, side, base, len, half, margin }  (pointed lens)
   const regions = [];
   const OPEN_MARGIN = 1.25;
 
@@ -331,6 +333,26 @@ export function getVictorianLambethGlazeCoverageFn(radius, height, opts = {}) {
     regions.push({ type: 'ellipse', angle, y, rx: trueR, ry: trueR, rot: 0, margin: OPEN_MARGIN });
   const addEllipse = (angle, y, rx, ry, rot = 0) =>
     regions.push({ type: 'ellipse', angle, y, rx, ry, rot, margin: OPEN_MARGIN });
+
+  // Rosette side leaf. Mirrors createLeafGeometry in buildVictorianLambeth:
+  // silhouette half-width = (maxW/2) * sin(PI * u^0.55), u = 0 at the base,
+  // 1 at the tip, so it is widest near the rosette and tapers to a point.
+  // The real leaf is scaled 1.6 with the swirl disc: length 0.45*1.6, max
+  // width 0.48*1.6, base tucked 0.04*1.6 toward the rosette centre. `side`
+  // (+1/-1) is which way it points; both leaves lie horizontal.
+  const LEAF_SCALE = 1.6;
+  const LEAF_MARGIN = 0.07;
+  const addLeaf = (angle, y, side) =>
+    regions.push({
+      type: 'leaf',
+      angle,
+      y,
+      side,
+      base: -0.04 * LEAF_SCALE,
+      len: 0.45 * LEAF_SCALE,
+      half: 0.48 * 0.5 * LEAF_SCALE,
+      margin: LEAF_MARGIN,
+    });
 
   const addRope = (startAngle, endAngle, startY, endY, sag) => {
     const pts = [];
@@ -340,8 +362,8 @@ export function getVictorianLambethGlazeCoverageFn(radius, height, opts = {}) {
       const parabola = 4 * t * (1 - t);
       pts.push([startAngle + (endAngle - startAngle) * t, startY + (endY - startY) * t - sag * parabola]);
     }
-    // Tube radius 0.035, star fluting up to +18% -> 0.041 real reach.
-    regions.push({ type: 'capsule', pts, r: 0.041 });
+    // Window size comes from ROPE_* constants (tube 0.035 + 18% fluting).
+    regions.push({ type: 'capsule', pts });
   };
 
   // Teardrop: center (0,-0.02), left (-0.06,-0.12) tilted +PI/10, right
@@ -378,12 +400,11 @@ export function getVictorianLambethGlazeCoverageFn(radius, height, opts = {}) {
       if (flags.rosette || flags.anchorPearl) {
         const anchorY = 0.42 * H + bandY + (flags.topRopes ? -ROPES_ONLY_EXTRA_DROP * H : 0);
         if (flags.rosette) {
-          // Swirl disc (petals, scaled 1.6) + two side leaves reaching
-          // ~0.78 either side of the anchor, lens-shaped, ~0.38 half-tall.
+          // Swirl disc (petals, scaled 1.6) + two pointed side leaves.
+          // The leaves get leaf-shaped windows (not ellipses, which read
+          // as a cloud blob once unioned with the disc's circle).
           addCircle(currentAngle, anchorY, 0.42);
-          for (const side of [-1, 1]) {
-            addEllipse(currentAngle + (side * 0.43) / radius, anchorY, 0.36, 0.30, 0);
-          }
+          for (const side of [-1, 1]) addLeaf(currentAngle, anchorY, side);
         }
         if (flags.anchorPearl) {
           addCircle(currentAngle, anchorY - 0.08 * H, ANCHOR_PEARL_RADIUS);
@@ -421,6 +442,23 @@ export function getVictorianLambethGlazeCoverageFn(radius, height, opts = {}) {
     }
   }
 
+  // Rope windows. The glaze mesh samples the cake's circumference far more
+  // coarsely than it samples height, so a window only as wide as the rope
+  // (+ a sliver) can miss every glaze vertex on a steep stretch of rope: the
+  // triangles between two un-opened vertices then stretch across the rope
+  // and bury it in dashes. Distance to a rope is therefore measured with the
+  // horizontal (around-the-cake) axis compressed by ROPE_KX, which widens
+  // the window sideways ~1/KX while leaving it tight where the rope runs
+  // flat (vertical sampling is fine there).
+  //   fully open within the tube's true reach + ROPE_CORE_PAD,
+  //   closed ROPE_RAMP further out (measured in the compressed space).
+  const ROPE_KX = 0.6;
+  const ROPE_CORE_PAD = 0.012;
+  const ROPE_RAMP = 0.05;
+  const ROPE_TRUE_R = 0.041; // tube 0.035 + 18% star fluting
+  const ROPE_CORE_R = ROPE_TRUE_R + ROPE_CORE_PAD;
+  const ROPE_WINDOW_R = ROPE_CORE_R + ROPE_RAMP;
+
   // ── Bounds + angular buckets ────────────────────────────────────────
   const TWO_PI = Math.PI * 2;
   const wrapSigned = (a) => {
@@ -441,14 +479,26 @@ export function getVictorianLambethGlazeCoverageFn(radius, height, opts = {}) {
       aMax = el.angle + reach / radius;
       yMin = el.y - reach;
       yMax = el.y + reach;
+    } else if (el.type === 'leaf') {
+      const near = el.base - el.margin;
+      const far = el.base + el.len + el.margin;
+      const x0 = el.side > 0 ? near : -far;
+      const x1 = el.side > 0 ? far : -near;
+      aMin = el.angle + x0 / radius - 0.02;
+      aMax = el.angle + x1 / radius + 0.02;
+      yMin = el.y - el.half - el.margin - 0.02;
+      yMax = el.y + el.half + el.margin + 0.02;
     } else if (el.type === 'capsule') {
-      const reach = el.r * 1.6 + 0.05;
+      // Horizontal reach is the widest (rope window is stretched across
+      // the arc, see capsuleCoverage), vertical the narrowest.
+      const reachX = (ROPE_WINDOW_R / ROPE_KX) + 0.03;
+      const reachY = ROPE_WINDOW_R + 0.03;
       aMin = Infinity; aMax = -Infinity; yMin = Infinity; yMax = -Infinity;
       for (const [a, y] of el.pts) {
         aMin = Math.min(aMin, a); aMax = Math.max(aMax, a);
         yMin = Math.min(yMin, y); yMax = Math.max(yMax, y);
       }
-      aMin -= reach / radius; aMax += reach / radius; yMin -= reach; yMax += reach;
+      aMin -= reachX / radius; aMax += reachX / radius; yMin -= reachY; yMax += reachY;
     } else {
       aMin = el.mid - el.halfArc; aMax = el.mid + el.halfArc;
       yMin = el.cy - el.sag - el.ch / 2 - 0.12;
@@ -488,18 +538,31 @@ export function getVictorianLambethGlazeCoverageFn(radius, height, opts = {}) {
     return smoothstep(inside / ramp);
   };
 
+  // Pointed-lens window: fully open inside the leaf's true silhouette,
+  // ramping to closed over `margin` outside it (sides and both ends).
+  const leafCoverage = (el, angle, localY) => {
+    const m = el.margin;
+    const s = el.side * radius * wrapSigned(angle - el.angle);
+    const a = s - el.base; // distance along the leaf from its base
+    if (a < -m || a > el.len + m) return 0;
+    const u = Math.min(1, Math.max(0, a / el.len));
+    const trueHalf = el.half * Math.sin(Math.PI * Math.pow(u, 0.55));
+    const across = (trueHalf + m - Math.abs(localY - el.y)) / m;
+    const along = a < 0 ? 1 + a / m : a > el.len ? 1 - (a - el.len) / m : 1;
+    return smoothstep(Math.min(across, along));
+  };
+
   const capsuleCoverage = (el, angle, localY) => {
-    const windowR = el.r * 1.5;
-    const ramp = Math.max(0.012, windowR - el.r);
     let best = Infinity;
     const pts = el.pts;
     for (let k = 0; k < pts.length - 1; k++) {
       const [a0, y0] = pts[k];
       const [a1, y1] = pts[k + 1];
       const am = (a0 + a1) / 2;
-      const s0 = radius * (a0 - am);
-      const s1 = radius * (a1 - am);
-      const px = radius * wrapSigned(angle - am);
+      // Horizontal axis compressed by ROPE_KX (see constants above).
+      const s0 = radius * (a0 - am) * ROPE_KX;
+      const s1 = radius * (a1 - am) * ROPE_KX;
+      const px = radius * wrapSigned(angle - am) * ROPE_KX;
       const vx = s1 - s0;
       const vy = y1 - y0;
       const len2 = vx * vx + vy * vy;
@@ -510,8 +573,8 @@ export function getVictorianLambethGlazeCoverageFn(radius, height, opts = {}) {
       const d = Math.hypot(px - cx, localY - cy);
       if (d < best) best = d;
     }
-    if (best >= windowR) return 0;
-    return smoothstep((windowR - best) / ramp);
+    if (best >= ROPE_WINDOW_R) return 0;
+    return smoothstep((ROPE_WINDOW_R - best) / ROPE_RAMP);
   };
 
   const curtainCoverage = (el, angle, localY) => {
@@ -534,6 +597,8 @@ export function getVictorianLambethGlazeCoverageFn(radius, height, opts = {}) {
       if (localY < el.yMin || localY > el.yMax) continue;
       const c = el.type === 'ellipse'
         ? ellipseCoverage(el, wrapped, localY)
+        : el.type === 'leaf'
+        ? leafCoverage(el, wrapped, localY)
         : el.type === 'capsule'
         ? capsuleCoverage(el, wrapped, localY)
         : curtainCoverage(el, wrapped, localY);
@@ -557,6 +622,7 @@ export function getVictorianLambethGlazeCoverageFn(radius, height, opts = {}) {
  * @param {string} icingColorHex - Main icing color.
  * @param {string} pearlColorHex - Pearl accent color.
  * @param {string} variant - see VARIANT_FLAGS inside this function for
+ * @param {string|null} icingColorId - Sugar Color id for gradient/metallic materials.
  *   the authoritative per-element breakdown. Summary:
  *   'classic' (default) — everything.
  *   'noRosette' — removes the rosette (petals + side leaves) and its
@@ -585,11 +651,11 @@ export function getVictorianLambethGlazeCoverageFn(radius, height, opts = {}) {
  *   See VICTORIAN_LAMBETH_SETS in cakeConfig.js.
  * @returns {THREE.Group} Group containing the complete Victorian Lambeth piping.
  */
-export function buildVictorianLambeth(radius, height, icingColorHex, pearlColorHex = '#ffffff', variant = 'classic') {
+export function buildVictorianLambeth(radius, height, icingColorHex, pearlColorHex = '#ffffff', variant = 'classic', icingColorId = null) {
   const masterGroup = new THREE.Group();
 
   // 1. Procedural GPU Buttercream Material
-  const icingMat = getFrostingMaterial(icingColorHex);
+  const icingMat = getFrostingMaterial(icingColorHex, icingColorId);
 
   // 2. Glossy Sugar Pearl Material (Dragées)
   const pearlMat = new THREE.MeshPhysicalMaterial({

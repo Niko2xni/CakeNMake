@@ -452,12 +452,23 @@ function getDesignCenterOffset(designId, orientation) {
 // (the +offset/-offset pair cancels out completely), so the untouched,
 // far more common untilted case is pixel-identical to before -- only
 // nonzero tilt/rotation actually changes anything visually.
-export function buildRotatedDecoration(designId, orientation, tiltX, rotationY, scale, color, prng) {
+//
+// rollRight (optional, radians, default 0) is the left/right tilt: how far
+// the item leans toward the viewer's RIGHT (negative = leans left), a roll
+// around the axis pointing at the camera. Euler order is 'ZXY' so that roll
+// is applied last, in the fixed view frame -- exactly how tiltX already
+// behaves relative to rotationY -- and with rollRight = 0 the matrix is
+// identical to the old (tiltX, rotationY, 0) 'XYZ' set, so existing placed
+// items render exactly as before. Added as a trailing param so any other
+// caller (e.g. DecorationPreview) keeps working unchanged.
+export function buildRotatedDecoration(designId, orientation, tiltX, rotationY, scale, color, prng, rollRight = 0) {
   const anchor = new THREE.Group();
   const offset = getDesignCenterOffset(designId, orientation);
   const rotationCore = new THREE.Group();
   rotationCore.position.set(offset.x * scale, offset.y * scale, offset.z * scale);
-  rotationCore.rotation.set(tiltX, rotationY, 0);
+  // Camera looks down -Z from +Z, so a positive Z rotation leans LEFT on
+  // screen; negate so rollRight > 0 leans right.
+  rotationCore.rotation.set(tiltX, rotationY, -rollRight, 'ZXY');
   const meshGroup = new THREE.Group();
   meshGroup.position.set(-offset.x * scale, -offset.y * scale, -offset.z * scale);
   buildAndAddDecoration(meshGroup, designId, 0, 0, 0, scale, color, prng, orientation);
@@ -871,6 +882,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       sideCheckeredColor = '#F6DEAB', sideCheckeredColorId = null,
       sideTriangleColor = '#F6DEAB', sideTriangleColorId = null,
       sideChevronColor = '#F6DEAB', sideChevronColorId = null,
+      sideChevronSecondaryColor = '#D6293E', sideChevronSecondaryColorId = 'red',
       sideNoNameColor = '#F6DEAB',
       sideDecorationSetId = null, sideDecorationVariant = 0,
       layerSideTreatments = [],
@@ -889,6 +901,8 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       sideChevronPatternSetId,
       sideChevronColor,
       sideChevronColorId,
+      sideChevronSecondaryColor,
+      sideChevronSecondaryColorId,
       sideScatterPearlsSetId,
       sidePipingScrollsSetId,
       sideSunshinePlaySetId,
@@ -1564,6 +1578,35 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         };
       })();
 
+      // Glaze's own Victorian Lambeth coverage — same relationship to
+      // victorianLambethCoverageFn as glazeCheckerCoverageFn has to
+      // checkerCoverageFn. Without this term in glazeSideCoverageFn the
+      // glaze had no windows at all under Lambeth and stayed one
+      // continuous coat over the piping. `forGlaze: true` routes
+      // getVictorianLambethCoverageFn to getVictorianLambethGlazeCoverageFn,
+      // which opens a window per REAL element (rope capsules, curtain
+      // drape, rosette + leaves, pearls, fleur-de-lis) instead of
+      // Filling's coarse 3-region approximation.
+      //  - Angle: takes the already-reflected angle as-is (the Glaze call
+      //    sites apply Math.PI/2 - angle before calling in), so NO extra
+      //    reflection here, unlike victorianLambethCoverageFn.
+      //  - Radius: glazeDecoRadius + lambethStandoff mirrors the real
+      //    build call (ridgedTextureRadius + lambethStandoff), which is
+      //    sideDecorationRadius on Naked/Fully Frosted.
+      //  - Height/origin: lambethHeight and currentY + height/2 +
+      //    lambethVerticalOffset, exactly as the mesh is positioned.
+      const glazeVictorianLambethCoverageFn = (() => {
+        if (!glazeWindowStyleOk) return null;
+        if (sideDecorationSetId !== 'victorianLambeth') return null;
+        const rawCoverageFn = getVictorianLambethCoverageFn(
+          glazeDecoRadius + lambethStandoff,
+          lambethHeight,
+          { variant: sideVictorianLambethSetId || 'classic', forGlaze: true },
+        );
+        const lambethOriginY = currentY + height / 2 + lambethVerticalOffset;
+        return (glazeArg, absoluteY) => rawCoverageFn(glazeArg, absoluteY - lambethOriginY);
+      })();
+
       // Whichever Side Treatment is actually active on this tier (at
       // most one ever is — Side Treatment is a single exclusive choice)
       // — Filling itself doesn't need to care which, just whether
@@ -1591,7 +1634,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       const glazeSideCoverageFn = (
         glazeCheckerCoverageFn || glazeTriangleCoverageFn || chevronCoverageFn ||
         glazeScatterPearlsCoverageFn || glazePipingScrollsCoverageFn ||
-        glazeSunshinePlayCoverageFn || null
+        glazeSunshinePlayCoverageFn || glazeVictorianLambethCoverageFn || null
       );
       lastActiveSideCoverageFn = glazeSideCoverageFn;
 
@@ -2130,6 +2173,8 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           setId: sideChevronPatternSetId || 'multiColor',
           color: sideChevronColor,
           colorId: sideChevronColorId,
+          secondaryColor: sideChevronSecondaryColor,
+          secondaryColorId: sideChevronSecondaryColorId,
           // Same fix as Checkered/Triangle's own build calls — see
           // buildCheckerSideSquares' comment. Chevron's ribbons are a
           // thick extruded shape with their own embed (CHEVRON_STANDOFF),
@@ -3038,7 +3083,8 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           const orientation = orientationTag === 'default' ? null : orientationTag;
           const tiltX = item.tiltX !== undefined ? item.tiltX : 0;
           const rotationY = item.rotation !== undefined ? item.rotation : 0;
-          const rotatedGroup = buildRotatedDecoration(designId, orientation, tiltX, rotationY, centerDecorScale, centerDecorationColor, rand);
+          const tiltZ = item.tiltZ !== undefined ? item.tiltZ : 0;
+          const rotatedGroup = buildRotatedDecoration(designId, orientation, tiltX, rotationY, centerDecorScale, centerDecorationColor, rand, tiltZ);
           rotatedGroup.position.set(px, py, pz);
           itemGroup.add(rotatedGroup);
         }
@@ -3348,12 +3394,14 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           if (!resolved.valid) return; // hard block (out of bounds or overlaps another item) -- snap back, no-op
           const rotationY = typeof tool === 'object' ? (tool.rotationY || 0) : 0;
           const rotationX = typeof tool === 'object' ? (tool.rotationX || 0) : 0;
+          const rotationZ = typeof tool === 'object' ? (tool.rotationZ || 0) : 0;
           onPlaceRef.current?.({
             type: toolType,
             x: resolved.x,
             z: resolved.z,
             rotation: THREE.MathUtils.degToRad(rotationY),
             tiltX: THREE.MathUtils.degToRad(rotationX),
+            tiltZ: THREE.MathUtils.degToRad(rotationZ),
           });
           return;
         }
@@ -3415,6 +3463,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
 
         const rotationDeg = typeof tool === 'object' ? (tool.rotationY || 0) : 0;
         const tiltDeg = typeof tool === 'object' ? (tool.rotationX || 0) : 0;
+        const rollDeg = typeof tool === 'object' ? (tool.rotationZ || 0) : 0;
 
         // Real mesh preview, not a placeholder shape -- same
         // buildRotatedDecoration used by the actual placed render below,
@@ -3423,7 +3472,8 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         const rotatedGroup = buildRotatedDecoration(
           designId, orientation,
           THREE.MathUtils.degToRad(tiltDeg), THREE.MathUtils.degToRad(rotationDeg),
-          scale, cakeConfigRef.current?.centerDecorationColor || '#F6DEAB', Math.random
+          scale, cakeConfigRef.current?.centerDecorationColor || '#F6DEAB', Math.random,
+          THREE.MathUtils.degToRad(rollDeg)
         );
         rotatedGroup.position.set(resolved.x, y, resolved.z);
         tintAsGhost(rotatedGroup, resolved.valid);
@@ -3552,11 +3602,18 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       };
 
       const handleKeyDown = (e) => {
-        const isYawLeft = e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A';
-        const isYawRight = e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D';
-        const isPitchUp = e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W';
-        const isPitchDown = e.key === 'ArrowDown' || e.key === 's' || e.key === 'S';
-        if (!isYawLeft && !isYawRight && !isPitchUp && !isPitchDown) return;
+        // Key map (while a Center design is armed):
+        //   W / S  = tilt up / down      (pitch, rotationX)
+        //   A / D  = tilt left / right   (roll,  rotationZ)
+        //   Q / E  = rotate left / right (spin,  rotationY)
+        // Arrow keys mirror the tilt keys: ↑ ↓ ← →.
+        const isPitchUp = e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp';
+        const isPitchDown = e.key === 's' || e.key === 'S' || e.key === 'ArrowDown';
+        const isRollLeft = e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft';
+        const isRollRight = e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight';
+        const isYawLeft = e.key === 'q' || e.key === 'Q';
+        const isYawRight = e.key === 'e' || e.key === 'E';
+        if (!isYawLeft && !isYawRight && !isPitchUp && !isPitchDown && !isRollLeft && !isRollRight) return;
         if (!onSelectToolRef.current) return;
         const tool = activeToolRef.current;
         const toolType = typeof tool === 'object' ? tool.type : tool;
@@ -3564,12 +3621,15 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         e.preventDefault(); // don't also scroll the page while rotating
         const currentYaw = typeof tool === 'object' ? (tool.rotationY || 0) : 0;
         const currentPitch = typeof tool === 'object' ? (tool.rotationX || 0) : 0;
+        const currentRoll = typeof tool === 'object' ? (tool.rotationZ || 0) : 0;
         const yawStep = isYawLeft ? -15 : isYawRight ? 15 : 0;
         const pitchStep = isPitchUp ? 15 : isPitchDown ? -15 : 0;
+        const rollStep = isRollRight ? 15 : isRollLeft ? -15 : 0;
         const rotatedTool = {
           type: toolType,
           rotationY: ((currentYaw + yawStep) % 360 + 360) % 360,
           rotationX: ((currentPitch + pitchStep) % 360 + 360) % 360,
+          rotationZ: ((currentRoll + rollStep) % 360 + 360) % 360,
         };
         onSelectToolRef.current(rotatedTool);
         // onSelectTool updates React state asynchronously -- activeToolRef

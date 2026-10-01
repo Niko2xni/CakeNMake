@@ -167,7 +167,7 @@ export const DEFAULT_CONFIG = {
   // just hidden.
   edge: {
     mode: 'topBottomSeparate', // 'topBottomSeparate' | 'both' — changed to 'topBottomSeparate' for 1-tier independent Top/Bottom
-    activeSlot: 'top', // 'top' | 'bottom' | 'both' — single source of truth for which edge slot is currently active
+    activeSlot: 'top', // 'top' | 'bottom' | 'both' | null — single source of truth for which edge slot is currently active
     topEnabled: false, // For 1-tier cakes, allows independent Top/Bottom configuration — starts disabled
     bottomEnabled: false, // For 1-tier cakes, allows independent Top/Bottom configuration — starts disabled
     top:    { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla', secondaryColorId: 'red', secondaryColorMode: 'colorOverride' } },
@@ -668,15 +668,6 @@ export const DOLLOPS_SOLID_CHERRY_VARIATIONS_DELUXE = [
   { id: 'roundDollopSparseCherry', label: 'Sparse Round Tip Dollop (8 pc) with Cherry' },
 ];
 
-export const DOLLOPS_SOLID_STRAWBERRY_VARIATIONS_DELUXE = [
-  { id: 'starDollopContinuousStrawberry', label: 'Continuous Star Dollop (20 pc) with Strawberry' },
-  { id: 'starDollopStrawberry', label: 'Star Dollop (12 pc) with Strawberry' },
-  { id: 'starDollopSparseStrawberry', label: 'Sparse Star Dollop (8 pc) with Strawberry' },
-  { id: 'roundDollopStrawberry', label: 'Continuous Round Tip Dollop (20 pc) with Strawberry' },
-  { id: 'roundDollopMediumStrawberry', label: 'Round Tip Dollop (12 pc) with Strawberry' },
-  { id: 'roundDollopSparseStrawberry', label: 'Sparse Round Tip Dollop (8 pc) with Strawberry' },
-];
-
 export const DOLLOPS_ALTERNATING_VARIATIONS_DELUXE = [
   { id: 'starDollopContinuousAlt', label: 'Continuous Star Dollop (20 pc) - Alternating' },
   { id: 'starDollopAlt', label: 'Star Dollop (12 pc) - Alternating' },
@@ -695,22 +686,11 @@ export const DOLLOPS_ALTERNATING_CHERRY_VARIATIONS_DELUXE = [
   { id: 'roundDollopSparseAltCherry', label: 'Sparse Round Tip Dollop (8 pc) - Alternating with Cherry' },
 ];
 
-export const DOLLOPS_ALTERNATING_STRAWBERRY_VARIATIONS_DELUXE = [
-  { id: 'starDollopContinuousAltStrawberry', label: 'Continuous Star Dollop (20 pc) - Alternating with Strawberry' },
-  { id: 'starDollopAltStrawberry', label: 'Star Dollop (12 pc) - Alternating with Strawberry' },
-  { id: 'starDollopSparseAltStrawberry', label: 'Sparse Star Dollop (8 pc) - Alternating with Strawberry' },
-  { id: 'roundDollopAltStrawberry', label: 'Continuous Round Tip Dollop (20 pc) - Alternating with Strawberry' },
-  { id: 'roundDollopMediumAltStrawberry', label: 'Round Tip Dollop (12 pc) - Alternating with Strawberry' },
-  { id: 'roundDollopSparseAltStrawberry', label: 'Sparse Round Tip Dollop (8 pc) - Alternating with Strawberry' },
-];
-
 export const DOLLOPS_VARIATIONS_DELUXE = [
   ...DOLLOPS_SOLID_VARIATIONS_DELUXE,
   ...DOLLOPS_SOLID_CHERRY_VARIATIONS_DELUXE,
-  ...DOLLOPS_SOLID_STRAWBERRY_VARIATIONS_DELUXE,
   ...DOLLOPS_ALTERNATING_VARIATIONS_DELUXE,
   ...DOLLOPS_ALTERNATING_CHERRY_VARIATIONS_DELUXE,
-  ...DOLLOPS_ALTERNATING_STRAWBERRY_VARIATIONS_DELUXE,
 ];
 
 export const WHIPPED_CREAM_SOLID_VARIATIONS = [
@@ -735,12 +715,9 @@ export const WHIPPED_CREAM_VARIATIONS = [
 ];
 
 export const FRUIT_CONFECTION_RIM_OPTIONS = [
-  { id: 'strawberryRim', label: 'Fresh Strawberries Rim 🍓' },
   { id: 'hersheysKissRim', label: "Hershey's Kisses Rim 🍫" },
   { id: 'ferreroRocherRim', label: 'Ferrero Rocher Rim 🌰' },
   { id: 'cherryRim', label: 'Cherry Rim 🍒' },
-  { id: 'basketballRim', label: 'Basketball Rim 🏀' },
-  { id: 'soccerBallRim', label: 'Soccer Ball Rim ⚽' },
 ];
 
 // Whipped Cream Rosettes' own Plain/With Cherry/With Strawberry blended

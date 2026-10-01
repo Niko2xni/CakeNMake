@@ -428,7 +428,7 @@ export function buildStrawberryRimRing(radius, y, rand = Math.random, opts = {})
  * Hershey's Kisses Chocolate Rim — upright chocolate kisses lining the cake rim.
  */
 export function buildHersheysKissRimRing(radius, y, rand = Math.random, opts = {}) {
-  const count = opts.count ?? Math.max(12, Math.round((radius * Math.PI * 2) / 1.35));
+  const count = opts.count ?? Math.max(10, Math.round((radius * Math.PI * 2) / 1.7));
   const scale = opts.scale ?? 0.36;
   const group = new THREE.Group();
   for (let i = 0; i < count; i++) {
@@ -446,7 +446,7 @@ export function buildHersheysKissRimRing(radius, y, rand = Math.random, opts = {
  * Ferrero Rocher Truffle Rim — textured hazelnut chocolate truffles lining the cake rim.
  */
 export function buildFerreroRocherRimRing(radius, y, rand = Math.random, opts = {}) {
-  const count = opts.count ?? Math.max(8, Math.round((radius * Math.PI * 2) / 2.15));
+  const count = opts.count ?? Math.max(6, Math.round((radius * Math.PI * 2) / 2.8));
   const scale = opts.scale ?? 0.45;
   const group = new THREE.Group();
   for (let i = 0; i < count; i++) {
@@ -494,7 +494,7 @@ export function buildOreoRimRing(radius, y, rand = Math.random, opts = {}) {
 
 /** Cherry Rim — complete glossy cherries nestled along the cake edge. */
 export function buildCherryRimRing(radius, y, rand = Math.random, opts = {}) {
-  const count = opts.count ?? 18;
+  const count = opts.count ?? 14;
   const scale = opts.scale ?? 0.85;
   const group = new THREE.Group();
   for (let i = 0; i < count; i++) {
@@ -1766,6 +1766,8 @@ export function buildChevronSideStripes(radius, height, opts = {}) {
   const setId = opts.setId || 'multiColor';
   const mainColor = opts.color || '#3B5FA0';
   const mainColorId = opts.colorId || null;
+  const secondaryColor = opts.secondaryColor || '#D6293E';
+  const secondaryColorId = opts.secondaryColorId || null;
 
   let numRows = 5;
   if (setId === 'wideZigzag') numRows = 3;
@@ -1788,9 +1790,9 @@ export function buildChevronSideStripes(radius, height, opts = {}) {
     // by Sugar Color (mainColor/mainColorId) — 'multiColor' cycles its
     // own fixed MULTI_COLOR_PALETTE regardless of Sugar Color (Color
     // Override is already disabled for it in SideSection.jsx, so there's
-    // nothing to fix there), and 'twoTone's alternate row is hardcoded
-    // white, never Sugar Color either. Only the rows that actually ARE
-    // mainColor need the colorId-aware material below.
+    // nothing to fix there). Two-Tone's alternate row uses its own
+    // secondary color. Only the rows that actually ARE mainColor need the
+    // primary colorId-aware material below.
     let hexColor;
     let isMainColorRow = false;
     if (setId === 'multiColor') {
@@ -1800,7 +1802,7 @@ export function buildChevronSideStripes(radius, height, opts = {}) {
         hexColor = mainColor;
         isMainColorRow = true;
       } else {
-        hexColor = '#FFFFFF';
+        hexColor = secondaryColor;
       }
     } else {
       hexColor = mainColor;
@@ -1816,6 +1818,8 @@ export function buildChevronSideStripes(radius, height, opts = {}) {
     // Color was never meant to apply to those rows at all.
     const mat = isMainColorRow
       ? getFrostingMaterial(hexColor, mainColorId)
+      : setId === 'twoTone'
+        ? getFrostingMaterial(hexColor, secondaryColorId)
       : new THREE.MeshStandardMaterial({
           color: hexColor,
           roughness: 0.55,

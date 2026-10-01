@@ -530,7 +530,7 @@ function addHandmadeWobble(geo, seedOffset, amount = 0.006) {
 
 // Builds a single complete rainbow arc with its 4 color bands and 2 fondant cloud feet,
 // wrapped flush to the cake cylinder at the specified radius.
-function buildSingleRainbowArc(radius, height, scale = 1, colorHex = CLOUD_COLOR, colorId = null) {
+function buildSingleRainbowArc(radius, height, scale = 1, colorHex = CLOUD_COLOR, colorId = null, whiteClouds = false) {
   const arcGroup = new THREE.Group();
   const effectiveHeight = height * scale;
 
@@ -589,10 +589,12 @@ function buildSingleRainbowArc(radius, height, scale = 1, colorHex = CLOUD_COLOR
   const cloudDepth = 0.24 * scale; // sleek 3D plaque thickness (~10-12% of width)
   const zBack = tube * 2 + 0.048 - cloudDepth;
   const cloudFootY = -legLength + centerYOffset + 0.015 * effectiveHeight;
-  const leftCloud = buildFlatCloud(-legMidX, cloudFootY, radius, cloudScale, cloudDepth, zBack, true, colorHex, colorId);
+  const cloudColor = whiteClouds ? '#FFFFFF' : colorHex;
+  const cloudColorId = whiteClouds ? null : colorId;
+  const leftCloud = buildFlatCloud(-legMidX, cloudFootY, radius, cloudScale, cloudDepth, zBack, true, cloudColor, cloudColorId);
   arcGroup.add(leftCloud);
 
-  const rightCloud = buildFlatCloud(legMidX, cloudFootY, radius, cloudScale, cloudDepth, zBack, false, colorHex, colorId);
+  const rightCloud = buildFlatCloud(legMidX, cloudFootY, radius, cloudScale, cloudDepth, zBack, false, cloudColor, cloudColorId);
   arcGroup.add(rightCloud);
 
   return arcGroup;
@@ -754,7 +756,14 @@ function buildStarryRainbow(radius, height, colorHex, isAssortedStars = false, c
 
   // 1. Rainbow Arcs
   for (const spec of RAINBOW_CHAMP_ARCS) {
-    const arc = buildSingleRainbowArc(radius, height, spec.scale, colorHex, colorId);
+    const arc = buildSingleRainbowArc(
+      radius,
+      height,
+      spec.scale,
+      isAssortedStars ? '#FFFFFF' : colorHex,
+      isAssortedStars ? null : colorId,
+      isAssortedStars,
+    );
     arc.rotation.y = (spec.angleDeg * Math.PI) / 180;
     arc.position.y = spec.yFrac * height;
     group.add(arc);
@@ -763,7 +772,9 @@ function buildStarryRainbow(radius, height, colorHex, isAssortedStars = false, c
   // 2. Cloudy Champ Clouds — same fix as buildCloudyChump/buildFlatCloud:
   // getFrostingMaterial (not a plain MeshStandardMaterial) is what
   // actually understands the six gradient/metallic Pick Color patterns.
-  const cloudMat = getFrostingMaterial(colorHex || CLOUD_COLOR, colorId);
+  const cloudMat = isAssortedStars
+    ? new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.7, metalness: 0 })
+    : getFrostingMaterial(colorHex || CLOUD_COLOR, colorId);
 
   const baseScale = Math.min(0.85, height * 0.38);
   const cloudDepth = 0.09;

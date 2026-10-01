@@ -1,5 +1,5 @@
 import React from 'react';
-import { RotateCw, RotateCcw, ChevronUp, ChevronDown } from 'lucide-react';
+import { RotateCw, RotateCcw, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { CENTER_PLACEABLE_DESIGNS, BUTTERCREAM_LETTERS, BUTTERCREAM_LETTERS_UPPER, BUTTERCREAM_LETTERS_LOWER } from '@/lib/cakeConfig';
 import DecorationPreview from './DecorationPreview';
 import SugarColorSection from './SugarColorSection';
@@ -29,7 +29,7 @@ function isLetterToolType(type) {
 // both get the exact same preview + spin/tilt controls for free. Kept as
 // one component instead of duplicated JSX so the two tabs can't drift out
 // of sync with each other.
-function ArmedItemControls({ armedDesign, armedRotation, armedTilt, setArmedRotation, setArmedTilt }) {
+function ArmedItemControls({ armedDesign, armedRotation, armedTilt, armedRoll, setArmedRotation, setArmedTilt, setArmedRoll }) {
   if (!armedDesign) return null;
   return (
     <>
@@ -39,6 +39,7 @@ function ArmedItemControls({ armedDesign, armedRotation, armedTilt, setArmedRota
           orientation={armedDesign.orientation}
           rotationY={(armedRotation * Math.PI) / 180}
           rotationX={(armedTilt * Math.PI) / 180}
+          rotationZ={(armedRoll * Math.PI) / 180}
         />
       </div>
 
@@ -80,6 +81,41 @@ function ArmedItemControls({ armedDesign, armedRotation, armedTilt, setArmedRota
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">Tilt (left/right)</span>
+            <span className="text-xs font-semibold text-foreground">{Math.round(armedRoll)}°</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setArmedRoll(armedRoll - 15)}
+              title="Tilt left 15°"
+              className="w-7 h-7 shrink-0 rounded-full bg-muted text-foreground hover:bg-muted/80 flex items-center justify-center"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+            <input
+              type="range"
+              min={0}
+              max={360}
+              step={1}
+              value={armedRoll}
+              onChange={(e) => setArmedRoll(Number(e.target.value))}
+              className="flex-1 accent-primary"
+              aria-label="Left/right tilt angle"
+            />
+            <button
+              type="button"
+              onClick={() => setArmedRoll(armedRoll + 15)}
+              title="Tilt right 15°"
+              className="w-7 h-7 shrink-0 rounded-full bg-muted text-foreground hover:bg-muted/80 flex items-center justify-center"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground">Tilt (up/down)</span>
             <span className="text-xs font-semibold text-foreground">{Math.round(armedTilt)}°</span>
           </div>
@@ -115,18 +151,15 @@ function ArmedItemControls({ armedDesign, armedRotation, armedTilt, setArmedRota
 
         <p className="text-[10px] text-muted-foreground flex items-center gap-1 flex-wrap">
           Tip: while a design is selected —
-          <kbd className="px-1.5 py-0.5 rounded bg-card border border-border/70 font-mono text-[10px]">←</kbd>
-          <kbd className="px-1.5 py-0.5 rounded bg-card border border-border/70 font-mono text-[10px]">→</kbd>
-          <span className="text-muted-foreground/70">or</span>
-          <kbd className="px-1.5 py-0.5 rounded bg-card border border-border/70 font-mono text-[10px]">A</kbd>
-          <kbd className="px-1.5 py-0.5 rounded bg-card border border-border/70 font-mono text-[10px]">D</kbd>
-          spin,
-          <kbd className="px-1.5 py-0.5 rounded bg-card border border-border/70 font-mono text-[10px]">↑</kbd>
-          <kbd className="px-1.5 py-0.5 rounded bg-card border border-border/70 font-mono text-[10px]">↓</kbd>
-          <span className="text-muted-foreground/70">or</span>
           <kbd className="px-1.5 py-0.5 rounded bg-card border border-border/70 font-mono text-[10px]">W</kbd>
           <kbd className="px-1.5 py-0.5 rounded bg-card border border-border/70 font-mono text-[10px]">S</kbd>
-          tilt
+          tilt up/down,
+          <kbd className="px-1.5 py-0.5 rounded bg-card border border-border/70 font-mono text-[10px]">A</kbd>
+          <kbd className="px-1.5 py-0.5 rounded bg-card border border-border/70 font-mono text-[10px]">D</kbd>
+          tilt left/right,
+          <kbd className="px-1.5 py-0.5 rounded bg-card border border-border/70 font-mono text-[10px]">Q</kbd>
+          <kbd className="px-1.5 py-0.5 rounded bg-card border border-border/70 font-mono text-[10px]">E</kbd>
+          rotate
         </p>
       </div>
     </>
@@ -176,13 +209,14 @@ export default function CenterSection({ center, onChange, activeTool, onSelectTo
   // machinery, since a letter is just another 'center-' design as far as
   // CakeScene.jsx's placement/collision code is concerned.
   //
-  // activeTool is an object here ({ type, rotationY, rotationX }), not a
+  // activeTool is an object here ({ type, rotationY, rotationX, rotationZ }), not a
   // bare string -- same shape already used elsewhere for rosette/piping
   // tools -- so pending rotation (Sims-style, set before the actual drop)
   // can travel with it. rotationY is yaw (spin left/right, around the
   // vertical axis), rotationX is pitch (tilt up/down, around the
-  // horizontal axis) -- two independent axes. Re-arming a design always
-  // resets both to 0, same as picking a fresh item off a shelf.
+  // horizontal axis), rotationZ is roll (tilt left/right, around the axis
+  // pointing at the viewer) -- three independent axes. Re-arming a design
+  // always resets all three to 0, same as picking a fresh item off a shelf.
   const armedCenterType = activeTool && typeof activeTool === 'object' && activeTool.type?.startsWith('center-')
     ? activeTool.type
     : null;
@@ -192,16 +226,17 @@ export default function CenterSection({ center, onChange, activeTool, onSelectTo
     : null;
   const armedRotation = armedCenterType ? (activeTool.rotationY || 0) : 0;
   const armedTilt = armedCenterType ? (activeTool.rotationX || 0) : 0;
+  const armedRoll = armedCenterType ? (activeTool.rotationZ || 0) : 0; // left/right lean, degrees (+ = leans right)
 
   const armDecorationTool = (toolId) => {
     const isSameArmed = armedCenterType === toolId;
-    onSelectTool?.(isSameArmed ? null : { type: toolId, rotationY: 0, rotationX: 0 });
+    onSelectTool?.(isSameArmed ? null : { type: toolId, rotationY: 0, rotationX: 0, rotationZ: 0 });
     onChange({ ...center, mode: 'decorations' });
   };
 
   const armLetterTool = (toolId) => {
     const isSameArmed = armedCenterType === toolId;
-    onSelectTool?.(isSameArmed ? null : { type: toolId, rotationY: 0, rotationX: 0 });
+    onSelectTool?.(isSameArmed ? null : { type: toolId, rotationY: 0, rotationX: 0, rotationZ: 0 });
     onChange({ ...center, mode: 'text', textCategory: 'buttercream' });
   };
 
@@ -219,13 +254,19 @@ export default function CenterSection({ center, onChange, activeTool, onSelectTo
   const setArmedRotation = (degrees) => {
     if (!armedCenterType) return;
     const normalized = ((degrees % 360) + 360) % 360;
-    onSelectTool?.({ type: armedCenterType, rotationY: normalized, rotationX: armedTilt });
+    onSelectTool?.({ type: armedCenterType, rotationY: normalized, rotationX: armedTilt, rotationZ: armedRoll });
   };
 
   const setArmedTilt = (degrees) => {
     if (!armedCenterType) return;
     const normalized = ((degrees % 360) + 360) % 360;
-    onSelectTool?.({ type: armedCenterType, rotationY: armedRotation, rotationX: normalized });
+    onSelectTool?.({ type: armedCenterType, rotationY: armedRotation, rotationX: normalized, rotationZ: armedRoll });
+  };
+
+  const setArmedRoll = (degrees) => {
+    if (!armedCenterType) return;
+    const normalized = ((degrees % 360) + 360) % 360;
+    onSelectTool?.({ type: armedCenterType, rotationY: armedRotation, rotationX: armedTilt, rotationZ: normalized });
   };
 
   // Decorations and Buttercream Text share one placedItems bucket (both
@@ -297,8 +338,10 @@ export default function CenterSection({ center, onChange, activeTool, onSelectTo
             armedDesign={armedDesign}
             armedRotation={armedRotation}
             armedTilt={armedTilt}
+            armedRoll={armedRoll}
             setArmedRotation={setArmedRotation}
             setArmedTilt={setArmedTilt}
+            setArmedRoll={setArmedRoll}
           />
 
           {placedDecorationItems.length > 0 && (
@@ -414,8 +457,10 @@ export default function CenterSection({ center, onChange, activeTool, onSelectTo
                 armedDesign={armedDesign}
                 armedRotation={armedRotation}
                 armedTilt={armedTilt}
+                armedRoll={armedRoll}
                 setArmedRotation={setArmedRotation}
                 setArmedTilt={setArmedTilt}
+                setArmedRoll={setArmedRoll}
               />
 
               {placedLetterItems.length > 0 && (

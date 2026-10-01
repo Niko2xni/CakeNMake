@@ -13,7 +13,7 @@ import {
   SUGAR_COLORS,
   WHIPPED_CREAM_VARIATIONS,
 } from '@/lib/cakeConfig';
-import { adaptConfigToLegacy } from '@/lib/configAdapter';
+import { adaptConfigFromLegacy, adaptConfigToLegacy } from '@/lib/configAdapter';
 
 function makeLayeredConfig(layerDesign) {
   return {
@@ -40,6 +40,13 @@ describe('Uniform and Individual tier state', () => {
 
     expect(legacy.layerFillingSugarColors).toEqual(Array(2).fill(colorHex('chocolate')));
     expect(legacy.layerSurfaceFrostingColors).toEqual(Array(2).fill(colorHex('chocolate')));
+  });
+
+  it('defaults legacy Edge configurations to the Top slot', () => {
+    const adapted = adaptConfigFromLegacy({});
+
+    expect(adapted.edge.mode).toBe('topBottomSeparate');
+    expect(adapted.edge.activeSlot).toBe('top');
   });
 
   it('preserves per-tier colors in Individual mode', () => {
@@ -70,6 +77,62 @@ describe('Uniform and Individual tier state', () => {
     expect(nextSide.layerTreatments[0].mode).toBe('checkeredPattern');
     expect(nextSide.layerTreatments[0].checkeredPattern.setId).toBe(variant.id);
     expect(nextSide.layerTreatments[1]).toEqual(side);
+  });
+
+  it('shows Assorted Color Plains for Chevron Multi-Color', () => {
+    render(React.createElement(SideSection, {
+      side: {
+        mode: 'chevronPattern',
+        chevronPattern: { setId: 'multiColor' },
+      },
+      structure: { layers: 1, layerDesign: 'uniform' },
+      onChange: () => {},
+      sugarColor: {},
+      onSugarColorChange: () => {},
+    }));
+
+    expect(screen.getByText('Assorted Color')).toBeInTheDocument();
+    expect(screen.getByText('Plains')).toBeInTheDocument();
+    expect(screen.queryByText('Match Flavor')).not.toBeInTheDocument();
+    expect(screen.queryByText('Pick Color')).not.toBeInTheDocument();
+  });
+
+  it('shows Assorted Color for both assorted Sunshine Play variants', () => {
+    for (const setId of ['assortedStarBurst', 'assortedStarryRainbow']) {
+      const { unmount } = render(React.createElement(SideSection, {
+        side: {
+          mode: 'sunshinePlay',
+          sunshinePlay: { setId },
+        },
+        structure: { layers: 1, layerDesign: 'uniform' },
+        onChange: () => {},
+        sugarColor: {},
+        onSugarColorChange: () => {},
+      }));
+
+      expect(screen.getByText('Assorted Color')).toBeInTheDocument();
+      expect(screen.getByText('Plains')).toBeInTheDocument();
+      expect(screen.queryByText('Match Flavor')).not.toBeInTheDocument();
+      expect(screen.queryByText('Pick Color')).not.toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it('shows 1st and 2nd Color toggles for Chevron Two-Tone', () => {
+    render(React.createElement(SideSection, {
+      side: {
+        mode: 'chevronPattern',
+        chevronPattern: { setId: 'twoTone' },
+      },
+      structure: { layers: 1, layerDesign: 'uniform' },
+      onChange: () => {},
+      sugarColor: { mode: 'colorOverride', colorId: 'red' },
+      onSugarColorChange: () => {},
+    }));
+
+    expect(screen.getByRole('button', { name: '1st Color', exact: true })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '2nd Color', exact: true })).toBeInTheDocument();
+    expect(screen.getByText('Pick Color')).toBeInTheDocument();
   });
 });
 
@@ -104,14 +167,10 @@ describe('edge decoration placement', () => {
     render(
       React.createElement(EdgeSection, {
         edge: {
-          mode: 'both',
-          both: {
-            decorations: { setId: null, colorId: 'vanilla' },
-            piping: { tip: null, colorId: 'vanilla' },
-          },
+          mode: 'topBottomSeparate',
+          activeSlot: 'top',
           top: { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
           bottom: { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
-          middle: { piping: { tip: null, colorId: 'vanilla' } },
         },
         onChange: () => {},
         sugarColor: {},
@@ -140,7 +199,88 @@ describe('edge decoration placement', () => {
     expect(screen.getByText('Dollops')).toBeInTheDocument();
     expect(screen.getByTitle('Star Dollop (12 pc)')).toBeInTheDocument();
     expect(screen.getByTitle('Sparse Star Dollop (8 pc)')).toBeInTheDocument();
-    expect(screen.getByTitle('Continuous Star Dollop (20 pc)')).toBeInTheDocument();
+    expect(screen.queryByTitle('Star Dollop (12 pc) with Strawberry')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Sparse Round Tip Dollop (8 pc) with Strawberry')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Star Dollop (12 pc) - Alternating with Strawberry')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Fresh Strawberries Rim 🍓')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Basketball Rim 🏀')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Soccer Ball Rim ⚽')).not.toBeInTheDocument();
+  });
+
+  it('hides edge designs until a Top, Middle, or Bottom toggle is selected', () => {
+    render(
+      React.createElement(EdgeSection, {
+        edge: {},
+        structure: { layers: 1, layerDesign: 'uniform' },
+        onChange: () => {},
+        sugarColor: {},
+        onSugarColorChange: () => {},
+      })
+    );
+
+    expect(screen.getByRole('button', { name: 'Top', exact: true })).toBeInTheDocument();
+    expect(screen.queryByText('Dollops')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Beaded Trim')).not.toBeInTheDocument();
+  });
+
+  it('shows designs when reset restores the default Top slot', () => {
+    render(
+      React.createElement(EdgeSection, {
+        edge: { mode: 'topBottomSeparate', activeSlot: 'top' },
+        structure: { layers: 1, layerDesign: 'uniform' },
+        onChange: () => {},
+        sugarColor: {},
+        onSugarColorChange: () => {},
+      })
+    );
+
+    expect(screen.getByText('Dollops')).toBeInTheDocument();
+    expect(screen.getByTitle('Beaded Trim')).toBeInTheDocument();
+  });
+
+  it('allows the selected Edge toggle to be cleared', () => {
+    const onChange = vi.fn();
+    render(
+      React.createElement(EdgeSection, {
+        edge: { mode: 'topBottomSeparate', activeSlot: 'top' },
+        structure: { layers: 1, layerDesign: 'uniform' },
+        onChange,
+        sugarColor: {},
+        onSugarColorChange: () => {},
+      })
+    );
+
+    expect(screen.getByText('Dollops')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Top', exact: true }));
+
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
+      mode: 'topBottomSeparate',
+      activeSlot: null,
+    }));
+  });
+
+  it('hides pattern Sugar Colors for Beaded Trim', () => {
+    render(
+      React.createElement(EdgeSection, {
+        edge: {
+          mode: 'both',
+          both: {
+            decorations: { setId: null, colorId: 'vanilla' },
+            piping: { tip: 'beadedTrim', colorId: 'vanilla' },
+          },
+        },
+        onChange: () => {},
+        sugarColor: { mode: 'colorOverride', colorId: 'red' },
+        onSugarColorChange: () => {},
+      })
+    );
+
+    expect(screen.queryByTitle('Marble')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Ombré')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Rainbow Swirl')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Gold Shimmer')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Watercolor Pastel Mix')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Red-White Gradient')).not.toBeInTheDocument();
   });
 
   it('offers Top, Middle, and Bottom without an All toggle on multi-tier cakes', () => {

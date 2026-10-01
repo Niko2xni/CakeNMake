@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { Droplet } from 'lucide-react';
 import {
   SIDE_TREATMENTS,
   CHECKERED_PATTERN_SETS,
@@ -12,6 +13,7 @@ import {
 import SugarColorSection from './SugarColorSection';
 
 export default function SideSection({ side, structure, activeLayer = 0, onChange, sugarColor, onSugarColorChange }) {
+  const [activeChevronColorSlot, setActiveChevronColorSlot] = useState('primary');
   const isIndividual = structure?.layerDesign === 'individual' && structure?.layers > 1;
   const tierLabel = (label) => (isIndividual ? `Tier ${activeLayer + 1} ${label}` : label);
   const activeSide = isIndividual ? (side.layerTreatments?.[activeLayer] || side) : side;
@@ -87,32 +89,114 @@ export default function SideSection({ side, structure, activeLayer = 0, onChange
                     ))}
                   </OptionRow>
                   {activeSide.mode === t.id && currentSetId && (
-                    <SugarColorSection
-                      sugarColor={sugarColor}
-                      onChange={onSugarColorChange}
-                      showDefaultColorPicker
-                      // Pick Color stays disabled (silently — Sugar
-                      // Color no longer renders an explanatory paragraph
-                      // for this, so Match Flavor's own content shows
-                      // normally instead of a warning) only for the sets
-                      // whose colors are still hard-coded rather than
-                      // threaded through: Chevron's Multi-Color, and
-                      // Sunshine Play's Assorted Star Burst. Assorted
-                      // Starry Rainbow and plain Rainbow Arc both thread
-                      // colorHex/colorId through fully now (see
-                      // sunshinePlayHelpers.js), so neither is disabled
-                      // here anymore — only Assorted Star Burst's fixed
-                      // ASSORTED_STAR_COLORS palette still is.
-                      colorOverrideDisabled={
-                        (t.id === 'chevronPattern' && currentSetId === 'multiColor') ||
-                        (t.id === 'sunshinePlay' && currentSetId === 'assortedStarBurst')
-                      }
-                    />
+                    t.id === 'chevronPattern' && currentSetId === 'multiColor' ? (
+                      <AssortedColorSection />
+                    ) : t.id === 'sunshinePlay' && (currentSetId === 'assortedStarBurst' || currentSetId === 'assortedStarryRainbow') ? (
+                      <AssortedColorSection />
+                    ) : t.id === 'chevronPattern' && currentSetId === 'twoTone' ? (
+                      <ChevronTwoToneColorSection
+                        activeSlot={activeChevronColorSlot}
+                        onSlotChange={setActiveChevronColorSlot}
+                        sugarColor={activeChevronColorSlot === 'primary'
+                          ? sugarColor
+                          : {
+                              mode: activeSide.chevronPattern?.secondaryColorMode || 'colorOverride',
+                              colorId: activeSide.chevronPattern?.secondaryColorId || 'red',
+                            }}
+                        onChange={activeChevronColorSlot === 'primary'
+                          ? onSugarColorChange
+                          : (nextSugarColor) => updateSide({
+                              ...activeSide,
+                              chevronPattern: {
+                                ...activeSide.chevronPattern,
+                                secondaryColorId: nextSugarColor.colorId || 'red',
+                                secondaryColorMode: nextSugarColor.mode || 'colorOverride',
+                              },
+                            })}
+                      />
+                    ) : (
+                      <SugarColorSection
+                        sugarColor={sugarColor}
+                        onChange={onSugarColorChange}
+                        showDefaultColorPicker
+                        // Pick Color stays disabled (silently — Sugar
+                        // Color no longer renders an explanatory paragraph
+                        // for this, so Match Flavor's own content shows
+                        // normally instead of a warning) only for Sunshine
+                        // Play's Assorted Star Burst, whose colors are still
+                        // hard-coded rather than threaded through.
+                        colorOverrideDisabled={
+                          t.id === 'sunshinePlay' && currentSetId === 'assortedStarBurst'
+                        }
+                      />
+                    )
                   )}
                 </React.Fragment>
               );
             }
 
+
+function AssortedColorSection() {
+  return (
+    <div className="space-y-4">
+      <div>
+        <span className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
+          <Droplet className="w-3.5 h-3.5 text-primary/60" />
+          Assorted Color
+        </span>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            aria-pressed="true"
+            className="flex flex-col items-center gap-1.5 rounded-xl p-3 text-left border-2 bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-[1.02]"
+          >
+            <span
+              className="w-8 h-8 rounded-full border-2 border-black/10"
+              style={{ background: 'linear-gradient(90deg, #D6293E 0 25%, #2C3E5C 25% 50%, #C9A24B 50% 75%, #2D7A45 75% 100%)' }}
+            />
+            <span className="text-xs font-semibold">Plains</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChevronTwoToneColorSection({ activeSlot, onSlotChange, sugarColor, onChange }) {
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => onSlotChange('primary')}
+          className={`py-2 px-3 rounded-lg text-left transition-all duration-150 border-2 ${
+            activeSlot === 'primary'
+              ? 'bg-primary text-primary-foreground border-primary shadow-md'
+              : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
+          }`}
+        >
+          <span className="block text-xs font-semibold">1st Color</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => onSlotChange('secondary')}
+          className={`py-2 px-3 rounded-lg text-left transition-all duration-150 border-2 ${
+            activeSlot === 'secondary'
+              ? 'bg-primary text-primary-foreground border-primary shadow-md'
+              : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
+          }`}
+        >
+          <span className="block text-xs font-semibold">2nd Color</span>
+        </button>
+      </div>
+      <SugarColorSection
+        sugarColor={sugarColor}
+        onChange={onChange}
+        showDefaultColorPicker
+      />
+    </div>
+  );
+}
             return (
               <React.Fragment key={t.id}>
                 <OptionRow label={tierLabel(t.label)}>

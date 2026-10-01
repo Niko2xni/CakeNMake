@@ -41,22 +41,27 @@ export default function EdgeSection({
   const tiers = layerCount ?? structure?.layers ?? 1;
   const hasMiddle = tiers >= 2;
 
-  const activeSlot = edge.activeSlot || (edge.mode === 'both' ? 'both' : 'top');
+  const activeSlot = Object.prototype.hasOwnProperty.call(edge, 'activeSlot')
+    ? edge.activeSlot
+    : (edge.mode === 'both' ? 'both' : 'top');
   const mode = edge.mode; // 'topBottomSeparate' | 'both'
 
   const switchToTop = () => {
-    onChange({ ...edge, mode: 'topBottomSeparate', activeSlot: 'top' });
-    onActiveSlotChange?.('top');
+    const nextSlot = activeSlot === 'top' ? null : 'top';
+    onChange({ ...edge, mode: 'topBottomSeparate', activeSlot: nextSlot });
+    if (nextSlot) onActiveSlotChange?.(nextSlot);
   };
 
   const switchToMiddle = () => {
-    onChange({ ...edge, mode: 'topBottomSeparate', activeSlot: 'middle' });
-    onActiveSlotChange?.('middle');
+    const nextSlot = activeSlot === 'middle' ? null : 'middle';
+    onChange({ ...edge, mode: 'topBottomSeparate', activeSlot: nextSlot });
+    if (nextSlot) onActiveSlotChange?.(nextSlot);
   };
 
   const switchToBottom = () => {
-    onChange({ ...edge, mode: 'topBottomSeparate', activeSlot: 'bottom' });
-    onActiveSlotChange?.('bottom');
+    const nextSlot = activeSlot === 'bottom' ? null : 'bottom';
+    onChange({ ...edge, mode: 'topBottomSeparate', activeSlot: nextSlot });
+    if (nextSlot) onActiveSlotChange?.(nextSlot);
   };
 
   // Both (1 tier) and All (2 tiers) are the exact same underlying data —
@@ -70,6 +75,8 @@ export default function EdgeSection({
   // inventing a second mode string.
   const isMiddleActive = hasMiddle && activeSlot === 'middle';
   const isAllActive = hasMiddle && mode === 'both';
+  const hasSelectedSlot = mode === 'topBottomSeparate'
+    && ['top', 'middle', 'bottom'].includes(activeSlot);
 
   const currentSlotKey = mode === 'both' ? 'both' : (isMiddleActive ? 'middle' : activeSlot);
   const currentSlot = isMiddleActive
@@ -157,7 +164,7 @@ export default function EdgeSection({
         </div>
       </div>
 
-      {isMiddleActive ? (
+      {hasSelectedSlot && (isMiddleActive ? (
         <div className="space-y-4">
           <div className="space-y-3">
             <span className="text-xs font-semibold text-foreground block mb-2">Border Piping</span>
@@ -175,6 +182,7 @@ export default function EdgeSection({
               variants={BEADED_TRIM_VARIATIONS_DELUXE}
               currentSlot={currentSlot}
               updateSlot={updateSlot}
+              excludePatternColors
               sugarColor={sugarColor}
               onSugarColorChange={onSugarColorChange}
               onSecondaryColorChange={updateSecondaryColor}
@@ -229,11 +237,6 @@ export default function EdgeSection({
                 onSugarColorChange={onSugarColorChange}
                 onSecondaryColorChange={updateSecondaryColor}
               />
-              {isAllActive && (
-                <p className="text-[10px] text-muted-foreground -mt-1">
-                  Also applied to the Middle seam. Beaded Trim, Dollops, Whipped Cream Rosettes and Edible Delicates below apply to Top &amp; Bottom only — switch to the Middle tab to give the seam its own design.
-                </p>
-              )}
             </div>
 
             <VariantRow
@@ -241,6 +244,7 @@ export default function EdgeSection({
               variants={BEADED_TRIM_VARIATIONS_DELUXE}
               currentSlot={currentSlot}
               updateSlot={updateSlot}
+              excludePatternColors
               sugarColor={sugarColor}
               onSugarColorChange={onSugarColorChange}
               onSecondaryColorChange={updateSecondaryColor}
@@ -284,7 +288,7 @@ export default function EdgeSection({
             </div>
           </div>
         </div>
-      )}
+      ))}
 
     </div>
   );
@@ -308,7 +312,7 @@ export default function EdgeSection({
 // and only pushing the ROWS AFTER it down.
 const ROW_SIZE = 6;
 
-function VariantRow({ label, variants, currentSlot, updateSlot, showSugarColor = true, sugarColor, onSugarColorChange, onSecondaryColorChange }) {
+function VariantRow({ label, variants, currentSlot, updateSlot, showSugarColor = true, excludePatternColors = false, sugarColor, onSugarColorChange, onSecondaryColorChange }) {
   const [activeColorSlot, setActiveColorSlot] = useState('primary');
   const activeId = currentSlot.piping?.tip;
   const activeIndex = variants.findIndex((v) => v.id === activeId);
@@ -383,6 +387,7 @@ function VariantRow({ label, variants, currentSlot, updateSlot, showSugarColor =
                           nextSugarColor.mode || 'colorOverride',
                         )}
                     showDefaultColorPicker
+                    excludePatternColors={excludePatternColors}
                   />
                 </div>
               )}
