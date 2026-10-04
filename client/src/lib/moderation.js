@@ -8,5 +8,9 @@ export function philippineTime(value) {
   return value ? new Date(value).toLocaleString('en-PH', { timeZone: 'Asia/Manila', dateStyle: 'medium', timeStyle: 'short' }) : 'No expiry';
 }
 export function suspensionExpiry(days, custom, now = Date.now()) {
-  return days === 'custom' ? new Date(`${custom}:00+08:00`).toISOString() : new Date(now + Number(days) * 86400000).toISOString();
+  const expiry = days === 'custom' ? new Date(`${custom}:00+08:00`) : new Date(now + Number(days) * 86400000);
+  if (!['1', '3', '7', '30', 'custom'].includes(String(days)) || !Number.isFinite(expiry.getTime()) || expiry.getTime() <= now) {
+    throw new Error('Choose a future suspension expiry.');
+  }
+  return expiry.toISOString();
 }

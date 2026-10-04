@@ -7,6 +7,10 @@ describe('Moderation dates', () => {
     expect(activeRestriction({ role: 'customer', restriction: { type: 'banned' } }, now).type).toBe('banned');
   });
   it('interprets custom expiry in Philippine time, independent of the computer timezone', () => {
-    expect(suspensionExpiry('custom', '2026-10-05T08:30')).toBe('2026-10-05T00:30:00.000Z');
+    expect(suspensionExpiry('custom', '2026-10-05T08:30', Date.parse('2026-10-04T00:00:00Z'))).toBe('2026-10-05T00:30:00.000Z');
+  });
+  it('rejects past, missing, and invalid custom expiries', () => {
+    const now = Date.parse('2026-10-04T00:00:00Z');
+    for (const value of ['', 'invalid', '2020-01-01T12:00']) expect(() => suspensionExpiry('custom', value, now)).toThrow('future');
   });
 });

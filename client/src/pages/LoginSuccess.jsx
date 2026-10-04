@@ -5,10 +5,22 @@ import { CheckCircle2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import AuthLayout from "@/components/AuthLayout";
 import { auth, firebaseConfigured } from "@/lib/firebase";
+import { useAuth } from '@/lib/AuthContext';
 
 export default function LoginSuccess() {
   const navigate = useNavigate();
   const [error, setError] = useState("");
+  const { account, isAuthenticated, isLoadingAuth, authError } = useAuth();
+  useEffect(() => {
+    if (isLoadingAuth) return;
+    if (isAuthenticated && account) {
+      navigate(['bakery_staff', 'bakery_admin', 'platform_admin'].includes(account.role) ? '/bakery/orders' : '/client', { replace: true });
+    } else if (authError) {
+      setError(authError.message || 'Your account could not be loaded. Please try signing in again.');
+    } else if (auth && !auth.currentUser && !isSignInWithEmailLink(auth, window.location.href)) {
+      navigate('/login', { replace: true });
+    }
+  }, [account, isAuthenticated, isLoadingAuth, authError, navigate]);
 
   useEffect(() => {
     const finishSignIn = async () => {
@@ -18,7 +30,6 @@ export default function LoginSuccess() {
       }
 
       if (!isSignInWithEmailLink(auth, window.location.href)) {
-        navigate("/client", { replace: true });
         return;
       }
 
@@ -31,7 +42,6 @@ export default function LoginSuccess() {
       try {
         await signInWithEmailLink(auth, email, window.location.href);
         window.localStorage.removeItem("emailForSignIn");
-        navigate("/client", { replace: true });
       } catch (signInError) {
         setError(signInError.message || "This sign-in link is no longer valid.");
       }

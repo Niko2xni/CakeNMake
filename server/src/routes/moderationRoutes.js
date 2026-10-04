@@ -118,7 +118,10 @@ router.get('/customers/:id/evidence', ...staff, handler(async (req, res) => {
   if (!target) throw httpError(404, 'CUSTOMER_NOT_FOUND', 'Customer not found.');
   const conversations = await Conversation.find({ customer: target._id, platform: req.platformId }).select('_id');
   const messages = await Message.find({ conversation: { $in: conversations.map((row) => row._id) }, sender: target._id }).sort({ createdAt: -1 }).limit(50);
-  res.json({ customer: customerView(target), messages });
+  // Evidence must remain selectable even after newer messages displace it
+  // from the recent-message list. Keep the same platform and sender scope.
+  const confirmedEvidence = await Message.find({ conversation: { $in: conversations.map((row) => row._id) }, sender: target._id, senderRole: 'customer', moderation: 'rejected', reviewedAt: { $ne: null } }).sort({ reviewedAt: -1 }).limit(50);
+  res.json({ customer: customerView(target), messages, confirmedEvidence });
 }));
 
 router.get('/mine', customer, handler(async (req, res) => {

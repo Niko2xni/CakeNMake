@@ -11,6 +11,29 @@ const router = require('../src/routes/moderationRoutes');
 const { createMessage } = require('../src/services/messageService');
 
 afterEach(() => mock.restoreAll());
+test('evidence includes older confirmed abuse independently of the recent message window', async () => {
+  const conversationId = new mongoose.Types.ObjectId();
+  const queries = [];
+  mock.method(User, 'findOne', async () => ({ _id: customerId, role: 'customer', moderationHistory: [] }));
+  mock.method(Conversation, 'find', () => ({ select: async () => [{ _id: conversationId }] }));
+  mock.method(Message, 'find', filter => {
+    queries.push(filter);
+    return { sort: () => ({ limit: async () => filter.moderation === 'rejected' ? [{ _id: messageId, moderation: 'rejected', reviewedAt: new Date() }] : [] }) };
+  });
+  const route = router.stack.find(layer => layer.route?.path === '/customers/:id/evidence').route;
+  const req = { user: staff, params: { id: String(customerId) }, app: { get: () => null } };
+  const res = { status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; } };
+  for (const layer of route.stack) {
+    let next = false;
+    await layer.handle(req, res, () => { next = true; });
+    if (!next) break;
+  }
+  assert.equal(res.body.messages.length, 0);
+  assert.equal(res.body.confirmedEvidence.length, 1);
+  assert.equal(queries[1].senderRole, 'customer');
+  assert.deepEqual(queries[1].conversation.$in, [conversationId]);
+  assert.equal(queries[1].sender, customerId);
+});
 const customerId = new mongoose.Types.ObjectId();
 const platformId = new mongoose.Types.ObjectId();
 const staffId = new mongoose.Types.ObjectId();

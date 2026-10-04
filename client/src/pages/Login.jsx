@@ -10,6 +10,7 @@ import GoogleIcon from "@/components/GoogleIcon";
 import { auth, facebookProvider, firebaseConfigured, googleProvider, missingFirebaseConfigMessage } from "@/lib/firebase";
 import { signInWithCustomToken, signInWithPopup } from "firebase/auth";
 import { authApi } from "@/services/api";
+import { useAuth } from '@/lib/AuthContext';
 
 const providerOptions = [
   { id: "google", label: "Continue with Google", icon: GoogleIcon },
@@ -18,6 +19,11 @@ const providerOptions = [
 
 export default function Login() {
   const navigate = useNavigate();
+  const { account, isAuthenticated, isLoadingAuth, authError } = useAuth();
+  useEffect(() => {
+    if (isLoadingAuth || !isAuthenticated || !account) return;
+    navigate(['bakery_staff', 'bakery_admin', 'platform_admin'].includes(account.role) ? '/bakery/orders' : '/client', { replace: true });
+  }, [account, isAuthenticated, isLoadingAuth, navigate]);
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
@@ -176,7 +182,7 @@ export default function Login() {
         </>
       )}
 
-      {error && <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>}
+      {(error || authError?.message) && <div role="alert" className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{error || authError.message}</div>}
       {otpExpiredMessage && (
         <div className="mb-4 p-3 rounded-lg bg-amber-50 text-amber-800 text-sm border border-amber-200">
           {otpExpiredMessage}
@@ -230,6 +236,7 @@ export default function Login() {
             </div>
             <div className="flex justify-center">
               <InputOTP
+                aria-label="Verification code"
                 maxLength={6}
                 value={otp}
                 onChange={handleOtpChange}

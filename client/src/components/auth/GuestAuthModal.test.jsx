@@ -3,6 +3,12 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import GuestAuthModal from './GuestAuthModal';
 import { authApi } from '@/services/api';
+const session = vi.hoisted(() => ({ isAuthenticated: false, isLoadingAuth: false, authError: null }));
+vi.mock('@/lib/AuthContext', () => ({ useAuth: () => session }));
+const firebase = vi.hoisted(() => ({ popup: vi.fn() }));
+vi.mock('@/lib/firebase', () => ({ auth: {}, firebaseConfigured: true, googleProvider: 'google', facebookProvider: 'facebook' }));
+vi.mock('firebase/auth', () => ({ signInWithPopup: firebase.popup, signInWithCustomToken: vi.fn() }));
+beforeEach(() => Object.assign(session, { isAuthenticated: false, isLoadingAuth: false, authError: null }));
 
 vi.mock('@/services/api', () => ({
   authApi: {
@@ -12,6 +18,21 @@ vi.mock('@/services/api', () => ({
 }));
 
 describe('GuestAuthModal', () => {
+  it('waits for app account readiness before resuming a designer action', async () => {
+    const user = { uid: 'guest' };
+    firebase.popup.mockResolvedValueOnce({ user });
+    const onClose = vi.fn();
+    const onSuccess = vi.fn();
+    const { rerender } = render(<GuestAuthModal isOpen onClose={onClose} onSuccess={onSuccess} />);
+    fireEvent.click(screen.getByRole('button', { name: /Continue with Facebook/ }));
+    await screen.findByText('Loading your account…');
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(firebase.popup).toHaveBeenCalledWith({}, 'facebook');
+    session.isAuthenticated = true;
+    rerender(<GuestAuthModal isOpen onClose={onClose} onSuccess={onSuccess} />);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onSuccess).toHaveBeenCalledWith(user);
+  });
   it('renders modal with Save title when actionType is save', () => {
     render(
       <GuestAuthModal

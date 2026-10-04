@@ -9,6 +9,7 @@ import GoogleIcon from "@/components/GoogleIcon";
 import { auth, facebookProvider, firebaseConfigured, googleProvider, missingFirebaseConfigMessage } from "@/lib/firebase";
 import { signInWithCustomToken, signInWithPopup } from "firebase/auth";
 import { authApi } from "@/services/api";
+import { useAuth } from '@/lib/AuthContext';
 
 const providerOptions = [
   { id: "google", label: "Continue with Google", icon: GoogleIcon },
@@ -21,6 +22,19 @@ export default function GuestAuthModal({
   actionType = "general", // 'save' | 'order' | 'general'
   onSuccess,
 }) {
+  const { isAuthenticated, isLoadingAuth, authError } = useAuth();
+  const [pendingUser, setPendingUser] = useState(null);
+  useEffect(() => {
+    if (!isOpen || !pendingUser || isLoadingAuth) return;
+    if (authError) {
+      setError(authError.message || 'Your account could not be loaded. Please try again.');
+      setPendingUser(null);
+    } else if (isAuthenticated) {
+      setPendingUser(null);
+      onClose();
+      onSuccess?.(pendingUser);
+    }
+  }, [isOpen, pendingUser, isLoadingAuth, authError, isAuthenticated, onClose, onSuccess]);
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
@@ -40,6 +54,7 @@ export default function GuestAuthModal({
 
   useEffect(() => {
     if (!isOpen) {
+      setPendingUser(null);
       setEmail("");
       setOtp("");
       setOtpSent(false);
@@ -137,8 +152,7 @@ export default function GuestAuthModal({
       const { token } = await authApi.verifyEmailOtp(email, otp);
       if (!firebaseConfigured || !auth) throw new Error(missingFirebaseConfigMessage);
       const userCredential = await signInWithCustomToken(auth, token);
-      onClose();
-      if (onSuccess) onSuccess(userCredential.user);
+      setPendingUser(userCredential.user);
     } catch (authError) {
       setError(authError.message || "Authentication failed.");
     } finally {
@@ -152,8 +166,7 @@ export default function GuestAuthModal({
     try {
       if (!firebaseConfigured || !auth) throw new Error(missingFirebaseConfigMessage);
       const userCredential = await signInWithPopup(auth, provider === "google" ? googleProvider : facebookProvider);
-      onClose();
-      if (onSuccess) onSuccess(userCredential.user);
+      setPendingUser(userCredential.user);
     } catch (authError) {
       setError(authError.code === "auth/popup-closed-by-user" ? "Sign-in was cancelled." : authError.message || "Provider sign-in failed.");
     } finally {
@@ -198,7 +211,7 @@ export default function GuestAuthModal({
                   className="w-full h-11 text-sm font-medium justify-start gap-3 rounded-xl border-border/80 hover:bg-accent"
                   onClick={() => handleProviderAuth(id)}
                   type="button"
-                  disabled={loading}
+                  disabled={loading || Boolean(pendingUser)}
                 >
                   <Icon className="w-5 h-5 flex-shrink-0" />
                   <span>{label}</span>
@@ -217,8 +230,9 @@ export default function GuestAuthModal({
           </>
         )}
 
+        {pendingUser && <p role="status" className="my-2 text-sm text-muted-foreground">Loading your account…</p>}
         {error && (
-          <div className="my-2 p-3 rounded-xl bg-destructive/10 text-destructive text-xs font-medium border border-destructive/20">
+          <div role="alert" className="my-2 p-3 rounded-xl bg-destructive/10 text-destructive text-xs font-medium border border-destructive/20">
             {error}
           </div>
         )}
@@ -285,6 +299,7 @@ export default function GuestAuthModal({
               </div>
               <div className="flex justify-center py-2">
                 <InputOTP
+                aria-label="Verification code"
                   maxLength={6}
                   value={otp}
                   onChange={handleOtpChange}
@@ -307,7 +322,7 @@ export default function GuestAuthModal({
                 variant="outline"
                 className="w-full h-9 text-xs font-medium rounded-xl disabled:cursor-not-allowed"
                 onClick={requestNewOtp}
-                disabled={loading || otpTimeLeft > 0}
+                disabled={loading || Boolean(pendingUser) || otpTimeLeft > 0}
               >
                 Resend OTP
               </Button>
@@ -317,7 +332,7 @@ export default function GuestAuthModal({
           <Button
             type="submit"
             className="w-full h-11 font-semibold rounded-xl"
-            disabled={loading || (otpSent && otp.length !== 6)}
+            disabled={loading || Boolean(pendingUser) || (otpSent && otp.length !== 6)}
           >
             {loading ? (
               <>

@@ -36,10 +36,10 @@ import BakeryDesigner from '@/pages/BakeryAdmin/BakeryDesigner';
 import BakeryProfile from '@/pages/BakeryAdmin/BakeryProfile';
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const { isLoadingAuth, authChecked, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
 
   // Keep the active route's layout visible while public settings or auth load.
-  if (isLoadingPublicSettings || isLoadingAuth) {
+  if (isLoadingPublicSettings || (isLoadingAuth && !authChecked)) {
     return <PageLoadingSkeleton />;
   }
 

@@ -16,6 +16,41 @@ beforeEach(() => {
   moderationApi.restrict.mockResolvedValue({});
 });
 describe('Chats Overview', () => {
+  it('reviews held messages directly inside account review', async () => {
+    moderationApi.evidence.mockResolvedValue({ customer, messages: [{ ...flag, moderation: 'held' }] });
+    moderationApi.overview.mockResolvedValue({ customers: [customer], flags: [], requests: [] });
+    render(<BakeryChatOverview />);
+    fireEvent.click(await screen.findByRole('button', { name: /Ana Cruz ana@example.com Unrestricted/ }));
+    const confirm = await screen.findByRole('button', { name: 'Confirm abuse' });
+    fireEvent.change(screen.getByLabelText('Message review reason'), { target: { value: 'Verified spam' } });
+    fireEvent.click(confirm);
+    await waitFor(() => expect(moderationApi.review).toHaveBeenCalledWith('message-1', 'reject', 'Verified spam'));
+  });
+  it('uses older confirmed evidence and disables a past custom suspension expiry', async () => {
+    moderationApi.evidence.mockResolvedValue({ customer, messages: [], confirmedEvidence: [{ ...flag, moderation: 'rejected', reviewedAt: '2026-10-04T00:00:00Z' }] });
+    render(<BakeryChatOverview />);
+    fireEvent.click(await screen.findByRole('button', { name: /Ana Cruz ana@example.com Unrestricted/ }));
+    await screen.findByLabelText('Confirmed abuse evidence');
+    fireEvent.change(screen.getByLabelText('Action / review reason'), { target: { value: 'Verified repeated spam' } });
+    fireEvent.change(screen.getByLabelText('Confirmed abuse evidence'), { target: { value: 'message-1' } });
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.change(screen.getByLabelText('Suspension duration'), { target: { value: 'custom' } });
+    fireEvent.change(screen.getByLabelText('Custom suspension expiry'), { target: { value: '2020-01-01T12:00' } });
+    expect(screen.getByRole('button', { name: 'Suspend' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Ban indefinitely' })).toBeEnabled();
+  });
+  it('uses summary cards to filter accounts and focuses the review section', async () => {
+    moderationApi.overview.mockResolvedValue({ customers: [customer, { ...customer, _id: 'customer-2', displayName: 'Ben Santos', email: 'ben@example.com', restriction: { type: 'suspended' } }], flags: [], requests: [] });
+    render(<BakeryChatOverview />);
+    fireEvent.click(await screen.findByRole('button', { name: /1 Suspended accounts/ }));
+    expect(screen.getByRole('button', { name: 'Suspended' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByRole('button', { name: /Ana Cruz ana@example.com Unrestricted/ })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Search customer accounts'), { target: { value: 'missing' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+    fireEvent.click(screen.getByRole('button', { name: /Ana Cruz ana@example.com Unrestricted/ }));
+    await screen.findByRole('region', { name: 'Customer account review' });
+    expect(screen.getByRole('region', { name: 'Customer account review' }).parentElement).toHaveFocus();
+  });
   it('combines account status filters with customer search', async () => {
     moderationApi.overview.mockResolvedValue({ customers: [customer, { ...customer, _id: 'customer-2', displayName: 'Ben Santos', email: 'ben@example.com', restriction: { type: 'suspended' } }], flags: [], requests: [] });
     render(<BakeryChatOverview />);
