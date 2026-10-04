@@ -8,8 +8,13 @@ export const cakeAiApi = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ messages, config }),
-    }).then((response) => {
-      if (!response.ok) throw new Error(`Cake AI request failed (${response.status})`);
+    }).then(async (response) => {
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        const error = new Error(`Cake AI request failed (${response.status})`);
+        if (['PROMPT_REJECTED', 'INVALID_AI_REQUEST'].includes(body.code)) error.validationMessage = body.error;
+        throw error;
+      }
       return response.json();
     }),
 };
@@ -97,6 +102,10 @@ export const accountApi = {
 
 // Design API calls
 export const designApi = {
+  getAiChat: id => requestAuthenticatedJson(`${API_BASE_URL}/designs/${id}/ai-chat`),
+  saveAiChat: (id, conversation) => requestAuthenticatedJson(`${API_BASE_URL}/designs/${id}/ai-chat`, {
+    method: 'PUT', body: JSON.stringify(conversation),
+  }),
   // Get all designs for current user
   getDesigns: async ({ trashOnly = false } = {}) => {
     return requestAuthenticatedJson(`${API_BASE_URL}/designs?isTrashed=${trashOnly}`);

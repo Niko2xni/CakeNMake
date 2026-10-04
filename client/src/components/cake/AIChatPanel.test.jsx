@@ -9,6 +9,38 @@ vi.mock('@/services/api', () => ({ cakeAiApi: { sendMessage: vi.fn() } }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe('imported Cake AI tool conversation', () => {
+  it('does not apply a delayed cake edit after leaving the designer', async () => {
+    let finish;
+    cakeAiApi.sendMessage.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const onChange = vi.fn();
+    const panel = render(<AIChatPanel config={DEFAULT_CONFIG} onChange={onChange} />);
+    const input = screen.getByPlaceholderText('Describe your cake...');
+    fireEvent.change(input, { target: { value: 'Make it chocolate' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    panel.unmount();
+    finish({ stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'edit', name: 'set_sponge_flavor', input: { flavor: 'chocolate' } }] });
+    await waitFor(() => expect(cakeAiApi.sendMessage).toHaveBeenCalledTimes(1));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+  it('shows prompt rejection without editing the cake and allows a corrected request', async () => {
+    const onChange = vi.fn();
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    cakeAiApi.sendMessage.mockRejectedValueOnce(Object.assign(new Error('Rejected'), {
+      validationMessage: 'Please send a cake-related request.',
+    })).mockResolvedValueOnce({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'Ready to design.' }] });
+    render(<AIChatPanel config={DEFAULT_CONFIG} onChange={onChange} />);
+    const input = screen.getByPlaceholderText('Describe your cake...');
+    fireEvent.change(input, { target: { value: 'Write a Python script' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await screen.findByText('Please send a cake-related request.');
+    expect(onChange).not.toHaveBeenCalled();
+    await waitFor(() => expect(input).toBeEnabled());
+    fireEvent.change(input, { target: { value: 'Make it pink' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await screen.findByText('Ready to design.');
+    expect(cakeAiApi.sendMessage.mock.calls[1][0]).toEqual([{ role: 'user', content: 'Make it pink' }]);
+    errorLog.mockRestore();
+  });
   it('applies successive edits and sends their updated state with tool results', async () => {
     const config = structuredClone(DEFAULT_CONFIG);
     const onChange = vi.fn();

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { cakeAiApi } from '@/services/api';
 import { applyCakeAiTool } from '@/lib/aiCakeTools';
+import { recentCakeAiHistory } from '@/lib/cakeAiConversation';
 
 const SUGGESTIONS = [
   'Make me a birthday cake for a 5-year-old',
@@ -19,16 +20,24 @@ const GREETING = {
 
 const MAX_TOOL_TURNS = 6;
 
-export default function AIChatPanel({ config, onChange, quote }) {
+export default function AIChatPanel({ config, onChange, quote, session }) {
   // `history` is the raw Anthropic-format message array sent back to the
   // API each turn. `display` is the simplified { role, content, changes? }
   // shape the bubbles below render — a tool_use/tool_result turn is never
   // shown to the person literally, only its resulting "changes" chips.
-  const [history, setHistory] = useState([]);
-  const [display, setDisplay] = useState([GREETING]);
-  const [input, setInput] = useState('');
-  const [thinking, setThinking] = useState(false);
+  const [localHistory, setLocalHistory] = useState([]);
+  const [localDisplay, setLocalDisplay] = useState([GREETING]);
+  const [localInput, setLocalInput] = useState('');
+  const [localThinking, setLocalThinking] = useState(false);
+  const { history, display, input, thinking, setHistory, setDisplay, setInput, setThinking } = session || {
+    history: localHistory, display: localDisplay, input: localInput, thinking: localThinking,
+    setHistory: setLocalHistory, setDisplay: setLocalDisplay, setInput: setLocalInput, setThinking: setLocalThinking,
+  };
+  const unavailable = session && !session.ready;
   const bottomRef = useRef(null);
+  const activeSession = useRef(session?.key);
+  activeSession.current = session?.key;
+  useEffect(() => () => { activeSession.current = Symbol('closed'); }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView?.({ behavior: 'smooth' });
@@ -36,21 +45,23 @@ export default function AIChatPanel({ config, onChange, quote }) {
 
   const sendMessage = async (text) => {
     const msg = (text || input).trim();
-    if (!msg || thinking) return;
+    if (!msg || thinking || unavailable) return;
     setInput('');
     setDisplay((prev) => [...prev, { role: 'user', content: msg }]);
     setThinking(true);
 
-    let nextHistory = [...history, { role: 'user', content: msg }];
+    let nextHistory = [...recentCakeAiHistory(history), { role: 'user', content: msg }];
     // Local mutable snapshot so multiple tool calls within the SAME turn
     // see each other's effects immediately, rather than the stale
     // `config` this closure captured on render (setState is async).
     let liveConfig = config;
     const changesThisTurn = [];
+    const requestSession = session?.key;
 
     try {
       for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
         const response = await cakeAiApi.sendMessage(nextHistory, liveConfig);
+        if (activeSession.current !== requestSession) return;
 
         if (response.stop_reason !== 'tool_use') {
           const finalText = response.content.find((b) => b.type === 'text')?.text || '';
@@ -101,7 +112,7 @@ export default function AIChatPanel({ config, onChange, quote }) {
       console.error('[cake-ai] failed:', err);
       setDisplay((prev) => [
         ...prev,
-        { role: 'assistant', content: "Sorry, I couldn't reach the design assistant just now. Please try again in a moment." },
+        { role: 'assistant', content: err.validationMessage || "Sorry, I couldn't reach the design assistant just now. Please try again in a moment." },
       ]);
     } finally {
       setThinking(false);
@@ -111,6 +122,13 @@ export default function AIChatPanel({ config, onChange, quote }) {
   return (
     <div className="flex flex-col h-full">
       {/* Header label */}
+      <div className="flex justify-end">
+        <Button variant="ghost" size="sm" disabled={thinking || unavailable} onClick={() => {
+          setHistory([]); setDisplay([GREETING]); setInput('');
+        }}>Clear chat</Button>
+      </div>
+      {session?.error && <p role="status" className="text-xs text-destructive pb-2">{session.error}</p>}
+      {unavailable && !session.error && <p role="status" className="text-xs text-muted-foreground pb-2">Loading saved chat...</p>}
       <div className="flex items-center gap-2 px-1 pb-3">
         <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
           <Sparkles className="w-4 h-4 text-primary" />
@@ -190,13 +208,13 @@ export default function AIChatPanel({ config, onChange, quote }) {
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
           placeholder="Describe your cake..."
           className="min-h-[60px] max-h-[100px] text-xs resize-none rounded-xl"
-          disabled={thinking}
+          disabled={thinking || unavailable}
         />
         <Button
           size="icon"
           className="rounded-xl shrink-0 h-9 w-9"
           onClick={() => sendMessage()}
-          disabled={!input.trim() || thinking}
+          disabled={!input.trim() || thinking || unavailable}
         >
           <Send className="w-4 h-4" />
         </Button>

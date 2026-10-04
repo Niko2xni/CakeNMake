@@ -10,6 +10,11 @@ const designSchema = new mongoose.Schema({
     type: Object,
     required: true
   },
+  aiChat: {
+    type: mongoose.Schema.Types.Mixed,
+    default: () => ({ history: [], display: [] }),
+    select: false,
+  },
   userId: {
     type: String,
     default: null

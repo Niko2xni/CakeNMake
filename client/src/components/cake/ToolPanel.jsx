@@ -41,6 +41,7 @@ export default function ToolPanel({
   canPlaceUndo,
   canPlaceRedo,
   quote,
+  aiChatSession,
   selectedCenterItemId,
   onCenterItemSelect,
   onDeleteSelectedCenterItem,
@@ -449,11 +450,11 @@ export default function ToolPanel({
           }`}
           aria-hidden={config.interiorPreview}
         >
-          {modeUi === 'ai' ? (
-            <div className="flex-1 p-4 min-h-0 flex flex-col">
-              <AIChatPanel config={config} onChange={onChange} quote={quote} />
+          {/* Keep the conversation mounted when switching to manual design. */}
+            <div className={`flex-1 p-4 min-h-0 flex-col ${modeUi === 'ai' ? 'flex' : 'hidden'}`} aria-hidden={modeUi !== 'ai'}>
+              <AIChatPanel config={config} onChange={onChange} quote={quote} session={aiChatSession} />
             </div>
-          ) : (
+          {modeUi !== 'ai' && (
             <>
 {/* Tab switcher — balanced 2x2 layout for the four remaining sections */}
               <div className="grid grid-cols-2 gap-2 px-4 py-2 bg-muted/30">

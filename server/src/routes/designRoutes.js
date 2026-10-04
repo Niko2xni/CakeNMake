@@ -5,6 +5,8 @@ const { loadAppUser } = require('../middleware/authorize');
 const {
   getDesigns,
   getDesignById,
+  getAiChat,
+  saveAiChat,
   createDesign,
   updateDesign,
   deleteDesign,
@@ -23,6 +25,8 @@ router.get('/', getDesigns);
 
 // GET /api/designs/:id - Get a single design
 router.get('/:id', getDesignById);
+router.get('/:id/ai-chat', getAiChat);
+router.put('/:id/ai-chat', saveAiChat);
 
 // POST /api/designs - Create a new design
 router.post('/', createDesign);

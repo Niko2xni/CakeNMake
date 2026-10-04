@@ -25,11 +25,11 @@ function convertMessages(messages) {
   });
 }
 
-function convertResponse(data) {
-  if (data.error) throw new Error('OpenRouter returned a provider error.');
+function convertResponse(data, providerName = 'OpenRouter') {
+  if (data.error) throw new Error(`${providerName} returned a provider error.`);
   const choice = data.choices?.[0];
   if (!choice?.message || ['length', 'content_filter', 'error'].includes(choice.finish_reason)) {
-    throw new Error('OpenRouter returned an incomplete response.');
+    throw new Error(`${providerName} returned an incomplete response.`);
   }
   const message = choice.message;
   const content = [];
@@ -40,7 +40,7 @@ function convertResponse(data) {
     if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Invalid provider tool arguments.');
     content.push({ type: 'tool_use', id: call.id, name: call.function.name, input });
   }
-  if (!content.length) throw new Error('OpenRouter returned an empty response.');
+  if (!content.length) throw new Error(`${providerName} returned an empty response.`);
   return {
     role: 'assistant', content,
     stop_reason: content.some(block => block.type === 'tool_use') ? 'tool_use' : 'end_turn',

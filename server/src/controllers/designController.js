@@ -56,6 +56,38 @@ exports.getDesignById = async (req, res) => {
   }
 };
 
+exports.getAiChat = async (req, res) => {
+  if (invalidDesignId(req, res)) return;
+  try {
+    const design = await Design.findOne(ownedDesignFilter(req)).select('+aiChat');
+    return design ? res.json(design.aiChat || { history: [], display: [] }) : notFound(res);
+  } catch {
+    return res.status(500).json({ message: 'Failed to load design chat' });
+  }
+};
+
+exports.saveAiChat = async (req, res) => {
+  if (invalidDesignId(req, res)) return;
+  const { history, display } = req.body || {};
+  if (!Array.isArray(history) || !Array.isArray(display) || history.length > 100 || display.length > 60
+    || JSON.stringify({ history, display }).length > 120000
+    || history.some(message => !message || !['user', 'assistant'].includes(message.role)
+      || !(typeof message.content === 'string' || Array.isArray(message.content)))
+    || display.some(message => !message || !['user', 'assistant'].includes(message.role)
+      || typeof message.content !== 'string' || message.content.length > 10000
+      || (message.changes !== undefined && (!Array.isArray(message.changes) || message.changes.some(change => typeof change !== 'string'))))) {
+    return res.status(400).json({ message: 'Invalid design chat' });
+  }
+  try {
+    const design = await Design.findOneAndUpdate(ownedDesignFilter(req), {
+      $set: { aiChat: { history, display } },
+    }, { new: true, runValidators: true });
+    return design ? res.json({ saved: true }) : notFound(res);
+  } catch {
+    return res.status(500).json({ message: 'Failed to save design chat' });
+  }
+};
+
 exports.createDesign = async (req, res) => {
   try {
     const { config, lastEstimate, thumbnail, thumbnailFallback, thumbnailAsset } = req.body;

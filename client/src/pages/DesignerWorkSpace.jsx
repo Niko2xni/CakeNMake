@@ -1,12 +1,13 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence, useDragControls } from 'framer-motion';
-import { useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { useSearchParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import CakeScene from '@/components/cake/CakeScene.jsx';
 import PageLoadingSkeleton from '@/components/shared/PageLoadingSkeleton';
 import ToolPanel from '@/components/cake/ToolPanel';
 import PricingPanel from '@/components/cake/PricingPanel';
 import SendBakeryModal from '@/components/bakery/SendBakeryModal';
 import BakeryChatPanel from '@/components/bakery/BakeryChatPanel';
+import useDesignAiChat from '@/hooks/useDesignAiChat';
 import GuestAuthModal from '@/components/auth/GuestAuthModal';
 import { Cake, X, Send, Cloud, CloudOff, Loader2, RotateCcw, GripHorizontal, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -238,6 +239,12 @@ export default function DesignerWorkSpace() {
 
   // Auto-save state
   const [designId, setDesignId] = useState(null);
+  const chatLocation = useLocation();
+  const aiChatSession = useDesignAiChat({
+    designId: searchParams.get('designId') || designId,
+    accountId: account?.id || account?._id,
+    guestId: `${chatLocation.key}:${searchParams.get('designId') || 'new'}`,
+  });
   const [saveStatus, setSaveStatus] = useState('saved'); // 'saved' | 'saving' | 'error'
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const isInitialMountRef = useRef(true);
@@ -1143,10 +1150,11 @@ export default function DesignerWorkSpace() {
         <div className={`hidden md:block w-[280px] lg:w-[320px] xl:w-[340px] max-w-[40vw] p-2 sm:p-3 shrink-0 ${isBreakdownOpen ? 'pointer-events-none opacity-50 select-none' : ''}`}>
           {orderComplete ? (
             <div className="h-full">
-              <BakeryChatPanel onNotificationChange={setChatNotifications} config={config} onChange={setConfig} quote={quote} />
+              <BakeryChatPanel onNotificationChange={setChatNotifications} config={config} onChange={setConfig} quote={quote} aiChatSession={aiChatSession} />
             </div>
           ) : (
             <ToolPanel
+              aiChatSession={aiChatSession}
               config={config}
               quote={quote}
               onChange={setConfig}
@@ -1185,10 +1193,11 @@ export default function DesignerWorkSpace() {
         {/* Mobile Panel */}
         {orderComplete ? (
           <div className="md:hidden fixed bottom-0 inset-x-0 h-[360px] max-h-[50vh] bg-card border-t border-border/40 z-30 shadow-2xl p-2">
-            <BakeryChatPanel onNotificationChange={setChatNotifications} config={config} onChange={setConfig} quote={quote} />
+            <BakeryChatPanel onNotificationChange={setChatNotifications} config={config} onChange={setConfig} quote={quote} aiChatSession={aiChatSession} />
           </div>
         ) : (
           <MobileDraggableToolPanel
+            aiChatSession={aiChatSession}
             panelOpen={panelOpen && !isBreakdownOpen}
             quote={quote}
             onClose={() => setPanelOpen(false)}
