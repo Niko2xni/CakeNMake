@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { accountApi } from '@/services/api';
@@ -15,9 +15,12 @@ export const AuthProvider = ({ children }) => {
   const [authError, setAuthError] = useState(null);
   const [authChecked, setAuthChecked] = useState(!auth);
   const [appPublicSettings, setAppPublicSettings] = useState(null);
+  const sessionRevision = useRef(0);
 
   const refreshAccount = async () => {
+    const revision = sessionRevision.current;
     const response = await accountApi.sync();
+    if (revision !== sessionRevision.current) return response.user;
     setAccount(response.user);
     setAuthError(null);
     return response.user;
@@ -28,9 +31,10 @@ export const AuthProvider = ({ children }) => {
     let active = true;
     let socket;
     const refresh = async () => {
+      const revision = sessionRevision.current;
       try {
         const response = await accountApi.getMe();
-        if (active) setAccount(response.user);
+        if (active && revision === sessionRevision.current) setAccount(response.user);
       } catch { /* Keep existing-order access during a temporary connection failure. */ }
     };
     getChatSocket().then((value) => {
@@ -54,6 +58,7 @@ export const AuthProvider = ({ children }) => {
     let currentUid = null;
     const unsubscribe = onAuthStateChanged(auth, async (nextUser) => {
       if (!active) return;
+      const revision = ++sessionRevision.current;
       if ((nextUser?.uid || null) !== currentUid) disconnectChatSocket();
       currentUid = nextUser?.uid || null;
 
@@ -71,13 +76,13 @@ export const AuthProvider = ({ children }) => {
 
       try {
         const synchronizedAccount = await refreshAccount();
-        if (!active) return;
+        if (!active || revision !== sessionRevision.current) return;
 
         setUser(nextUser);
         setAccount(synchronizedAccount);
         setIsAuthenticated(true);
       } catch (error) {
-        if (!active) return;
+        if (!active || revision !== sessionRevision.current) return;
 
         setUser(nextUser);
         setAccount(null);
@@ -87,7 +92,7 @@ export const AuthProvider = ({ children }) => {
           message: error.message || 'Your account could not be loaded.',
         });
       } finally {
-        if (active) {
+        if (active && revision === sessionRevision.current) {
           setAuthChecked(true);
           setIsLoadingAuth(false);
         }
@@ -107,7 +112,13 @@ export const AuthProvider = ({ children }) => {
       await signOut(auth);
     }
 
+    sessionRevision.current++;
+    setUser(null);
     setAccount(null);
+    setIsAuthenticated(false);
+    setAuthError(null);
+    setAuthChecked(true);
+    setIsLoadingAuth(false);
 
     if (shouldRedirect) {
       window.location.href = '/';

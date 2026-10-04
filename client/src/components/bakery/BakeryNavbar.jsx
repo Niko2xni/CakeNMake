@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import useLogout from '@/hooks/useLogout';
 import {
   Cake,
   ClipboardList,
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
 ];
 
 export default function BakeryNavbar() {
+  const { handleLogout, isLoggingOut } = useLogout();
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreButtonRef = useRef(null);
@@ -91,6 +93,8 @@ export default function BakeryNavbar() {
         type="button"
         title="Log out"
         aria-label="Log out"
+        onClick={handleLogout}
+        disabled={isLoggingOut}
         className="w-12 h-12 flex-shrink-0 flex items-center justify-center rounded-xl text-gray-400 hover:bg-pink-50 hover:text-pink-500 transition-colors mt-2"
       >
         <LogOut className="w-5 h-5" />
@@ -148,7 +152,7 @@ export default function BakeryNavbar() {
               );
             })}
           </div>
-          <button type="button" className="cn-bakery-mobile-logout"><LogOut /> Log out</button>
+          <button type="button" className="cn-bakery-mobile-logout" onClick={handleLogout} disabled={isLoggingOut}><LogOut /> Log out</button>
         </section>
       </div>
     )}

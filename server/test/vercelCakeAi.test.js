@@ -20,6 +20,7 @@ test('Vercel sends tools to its fixed endpoint and normalizes tool calls', async
   assert.equal(request.headers.Authorization, 'Bearer test-key');
   assert.ok(request.signal instanceof AbortSignal);
   assert.equal(body.model, 'alibaba/qwen3.8-omni-flash');
+  assert.equal(body.max_tokens, 1024);
   assert.equal(body.messages[0].role, 'system');
   assert.equal(body.messages[0].content, 'Cake instructions');
   assert.equal(body.tools.length, 12);

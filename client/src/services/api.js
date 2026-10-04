@@ -1,4 +1,5 @@
 import { auth } from '@/lib/firebase';
+import { createThumbnailQueue } from '@/lib/thumbnailQueue';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
@@ -116,6 +117,7 @@ export const designApi = {
   }),
   // Get all designs for current user
   getDesigns: async ({ trashOnly = false } = {}) => {
+    await designApi.retryThumbnails();
     return requestAuthenticatedJson(`${API_BASE_URL}/designs?isTrashed=${trashOnly}`);
   },
 
@@ -169,7 +171,14 @@ export const designApi = {
   },
 
   // Upload image to Cloudinary
-  uploadImage: async (designId, base64Image) => {
+  retryThumbnails: () => auth?.currentUser?.uid ? thumbnailQueue.flush(auth.currentUser.uid) : Promise.resolve(),
+  uploadImage: (designId, image) => {
+    const owner = auth?.currentUser?.uid;
+    if (!owner) return Promise.reject(new Error('You must be signed in.'));
+    return thumbnailQueue.enqueue(owner, designId, image);
+  },
+  uploadThumbnail: async (designId, base64Image, owner) => {
+    if (auth?.currentUser?.uid !== owner) throw new Error('Account changed.');
     // Ensure the base64 data has the data URL prefix
     const imageData = base64Image.startsWith('data:')
       ? base64Image
@@ -179,6 +188,7 @@ export const designApi = {
       `${API_BASE_URL}/designs/${designId}/thumbnail/upload-signature`,
       { method: 'POST' }
     );
+    if (auth?.currentUser?.uid !== owner) throw new Error('Account changed.');
     const formData = new FormData();
     formData.append('file', imageData);
     formData.append('api_key', upload.apiKey);
@@ -200,6 +210,7 @@ export const designApi = {
       throw new Error('Failed to upload image');
     }
     const data = await response.json();
+    if (auth?.currentUser?.uid !== owner) throw new Error('Account changed.');
     return requestAuthenticatedJson(`${API_BASE_URL}/designs/${designId}/thumbnail`, {
       method: 'PATCH',
       body: JSON.stringify({ publicId: data.public_id, secureUrl: data.secure_url }),
@@ -301,3 +312,10 @@ export const billingApi = {
 export const transactionApi = {
   getTransactions: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/transactions`),
 };
+
+const thumbnailQueue = createThumbnailQueue(
+  { getItem: key => localStorage.getItem(key), setItem: (key, value) => localStorage.setItem(key, value) },
+  (id, image, owner) => designApi.uploadThumbnail(id, image, owner),
+  owner => auth?.currentUser?.uid === owner,
+);
+if (typeof window !== 'undefined') window.addEventListener('online', () => { void designApi.retryThumbnails(); });

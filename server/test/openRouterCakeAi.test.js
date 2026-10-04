@@ -59,6 +59,7 @@ test('sends configured model, current system prompt, and schemas on every reques
   assert.equal(request.headers.Authorization, 'Bearer test-key');
   const body = JSON.parse(request.body);
   assert.equal(body.model, 'test/model');
+  assert.equal(body.max_tokens, 1024);
   assert.equal(body.messages[0].content, 'Current cake JSON');
   assert.equal(body.tools.length, 12);
   assert.ok(body.tools.some(tool => tool.function.name === 'set_edge_border'));

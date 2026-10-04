@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react';
 import { motion, AnimatePresence, useDragControls } from 'framer-motion';
 import { useSearchParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import CakeScene from '@/components/cake/CakeScene.jsx';
@@ -365,6 +365,8 @@ export default function DesignerWorkSpace() {
               isPublic: false,
             });
 
+            // Capture was cached during exit if creation completed after unmount.
+            void saveThumbnail(savedDesign._id);
             if (!isMounted) return;
 
             setDesignId(savedDesign._id);
@@ -372,11 +374,7 @@ export default function DesignerWorkSpace() {
             setSaveStatus('saved');
             setHasUnsavedChanges(false);
             navigate(`/designer?designId=${savedDesign._id}`, { replace: true });
-            setTimeout(() => {
-              if (isMounted) {
-                saveThumbnail(savedDesign._id);
-              }
-            }, 600);
+            setTimeout(() => saveThumbnail(savedDesign._id), 600);
             return;
           } catch (err) {
             console.warn('Could not initialize new design in db:', err);
@@ -393,6 +391,26 @@ export default function DesignerWorkSpace() {
       };
     }
   }, [searchParams, loadDesign, account, navigate]);
+
+  const cachedThumbnailRef = useRef(null);
+  const captureThumbnail = useCallback(() => {
+    try {
+      const image = cakeSceneRef.current?.captureThumbnail();
+      if (image) cachedThumbnailRef.current = image;
+      return image || cachedThumbnailRef.current;
+    } catch (error) { console.warn('Thumbnail capture failed:', error); return cachedThumbnailRef.current; }
+  }, []);
+  const saveThumbnail = useCallback(async (id = null, image = null) => {
+    const targetId = id || designId;
+    const snapshot = image || captureThumbnail();
+    if (targetId && snapshot) await designApi.uploadImage(targetId, snapshot);
+  }, [designId, captureThumbnail]);
+
+  useEffect(() => {
+    cachedThumbnailRef.current = null;
+    const timer = setTimeout(captureThumbnail, 200);
+    return () => clearTimeout(timer);
+  }, [config, captureThumbnail]);
 
   const saveDesign = useCallback(async ({ skipThumbnail = false, sentToBakery = false } = {}) => {
     if (!account) {
@@ -455,11 +473,13 @@ export default function DesignerWorkSpace() {
     if (orderComplete || !hasUnsavedChanges) return;
 
     const saveTimer = setTimeout(async () => {
-      await saveDesign({ skipThumbnail: true });
+      const snapshot = captureThumbnail();
+      const id = await saveDesign({ skipThumbnail: true });
+      if (id) await saveThumbnail(id, snapshot);
     }, 600); // Fast auto-save after 600ms of inactivity
 
     return () => clearTimeout(saveTimer);
-  }, [hasUnsavedChanges, saveDesign, orderComplete]);
+  }, [hasUnsavedChanges, saveDesign, saveThumbnail, captureThumbnail, orderComplete]);
 
   // Mark as having unsaved changes when config or title changes (skipping initial mount, design loading, and completed orders)
   useEffect(() => {
@@ -480,36 +500,6 @@ export default function DesignerWorkSpace() {
     setActiveCategory(category);
   }, []);
 
-  const saveThumbnail = useCallback(async (id = null) => {
-    console.log('[DEBUG] saveThumbnail called with id:', id);
-    if (!cakeSceneRef.current) {
-      console.log('[DEBUG] saveThumbnail - cakeSceneRef.current is null');
-      return;
-    }
-
-    const targetDesignId = id || designId;
-    if (!targetDesignId) {
-      console.log('[DEBUG] saveThumbnail - No design ID available');
-      return;
-    }
-
-    try {
-      console.log('[DEBUG] saveThumbnail - Capturing thumbnail from cake scene');
-      // Ensure scene is fully updated before render
-      await new Promise(resolve => setTimeout(resolve, 300));
-      const thumbnail = cakeSceneRef.current.captureThumbnail();
-      if (thumbnail) {
-        console.log('[DEBUG] saveThumbnail - Thumbnail captured, uploading');
-        await designApi.uploadImage(targetDesignId, thumbnail);
-        console.log('[DEBUG] saveThumbnail - Design updated successfully');
-      } else {
-        console.log('[DEBUG] saveThumbnail - Thumbnail is null/empty');
-      }
-    } catch (error) {
-      console.error('[ERROR] saveThumbnail - Failed to save thumbnail:', error);
-    }
-  }, [designId]);
-
   const latestConfigRef = useRef(config);
   const latestTitleRef = useRef(title);
   const latestDesignIdRef = useRef(designId);
@@ -524,9 +514,13 @@ export default function DesignerWorkSpace() {
     latestQuoteRef.current = quote;
   }, [config, title, designId, hasUnsavedChanges, quote]);
 
-  // Flush save and thumbnail when user exits the page or component unmounts
-  useEffect(() => {
+  // Layout cleanup captures before the scene is disposed. No delayed capture on exit.
+  useLayoutEffect(() => {
     const handleExitFlush = () => {
+      if (!account) return;
+      const snapshot = captureThumbnail();
+      const existingId = latestDesignIdRef.current;
+      if (existingId && snapshot) void designApi.uploadImage(existingId, snapshot);
       if (latestHasUnsavedChangesRef.current && account) {
         const targetId = latestDesignIdRef.current;
         const designData = {
@@ -544,20 +538,22 @@ export default function DesignerWorkSpace() {
 
         if (targetId) {
           designApi.updateDesign(targetId, designData).catch(() => {});
-          saveThumbnail(targetId);
+
         } else {
-          designApi.createDesign(designData).catch(() => {});
+          designApi.createDesign(designData).then(saved => {
+            if (snapshot) return designApi.uploadImage(saved._id, snapshot);
+          }).catch(() => {});
         }
       }
     };
 
-    window.addEventListener('beforeunload', handleExitFlush);
+    window.addEventListener('pagehide', handleExitFlush);
 
     return () => {
-      window.removeEventListener('beforeunload', handleExitFlush);
+      window.removeEventListener('pagehide', handleExitFlush);
       handleExitFlush();
     };
-  }, [account, saveThumbnail]);
+  }, [account?._id, account?.id, captureThumbnail]);
 
   const handlePaymentComplete = useCallback(async (selectedDate) => {
     // Blueprint captures: Start Page hero + Angle Page (Front / Back / Top / Side). Taken exactly once, right

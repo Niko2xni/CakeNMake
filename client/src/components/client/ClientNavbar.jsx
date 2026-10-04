@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   Clock,
   LayoutTemplate,
@@ -11,6 +11,7 @@ import {
   User,
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
+import useLogout from '@/hooks/useLogout';
 
 const primaryItems = [
   { to: '/client', icon: Clock, label: 'Recents' },
@@ -36,7 +37,7 @@ function NavItem({ to, icon: Icon, label, currentPath }) {
 export default function ClientNavbar() {
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const menuRef = useRef(null);
-  const navigate = useNavigate();
+  const { handleLogout, isLoggingOut } = useLogout();
   const location = useLocation();
   const { user } = useAuth();
 
@@ -58,7 +59,6 @@ export default function ClientNavbar() {
     };
   }, []);
 
-  const handleLogout = () => navigate('/login');
 
   return (
     <nav className="cn-sidebar" aria-label="Client navigation">
@@ -117,7 +117,7 @@ export default function ClientNavbar() {
                 <Settings className="w-4 h-4" /> Settings
               </Link>
               <Link to="/support" role="menuitem" onClick={() => setUserDropdownOpen(false)}><MessageSquare className="w-4 h-4" /> Orders & Support</Link>
-              <button type="button" role="menuitem" onClick={handleLogout}>
+              <button type="button" role="menuitem" onClick={handleLogout} disabled={isLoggingOut}>
                 <LogOut className="w-4 h-4" /> Log out
               </button>
             </div>

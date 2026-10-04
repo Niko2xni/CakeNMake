@@ -933,8 +933,19 @@ const CakeScene = React.forwardRef(function CakeScene({
       const prevRotY = cakeGroupRef.current?.rotation?.y ?? 0;
       if (cakeGroupRef.current) cakeGroupRef.current.rotation.set(0, 0, 0);
 
-      renderer.render(scene, thumbnailCam);
-      const dataUrl = renderer.domElement.toDataURL('image/png');
+      let dataUrl;
+      try {
+        renderer.render(scene, thumbnailCam);
+        const canvas = document.createElement('canvas');
+        const scale = Math.min(1, 640 / Math.max(renderer.domElement.width, renderer.domElement.height));
+        canvas.width = Math.max(1, Math.round(renderer.domElement.width * scale));
+        canvas.height = Math.max(1, Math.round(renderer.domElement.height * scale));
+        const context = canvas.getContext('2d');
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(renderer.domElement, 0, 0, canvas.width, canvas.height);
+        dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+      } finally {
 
       if (cakeGroupRef.current) cakeGroupRef.current.rotation.y = prevRotY;
 
@@ -942,6 +953,7 @@ const CakeScene = React.forwardRef(function CakeScene({
       if (slotsGroupRef.current) slotsGroupRef.current.visible = prevSlotsVisible;
       if (ghostGroupRef.current) ghostGroupRef.current.visible = prevGhostVisible;
 
+      }
       return dataUrl;
     },
 

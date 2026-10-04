@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 const authMocks = vi.hoisted(() => ({
@@ -25,10 +25,12 @@ vi.mock('firebase/auth', () => ({
 import { AuthProvider, useAuth } from './AuthContext';
 
 function AccountProbe() {
-  const { account, isAuthenticated, authError } = useAuth();
+  const { account, isAuthenticated, authError, user, logout } = useAuth();
 
   return (
     <div>
+      <button onClick={() => logout(false)}>Sign out</button>
+      <span data-testid="user">{user?.uid || 'none'}</span>
       <span data-testid="authenticated">{String(isAuthenticated)}</span>
       <span data-testid="role">{account?.role || 'none'}</span>
       <span data-testid="error">{authError?.type || 'none'}</span>
@@ -37,6 +39,21 @@ function AccountProbe() {
 }
 
 describe('AuthProvider account hydration', () => {
+  it('clears the session and ignores account hydration that finishes after logout', async () => {
+    let finish;
+    authMocks.sync.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    authMocks.onAuthStateChanged.mockImplementationOnce((_auth, callback) => {
+      callback({ uid: 'old-user' });
+      return vi.fn();
+    });
+    render(<AuthProvider><AccountProbe /></AuthProvider>);
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    await act(async () => { await Promise.resolve(); });
+    await act(async () => { finish({ user: { firebaseUid: 'old-user', role: 'customer' } }); });
+    expect(screen.getByTestId('authenticated')).toHaveTextContent('false');
+    expect(screen.getByTestId('role')).toHaveTextContent('none');
+    expect(screen.getByTestId('user')).toHaveTextContent('none');
+  });
   it('synchronizes and exposes the MongoDB account after Firebase restores a user', async () => {
     authMocks.sync.mockResolvedValueOnce({
       user: { firebaseUid: 'firebase-user-1', role: 'customer' },

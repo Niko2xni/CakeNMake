@@ -14,7 +14,7 @@ async function callVercel(messages, systemPrompt, {
     headers: { Authorization: `Bearer ${apiKey.trim()}`, 'Content-Type': 'application/json' },
     signal: AbortSignal.timeout(60000),
     body: JSON.stringify({
-      model: model.trim(), stream: false, max_tokens: 2048,
+      model: model.trim(), stream: false, max_tokens: 1024,
       messages: [{ role: 'system', content: systemPrompt }, ...convertMessages(messages)],
       tools: CAKE_AI_TOOLS.map(tool => ({ type: 'function', function: {
         name: tool.name, description: tool.description,

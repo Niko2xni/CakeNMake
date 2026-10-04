@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Send, Sparkles, Bot, Loader2, Plus, Mic, Square, X, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,15 @@ export default function AIChatPanel({ config, onChange, quote, session, active =
   const [preparing, setPreparing] = useState(false);
   const [mediaError, setMediaError] = useState('');
   const fileRef = useRef(null);
+  const inputRef = useRef(null);
+  useLayoutEffect(() => {
+    const element = inputRef.current;
+    if (!element) return;
+    element.style.height = '32px';
+    const height = Math.min(104, Math.max(32, element.scrollHeight));
+    element.style.height = `${height}px`;
+    element.style.overflowY = element.scrollHeight > 104 ? 'auto' : 'hidden';
+  }, [input, active]);
   const mediaVersion = useRef(0);
   const referenceRequest = useRef(null);
   const dictation = useCakeDictation({ active: active && !thinking && !unavailable, sessionKey: session?.key,
@@ -266,34 +275,37 @@ export default function AIChatPanel({ config, onChange, quote, session, active =
       <div className="shrink-0 space-y-2">
         {(mediaError || dictation.error) && <p role="alert" className="text-xs text-destructive">{mediaError || dictation.error}</p>}
         {preparing && <p role="status" className="text-xs text-muted-foreground">Preparing reference image...</p>}
-        <div className="rounded-2xl border border-border bg-background p-2 shadow-sm focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10 transition-colors">
+        {dictation.interim && <p role="status" className="text-xs text-muted-foreground break-words">Heard: {dictation.interim}</p>}
+        <div className="rounded-2xl border border-border bg-background p-1.5 shadow-sm focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10 transition-colors">
         {attachment && <div className="flex items-center gap-2 rounded-xl bg-muted p-2 mb-1">
           <img src={attachment.data} alt="Cake reference preview" className="h-12 w-12 rounded-lg object-cover" />
           <span className="text-xs truncate flex-1">{attachment.name}</span>
           <Button variant="ghost" size="icon" aria-label="Remove reference image" disabled={thinking} onClick={() => setAttachment(null)}><X className="h-4 w-4" /></Button>
         </div>}
         <Textarea
+          ref={inputRef}
+          rows={1}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
           placeholder="Describe your cake..."
           maxLength={2000}
-          className="min-h-[64px] max-h-[120px] text-xs resize-none border-0 rounded-xl px-2 py-2 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+          className="min-h-[32px] max-h-[104px] text-xs leading-[20px] resize-none border-0 rounded-xl px-2 py-1.5 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
           disabled={thinking || unavailable || dictation.listening}
         />
-        <div className="flex items-center gap-1 pt-1">
+        <div className="flex items-center gap-1">
           <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" aria-label="Choose cake reference image" onChange={attachImage} />
           <Button variant="ghost" size="sm" className="h-8 px-2 text-[11px] text-muted-foreground" aria-label="Add reference image" disabled={thinking || unavailable || preparing} onClick={() => fileRef.current?.click()}><Plus className="h-3.5 w-3.5 mr-1" /> Image</Button>
           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" aria-label={dictation.listening ? 'Stop dictation' : 'Start dictation'} title={dictation.supported ? 'Dictate your cake request' : 'Speech recognition is unavailable in this browser'} aria-pressed={dictation.listening} disabled={!dictation.supported || thinking || unavailable} onClick={dictation.toggle}>
             {dictation.listening ? <Square className="h-4 w-4 text-primary" /> : <Mic className="h-4 w-4" />}
           </Button>
-          {dictation.listening && <span role="status" className="text-xs text-primary">Listening...</span>}
+          {dictation.listening && <span role="status" className="text-xs text-primary">{dictation.started ? 'Listening...' : 'Starting mic...'}</span>}
           <div className="flex-1" />
           <Button size="icon" className="rounded-xl shrink-0 h-8 w-8" onClick={() => sendMessage()} aria-label="Send cake request" disabled={(!input.trim() && !attachment) || thinking || unavailable || preparing || dictation.listening}><Send className="w-4 h-4" /></Button>
         </div>
         </div>
         <p className="text-[10px] leading-relaxed text-muted-foreground text-center px-1">AI may miss details or differ from your reference. Review your design before sending it to a bakery.</p>
-        <p className="text-[10px] leading-relaxed text-muted-foreground text-center px-1">Browser dictation may process audio online.</p>
+        <p className="text-[10px] leading-relaxed text-muted-foreground text-center px-1">{dictation.supported ? 'Browser dictation may process audio online.' : 'Voice input is unavailable in this browser. Use a browser with speech recognition or type your request.'}</p>
       </div>
     </div>
   );
