@@ -22,7 +22,9 @@ test('Vercel sends tools to its fixed endpoint and normalizes tool calls', async
   assert.equal(body.model, 'alibaba/qwen3.8-omni-flash');
   assert.equal(body.messages[0].role, 'system');
   assert.equal(body.messages[0].content, 'Cake instructions');
-  assert.equal(body.tools.length, 10);
+  assert.equal(body.tools.length, 12);
+  assert.ok(body.tools.some(tool => tool.function.name === 'set_edge_border'));
+  assert.ok(body.tools.some(tool => tool.function.name === 'set_cake_text' && tool.function.parameters.properties.text.maxLength === 60));
   assert.equal(body.tools[0].function.parameters.additionalProperties, false);
   assert.equal(body.tool_choice, 'auto');
   assert.equal(body.provider, undefined); // OpenRouter-specific settings must not leak into Vercel.

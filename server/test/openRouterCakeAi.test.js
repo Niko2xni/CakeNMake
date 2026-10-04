@@ -60,7 +60,9 @@ test('sends configured model, current system prompt, and schemas on every reques
   const body = JSON.parse(request.body);
   assert.equal(body.model, 'test/model');
   assert.equal(body.messages[0].content, 'Current cake JSON');
-  assert.equal(body.tools.length, 10);
+  assert.equal(body.tools.length, 12);
+  assert.ok(body.tools.some(tool => tool.function.name === 'set_edge_border'));
+  assert.ok(body.tools.some(tool => tool.function.name === 'set_cake_text' && tool.function.parameters.properties.text.maxLength === 60));
   assert.equal(body.tools[0].function.parameters.additionalProperties, false);
   assert.equal(body.provider.require_parameters, true);
   assert.equal(response.content[0].text, 'Hello!');

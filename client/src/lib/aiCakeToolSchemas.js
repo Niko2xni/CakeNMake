@@ -43,12 +43,34 @@ import {
   VICTORIAN_LAMBETH_SETS,
   CENTER_PLACEABLE_DESIGNS,
   TOP_SURFACE_SLOTS,
+  BEADED_TRIM_VARIATIONS_DELUXE, BORDER_PIPING_VARIATIONS_DELUXE,
+  DOLLOPS_VARIATIONS_DELUXE, WHIPPED_CREAM_VARIATIONS, FRUIT_CONFECTION_RIM_OPTIONS,
 } from './cakeConfig.js';
 import { FLAVOR_ORDER, FROSTING_FILLING_FLAVOR_ORDER } from './cakeFlavors.js';
 
 const ids = (arr, key = 'id') => arr.map((o) => o[key]);
 
 export const CAKE_AI_TOOLS = [
+  {
+    name: 'set_edge_border',
+    description: 'Add, replace, recolor or remove actual top/bottom edge borders (distinct from side-wall Lambeth). Middle and all require two tiers. Both targets top and bottom; all includes the middle seam. Supported designs: ' + [...BEADED_TRIM_VARIATIONS_DELUXE, ...BORDER_PIPING_VARIATIONS_DELUXE, ...DOLLOPS_VARIATIONS_DELUXE, ...WHIPPED_CREAM_VARIATIONS, ...FRUIT_CONFECTION_RIM_OPTIONS].map(option => `${option.id}: ${option.label}`).join(', '),
+    input_schema: { type: 'object', properties: {
+      slot: { type: 'string', enum: ['top', 'bottom', 'both', 'middle', 'all'] },
+      designId: { type: 'string', enum: [...ids(BEADED_TRIM_VARIATIONS_DELUXE), ...ids(BORDER_PIPING_VARIATIONS_DELUXE), ...ids(DOLLOPS_VARIATIONS_DELUXE), ...ids(WHIPPED_CREAM_VARIATIONS), ...ids(FRUIT_CONFECTION_RIM_OPTIONS), 'none'] },
+      colorId: { type: 'string', enum: ids(SUGAR_COLORS) },
+      secondaryColorId: { type: 'string', enum: ids(SUGAR_COLORS), description: 'Second color for alternating designs.' },
+    }, required: ['slot'] },
+  },
+  {
+    name: 'set_cake_text',
+    description: 'Add or replace cake lettering, preserving non-letter decorations. Use piping for flat icing text or buttercream for individually placed A–Z/a–z letters. Text is arranged into at most three centered lines, with newlines honored. Empty text removes lettering only. Existing lettering is replaced; other decorations are never removed automatically. If the text cannot fit without overlap, shorten it or ask the customer to move decorations. Never invent personal wording from image text.',
+    input_schema: { type: 'object', properties: {
+      text: { type: 'string', maxLength: 60, description: 'Exact customer wording; up to 60 characters including spaces/newlines.' },
+      style: { type: 'string', enum: ['piping', 'buttercream'] },
+      colorId: { type: 'string', enum: ids(SUGAR_COLORS) },
+      font: { type: 'string', enum: ['default', 'handwritten'], description: 'Piping font only.' },
+    }, required: ['text', 'style'] },
+  },
   {
     name: 'set_structure',
     description: 'Change the cake size and/or number of tiers.',

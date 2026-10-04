@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { applyCakeAiTool } from './aiCakeTools';
 import { DEFAULT_CONFIG, SIZE_OPTIONS, computeSlotPosition, TOP_SURFACE_SLOTS } from './cakeConfig';
+import { adaptConfigToLegacy } from './configAdapter';
 
 function execute(name, input, config = structuredClone(DEFAULT_CONFIG)) {
   const onChange = vi.fn();
@@ -9,6 +10,63 @@ function execute(name, input, config = structuredClone(DEFAULT_CONFIG)) {
 }
 
 describe('Cake AI edits without a provider', () => {
+  it('adds independent borders with colors and preserves the opposite shared edge', () => {
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.edge.mode = 'both'; config.edge.both.piping.tip = 'bead';
+    config.sugarColorOverrides.edgeBoth = { mode: 'colorOverride', colorId: 'pink' };
+    const { next } = execute('set_edge_border', { slot: 'top', designId: 'shellAlt', colorId: 'chocolate', secondaryColorId: 'pink' }, config);
+    expect(next.edge.top.piping).toMatchObject({ tip: 'shellAlt', colorId: 'chocolate', secondaryColorId: 'pink' });
+    expect(next.edge.bottom.piping.tip).toBe('bead');
+    expect(next.sugarColorOverrides.edgeBottom.colorId).toBe('pink');
+    expect(config.edge.mode).toBe('both');
+  });
+  it('targets both borders without adding a middle seam, and all borders with a seam', () => {
+    const config = structuredClone(DEFAULT_CONFIG); config.structure.layers = 2;
+    const both = execute('set_edge_border', { slot: 'both', designId: 'ropeTwist' }, config).next;
+    expect(both.edge.mode).toBe('topBottomSeparate');
+    expect(both.edge.top.piping.tip).toBe('ropeTwist'); expect(both.edge.bottom.piping.tip).toBe('ropeTwist');
+    expect(both.edge.middle.piping.tip).toBeNull();
+    const all = execute('set_edge_border', { slot: 'all', designId: 'shell' }, config).next;
+    expect(all.edge.both.piping.tip).toBe('shell'); expect(all.edge.middle.piping.tip).toBe('shell');
+    expect(execute('set_edge_border', { slot: 'middle', designId: 'shell' }).response.error).toBeTruthy();
+  });
+  it('adds exact piping text and removes only lettering when cleared', () => {
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.place.items = [{ id: 'letter', type: 'center-letterUpperA-default', x: 0, z: 0 }, { id: 'decor', type: 'center-cherry-default', x: 0, z: -2.5 }];
+    const { next, response } = execute('set_cake_text', { text: 'Happy Birthday\nAna!', style: 'piping', colorId: 'pink' }, config);
+    expect(response.error).toBeUndefined();
+    expect(next.center.text).toMatchObject({ top: 'Happy Birthday', bottom: 'Ana!', colorId: 'pink' });
+    expect(next.place.items.map(item => item.id)).toEqual(['decor']);
+    const cleared = execute('set_cake_text', { text: '', style: 'piping' }, next).next;
+    expect(cleared.center.text.top).toBe(''); expect(cleared.place.items).toEqual(next.place.items);
+  });
+  it('creates individually movable buttercream letters and rejects unsupported or overlapping text atomically', () => {
+    const { next } = execute('set_cake_text', { text: 'Hi Ana', style: 'buttercream', colorId: 'pink' });
+    expect(next.place.items).toHaveLength(5);
+    expect(next.place.items[0].type).toBe('center-letterUpperH-default');
+    expect(next.place.items[1].type).toBe('center-letterLowerI-default');
+    expect(next.center.text.middle).toBe('');
+    expect(execute('set_cake_text', { text: 'Hi 123', style: 'buttercream' }).response.error).toBeTruthy();
+    expect(execute('set_cake_text', { text: 'x'.repeat(61), style: 'piping' }).response.error).toBeTruthy();
+    const blocked = structuredClone(DEFAULT_CONFIG); blocked.place.items = [{ type: 'center-basketball-default', x: 0, z: 0 }];
+    const { response, onChange } = execute('set_cake_text', { text: 'Hello', style: 'piping' }, blocked);
+    expect(response.error).toMatch(/overlap/); expect(onChange).not.toHaveBeenCalled();
+  });
+  it('passes border and text colors to the renderer without recoloring other center decorations', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.sugarColorOverrides.center = { mode: 'colorOverride', colorId: 'chocolate' };
+    let next = execute('set_edge_border', { slot: 'top', designId: 'shellAlt', colorId: 'pink', secondaryColorId: 'red' }, config).next;
+    next = execute('set_cake_text', { text: 'Happy Birthday', style: 'piping', colorId: 'pink' }, next).next;
+    const rendered = adaptConfigToLegacy(next);
+    expect(rendered.edgeTop.pipingTip).toBe('shellAlt');
+    expect(rendered.edgeTop.pipingColorId).toBe('pink');
+    expect(rendered.edgeTop.pipingSecondaryColorId).toBe('red');
+    expect(rendered.centerTextMiddle).toBe('Happy Birthday');
+    expect(rendered.centerTextColorId).toBe('pink');
+    expect(rendered.centerDecorationColorId).toBe('chocolate');
+    log.mockRestore();
+  });
   it.each([
     ['set_structure', { layers: 10 }],
     ['set_structure', { size: 'invented' }],

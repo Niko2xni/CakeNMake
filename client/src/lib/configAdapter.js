@@ -272,8 +272,9 @@ export function adaptConfigToLegacy(newConfig) {
   const centerTextSpacing = typeof center.text?.spacing === 'number' ? center.text.spacing : 0.28;
   const centerText = [rawTop, rawMiddle, rawBottom].filter(Boolean).join('\n');
   const centerTextFont = center.text?.font || 'script';
-  const centerTextColor = centerSugarColorHex || resolveColor(center.text?.colorId);
-  const centerTextColorId = centerSugarColorId || center.text?.colorId || null;
+  const individualTextColor = center.text?.colorMode === 'individual' && center.text?.colorId;
+  const centerTextColor = individualTextColor ? resolveColor(individualTextColor) : centerSugarColorHex || resolveColor(center.text?.colorId);
+  const centerTextColorId = individualTextColor || centerSugarColorId || center.text?.colorId || null;
   const centerTextColorMode = center.text?.colorMode || 'uniform';
 
   // ── Edge — Top+Bottom-separate XOR Both (genuine delete, spec §4b).
