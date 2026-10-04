@@ -75,6 +75,8 @@ export default function AIChatPanel({ config, onChange, quote, session, active =
   const sendMessage = async (text) => {
     const msg = (text || input).trim() || (attachment ? 'Use this cake reference as inspiration for my design.' : '');
     if (!msg || thinking || unavailable || preparing || dictation.listening) return;
+    const sentAttachment = attachment;
+    setAttachment(null);
     setMediaError('');
     setInput('');
     setDisplay((prev) => [...prev, { role: 'user', content: msg + (attachment ? `\nReference: ${attachment.name}` : '') }]);
@@ -89,15 +91,14 @@ export default function AIChatPanel({ config, onChange, quote, session, active =
     const requestSession = session?.key;
 
     try {
-      if (attachment) {
-        let description = attachment.description;
+      if (sentAttachment) {
+        let description = sentAttachment.description;
         if (!description) {
           const controller = new AbortController(); referenceRequest.current = controller;
           const timeout = setTimeout(() => controller.abort(), 50000);
-          try { description = await cakeAiApi.describeReference(attachment.data, msg, controller.signal); }
+          try { description = await cakeAiApi.describeReference(sentAttachment.data, msg, controller.signal); }
           finally { clearTimeout(timeout); referenceRequest.current = null; }
           if (activeSession.current !== requestSession) return;
-          setAttachment(previous => previous ? { ...previous, description } : previous);
         }
         nextHistory[nextHistory.length - 1] = { role: 'user', content: [
           { type: 'text', text: msg },
@@ -113,7 +114,6 @@ export default function AIChatPanel({ config, onChange, quote, session, active =
           setHistory([...nextHistory, { role: 'assistant', content: response.content,
             ...(response.reasoning_details ? { reasoning_details: response.reasoning_details } : {}),
           }]);
-          setAttachment(null);
           setDisplay((prev) => [
             ...prev,
             { role: 'assistant', content: finalText, changes: changesThisTurn.length ? changesThisTurn : undefined },
@@ -150,7 +150,6 @@ export default function AIChatPanel({ config, onChange, quote, session, active =
       // Hit the turn cap without a final text reply — still surface what
       // changed rather than leaving the person with no response at all.
       setHistory(nextHistory);
-      setAttachment(null);
       setDisplay((prev) => [
         ...prev,
         { role: 'assistant', content: "I've made a few changes — let me know if you'd like anything else!", changes: changesThisTurn.length ? changesThisTurn : undefined },

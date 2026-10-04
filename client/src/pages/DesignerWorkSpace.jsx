@@ -653,7 +653,7 @@ export default function DesignerWorkSpace() {
     }
 
     // Direct the user to the dedicated Client Chats page
-    navigate('/client/chats');
+    navigate('/chats');
   }, [account, saveDesign, saveThumbnail, quote, title, navigate]);
 
   const handleSaveDesign = async () => {

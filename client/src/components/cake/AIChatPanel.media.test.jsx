@@ -26,7 +26,7 @@ it('analyzes an attachment once and sends only its description through tool exch
   expect(screen.queryByAltText('Cake reference preview')).not.toBeInTheDocument();
 });
 
-it('keeps a failed reference for retry and shows a useful error without editing', async () => {
+it('clears the sent reference even when analysis fails and shows a useful error without editing', async () => {
   prepareCakeReference.mockResolvedValue({ name: 'cake.png', data: 'image' });
   cakeAiApi.describeReference.mockRejectedValue(Object.assign(new Error('failed'), { validationMessage: 'Choose a cake reference.' }));
   const log = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -36,8 +36,27 @@ it('keeps a failed reference for retry and shows a useful error without editing'
   fireEvent.click(screen.getByRole('button', { name: 'Send cake request' }));
   await screen.findByText('Choose a cake reference.');
   expect(cakeAiApi.sendMessage).not.toHaveBeenCalled();
-  expect(screen.getByAltText('Cake reference preview')).toBeInTheDocument();
+  expect(screen.queryByAltText('Cake reference preview')).not.toBeInTheDocument();
   log.mockRestore();
+});
+
+it('clears the composer immediately while keeping the submitted image available to the pending request', async () => {
+  let finishAnalysis;
+  prepareCakeReference.mockResolvedValue({ name: 'cake.png', data: 'image-bytes' });
+  cakeAiApi.describeReference.mockImplementationOnce(() => new Promise(resolve => { finishAnalysis = resolve; }));
+  cakeAiApi.sendMessage.mockResolvedValue({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'Reference applied.' }] });
+  render(<AIChatPanel config={DEFAULT_CONFIG} onChange={vi.fn()} />);
+  fireEvent.change(screen.getByLabelText('Choose cake reference image'), { target: { files: [new File(['x'], 'cake.png', { type: 'image/png' })] } });
+  await screen.findByAltText('Cake reference preview');
+  fireEvent.click(screen.getByRole('button', { name: 'Send cake request' }));
+  expect(screen.queryByAltText('Cake reference preview')).not.toBeInTheDocument();
+  expect(cakeAiApi.describeReference).toHaveBeenCalledWith('image-bytes', expect.any(String), expect.any(AbortSignal));
+  await act(async () => finishAnalysis('Pink cake.'));
+  await screen.findByText('Reference applied.');
+  fireEvent.change(screen.getByPlaceholderText('Describe your cake...'), { target: { value: 'Make it blue' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Send cake request' }));
+  await waitFor(() => expect(cakeAiApi.sendMessage).toHaveBeenCalledTimes(2));
+  expect(cakeAiApi.describeReference).toHaveBeenCalledTimes(1);
 });
 
 it('dictates into the draft without sending and stops when the AI panel is hidden', async () => {
