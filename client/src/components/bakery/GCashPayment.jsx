@@ -13,6 +13,7 @@ export default function GCashPayment({ total, selectedDate, onPaid, onBack, onPa
   const downpayment = Math.ceil(total / 2);
   const [ref] = useState(() => generateRef(downpayment));
   const [paying, setPaying] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [done, setDone] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -64,9 +65,13 @@ export default function GCashPayment({ total, selectedDate, onPaid, onBack, onPa
           <span className="text-muted-foreground">Total cake price</span>
           <span className="font-medium">₱{total}</span>
         </div>
+        <div className="flex justify-between text-xs">
+          <span className="text-muted-foreground">Remaining balance</span>
+          <span className="font-medium text-muted-foreground">₱{total - downpayment}</span>
+        </div>
         <Separator className="opacity-40" />
         <div className="flex justify-between text-sm font-bold">
-          <span>Down payment (50%)</span>
+          <span>Down payment (50% due now)</span>
           <span className="text-primary">₱{downpayment}</span>
         </div>
       </div>
@@ -100,9 +105,17 @@ export default function GCashPayment({ total, selectedDate, onPaid, onBack, onPa
             <p className="font-mono text-xs font-bold tracking-widest text-foreground">{ref}</p>
           </div>
 
-          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-            <ShieldCheck className="w-3 h-3 text-green-500" />
-            Secured by PayMongo • Only ₱{downpayment} will be charged
+          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mb-3">
+            <ShieldCheck className="w-3 h-3 text-green-500 shrink-0" />
+            Secured by PayMongo • Only ₱{downpayment} will be charged now
+          </div>
+
+          {/* Payment terms & liability disclosure */}
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-2.5 text-[10.5px] text-amber-900 dark:text-amber-200 leading-snug">
+            <p className="font-semibold mb-0.5">⚠️ Fulfillment &amp; Payment Rules</p>
+            <p>
+              Paying this 50% down payment confirms your order slot. The remaining balance (₱{total - downpayment}) must be fully settled on or before delivery. The bakery will not release or deliver the cake without complete payment, and neither the platform nor the bakery is liable for non-fulfillment due to unpaid balances.
+            </p>
           </div>
         </div>
       </div>
@@ -117,9 +130,76 @@ export default function GCashPayment({ total, selectedDate, onPaid, onBack, onPa
           <Button className="w-full" onClick={onPaid} disabled={!submitted || submitting}>Open Bakery Chat</Button>
         </div>
       ) : (
-        <Button className="w-full bg-[#007DFF] hover:bg-[#0068D9]" onClick={handlePay} disabled={paying}>
+        <Button className="w-full bg-[#007DFF] hover:bg-[#0068D9]" onClick={() => setShowConfirmModal(true)} disabled={paying}>
           {paying ? 'Processing...' : `Pay ₱${downpayment} via GCash`}
         </Button>
+      )}
+
+      {/* Elaborate Final Confirmation & Rules Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-card border border-border/60 rounded-2xl shadow-2xl w-full max-w-[380px] p-5 text-left space-y-4">
+            <div className="flex items-center gap-2.5 text-primary">
+              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                <ShieldCheck className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-heading font-bold text-base text-foreground leading-tight">Confirm Order &amp; Payment</h3>
+                <p className="text-[11px] text-muted-foreground">Please review these essential terms</p>
+              </div>
+            </div>
+
+            <div className="space-y-2.5 text-xs text-muted-foreground bg-muted/30 border border-border/40 rounded-xl p-3">
+              <div className="flex items-start gap-2">
+                <span className="font-bold text-foreground shrink-0">•</span>
+                <p>
+                  <strong className="text-foreground">50% Down Payment (₱{downpayment}):</strong> Will be charged now via GCash to reserve your bakery slot and initiate preparation.
+                </p>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="font-bold text-foreground shrink-0">•</span>
+                <p>
+                  <strong className="text-foreground">Remaining Balance (₱{total - downpayment}):</strong> Must be settled on or before delivery/pickup.
+                </p>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="font-bold text-foreground shrink-0">•</span>
+                <p>
+                  <strong className="text-foreground">Permanent Design Lock:</strong> Once paid and sent, this design is permanently finalized for viewing only and cannot be edited.
+                </p>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="font-bold text-foreground shrink-0">•</span>
+                <p>
+                  <strong className="text-foreground">Fulfillment Policy:</strong> Unsettled cakes will not be released. The bakery and platform are not liable for non-fulfillment due to unpaid balances.
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs font-semibold text-foreground text-center pt-1">
+              Are you sure you want to proceed and finalize this order?
+            </p>
+
+            <div className="flex gap-2 pt-1">
+              <Button
+                variant="outline"
+                className="flex-1 rounded-xl text-xs"
+                onClick={() => setShowConfirmModal(false)}
+              >
+                Go Back
+              </Button>
+              <Button
+                className="flex-1 rounded-xl text-xs font-bold bg-[#007DFF] hover:bg-[#0068D9] text-white"
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  handlePay();
+                }}
+              >
+                Yes, Confirm &amp; Pay
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

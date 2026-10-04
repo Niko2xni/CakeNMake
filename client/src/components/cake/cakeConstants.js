@@ -62,14 +62,78 @@ export const FILLING_COLORS = {
   mocha: '#8D6E63',
 };
 
-// Interior Preview cutaway: a single plane through the cake's central (Y)
-// axis. Its normal points along the -X/-Z diagonal, so the half-space it
-// clips away is {x + z > 0} — the front-right half of the cake, a clean
-// 180° cutaway, camera-facing by default since the camera sits on the
-// +X/+Z side. This only ever gets applied to materials that actually cover
-// the sponge/filling (currently just the frosting shell).
-export const INTERIOR_PREVIEW_CLIP_PLANES = [
+// ---------------------------------------------------------------------------
+// Interior Preview Cutaway Clipping Planes
+// ---------------------------------------------------------------------------
+
+// Standard 180° / 180° 2-way split: clips front-right 180° (x + z > 0)
+export const INTERIOR_PREVIEW_CLIP_PLANES_2WAY = [
   new THREE.Plane(new THREE.Vector3(-1, 0, -1).normalize(), 0),
+];
+
+// Backwards-compatible alias
+export const INTERIOR_PREVIEW_CLIP_PLANES = INTERIOR_PREVIEW_CLIP_PLANES_2WAY;
+
+const DEG2RAD = Math.PI / 180;
+const norm = (deg) => new THREE.Vector3(Math.cos(deg * DEG2RAD), 0, Math.sin(deg * DEG2RAD)).normalize();
+
+// ---------------------------------------------------------------------------
+// 3-Way 120° / 120° / 120° Split
+// Sector 1: [-15°, 105°] (Naked 120°)
+// Sector 2: [105°, 225°] (Feature 1 120°)
+// Sector 3: [225°, 345°] (Feature 2 120°)
+// ---------------------------------------------------------------------------
+
+// Frosting in 3-way split: kept in 240° arc (Sector 2 & Sector 3), clipped in Sector 1 (120°)
+// Used with clipIntersection = true
+export const INTERIOR_PREVIEW_FROSTING_3WAY_PLANES = [
+  new THREE.Plane(norm(-105), 0),
+  new THREE.Plane(norm(195), 0),
+];
+
+// Sector 2 in 3-way split: kept in [105°, 225°] (120°), clipped in Sector 1 & 3 (240°)
+// Used with clipIntersection = false (e.g. Drip in Naked + Drip + Side)
+export const INTERIOR_PREVIEW_SECTOR2_3WAY_PLANES = [
+  new THREE.Plane(norm(195), 0),
+  new THREE.Plane(norm(135), 0),
+];
+
+// Sector 3 in 3-way split: kept in [225°, 345°] (120°), clipped in Sector 1 & 2 (240°)
+// Used with clipIntersection = false (e.g. Drip in Frosted + Drip, or Side in Frosted + Side / Naked + Drip + Side)
+export const INTERIOR_PREVIEW_SECTOR3_3WAY_PLANES = [
+  new THREE.Plane(norm(-105), 0),
+  new THREE.Plane(norm(315), 0),
+];
+
+export const INTERIOR_PREVIEW_DRIP_3WAY_PLANES = INTERIOR_PREVIEW_SECTOR3_3WAY_PLANES;
+export const INTERIOR_PREVIEW_SIDE_3WAY_PLANES = INTERIOR_PREVIEW_SECTOR3_3WAY_PLANES;
+
+// ---------------------------------------------------------------------------
+// 4-Way 90° / 90° / 90° / 90° Split
+// Sector 1: [0°, 90°] (Naked 90°)
+// Sector 2: [90°, 180°] (Frosting / Textured Finish 90°)
+// Sector 3: [180°, 270°] (Drip 90°)
+// Sector 4: [270°, 360°] (Side Selection 90°)
+// ---------------------------------------------------------------------------
+
+// Frosting in 4-way split: kept in 270° arc (Sector 2, 3, 4: [90°, 360°]), clipped in Sector 1 (90°)
+// Used with clipIntersection = true
+export const INTERIOR_PREVIEW_4WAY_FROSTING_PLANES = [
+  new THREE.Plane(new THREE.Vector3(0, 0, -1), 0),
+  new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0),
+];
+
+// Drip / Glaze in 4-way split: kept in Sector 3 & Sector 4 ([180°, 360°], 180° arc), clipped in Sector 1 & 2 (180°)
+// Used with clipIntersection = false
+export const INTERIOR_PREVIEW_4WAY_DRIP_PLANES = [
+  new THREE.Plane(new THREE.Vector3(0, 0, -1), 0),
+];
+
+// Side in 4-way split: kept in Sector 4 ([270°, 360°], 90°), clipped in Sector 1, 2, 3 (270°)
+// Used with clipIntersection = false
+export const INTERIOR_PREVIEW_4WAY_SIDE_PLANES = [
+  new THREE.Plane(new THREE.Vector3(1, 0, 0), 0),
+  new THREE.Plane(new THREE.Vector3(0, 0, -1), 0),
 ];
 
 // The six GLAZE_PATTERNS variants (see cakeConfig.js), expressed as

@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  Bot,
   Clock,
   LayoutTemplate,
   LogOut,
@@ -16,7 +15,6 @@ import { useAuth } from '@/lib/AuthContext';
 const primaryItems = [
   { to: '/client', icon: Clock, label: 'Recents' },
   { to: '/templates', icon: LayoutTemplate, label: 'Templates' },
-  { to: '/cake-ai', icon: Bot, label: 'Cake AI' },
   { to: '/trash', icon: Trash2, label: 'Trash' },
 ];
 

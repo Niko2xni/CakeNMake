@@ -22,7 +22,7 @@ import { SURFACE_TREATMENT_MODES, GLAZE_PATTERNS } from '@/lib/cakeConfig';
 // variants shape ExteriorFinishSection's Buttercream Texture picker uses
 // for Ridged Comb/Ribbon Wrap.
 export default function SurfaceTreatmentSection({ surfaceTreatment, onChange, isIndividual = false, activeLayer = 0 }) {
-  const sectionLabel = isIndividual ? `Tier ${activeLayer + 1} Glaze` : 'Surface Treatment';
+  const sectionLabel = isIndividual ? `Tier ${activeLayer + 1} Drip` : 'Surface Treatment';
   const activeTreatment = isIndividual
     ? (surfaceTreatment.layerTreatments?.[activeLayer] || surfaceTreatment)
     : surfaceTreatment;
@@ -42,7 +42,10 @@ export default function SurfaceTreatmentSection({ surfaceTreatment, onChange, is
             { [activeLayer]: nextTreatment },
           ),
         }
-      : nextTreatment);
+      : {
+          ...nextTreatment,
+          layerTreatments: Array.from({ length: 2 }, () => ({ ...nextTreatment })),
+        });
   };
 
   const updatePattern = (pattern) => {
@@ -57,7 +60,10 @@ export default function SurfaceTreatmentSection({ surfaceTreatment, onChange, is
             { [activeLayer]: nextTreatment },
           ),
         }
-      : nextTreatment);
+      : {
+          ...nextTreatment,
+          layerTreatments: Array.from({ length: 2 }, () => ({ ...nextTreatment })),
+        });
   };
 
   return (

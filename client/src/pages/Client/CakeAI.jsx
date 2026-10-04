@@ -105,7 +105,7 @@ function CustomScrollbar({ className = '', contentClassName = '', children }) {
   return (
     <div className={`relative min-h-0 ${className}`}>
       {thumbMetrics.visible && (
-        <div className="cn-ai-scrollbar absolute top-0 right-0 h-full w-4 flex flex-col z-10">
+        <div className="cn-ai-scrollbar hidden md:flex absolute top-0 right-0 h-full w-4 flex-col z-10">
           <button
             onClick={scrollUp}
             aria-label="Scroll up"
@@ -136,7 +136,7 @@ function CustomScrollbar({ className = '', contentClassName = '', children }) {
       <div
         ref={scrollRef}
         onScroll={updateThumbMetrics}
-        className={`h-full overflow-y-auto ${thumbMetrics.visible ? 'pr-5' : ''} [&::-webkit-scrollbar]:hidden [scrollbar-width:none]`}
+        className={`h-full overflow-y-auto ${thumbMetrics.visible ? 'md:pr-5' : ''} [&::-webkit-scrollbar]:hidden [scrollbar-width:none]`}
       >
         <div ref={contentRef} className={contentClassName}>{children}</div>
       </div>
@@ -316,7 +316,7 @@ export default function CakeAI() {
   const hasContentToSend = message.trim().length > 0 || attachedFiles.length > 0;
 
   return (
-    <div className="cn-app-page cn-ai-page min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-orange-50 ml-[70px] flex relative overflow-visible">
+    <div className="cn-app-page cn-ai-page min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-orange-50 flex relative overflow-visible">
       <ClientNavbar />
       
       {/* PERSONAL HISTORY SIDE NAVIGATION */}

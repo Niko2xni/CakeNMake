@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Cake, Loader2, RefreshCw, Search, Send, User, X } from 'lucide-react';
 import CustomScrollbar from '@/components/shared/CustomScrollbar';
+import { AdminRowsSkeleton } from '@/components/shared/PageLoadingSkeleton';
+import { Skeleton } from '@/components/ui/skeleton';
 import { sortConversationsByActivity, useChat } from '@/hooks/useChat';
 import { chatApi } from '@/services/chat-api';
 
@@ -95,7 +97,7 @@ export default function BakeryChat() {
           </label>
         </div>
         <CustomScrollbar className="flex-1">
-          {chat.loading && <Loader2 className="w-5 h-5 mx-auto my-8 animate-spin text-pink-500" />}
+          {chat.loading && <div role="status" aria-label="Loading customer conversations" className="p-3"><AdminRowsSkeleton count={5} avatar /></div>}
           {!chat.loading && chat.conversations.length === 0 && <p className="text-sm text-gray-600 text-center px-4 py-8">No customer conversations yet.</p>}
           {!chat.loading && chat.conversations.length > 0 && visibleConversations.length === 0 && <p className="text-sm text-gray-600 text-center px-4 py-8">No customers match your search.</p>}
           {visibleConversations.map((conversation) => {
@@ -130,7 +132,13 @@ export default function BakeryChat() {
             </header>
             <div className="flex-1 overflow-y-auto px-6 py-4 bg-gradient-to-br from-pink-50/60 via-white to-orange-50/50">
               {chat.hasMore && <button onClick={chat.loadOlder} disabled={chat.loadingMessages} className="block mx-auto mb-4 text-sm text-pink-700 hover:underline">{chat.loadingMessages ? 'Loading…' : 'Load earlier messages'}</button>}
-              {chat.loadingMessages && chat.messages.length === 0 && <Loader2 className="w-5 h-5 mx-auto animate-spin text-pink-500" />}
+              {chat.loadingMessages && chat.messages.length === 0 && (
+                <div role="status" aria-label="Loading messages" className="space-y-4">
+                  <Skeleton className="h-12 w-2/5 rounded-2xl" />
+                  <Skeleton className="ml-auto h-16 w-1/2 rounded-2xl" />
+                  <Skeleton className="h-14 w-1/3 rounded-2xl" />
+                </div>
+              )}
               <div className="space-y-2">
                 {chat.messages.filter(Boolean).map((message) => {
                   const fromBakery = message.senderRole !== 'customer';

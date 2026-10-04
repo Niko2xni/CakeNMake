@@ -26,7 +26,6 @@ describe('ClientNavbar', () => {
     expect(screen.getByRole('link', { name: /create/i })).toHaveAttribute('href', '/designer');
     expect(screen.getByRole('link', { name: /recents/i })).toHaveAttribute('href', '/client');
     expect(screen.getByRole('link', { name: /templates/i })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('link', { name: /cake ai/i })).toHaveAttribute('href', '/cake-ai');
     expect(screen.getByRole('link', { name: /trash/i })).toHaveAttribute('href', '/trash');
     expect(screen.getByRole('link', { name: /chats/i })).toHaveAttribute('href', '/chats');
   });

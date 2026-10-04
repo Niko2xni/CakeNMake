@@ -10,7 +10,11 @@ export default function SpongeFlavorSection({ sponge, structure, activeLayer, on
       newLayerFlavors[activeLayer] = flavor;
       onChange({ ...sponge, layerFlavors: newLayerFlavors });
     } else {
-      onChange({ ...sponge, flavor });
+      onChange({
+        ...sponge,
+        flavor,
+        layerFlavors: Array(structure?.layers || 2).fill(flavor),
+      });
     }
   };
 

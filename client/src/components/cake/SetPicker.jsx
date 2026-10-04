@@ -50,6 +50,8 @@ export default function SetPicker({
   colorId,
   onSelectColor,
   disabled = false,
+  disabledItemIds = [],
+  isItemDisabled,
   label,
   colorLabel = 'Color',
   showColorPicker = true,
@@ -78,14 +80,14 @@ export default function SetPicker({
             title="None"
             className={isBox
               ? `flex flex-col items-center gap-1.5 rounded-xl p-3 text-xs font-semibold transition-all duration-200 border-2 ${
-                  disabled ? 'cursor-not-allowed' : ''
+                  disabled ? 'cursor-not-allowed opacity-40' : ''
                 } ${
                   !activeSetId
                     ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-[1.02]'
                     : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
                 }`
               : `w-10 h-10 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
-                  disabled ? 'cursor-not-allowed' : ''
+                  disabled ? 'cursor-not-allowed opacity-40' : ''
                 } ${
                   !activeSetId
                     ? 'bg-primary text-primary-foreground border-primary'
@@ -107,27 +109,28 @@ export default function SetPicker({
         )}
         {sets.map((set, i) => {
           const active = activeSetId === set.id;
+          const itemDisabled = disabled || (disabledItemIds && disabledItemIds.includes(set.id)) || (isItemDisabled && isItemDisabled(set.id)) || Boolean(set.disabled);
           return (
             <button
               key={set.id}
               type="button"
-              disabled={disabled}
+              disabled={itemDisabled}
               onClick={() => onSelectSet(set.id)}
-              title={set.label}
+              title={itemDisabled ? `${set.label} (Not available for frosted/textured finish)` : set.label}
               className={isBox
                 ? `flex flex-col items-center gap-1.5 rounded-xl p-3 text-xs font-semibold transition-all duration-200 border-2 ${
-                    disabled ? 'cursor-not-allowed' : ''
-                  } ${
-                    active
-                      ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-[1.02]'
-                      : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
+                    itemDisabled
+                      ? 'opacity-40 cursor-not-allowed bg-muted/40 border-transparent text-muted-foreground hover:border-transparent'
+                      : active
+                        ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-[1.02]'
+                        : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
                   }`
                 : `w-10 h-10 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
-                    disabled ? 'cursor-not-allowed' : ''
-                  } ${
-                    active
-                      ? 'bg-primary text-primary-foreground border-primary shadow-md'
-                      : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
+                    itemDisabled
+                      ? 'opacity-40 cursor-not-allowed bg-muted/40 border-transparent text-muted-foreground hover:border-transparent'
+                      : active
+                        ? 'bg-primary text-primary-foreground border-primary shadow-md'
+                        : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
                   }`
               }
             >

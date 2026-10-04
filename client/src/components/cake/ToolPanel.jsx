@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Cake, Palette, Sparkles, RotateCcw, Layers, Building2, ChevronDown, ChevronUp, Eye, EyeOff, Bot, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { DEFAULT_CONFIG } from '@/lib/cakeConfig';
+import { DEFAULT_CONFIG, pruneItemsCollidingWithEdgeDelicates, getTopTierRadiusFromConfig } from '@/lib/cakeConfig';
 import CakeStructureSection from './sections/CakeStructureSection';
 import SpongeFlavorSection from './sections/SpongeFlavorSection';
 import FillingSection from './sections/FillingSection';
@@ -18,6 +18,7 @@ import SideSection from './sections/SideSection';
 import LayerTabStrip from './sections/LayerTabStrip';
 import TierDesignControl from './sections/TierDesignControl';
 import AIChatPanel from './AIChatPanel';
+import { syncTierDesignOnToggle } from '@/lib/tierDesignSync';
 
 // Nav rework — see CAKE_SETS_REWORK_SPEC.md §2. Two rows of three
 // (Option 1, approved) rather than one cramped row of six.
@@ -40,19 +41,70 @@ export default function ToolPanel({
   canPlaceUndo,
   canPlaceRedo,
   quote,
+  selectedCenterItemId,
+  onCenterItemSelect,
+  onDeleteSelectedCenterItem,
+  onCenterTextColorModeChange,
+  tab: controlledTab,
+  onTabChange,
+  activeLayer: controlledActiveLayer,
+  onActiveLayerChange,
+  activeEdgeSlot: controlledActiveEdgeSlot,
+  onActiveEdgeSlotChange,
+  modeUi: controlledModeUi,
+  onModeUiChange,
+  expandedSections: controlledExpandedSections,
+  onExpandedSectionsChange,
+  onDragHandlePointerDown,
+  hideScrollbar = false,
 }) {
-  const [modeUi, setModeUi] = useState('design'); // 'design' | 'ai'
-  const [tab, setTab] = useState('fundamentals');
-  const [activeLayer, setActiveLayer] = useState(0);
-  const [activeEdgeSlot, setActiveEdgeSlot] = useState('top');
+  const [internalModeUi, setInternalModeUi] = useState('design'); // 'design' | 'ai'
+  const modeUi = controlledModeUi !== undefined ? controlledModeUi : internalModeUi;
+  const setModeUi = (val) => {
+    const next = typeof val === 'function' ? val(modeUi) : val;
+    setInternalModeUi(next);
+    onModeUiChange?.(next);
+  };
 
-  const [expandedSections, setExpandedSections] = useState({
+  const [internalTab, setInternalTab] = useState('fundamentals');
+  const tab = controlledTab !== undefined ? controlledTab : internalTab;
+  const setTab = (val) => {
+    const next = typeof val === 'function' ? val(tab) : val;
+    setInternalTab(next);
+    onTabChange?.(next);
+  };
+
+  const [internalActiveLayer, setInternalActiveLayer] = useState(0);
+  const activeLayer = controlledActiveLayer !== undefined ? controlledActiveLayer : internalActiveLayer;
+  const setActiveLayer = (val) => {
+    const next = typeof val === 'function' ? val(activeLayer) : val;
+    setInternalActiveLayer(next);
+    onActiveLayerChange?.(next);
+  };
+
+  const [internalActiveEdgeSlot, setInternalActiveEdgeSlot] = useState('top');
+  const activeEdgeSlot = controlledActiveEdgeSlot !== undefined ? controlledActiveEdgeSlot : internalActiveEdgeSlot;
+  const setActiveEdgeSlot = (val) => {
+    const next = typeof val === 'function' ? val(activeEdgeSlot) : val;
+    setInternalActiveEdgeSlot(next);
+    onActiveEdgeSlotChange?.(next);
+  };
+
+  const [internalExpandedSections, setInternalExpandedSections] = useState({
     structure: true,
     sponge: true,
     filling: true,
     exteriorFinish: true,
     surfaceTreatment: true,
   });
+  const expandedSections = controlledExpandedSections !== undefined ? controlledExpandedSections : internalExpandedSections;
+  const setExpandedSections = (val) => {
+    const next = typeof val === 'function' ? val(expandedSections) : val;
+    setInternalExpandedSections(next);
+    onExpandedSectionsChange?.(next);
+  };
+
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   const isIndividual = config.structure?.layerDesign === 'individual' && config.structure?.layers > 1;
 
@@ -82,6 +134,13 @@ export default function ToolPanel({
     frostedNoticeTimeoutRef.current = setTimeout(() => setFrostedNotice(null), 2400);
   };
   useEffect(() => () => clearTimeout(frostedNoticeTimeoutRef.current), []);
+
+  useEffect(() => {
+    const maxLayer = (config.structure?.layers || 1) - 1;
+    if (activeLayer > maxLayer) {
+      setActiveLayer(0);
+    }
+  }, [config.structure?.layers, activeLayer]);
 
   // Refs to each collapsible section's own wrapper, keyed by section id —
   // used to scroll a section into view right after IT opens, so expanding
@@ -137,6 +196,12 @@ export default function ToolPanel({
     onChange({ ...config, interiorPreview: !config.interiorPreview });
   };
 
+  const handleTierDesignToggle = (newLayerDesign) => {
+    const targetDesign = newLayerDesign || (config.structure?.layerDesign === 'individual' ? 'uniform' : 'individual');
+    const syncedConfig = syncTierDesignOnToggle(config, targetDesign, activeLayer);
+    onChange(syncedConfig);
+  };
+
   const handleStructureChange = (newStructure, newRealSize) => {
     const tierCountChanged = newStructure.layers !== config.structure?.layers;
     if (!tierCountChanged) {
@@ -150,12 +215,90 @@ export default function ToolPanel({
     const legacyPlacedItems = (config.placedItems || []).filter(
       (item) => !(typeof item.type === 'string' && item.type.startsWith('center-'))
     );
-    onChange({
+
+    const baseConfig = {
       ...config,
       structure: newStructure,
       realSize: newRealSize,
       place: { ...(config.place || {}), items: centerItems },
       placedItems: legacyPlacedItems,
+    };
+
+    const syncedConfig = syncTierDesignOnToggle(
+      baseConfig,
+      newStructure.layerDesign,
+      activeLayer
+    );
+    onChange(syncedConfig);
+  };
+
+  const isDragScrollingRef = useRef(false);
+  const startDragYRef = useRef(0);
+  const startScrollTopRef = useRef(0);
+  const hasDraggedRef = useRef(false);
+  const suppressClickRef = useRef(false);
+
+  const handlePointerDownScroll = useCallback((e) => {
+    if (e.button !== 0) return;
+    if (e.target.closest('input, select, textarea, [role="slider"]')) return;
+
+    const root = e.currentTarget;
+    const viewport = root.querySelector('[data-radix-scroll-area-viewport]') || root;
+    if (!viewport) return;
+
+    isDragScrollingRef.current = true;
+    startDragYRef.current = e.clientY;
+    startScrollTopRef.current = viewport.scrollTop;
+    hasDraggedRef.current = false;
+
+    const onPointerMove = (moveEvent) => {
+      if (!isDragScrollingRef.current) return;
+      const deltaY = moveEvent.clientY - startDragYRef.current;
+      if (Math.abs(deltaY) > 8) {
+        hasDraggedRef.current = true;
+      }
+      viewport.scrollTop = startScrollTopRef.current - deltaY;
+    };
+
+    const onPointerUp = () => {
+      isDragScrollingRef.current = false;
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+
+      if (hasDraggedRef.current) {
+        suppressClickRef.current = true;
+        setTimeout(() => {
+          suppressClickRef.current = false;
+        }, 0);
+      }
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+  }, []);
+
+  const handleClickCapture = useCallback((e) => {
+    if (!suppressClickRef.current) return;
+    suppressClickRef.current = false;
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const updateContextSugarColor = (context, newSugarColor) => {
+    const nextOverrides = { ...(config.sugarColorOverrides || {}) };
+    if (isIndividual) {
+      nextOverrides[`${context}-${activeLayer}`] = newSugarColor;
+    } else {
+      nextOverrides[context] = newSugarColor;
+      for (let i = 0; i < (config.structure?.layers || 2); i++) {
+        nextOverrides[`${context}-${i}`] = newSugarColor;
+      }
+    }
+    onChange({
+      ...config,
+      sugarColorOverrides: nextOverrides,
     });
   };
 
@@ -168,16 +311,14 @@ export default function ToolPanel({
   // instead of quietly inheriting Exterior Finish's flavor.
   const renderSugarColor = (context) => {
     const colorContext = isIndividual ? `${context}-${activeLayer}` : context;
+    const activeColor = (isIndividual
+      ? (config.sugarColorOverrides?.[colorContext] || config.sugarColorOverrides?.[context])
+      : config.sugarColorOverrides?.[context]) || DEFAULT_CONFIG.sugarColor;
+
     return (
     <SugarColorSection
-      sugarColor={config.sugarColorOverrides?.[colorContext] || DEFAULT_CONFIG.sugarColor}
-      onChange={(newSugarColor) => onChange({
-        ...config,
-        sugarColorOverrides: {
-          ...(config.sugarColorOverrides || {}),
-          [colorContext]: newSugarColor,
-        },
-      })}
+      sugarColor={activeColor}
+      onChange={(newSugarColor) => updateContextSugarColor(context, newSugarColor)}
       showDefaultColorPicker
       // Glaze ('surface') is a thin poured coat, not a full buttercream
       // build, so the six Pattern/multi-tone colors don't apply the way
@@ -190,12 +331,18 @@ export default function ToolPanel({
     />
     );
   };
-  const fillingSugarColor = config.sugarColorOverrides?.[isIndividual ? `filling-${activeLayer}` : 'filling'] || DEFAULT_CONFIG.sugarColor;
-  const exteriorSugarColor = config.sugarColorOverrides?.[isIndividual ? `exterior-${activeLayer}` : 'exterior'] || DEFAULT_CONFIG.sugarColor;
-  const sideSugarColorContext = isIndividual ? `side-${activeLayer}` : 'side';
+  const fillingSugarColor = (isIndividual
+    ? (config.sugarColorOverrides?.[`filling-${activeLayer}`] || config.sugarColorOverrides?.filling)
+    : config.sugarColorOverrides?.filling) || DEFAULT_CONFIG.sugarColor;
+  const exteriorSugarColor = (isIndividual
+    ? (config.sugarColorOverrides?.[`exterior-${activeLayer}`] || config.sugarColorOverrides?.exterior)
+    : config.sugarColorOverrides?.exterior) || DEFAULT_CONFIG.sugarColor;
+  const sideSugarColor = (isIndividual
+    ? (config.sugarColorOverrides?.[`side-${activeLayer}`] || config.sugarColorOverrides?.side)
+    : config.sugarColorOverrides?.side) || DEFAULT_CONFIG.sugarColor;
 
   return (
-    <div className="relative flex flex-col h-full bg-card rounded-2xl shadow-xl border border-border/50 overflow-hidden">
+    <div className="cn-designer-tool-panel relative flex flex-col h-full bg-card rounded-2xl shadow-xl border border-border/50 overflow-hidden select-none">
       {/* "Applied — hidden under frosting" confirmation. Sponge Flavor and
           Filling changes have no visible effect once Fully Frosted or
           Textured Buttercream covers them (see isFrostedExterior above),
@@ -277,8 +424,9 @@ export default function ToolPanel({
           variant="ghost"
           size="icon"
           className="rounded-full text-muted-foreground hover:text-foreground shrink-0 h-9 w-9"
-          onClick={onReset}
-          title="Reset"
+          onClick={() => setShowResetConfirm(true)}
+          title="Reset Cake Design"
+          aria-label="Reset Cake Design"
         >
           <RotateCcw className="w-4 h-4" />
         </Button>
@@ -329,8 +477,13 @@ export default function ToolPanel({
                 ))}
               </div>
 
-              {/* Scrollable content */}
-              <ScrollArea className="flex-1">
+              {/* Scrollable content with drag-to-scroll */}
+              <ScrollArea
+                className="flex-1"
+                hideScrollbar={hideScrollbar}
+                onPointerDown={handlePointerDownScroll}
+                onClickCapture={handleClickCapture}
+              >
             <motion.div
               className="p-4 space-y-4"
               initial={{ opacity: 0 }}
@@ -341,7 +494,14 @@ export default function ToolPanel({
                 <>
                   <TierDesignControl
                     structure={config.structure}
-                    onChange={(newStructure) => onChange({ ...config, structure: newStructure })}
+                    onChange={(newStructure) => {
+                      if (newStructure.layerDesign !== config.structure?.layerDesign) {
+                        handleTierDesignToggle(newStructure.layerDesign);
+                      } else {
+                        onChange({ ...config, structure: newStructure });
+                      }
+                    }}
+                    onToggle={handleTierDesignToggle}
                   />
                   {showLayerStrip && (
                     <LayerTabStrip
@@ -459,13 +619,7 @@ export default function ToolPanel({
                         interiorPreview={config.interiorPreview}
                         activeLayer={activeLayer}
                         sugarColor={fillingSugarColor}
-                        onSugarColorChange={(newSugarColor) => onChange({
-                          ...config,
-                          sugarColorOverrides: {
-                            ...(config.sugarColorOverrides || {}),
-                            [isIndividual ? `filling-${activeLayer}` : 'filling']: newSugarColor,
-                          },
-                        })}
+                        onSugarColorChange={(newSugarColor) => updateContextSugarColor('filling', newSugarColor)}
                         onChange={(newFilling) => {
                           onChange({
                             ...config,
@@ -505,18 +659,31 @@ export default function ToolPanel({
                         structure={config.structure || DEFAULT_CONFIG.structure}
                         activeLayer={activeLayer}
                         sugarColor={exteriorSugarColor}
-                        onSugarColorChange={(newSugarColor) => onChange({
-                          ...config,
-                          sugarColorOverrides: {
-                            ...(config.sugarColorOverrides || {}),
-                            [isIndividual ? `exterior-${activeLayer}` : 'exterior']: newSugarColor,
-                          },
-                        })}
+                        onSugarColorChange={(newSugarColor) => updateContextSugarColor('exterior', newSugarColor)}
                         onChange={(newExteriorFinish) => {
-                          onChange({
+                          const newStyle = newExteriorFinish?.style;
+                          const newLayerStyles = newExteriorFinish?.layerStyles || [];
+                          const isFrostedOrTextured = newStyle === 'fullyFrosted' || newStyle === 'texturedButtercream' || newLayerStyles.some(s => s === 'fullyFrosted' || s === 'texturedButtercream');
+
+                          let nextConfig = {
                             ...config,
-                            exteriorFinish: newExteriorFinish
-                          });
+                            exteriorFinish: newExteriorFinish,
+                          };
+
+                          const currentTip = config.filling?.piping?.tip;
+                          const hasMashedPiping = currentTip === 'mashedCircles' || currentTip === 'mashedSwirls' || Boolean(currentTip);
+
+                          if (isFrostedOrTextured && hasMashedPiping) {
+                            nextConfig.filling = {
+                              ...config.filling,
+                              piping: {
+                                ...config.filling?.piping,
+                                tip: null,
+                              },
+                            };
+                          }
+
+                          onChange(nextConfig);
                         }}
                       />
                     </CollapsibleContent>
@@ -593,6 +760,10 @@ export default function ToolPanel({
                     onSelectTool={onSelectTool}
                     placedItems={config.place?.items || []}
                     onPlacedItemsChange={onPlaceChange}
+                    selectedItemId={selectedCenterItemId}
+                    onItemSelect={onCenterItemSelect}
+                    onDeleteSelectedItem={onDeleteSelectedCenterItem}
+                    onTextColorModeChange={onCenterTextColorModeChange}
                     sugarColor={config.sugarColorOverrides?.center || DEFAULT_CONFIG.sugarColor}
                     onSugarColorChange={(newSugarColor) => onChange({
                       ...config,
@@ -602,19 +773,38 @@ export default function ToolPanel({
                 </>
               )}
 
-              {tab === 'edge' && (
-                <>
+              {tab === 'edge' && (() => {
+                const currentSlot = config.edge?.mode === 'both' ? 'both' : (config.edge?.activeSlot || activeEdgeSlot || 'top');
+                const edgeContext = currentSlot === 'both' ? 'edgeBoth' : `edge${currentSlot.charAt(0).toUpperCase()}${currentSlot.slice(1)}`;
+                return (
                   <EdgeSection
                     edge={config.edge || DEFAULT_CONFIG.edge}
                     structure={config.structure || DEFAULT_CONFIG.structure}
-                    activeLayer={activeLayer}
-                    onChange={(newEdge) => onChange({ ...config, edge: newEdge })}
-                    layerCount={config.structure?.layers || 1}
+                    onChange={(newEdge) => {
+                      const topRadius = getTopTierRadiusFromConfig(config);
+                      const centerDecorScale = config.center?.scale ?? 1;
+                      const exteriorFinishStyle = config.exteriorFinish?.style || 'fullyFrosted';
+                      const currentItems = config.place?.items || [];
+                      const prunedItems = pruneItemsCollidingWithEdgeDelicates(
+                        currentItems,
+                        newEdge,
+                        topRadius,
+                        centerDecorScale,
+                        exteriorFinishStyle
+                      );
+                      onChange({
+                        ...config,
+                        edge: newEdge,
+                        place: {
+                          ...(config.place || {}),
+                          items: prunedItems,
+                        },
+                      });
+                    }}
                     onActiveSlotChange={setActiveEdgeSlot}
-                    sugarColor={config.sugarColorOverrides?.[config.edge?.mode === 'both' ? 'edgeBoth' : `edge${activeEdgeSlot[0].toUpperCase()}${activeEdgeSlot.slice(1)}`] || DEFAULT_CONFIG.sugarColor}
+                    sugarColor={config.sugarColorOverrides?.[edgeContext] || DEFAULT_CONFIG.sugarColor}
                     onSugarColorChange={(newSugarColor) => {
-                      const context = config.edge?.mode === 'both' ? 'edgeBoth' : `edge${activeEdgeSlot[0].toUpperCase()}${activeEdgeSlot.slice(1)}`;
-                      const nextOverrides = { ...(config.sugarColorOverrides || {}), [context]: newSugarColor };
+                      const nextOverrides = { ...(config.sugarColorOverrides || {}), [edgeContext]: newSugarColor };
                       // "All" (2-tier cakes) reuses this same edgeBoth
                       // context for Top+Bottom's color, exactly as Both
                       // always has — but All also fills the Middle seam
@@ -626,12 +816,12 @@ export default function ToolPanel({
                       // only ever renders once edge.middle.piping.tip is
                       // set, which only Middle's own tab or All's tip
                       // mirroring ever does.
-                      if (context === 'edgeBoth') nextOverrides.edgeMiddle = newSugarColor;
+                      if (edgeContext === 'edgeBoth') nextOverrides.edgeMiddle = newSugarColor;
                       onChange({ ...config, sugarColorOverrides: nextOverrides });
                     }}
                   />
-                </>
-              )}
+                );
+              })()}
 
               {tab === 'side' && (
                 <>
@@ -640,11 +830,8 @@ export default function ToolPanel({
                     structure={config.structure || DEFAULT_CONFIG.structure}
                     activeLayer={activeLayer}
                     onChange={(newSide) => onChange({ ...config, side: newSide })}
-                    sugarColor={config.sugarColorOverrides?.[sideSugarColorContext] || config.sugarColorOverrides?.side || DEFAULT_CONFIG.sugarColor}
-                    onSugarColorChange={(newSugarColor) => onChange({
-                      ...config,
-                      sugarColorOverrides: { ...(config.sugarColorOverrides || {}), [sideSugarColorContext]: newSugarColor },
-                    })}
+                    sugarColor={sideSugarColor}
+                    onSugarColorChange={(newSugarColor) => updateContextSugarColor('side', newSugarColor)}
                   />
                 </>
               )}
@@ -652,9 +839,14 @@ export default function ToolPanel({
             </motion.div>
           </ScrollArea>
 
-          {/* Footer hint */}
-          <div className="px-5 py-3 border-t border-border/50 bg-muted/30">
-            <p className="text-[11px] text-muted-foreground text-center">
+          {/* Footer hint & bottom drag handle */}
+          <div
+            onPointerDown={onDragHandlePointerDown}
+            className={`px-5 py-3 border-t border-border/50 bg-muted/30 select-none ${
+              onDragHandlePointerDown ? 'cursor-grab active:cursor-grabbing touch-none' : ''
+            }`}
+          >
+            <p className="text-[11px] text-muted-foreground text-center flex items-center justify-center gap-1.5">
               Drag to rotate • Scroll to zoom
             </p>
           </div>
@@ -689,6 +881,67 @@ export default function ToolPanel({
           )}
         </AnimatePresence>
       </div>
+
+      {/* Reset Confirmation Modal */}
+      <AnimatePresence>
+        {showResetConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+            onClick={() => setShowResetConfirm(false)}
+          >
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Confirm Reset Design"
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ duration: 0.2 }}
+              className="w-[340px] max-w-[calc(100vw-2rem)] rounded-2xl border border-border/40 bg-card p-5 sm:p-6 shadow-2xl space-y-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
+                  <RotateCcw className="h-5 w-5" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-heading text-base font-bold text-foreground">Reset Cake Design?</h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Are you sure you want to reset your cake design? All custom selections, piping, decorations, and colors will be reverted to default.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-xl px-4 text-xs font-semibold"
+                  onClick={() => setShowResetConfirm(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  className="rounded-xl px-4 text-xs font-semibold"
+                  onClick={() => {
+                    setShowResetConfirm(false);
+                    onReset?.();
+                  }}
+                >
+                  Reset Design
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

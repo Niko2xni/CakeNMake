@@ -2,6 +2,7 @@ const PriceBook = require('../models/PriceBook');
 const PricingPreset = require('../models/PricingPreset');
 const { CATALOG_DEFINITIONS } = require('../services/pricingCatalog');
 const { buildQuote, customerItem, getActivePriceBook, resolvePlatform } = require('../services/pricingService');
+const { DEFAULT_RATES } = require('../services/cakePricingRules');
 
 const LEGACY_ESTIMATES = {
   'base.standard': 170000,
@@ -20,7 +21,13 @@ function initialItems() {
 
 async function ensureInitialBook(platformId, userId = null) {
   const existing = await PriceBook.findOne({ platform: platformId }).sort({ version: -1 });
-  if (existing) return existing;
+  if (existing) {
+    if (!existing.rates) {
+      existing.rates = JSON.parse(JSON.stringify(DEFAULT_RATES));
+      await existing.save();
+    }
+    return existing;
+  }
   const migratedItems = initialItems();
   const itemIndex = new Map(migratedItems.map((entry) => [entry.componentKey, entry]));
   const legacyPresets = await PricingPreset.find({ platform: platformId, isActive: true });
@@ -43,6 +50,7 @@ async function ensureInitialBook(platformId, userId = null) {
       publicationReason: 'Initial catalog migration',
       createdBy: userId,
       items: migratedItems,
+      rates: JSON.parse(JSON.stringify(DEFAULT_RATES)),
     });
   } catch (error) {
     if (error?.code === 11000) return PriceBook.findOne({ platform: platformId }).sort({ version: -1 });
@@ -56,6 +64,7 @@ async function getOrCreateDraft(platformId, userId) {
   await ensureInitialBook(platformId, userId);
   const source = await PriceBook.findOne({ platform: platformId, status: { $in: ['active', 'scheduled'] } }).sort({ version: -1 });
   const latest = await PriceBook.findOne({ platform: platformId }).sort({ version: -1 });
+  const ratesToCopy = source?.rates ? JSON.parse(JSON.stringify(source.rates)) : JSON.parse(JSON.stringify(DEFAULT_RATES));
   draft = await PriceBook.create({
     platform: platformId,
     version: (latest?.version || 0) + 1,
@@ -71,6 +80,7 @@ async function getOrCreateDraft(platformId, userId) {
       isActive: entry.isActive,
       isRequired: entry.isRequired,
     })),
+    rates: ratesToCopy,
   });
   return draft;
 }
@@ -227,4 +237,20 @@ async function quoteCake(req, res) {
   }
 }
 
-module.exports = { cancelScheduled, createDraft, discardDraft, getActiveCatalog, getWorkspace, nextManilaTenPm, publishDraftNow, quoteCake, scheduleDraft, updateDraftItem };
+async function updateDraftRates(req, res) {
+  try {
+    const { rates } = req.body;
+    if (!rates || typeof rates !== 'object') {
+      return res.status(400).json({ message: 'Rates object is required.' });
+    }
+    const draft = await getOrCreateDraft(req.platformId, req.user._id);
+    draft.rates = rates;
+    draft.markModified('rates');
+    await draft.save();
+    res.json(draft);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to update pricing draft rates', error: error.message });
+  }
+}
+
+module.exports = { cancelScheduled, createDraft, discardDraft, getActiveCatalog, getWorkspace, nextManilaTenPm, publishDraftNow, quoteCake, scheduleDraft, updateDraftItem, updateDraftRates };

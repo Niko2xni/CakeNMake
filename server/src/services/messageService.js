@@ -5,7 +5,7 @@ const { findAccessibleConversation, httpError } = require('./conversationAccessS
 function normalizeMessageText(value) {
   if (typeof value !== 'string') return '';
   return value
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '')
     .replace(/\r\n?/g, '\n')
     .trim();
 }

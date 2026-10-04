@@ -7,8 +7,13 @@ import SugarColorSection from './SugarColorSection';
 const DEFAULT_PIPING = { tip: null, colorId: 'vanilla' };
 
 export default function FillingSection({ filling, structure, exteriorFinish, interiorPreview, activeLayer, onChange, sugarColor, onSugarColorChange }) {
-  const isIndividual = structure.layerDesign === 'individual' && structure.layers > 1;
+  const isIndividual = structure?.layerDesign === 'individual' && structure?.layers > 1;
   const piping = filling.piping || DEFAULT_PIPING;
+
+  const currentFinishStyle = isIndividual
+    ? (exteriorFinish?.layerStyles?.[activeLayer] || exteriorFinish?.style || 'fullyFrosted')
+    : (exteriorFinish?.style || 'fullyFrosted');
+  const isFrostedOrTextured = currentFinishStyle === 'fullyFrosted' || currentFinishStyle === 'texturedButtercream';
 
   const updateLayers = (layers) => {
     onChange({
@@ -24,7 +29,11 @@ export default function FillingSection({ filling, structure, exteriorFinish, int
       newLayerFlavors[activeLayer] = flavor;
       onChange({ ...filling, layerFlavors: newLayerFlavors });
     } else {
-      onChange({ ...filling, flavor });
+      onChange({
+        ...filling,
+        flavor,
+        layerFlavors: Array(structure?.layers || 2).fill(flavor),
+      });
     }
   };
 
@@ -98,14 +107,14 @@ export default function FillingSection({ filling, structure, exteriorFinish, int
               numberFromNone: None reads as "1", Mashed Circles as "2",
               Mashed Swirls as "3" — opted in just for this picker (see
               SetPicker's docstring for why it's not the shared default).
-              No longer disabled based on Exterior Finish style — always
-              clickable regardless of Naked/Fully Frosted/Textured
-              Buttercream. */}
+              Disabled for Frosted/Textured finishes since mashed piping
+              only applies to Naked cakes. */}
           <SetPicker
             label="Piping Design"
             sets={FILLING_PIPING_DESIGNS}
             activeSetId={piping.tip}
             onSelectSet={(tip) => updatePiping({ tip })}
+            disabledItemIds={isFrostedOrTextured ? ['mashedCircles', 'mashedSwirls'] : []}
             numberFromNone
             showColorPicker={false}
             shape="box"

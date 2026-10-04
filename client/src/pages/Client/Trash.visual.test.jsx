@@ -47,7 +47,7 @@ describe('Trash page states and actions', () => {
     renderPage();
 
     expect(await screen.findByRole('heading', { name: 'Trash is empty' })).toBeVisible();
-    expect(screen.getByLabelText(/0 of 5 designs/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/0 of 20 designs/i)).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /how trash works/i })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /create a design/i })).toHaveAttribute('href', '/designer');
     expect(screen.getByRole('link', { name: /browse templates/i })).toHaveAttribute('href', '/templates');
@@ -64,7 +64,7 @@ describe('Trash page states and actions', () => {
 
     expect(disclosure).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('heading', { name: /how trash works/i })).toBeVisible();
-    expect(screen.getByText(/five-design capacity/i)).toBeInTheDocument();
+    expect(screen.getByText(/twenty-design capacity/i)).toBeInTheDocument();
   });
 
   it('distinguishes a failed request from an empty trash and can retry', async () => {
@@ -112,8 +112,7 @@ describe('Trash page states and actions', () => {
     ]);
     renderPage();
 
-    expect(await screen.findByLabelText(/4 of 5 designs/i)).toBeInTheDocument();
-    expect(screen.getByText(/almost full/i)).toBeInTheDocument();
+    expect(await screen.findByLabelText(/4 of 20 designs/i)).toBeInTheDocument();
     expect(screen.getAllByText(/days left to restore/i)).toHaveLength(4);
   });
 });

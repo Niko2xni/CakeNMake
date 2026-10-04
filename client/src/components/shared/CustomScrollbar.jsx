@@ -107,24 +107,26 @@ export default function CustomScrollbar({ className = '', contentClassName = '',
       {thumbMetrics.visible && (
         <div className="absolute top-0 right-0 h-full w-5 flex flex-col z-10">
           <button
+            type="button"
             onClick={scrollUp}
             aria-label="Scroll up"
-            className="h-5 flex-shrink-0 flex items-center justify-center text-pink-300 hover:text-pink-400 text-[10px] leading-none transition-colors cursor-default"
+            className="h-5 flex-shrink-0 flex items-center justify-center text-primary/60 hover:text-primary text-[10px] leading-none transition-colors cursor-pointer"
           >
             ▲
           </button>
-          <div onClick={handleTrackClick} className="relative flex-1 cursor-default">
+          <div onClick={handleTrackClick} className="relative flex-1 cursor-pointer bg-muted/30 rounded-full my-0.5">
             <div
               onMouseDown={handleThumbMouseDown}
               onClick={(e) => e.stopPropagation()}
-              className="absolute left-1/2 -translate-x-1/2 w-2.5 bg-pink-300 hover:bg-pink-400 rounded-full transition-colors cursor-default"
+              className="absolute left-1/2 -translate-x-1/2 w-2.5 bg-primary/40 hover:bg-primary/70 rounded-full transition-colors cursor-grab active:cursor-grabbing shadow-sm"
               style={{ top: thumbMetrics.top, height: thumbMetrics.height }}
             />
           </div>
           <button
+            type="button"
             onClick={scrollDown}
             aria-label="Scroll down"
-            className="h-5 flex-shrink-0 flex items-center justify-center text-pink-300 hover:text-pink-400 text-[10px] leading-none transition-colors cursor-default"
+            className="h-5 flex-shrink-0 flex items-center justify-center text-primary/60 hover:text-primary text-[10px] leading-none transition-colors cursor-pointer"
           >
             ▼
           </button>

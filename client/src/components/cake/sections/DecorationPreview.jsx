@@ -13,7 +13,15 @@ import { areFontsReady, onFontsReady } from '@/components/cake/cakeFonts';
 // way to just look at "what does this thing look like right now" without
 // hunting for a moment mid-drag. This is a static, always-visible view in
 // the panel itself instead.
-export default function DecorationPreview({ designId, orientation, rotationY = 0, rotationX = 0, rotationZ = 0 }) {
+export default function DecorationPreview({
+  designId,
+  orientation,
+  rotationY = 0,
+  rotationX = 0,
+  rotationZ = 0,
+  color = '#F6DEAB',
+  colorId = null,
+}) {
   const mountRef = useRef(null);
   const sceneRef = useRef(null);
   const rendererRef = useRef(null);
@@ -77,15 +85,9 @@ export default function DecorationPreview({ designId, orientation, rotationY = 0
 
     return () => {
       resizeObserver.disconnect();
-      renderer.dispose();
-      // Deliberately not disposing itemGroup's mesh geometry/materials --
-      // buildAndAddDecoration builds with getSharedXXXGeometry()/
-      // getSharedXXXMaterial() caching for most designs, so these meshes
-      // reference the SAME shared, cached resources every real placement
-      // of that design uses. Disposing them here would corrupt every
-      // instance already placed on the actual cake, not just this
-      // preview's copy.
       if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement);
+      renderer.dispose();
+      renderer.forceContextLoss?.();
     };
   }, []);
 
@@ -115,7 +117,7 @@ export default function DecorationPreview({ designId, orientation, rotationY = 0
     // (see the 8x5 reference-cake scale notes in CakeScene.jsx) -- the
     // camera fit below adapts to whatever size that produces per design,
     // rather than needing a per-design fixed camera distance.
-    buildAndAddDecoration(measureGroup, designId, 0, 0, 0, 1, '#F6DEAB', Math.random, orientation);
+    buildAndAddDecoration(measureGroup, designId, 0, 0, 0, 1, color, Math.random, orientation, colorId);
     const box = new THREE.Box3().setFromObject(measureGroup);
     const sphere = new THREE.Sphere();
     box.getBoundingSphere(sphere);
@@ -131,7 +133,7 @@ export default function DecorationPreview({ designId, orientation, rotationY = 0
     // obvious on Buttercream Text letters, which are flat and thin enough
     // in one direction that the base and the true center are noticeably
     // far apart.
-    const rotatedGroup = buildRotatedDecoration(designId, orientation, rotationX, rotationY, 1, '#F6DEAB', Math.random, rotationZ);
+    const rotatedGroup = buildRotatedDecoration(designId, orientation, rotationX, rotationY, 1, color, Math.random, rotationZ, colorId);
     itemGroup.add(rotatedGroup);
 
     // Auto-fit: the designs vary hugely in size (a Chocolate Bear vs a
@@ -141,7 +143,9 @@ export default function DecorationPreview({ designId, orientation, rotationY = 0
     // since some designs sit offset from their own local (0,0,0) -- e.g.
     // standing Oreo's built-in y + 1.55*scale lift.
     const fitDist = (radius / Math.sin((camera.fov * Math.PI / 180) / 2)) * 1.5;
-    const center = sphere.center;
+    const rotBox = new THREE.Box3().setFromObject(rotatedGroup);
+    const center = new THREE.Vector3();
+    rotBox.getCenter(center);
     // Level, not angled down -- an elevated camera looking down implies a
     // surface the item is resting on, which is exactly the illusion that
     // was reading as clipping when the item pitched. Straight-on framing
@@ -154,7 +158,7 @@ export default function DecorationPreview({ designId, orientation, rotationY = 0
     camera.updateProjectionMatrix();
 
     renderer.render(scene, camera);
-  }, [designId, orientation, rotationY, rotationX, rotationZ, fontsReady]);
+  }, [designId, orientation, rotationY, rotationX, rotationZ, color, colorId, fontsReady]);
 
   return <div ref={mountRef} className="w-full h-32 rounded-xl bg-muted/40 overflow-hidden" />;
 }

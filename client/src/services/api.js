@@ -196,6 +196,45 @@ export const bakeryApi = {
   },
 };
 
+export const templateApi = {
+  getPublicTemplates: () => requestJson(`${API_BASE_URL}/templates/public`),
+  getPublicTemplateById: (id) => requestJson(`${API_BASE_URL}/templates/public/${id}`),
+
+  getBakeryTemplates: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/templates`),
+  createTemplate: (data) => requestAuthenticatedJson(`${API_BASE_URL}/bakery/templates`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  updateTemplate: (id, data) => requestAuthenticatedJson(`${API_BASE_URL}/bakery/templates/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+  deleteTemplate: (id) => requestAuthenticatedJson(`${API_BASE_URL}/bakery/templates/${id}`, {
+    method: 'DELETE',
+  }),
+  reorderTemplates: (sectionId, orderedIds) => requestAuthenticatedJson(`${API_BASE_URL}/bakery/templates/reorder`, {
+    method: 'POST',
+    body: JSON.stringify({ sectionId, orderedIds }),
+  }),
+
+  getSections: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/templates/sections`),
+  createSection: (name) => requestAuthenticatedJson(`${API_BASE_URL}/bakery/templates/sections`, {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  }),
+  updateSection: (id, data) => requestAuthenticatedJson(`${API_BASE_URL}/bakery/templates/sections/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+  deleteSection: (id) => requestAuthenticatedJson(`${API_BASE_URL}/bakery/templates/sections/${id}`, {
+    method: 'DELETE',
+  }),
+  reorderSections: (orderedIds) => requestAuthenticatedJson(`${API_BASE_URL}/bakery/templates/sections/reorder`, {
+    method: 'POST',
+    body: JSON.stringify({ orderedIds }),
+  }),
+};
+
 export const pricingApi = {
   getWorkspace: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/pricing`),
   createDraft: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/pricing/draft`, { method: 'POST' }),
@@ -203,6 +242,12 @@ export const pricingApi = {
     return requestAuthenticatedJson(`${API_BASE_URL}/bakery/pricing/draft/items/${encodeURIComponent(componentKey)}`, {
       method: 'PATCH',
       body: JSON.stringify({ costBasisMinor, markupMinor }),
+    });
+  },
+  updateDraftRates: async (rates) => {
+    return requestAuthenticatedJson(`${API_BASE_URL}/bakery/pricing/draft/rates`, {
+      method: 'PATCH',
+      body: JSON.stringify({ rates }),
     });
   },
   scheduleDraft: (reason) => requestAuthenticatedJson(`${API_BASE_URL}/bakery/pricing/draft/schedule`, { method: 'POST', body: JSON.stringify({ reason }) }),

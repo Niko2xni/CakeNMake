@@ -16,7 +16,7 @@ if (process.env.NODE_ENV === 'production') {
 
 app.use(cors(corsOptions));
 app.use('/api/blueprint-submissions', require('./routes/blueprintSubmissionRoutes'));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 app.get("/", (req, res) => {
     res.send("CakeNMake API Running");
@@ -39,5 +39,8 @@ app.use('/api/pricing', publicPricingRoutes);
 const transactionRoutes = require('./routes/transactionRoutes');
 app.use('/api/bakery/transactions', transactionRoutes);
 app.use('/api/bakery/blueprints', require('./routes/bakeryBlueprintRoutes'));
+app.use('/api/bakery/billing', require('./routes/billingRoutes'));
+app.use('/api/templates', require('./routes/templateRoutes'));
+app.use('/api/bakery/templates', require('./routes/templateRoutes'));
 
 module.exports = app;

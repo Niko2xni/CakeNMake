@@ -17,11 +17,18 @@ vi.mock('@/components/client/ClientNavbar', () => ({
   default: () => <nav aria-label="Client navigation" />,
 }));
 
-vi.mock('@/services/api', () => ({ designApi: apiMocks }));
+const pricingMocks = vi.hoisted(() => ({
+  quoteCake: vi.fn().mockResolvedValue({ totalMinor: 250000, lineItems: [] }),
+}));
+
+vi.mock('@/services/api', () => ({
+  designApi: apiMocks,
+  pricingApi: pricingMocks,
+}));
 
 const designs = [
-  { _id: 'older', name: 'Garden cake', lastEdited: '2026-09-19T09:00:00Z', thumbnail: 'garden.png', config: {} },
-  { _id: 'latest', name: 'Cherry cake', lastEdited: '2026-09-20T09:00:00Z', thumbnail: 'cherry.png', config: {} },
+  { _id: 'older', name: 'Garden cake', lastEdited: '2026-09-19T09:00:00Z', thumbnail: 'garden.png', config: {}, sentToBakery: false },
+  { _id: 'latest', name: 'Cherry cake', lastEdited: '2026-09-20T09:00:00Z', thumbnail: 'cherry.png', thumbnailFallback: 'cherry-fallback.png', config: { structure: { size: 'big' } }, sentToBakery: true },
 ];
 
 function renderHome() {
@@ -67,12 +74,13 @@ describe('ClientHome presentation', () => {
     expect(await screen.findByText(/cake table is ready/i)).toBeInTheDocument();
   });
 
-  it('opens card actions without navigating and duplicates through the design API', async () => {
+  it('opens card actions without navigating and duplicates through the design API copying all details, preserving thumbnail, and resetting sentToBakery to false', async () => {
     apiMocks.getDesigns.mockResolvedValue(designs);
     apiMocks.createDesign.mockResolvedValue({
       ...designs[1],
       _id: 'duplicate',
       name: 'Cherry cake copy',
+      sentToBakery: false,
       lastEdited: '2026-09-20T10:00:00Z',
     });
     renderHome();
@@ -81,10 +89,26 @@ describe('ClientHome presentation', () => {
     expect(screen.getByRole('menu')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('menuitem', { name: /duplicate/i }));
 
-    await waitFor(() => expect(apiMocks.createDesign).toHaveBeenCalledWith(expect.objectContaining({
+    await waitFor(() => expect(apiMocks.createDesign).toHaveBeenCalledWith({
       name: 'Cherry cake copy',
+      config: { structure: { size: 'big' } },
+      thumbnail: 'cherry.png',
+      thumbnailFallback: 'cherry-fallback.png',
       sentToBakery: false,
-    })));
+      isDuplicated: true,
+    }));
     expect(await screen.findByText('Cherry cake copy')).toBeInTheDocument();
+    expect(await screen.findByText('Duplicated')).toBeInTheDocument();
+  });
+
+  it('wraps long unbroken design names in the move-to-trash confirmation', async () => {
+    const longName = 'HA'.repeat(40);
+    apiMocks.getDesigns.mockResolvedValue([{ ...designs[0], name: longName }]);
+    renderHome();
+
+    fireEvent.click(await screen.findByRole('button', { name: `Actions for ${longName}` }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /move to trash/i }));
+
+    expect(screen.getByRole('heading', { name: `Move “${longName}” to trash?` })).toHaveClass('break-words');
   });
 });

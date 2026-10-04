@@ -224,8 +224,8 @@ export const DEFAULT_CONFIG = {
 // Finish styles
 export const FINISH_STYLES = [
   { id: 'naked', label: 'Naked', description: 'No exterior frosting' },
-  { id: 'fullyFrosted', label: 'Fully Frosted', description: 'Entire cake covered' },
-  { id: 'texturedButtercream', label: 'Textured Buttercream', description: 'Ridged, hand-applied coat' },
+  { id: 'fullyFrosted', label: 'Frosted', description: 'Entire cake covered' },
+  { id: 'texturedButtercream', label: 'Textured', description: 'Ridged, hand-applied coat' },
 ];
 
 // ─── Buttercream Texture variants — only meaningful when
@@ -273,7 +273,7 @@ export const PIPING_TIPS = [
   { id: 'star', label: 'Star' },
   { id: 'rope', label: 'Rope' },
   { id: 'ropeTwist', label: 'Rope Twist' },
-  { id: 'ropeTwistClassic', label: 'Rope Twist (Classic)' },
+  { id: 'ropeTwistClassic', label: 'Rope Twist Classic' },
   { id: 'round', label: 'Round' },
   { id: 'petal', label: 'Petal' },
   { id: 'leaf', label: 'Leaf' },
@@ -439,7 +439,7 @@ export const SUGAR_COLOR_MODES = [
 // DEFAULT_CONFIG). Kept as a list (not a single flag) since more
 // combinable overlays are expected to join Glaze eventually.
 export const SURFACE_TREATMENT_MODES = [
-  { id: 'glaze', label: 'Glaze', implemented: true },
+  { id: 'glaze', label: 'Drip', implemented: true },
 ];
 
 // ─── Glaze Patterns — six variants of the poured-and-dripping silhouette
@@ -520,15 +520,586 @@ export const TRIANGLE_PATTERN_SETS = [
 // exact 'center-{designId}-{orientation}' format CakeScene.jsx's placedItems
 // loop parses back apart when rendering (see buildAndAddDecoration call
 // there) -- designId itself must never contain '-'.
+export const CENTER_ITEM_LIMITS = {
+  strawberry: 10,
+  cherry: 10,
+  ferreroRocher: 8,
+  oreo: 8,
+  hersheysKisses: 9,
+  basketball: 8,
+  soccerball: 8,
+  chocolateBear: 4,
+  buttercreamText: 50,
+  fondantText: 50,
+};
+
+export function isLetterDesignId(designId) {
+  if (!designId || typeof designId !== 'string') return false;
+  return designId.startsWith('letterUpper')
+    || designId.startsWith('letterLower')
+    || designId.startsWith('letter')
+    || designId === 'buttercreamText'
+    || designId === 'fondantText';
+}
+
+export function getCenterItemLimit(designId) {
+  if (!designId) return null;
+  if (isLetterDesignId(designId)) return 50;
+  return CENTER_ITEM_LIMITS[designId] ?? null;
+}
+
+export function getCenterItemCount(placedItems = [], designId) {
+  if (!designId || !Array.isArray(placedItems)) return 0;
+  if (isLetterDesignId(designId)) {
+    return placedItems.filter((item) => {
+      if (!item?.type || typeof item.type !== 'string') return false;
+      return item.type.startsWith('center-letter') || item.type.startsWith('letter');
+    }).length;
+  }
+  return placedItems.filter((item) => {
+    if (!item?.type || typeof item.type !== 'string') return false;
+    if (item.type.startsWith('center-')) {
+      const parts = item.type.split('-');
+      return parts[1] === designId;
+    }
+    return item.type === designId;
+  }).length;
+}
+
+export function isCenterItemAtLimit(placedItems = [], designId) {
+  const limit = getCenterItemLimit(designId);
+  if (limit === null) return false;
+  return getCenterItemCount(placedItems, designId) >= limit;
+}
+
+// ── Smart Detector: Physical Collision Footprints for Center Items ─────
+// Calibrated to the exact visual 3D mesh dimensions so that items only clash
+// when their actual 3D geometries would collide. Oriented items (such as
+// standing Oreos and letters) use an Oriented Bounding Box (OBB) rather than
+// an oversized circle, acknowledging all available free distance.
+export const CENTER_ITEM_RADII = {
+  strawberry: 0.30,       // mesh diameter ~0.60
+  cherry: 0.34,           // mesh diameter ~0.68
+  ferreroRocher: 0.62,    // mesh diameter ~1.24 across textured hazelnut sphere
+  oreo: 0.875,            // mesh diameter 1.75in (radius 0.875, half-thickness 0.23)
+  hersheysKisses: 0.40,   // mesh diameter ~0.80 base
+  chocolateBear: 0.56,    // mesh diameter ~1.12 across seated body + paws
+  basketball: 0.54,       // mesh diameter ~1.08 across ball + collar
+  soccerball: 0.54,       // mesh diameter ~1.08 across ball + collar
+  floralCluster: 0.50,
+  fruitRing: 0.55,
+};
+
+/**
+ * Returns the effective collision footprint radius for a Center design.
+ * Delicately sized edible items stay at true 1:1 scale; scalable items scale with centerDecorScale.
+ */
+export function getCenterItemRadius(designId, centerDecorScale = 1) {
+  if (!designId) return 0.5;
+  const isFixedScale = [
+    'strawberry',
+    'cherry',
+    'ferreroRocher',
+    'hersheysKisses',
+    'basketball',
+    'soccerball',
+  ].includes(designId);
+
+  let baseRadius = CENTER_ITEM_RADII[designId];
+  if (baseRadius === undefined) {
+    if (designId.startsWith('letterUpper')) {
+      baseRadius = 0.28;
+    } else if (designId.startsWith('letterLower')) {
+      baseRadius = 0.20;
+    } else {
+      baseRadius = 0.50;
+    }
+  }
+
+  const scale = isFixedScale ? 1.0 : (centerDecorScale ?? 1.0);
+  return baseRadius * scale;
+}
+
+/**
+ * Computes the 2D geometric footprint (circle or rotated OBB) for an item
+ */
+export function getItemFootprint(item, centerDecorScale = 1) {
+  if (!item) return { x: 0, z: 0, type: 'circle', radius: 0.5 };
+  const x = item.x || 0;
+  const z = item.z || 0;
+  const rotation = item.rotation || 0;
+  const tiltX = item.tiltX || 0;
+  const tiltZ = item.tiltZ || 0;
+  const toolType = typeof item === 'object' && item.type ? item.type : (typeof item === 'string' ? item : '');
+
+  let designId = item.designId;
+  let orientation = item.orientation || 'default';
+
+  if (toolType.startsWith('center-')) {
+    const parts = toolType.split('-');
+    designId = parts[1];
+    orientation = parts[2] || item.orientation || 'default';
+  }
+
+  if (designId) {
+    // Oreo: detects standing (OBB) vs lying flat (circle) based on orientation and tilt angles
+    if (designId === 'oreo') {
+      const scale = centerDecorScale ?? 1;
+      const isFlat = orientation === 'flat' ||
+        Math.abs(Math.sin(tiltX)) > 0.6 ||
+        Math.abs(Math.sin(tiltZ)) > 0.6 ||
+        (Math.abs(Math.cos(tiltX)) < 0.4 && Math.abs(Math.cos(tiltZ)) < 0.4);
+
+      if (isFlat) {
+        return {
+          x,
+          z,
+          type: 'circle',
+          radius: 0.875 * scale,
+        };
+      }
+      return {
+        x,
+        z,
+        type: 'obb',
+        halfLength: 0.875 * scale,
+        halfWidth: 0.23 * scale,
+        angle: rotation,
+      };
+    }
+
+    if (designId.startsWith('letterUpper')) {
+      const scale = centerDecorScale ?? 1;
+      return {
+        x,
+        z,
+        type: 'obb',
+        halfLength: 0.24 * scale,
+        halfWidth: 0.12 * scale,
+        angle: rotation,
+      };
+    }
+    if (designId.startsWith('letterLower')) {
+      const scale = centerDecorScale ?? 1;
+      return {
+        x,
+        z,
+        type: 'obb',
+        halfLength: 0.18 * scale,
+        halfWidth: 0.12 * scale,
+        angle: rotation,
+      };
+    }
+
+    const radius = getCenterItemRadius(designId, centerDecorScale);
+    return {
+      x,
+      z,
+      type: 'circle',
+      radius,
+    };
+  }
+
+  if (PLACE_ITEM_RADII[toolType]) {
+    return {
+      x,
+      z,
+      type: 'circle',
+      radius: PLACE_ITEM_RADII[toolType] * 0.75,
+    };
+  }
+
+  return {
+    x,
+    z,
+    type: 'circle',
+    radius: 0.5,
+  };
+}
+
+/**
+ * Accurately determines if two geometric footprints clash or overlap.
+ * Supports Circle-Circle, Circle-OBB, and OBB-OBB (SAT).
+ */
+export function doFootprintsClash(fp1, fp2, gap = 0.02) {
+  if (!fp1 || !fp2) return false;
+
+  // Circle vs Circle
+  if (fp1.type === 'circle' && fp2.type === 'circle') {
+    const dx = fp1.x - fp2.x;
+    const dz = fp1.z - fp2.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    return dist < fp1.radius + fp2.radius + gap;
+  }
+
+  // Circle vs OBB
+  const checkCircleVsObb = (circle, obb) => {
+    const dx = circle.x - obb.x;
+    const dz = circle.z - obb.z;
+    const cos = Math.cos(-obb.angle);
+    const sin = Math.sin(-obb.angle);
+    const localX = dx * cos - dz * sin;
+    const localZ = dx * sin + dz * cos;
+    const clampedX = Math.max(-obb.halfLength, Math.min(obb.halfLength, localX));
+    const clampedZ = Math.max(-obb.halfWidth, Math.min(obb.halfWidth, localZ));
+    const distX = localX - clampedX;
+    const distZ = localZ - clampedZ;
+    const distSq = distX * distX + distZ * distZ;
+    const threshold = circle.radius + gap;
+    return distSq < threshold * threshold;
+  };
+
+  if (fp1.type === 'circle' && fp2.type === 'obb') {
+    return checkCircleVsObb(fp1, fp2);
+  }
+  if (fp1.type === 'obb' && fp2.type === 'circle') {
+    return checkCircleVsObb(fp2, fp1);
+  }
+
+  // OBB vs OBB (Separating Axis Theorem)
+  if (fp1.type === 'obb' && fp2.type === 'obb') {
+    const getCorners = (b, extraGap = 0) => {
+      const hl = b.halfLength + extraGap;
+      const hw = b.halfWidth + extraGap;
+      const cos = Math.cos(b.angle);
+      const sin = Math.sin(b.angle);
+      return [
+        { x: b.x + (-hl * cos - -hw * sin), z: b.z + (-hl * sin + -hw * cos) },
+        { x: b.x + ( hl * cos - -hw * sin), z: b.z + ( hl * sin + -hw * cos) },
+        { x: b.x + ( hl * cos -  hw * sin), z: b.z + ( hl * sin +  hw * cos) },
+        { x: b.x + (-hl * cos -  hw * sin), z: b.z + (-hl * sin +  hw * cos) },
+      ];
+    };
+
+    const corners1 = getCorners(fp1, gap / 2);
+    const corners2 = getCorners(fp2, gap / 2);
+
+    const axes = [
+      { x: Math.cos(fp1.angle), z: Math.sin(fp1.angle) },
+      { x: -Math.sin(fp1.angle), z: Math.cos(fp1.angle) },
+      { x: Math.cos(fp2.angle), z: Math.sin(fp2.angle) },
+      { x: -Math.sin(fp2.angle), z: Math.cos(fp2.angle) },
+    ];
+
+    for (const axis of axes) {
+      let min1 = Infinity, max1 = -Infinity;
+      for (const c of corners1) {
+        const proj = c.x * axis.x + c.z * axis.z;
+        if (proj < min1) min1 = proj;
+        if (proj > max1) max1 = proj;
+      }
+      let min2 = Infinity, max2 = -Infinity;
+      for (const c of corners2) {
+        const proj = c.x * axis.x + c.z * axis.z;
+        if (proj < min2) min2 = proj;
+        if (proj > max2) max2 = proj;
+      }
+      if (max1 < min2 || max2 < min1) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Checks whether an item's footprint stays within the Center placement boundary
+ * (fine line boundary at topRadius * 0.88), ensuring items can be placed across the full
+ * available surface of the cake without spilling over the cake's physical top rim.
+ */
+export function isFootprintInBoundary(fp, boundaryR, cakeRadius) {
+  if (!fp) return true;
+  const dist = Math.sqrt(fp.x * fp.x + fp.z * fp.z);
+  // Item drop center must stay within the Center placement boundary
+  if (dist > boundaryR) return false;
+
+  // Physical outer bounds must stay solidly on the cake top surface
+  const maxRim = cakeRadius || (boundaryR > 0 ? boundaryR / 0.88 : 0);
+  if (maxRim <= 0) return true;
+  const outerLimit = maxRim * 0.98;
+
+  if (fp.type === 'circle') {
+    return dist + fp.radius * 0.70 <= outerLimit;
+  }
+  if (fp.type === 'obb') {
+    const hl = fp.halfLength;
+    const hw = fp.halfWidth;
+    const cos = Math.cos(fp.angle);
+    const sin = Math.sin(fp.angle);
+    const corners = [
+      { x: fp.x + (-hl * cos - -hw * sin), z: fp.z + (-hl * sin + -hw * cos) },
+      { x: fp.x + ( hl * cos - -hw * sin), z: fp.z + ( hl * sin + -hw * cos) },
+      { x: fp.x + ( hl * cos -  hw * sin), z: fp.z + ( hl * sin +  hw * cos) },
+      { x: fp.x + (-hl * cos -  hw * sin), z: fp.z + (-hl * sin +  hw * cos) },
+    ];
+    return corners.every((c) => Math.sqrt(c.x * c.x + c.z * c.z) <= outerLimit);
+  }
+  return true;
+}
+
+/**
+ * Checks whether two items on the top surface clash or overlay.
+ * Uses exact physical footprints and reads true distance across orientations.
+ */
+export function doItemsClash(item1, item2, centerDecorScale = 1, minGap = 0.02) {
+  if (!item1 || !item2) return false;
+  const fp1 = item1.type && (item1.type === 'circle' || item1.type === 'obb')
+    ? item1
+    : getItemFootprint(item1, centerDecorScale);
+  const fp2 = item2.type && (item2.type === 'circle' || item2.type === 'obb')
+    ? item2
+    : getItemFootprint(item2, centerDecorScale);
+  return doFootprintsClash(fp1, fp2, minGap);
+}
+
+// Single constant fine-line boundary reserve for Center designs (local units).
+// Reserves the outer margin of the cake top for Edge designs (at topRadius * 0.88),
+// guaranteeing that Edge designs will never conflict while maximizing available space.
+export const CENTER_BOUNDARY_RATIO = 0.88;
+export const CENTER_BOUNDARY_RESERVE = 0.48;
+
+export function getCenterPlacementBoundaryRadius(topRadius) {
+  return Math.max(0, (topRadius || 0) * CENTER_BOUNDARY_RATIO);
+}
+
+/**
+ * Computes obstacle footprints for Edge Ferrero Rocher truffles when the Edge tab
+ * has Ferrero Rocher Rim selected on the top tier.
+ * Because Ferrero Rocher is large (~1.24 units wide, radius 0.62), its physical size
+ * actively defines forbidden placement areas for Center decorations and text.
+ */
+export const EDIBLE_DELICATES_RIM_SPECS = {
+  ferreroRocherRim: {
+    inset: 0.65,
+    radius: CENTER_ITEM_RADII.ferreroRocher || 0.62,
+    countFn: (ringRadius) => Math.max(6, Math.round((ringRadius * Math.PI * 2) / 2.8)),
+    designId: 'ferreroRocher',
+  },
+  ferreroRocherRimSparse: {
+    inset: 0.65,
+    radius: CENTER_ITEM_RADII.ferreroRocher || 0.62,
+    countFn: (ringRadius) => {
+      const ferreros = Math.max(3, Math.round((ringRadius * Math.PI * 2) / 4.8)) + 1;
+      return ferreros * 2;
+    },
+    itemAt: (i) => (i % 2 === 0
+      ? { radius: CENTER_ITEM_RADII.ferreroRocher || 0.62, designId: 'ferreroRocher' }
+      : { radius: CENTER_ITEM_RADII.cherry || 0.34, designId: 'cherry' }),
+    designId: 'ferreroRocher',
+  },
+  hersheysKissRim: {
+    inset: 0.48,
+    radius: CENTER_ITEM_RADII.hersheysKisses || 0.40,
+    countFn: (ringRadius) => Math.max(10, Math.round((ringRadius * Math.PI * 2) / 1.7)),
+    designId: 'hersheysKisses',
+  },
+  hersheysKissRimSparse: {
+    inset: 0.65,
+    radius: CENTER_ITEM_RADII.ferreroRocher || 0.62,
+    countFn: (ringRadius) => {
+      const kisses = Math.max(3, Math.round((ringRadius * Math.PI * 2) / 3.4));
+      return kisses * 2;
+    },
+    itemAt: (i) => (i % 2 === 0
+      ? { radius: CENTER_ITEM_RADII.hersheysKisses || 0.40, designId: 'hersheysKisses' }
+      : { radius: CENTER_ITEM_RADII.ferreroRocher || 0.62, designId: 'ferreroRocher' }),
+    designId: 'hersheysKisses',
+  },
+  cherryRim: {
+    inset: 0.36,
+    radius: CENTER_ITEM_RADII.cherry || 0.34,
+    countFn: () => 10,
+    designId: 'cherry',
+  },
+  cherryRimSparse: {
+    inset: 0.48,
+    radius: CENTER_ITEM_RADII.hersheysKisses || 0.40,
+    countFn: (ringRadius) => {
+      const cherries = Math.max(3, Math.round((ringRadius * Math.PI * 2) / 4.2));
+      return cherries * 2;
+    },
+    itemAt: (i) => (i % 2 === 0
+      ? { radius: CENTER_ITEM_RADII.cherry || 0.34, designId: 'cherry' }
+      : { radius: CENTER_ITEM_RADII.hersheysKisses || 0.40, designId: 'hersheysKisses' }),
+    designId: 'cherry',
+  },
+};
+
+export function getActiveEdgeDelicateTip(edgeConfig) {
+  if (!edgeConfig) return null;
+  const mode = edgeConfig.mode || 'both';
+  const top = edgeConfig.top || null;
+  const both = edgeConfig.both || null;
+  const tip = mode === 'both'
+    ? (both?.pipingTip || both?.piping?.tip)
+    : (top?.pipingTip || top?.piping?.tip);
+  return EDIBLE_DELICATES_RIM_SPECS[tip] ? tip : null;
+}
+
+/**
+ * Computes obstacle footprints for Edible Delicates rim designs (Ferrero Rocher,
+ * Hershey's Kisses, Cherry) when selected on the top tier.
+ * Their physical geometry defines forbidden placement areas for Center decorations and text.
+ */
+export function getEdgeDelicatesObstacles(edgeConfig, topRadius = 4, exteriorFinishStyle = 'fullyFrosted') {
+  const tip = getActiveEdgeDelicateTip(edgeConfig);
+  if (!tip) return [];
+
+  const spec = EDIBLE_DELICATES_RIM_SPECS[tip];
+  if (!spec) return [];
+
+  const surfaceRadius = exteriorFinishStyle === 'naked'
+    ? topRadius - 0.02
+    : topRadius + (exteriorFinishStyle === 'texturedButtercream' ? 0.08 : 0.06);
+  const ringRadius = Math.max(0.15, surfaceRadius - spec.inset);
+  const count = typeof spec.countFn === 'function' ? spec.countFn(ringRadius) : 12;
+  const obstacles = [];
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2;
+    const cx = Math.sin(angle) * ringRadius;
+    const cz = Math.cos(angle) * ringRadius;
+    const itemInfo = typeof spec.itemAt === 'function' ? spec.itemAt(i) : null;
+    obstacles.push({
+      type: 'circle',
+      x: cx,
+      z: cz,
+      radius: itemInfo?.radius || spec.radius,
+      designId: itemInfo?.designId || spec.designId,
+      source: 'edge',
+    });
+  }
+  return obstacles;
+}
+
+export function getEdgeFerreroObstacles(edgeConfig, topRadius = 4, exteriorFinishStyle = 'fullyFrosted') {
+  return getEdgeDelicatesObstacles(edgeConfig, topRadius, exteriorFinishStyle);
+}
+
+/**
+ * Computes the effective boundary radius for Center placement, reducing it when
+ * an Edible Delicates rim design (Ferrero Rocher, Hershey's Kisses, Cherry) is present.
+ */
+export function getDelicatesAwareBoundaryRadius(topRadius = 4, edgeConfig = null, exteriorFinishStyle = 'fullyFrosted') {
+  const defaultBoundary = getCenterPlacementBoundaryRadius(topRadius);
+  const tip = getActiveEdgeDelicateTip(edgeConfig);
+  if (!tip) return defaultBoundary;
+
+  const spec = EDIBLE_DELICATES_RIM_SPECS[tip];
+  if (!spec) return defaultBoundary;
+
+  const surfaceRadius = exteriorFinishStyle === 'naked'
+    ? topRadius - 0.02
+    : topRadius + (exteriorFinishStyle === 'texturedButtercream' ? 0.08 : 0.06);
+  const ringRadius = Math.max(0.15, surfaceRadius - spec.inset);
+  return Math.max(0, ringRadius - spec.radius);
+}
+
+export function getFerreroAwareBoundaryRadius(topRadius = 4, edgeConfig = null, exteriorFinishStyle = 'fullyFrosted') {
+  return getDelicatesAwareBoundaryRadius(topRadius, edgeConfig, exteriorFinishStyle);
+}
+
+/**
+ * Derives the topmost tier's radius directly from cake configuration.
+ */
+export function getTopTierRadiusFromConfig(config) {
+  const size = config?.structure?.size || 'big';
+  const layers = config?.structure?.layers || 1;
+  if (size === 'small') {
+    return layers >= 2 ? 2.0 : 3.0;
+  }
+  return layers >= 2 ? 3.0 : 4.0;
+}
+
+/**
+ * Prunes/removes ONLY the placed center items that collide with Edible Delicates rim designs
+ * (Ferrero Rocher, Hershey's Kisses, Cherry) or violate the adjusted boundary clearance.
+ * Exception rule: removes whatever it hits and leaves all other placed items completely intact.
+ */
+export function pruneItemsCollidingWithEdgeDelicates(
+  placedItems = [],
+  edgeConfig = null,
+  topRadius = 4,
+  centerDecorScale = 1,
+  exteriorFinishStyle = 'fullyFrosted'
+) {
+  if (!placedItems || placedItems.length === 0 || !edgeConfig) return placedItems;
+
+  const obstacles = getEdgeDelicatesObstacles(edgeConfig, topRadius, exteriorFinishStyle);
+  if (!obstacles || obstacles.length === 0) return placedItems;
+
+  const boundaryR = getDelicatesAwareBoundaryRadius(topRadius, edgeConfig, exteriorFinishStyle);
+
+  return placedItems.filter((item) => {
+    if (!item) return false;
+    const itemFp = getItemFootprint(item, centerDecorScale);
+    if (!itemFp) return true;
+
+    // Check if item footprint is outside the Delicates-aware boundary
+    if (!isFootprintInBoundary(itemFp, boundaryR, topRadius)) {
+      return false; // Collides with Edge Delicates clearance -> remove
+    }
+
+    // Check if item footprint clashes directly with any Edge Delicates obstacle
+    const hitsObstacle = obstacles.some((obs) => doFootprintsClash(itemFp, obs, 0.02));
+    if (hitsObstacle) {
+      return false; // Hit by Edible Delicates rim item -> remove
+    }
+
+    return true; // Free and untouched -> keep
+  });
+}
+
+export function pruneItemsCollidingWithEdgeFerrero(
+  placedItems = [],
+  edgeConfig = null,
+  topRadius = 4,
+  centerDecorScale = 1,
+  exteriorFinishStyle = 'fullyFrosted'
+) {
+  return pruneItemsCollidingWithEdgeDelicates(
+    placedItems,
+    edgeConfig,
+    topRadius,
+    centerDecorScale,
+    exteriorFinishStyle
+  );
+}
+
+/**
+ * Checks if a candidate item footprint collides with any active Center Piping Text bounding boxes.
+ */
+export function isFootprintCollidingWithText(footprint, textBounds) {
+  if (!footprint || !textBounds || textBounds.length === 0) return false;
+  for (const b of textBounds) {
+    const w = b.maxX - b.minX;
+    const h = b.maxZ - b.minZ;
+    if (w <= 0 || h <= 0) continue;
+    const textBoxFp = {
+      type: 'obb',
+      x: (b.minX + b.maxX) * 0.5,
+      z: (b.minZ + b.maxZ) * 0.5,
+      halfLength: w * 0.5,
+      halfWidth: h * 0.5,
+      angle: 0,
+    };
+    if (doFootprintsClash(footprint, textBoxFp, 0.02)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export const CENTER_PLACEABLE_DESIGNS = [
-  { designId: 'strawberry', orientation: null, label: 'Strawberry', toolId: 'center-strawberry-default' },
-  { designId: 'cherry', orientation: null, label: 'Cherry', toolId: 'center-cherry-default' },
-  { designId: 'ferreroRocher', orientation: null, label: 'Ferrero Rocher', toolId: 'center-ferreroRocher-default' },
-  { designId: 'hersheysKisses', orientation: null, label: "Hershey's Kiss", toolId: 'center-hersheysKisses-default' },
-  { designId: 'oreo', orientation: 'standing', label: 'Oreo', toolId: 'center-oreo-standing' },
-  { designId: 'chocolateBear', orientation: null, label: 'Chocolate Bear', toolId: 'center-chocolateBear-default' },
-  { designId: 'basketball', orientation: null, label: 'Basketball', toolId: 'center-basketball-default' },
-  { designId: 'soccerball', orientation: null, label: 'Soccer Ball', toolId: 'center-soccerball-default' },
+  { designId: 'strawberry', orientation: null, label: 'Strawberry', toolId: 'center-strawberry-default', maxLimit: 10 },
+  { designId: 'cherry', orientation: null, label: 'Cherry', toolId: 'center-cherry-default', maxLimit: 10 },
+  { designId: 'ferreroRocher', orientation: null, label: 'Ferrero Rocher', toolId: 'center-ferreroRocher-default', maxLimit: 8 },
+  { designId: 'hersheysKisses', orientation: null, label: 'Hershey Kisses', toolId: 'center-hersheysKisses-default', maxLimit: 9 },
+  { designId: 'oreo', orientation: 'standing', label: 'Oreo', toolId: 'center-oreo-standing', maxLimit: 8 },
+  { designId: 'chocolateBear', orientation: null, label: 'Bear', toolId: 'center-chocolateBear-default', maxLimit: 4 },
+  { designId: 'basketball', orientation: null, label: 'Fondant Basketball', toolId: 'center-basketball-default', maxLimit: 8 },
+  { designId: 'soccerball', orientation: null, label: 'Fondant Soccer Ball', toolId: 'center-soccerball-default', maxLimit: 8 },
 ];
 
 // Buttercream Text: individual hardened-buttercream letters, placed one at
@@ -619,9 +1190,9 @@ export const BEADED_TRIM_VARIATIONS_DELUXE = [
   // Trio from there too, which wasn't asked for.
   ...BRACELET_BEADS_VARIATIONS.filter((v) => v.id !== 'beadedTrimTrio'),
   { id: 'beadedTrimGrand', label: 'Grand Beaded Trim' },
-  { id: 'beadedTrimMorseDotDashDot', label: 'Morse Dot-Dash-Dot (Bead-Line-Bead)' },
-  { id: 'beadedTrimMorseDotDash', label: 'Morse Alternating (Dot-Dash)' },
-  { id: 'beadedTrimMorseDotDotDash', label: 'Morse Double-Dot Dash (2 Beads-Line)' },
+  { id: 'beadedTrimMorseDotDashDot', label: 'Morse Dot-Dash-Dot' },
+  { id: 'beadedTrimMorseDotDash', label: 'Morse Alternating' },
+  { id: 'beadedTrimMorseDotDotDash', label: 'Morse Double-Dot Dash' },
 ];
 
 export const BORDER_PIPING_SOLID_VARIATIONS = [
@@ -629,7 +1200,7 @@ export const BORDER_PIPING_SOLID_VARIATIONS = [
   { id: 'reverseShell', label: 'Reverse Shell' },
   { id: 'bead', label: 'Bead Piping' },
   { id: 'ropeTwist', label: 'Rope Twist' },
-  { id: 'ropeTwistClassic', label: 'Rope Twist (Classic)' },
+  { id: 'ropeTwistClassic', label: 'Rope Twist Classic' },
   { id: 'elongatedShell', label: 'Elongated Shell Border' },
 ];
 
@@ -638,7 +1209,7 @@ export const BORDER_PIPING_ALTERNATING_VARIATIONS = [
   { id: 'reverseShellAlt', label: 'Reverse Shell - Alternating' },
   { id: 'beadAlt', label: 'Bead Piping - Alternating' },
   { id: 'ropeTwistAlt', label: 'Rope Twist - Alternating' },
-  { id: 'ropeTwistClassicAlt', label: 'Rope Twist (Classic) - Alternating' },
+  { id: 'ropeTwistClassicAlt', label: 'Rope Twist Classic - Alternating' },
   { id: 'elongatedShellAlt', label: 'Elongated Shell Border - Alternating' },
 ];
 
@@ -651,39 +1222,39 @@ export const BORDER_PIPING_VARIATIONS_DELUXE = [
 ];
 
 export const DOLLOPS_SOLID_VARIATIONS_DELUXE = [
-  { id: 'starDollopContinuous', label: 'Continuous Star Dollop (20 pc)' },
-  { id: 'starDollop', label: 'Star Dollop (12 pc)' },
-  { id: 'starDollopSparse', label: 'Sparse Star Dollop (8 pc)' },
-  { id: 'roundDollop', label: 'Continuous Round Tip Dollop (20 pc)' },
-  { id: 'roundDollopMedium', label: 'Round Tip Dollop (12 pc)' },
-  { id: 'roundDollopSparse', label: 'Sparse Round Tip Dollop (8 pc)' },
+  { id: 'starDollopContinuous', label: 'Continuous Star Dollop' },
+  { id: 'starDollop', label: 'Star Dollop' },
+  { id: 'starDollopSparse', label: 'Sparse Star Dollop' },
+  { id: 'roundDollop', label: 'Continuous Round Tip Dollop' },
+  { id: 'roundDollopMedium', label: 'Round Tip Dollop' },
+  { id: 'roundDollopSparse', label: 'Sparse Round Tip Dollop' },
 ];
 
 export const DOLLOPS_SOLID_CHERRY_VARIATIONS_DELUXE = [
-  { id: 'starDollopContinuousCherry', label: 'Continuous Star Dollop (20 pc) with Cherry' },
-  { id: 'starDollopCherry', label: 'Star Dollop (12 pc) with Cherry' },
-  { id: 'starDollopSparseCherry', label: 'Sparse Star Dollop (8 pc) with Cherry' },
-  { id: 'roundDollopCherry', label: 'Continuous Round Tip Dollop (20 pc) with Cherry' },
-  { id: 'roundDollopMediumCherry', label: 'Round Tip Dollop (12 pc) with Cherry' },
-  { id: 'roundDollopSparseCherry', label: 'Sparse Round Tip Dollop (8 pc) with Cherry' },
+  { id: 'starDollopContinuousCherry', label: 'Continuous Star Dollop with Cherry' },
+  { id: 'starDollopCherry', label: 'Star Dollop with Cherry' },
+  { id: 'starDollopSparseCherry', label: 'Sparse Star Dollop with Cherry' },
+  { id: 'roundDollopCherry', label: 'Continuous Round Tip Dollop with Cherry' },
+  { id: 'roundDollopMediumCherry', label: 'Round Tip Dollop with Cherry' },
+  { id: 'roundDollopSparseCherry', label: 'Sparse Round Tip Dollop with Cherry' },
 ];
 
 export const DOLLOPS_ALTERNATING_VARIATIONS_DELUXE = [
-  { id: 'starDollopContinuousAlt', label: 'Continuous Star Dollop (20 pc) - Alternating' },
-  { id: 'starDollopAlt', label: 'Star Dollop (12 pc) - Alternating' },
-  { id: 'starDollopSparseAlt', label: 'Sparse Star Dollop (8 pc) - Alternating' },
-  { id: 'roundDollopAlt', label: 'Continuous Round Tip Dollop (20 pc) - Alternating' },
-  { id: 'roundDollopMediumAlt', label: 'Round Tip Dollop (12 pc) - Alternating' },
-  { id: 'roundDollopSparseAlt', label: 'Sparse Round Tip Dollop (8 pc) - Alternating' },
+  { id: 'starDollopContinuousAlt', label: 'Continuous Star Dollop - Alternating' },
+  { id: 'starDollopAlt', label: 'Star Dollop - Alternating' },
+  { id: 'starDollopSparseAlt', label: 'Sparse Star Dollop - Alternating' },
+  { id: 'roundDollopAlt', label: 'Continuous Round Tip Dollop - Alternating' },
+  { id: 'roundDollopMediumAlt', label: 'Round Tip Dollop - Alternating' },
+  { id: 'roundDollopSparseAlt', label: 'Sparse Round Tip Dollop - Alternating' },
 ];
 
 export const DOLLOPS_ALTERNATING_CHERRY_VARIATIONS_DELUXE = [
-  { id: 'starDollopContinuousAltCherry', label: 'Continuous Star Dollop (20 pc) - Alternating with Cherry' },
-  { id: 'starDollopAltCherry', label: 'Star Dollop (12 pc) - Alternating with Cherry' },
-  { id: 'starDollopSparseAltCherry', label: 'Sparse Star Dollop (8 pc) - Alternating with Cherry' },
-  { id: 'roundDollopAltCherry', label: 'Continuous Round Tip Dollop (20 pc) - Alternating with Cherry' },
-  { id: 'roundDollopMediumAltCherry', label: 'Round Tip Dollop (12 pc) - Alternating with Cherry' },
-  { id: 'roundDollopSparseAltCherry', label: 'Sparse Round Tip Dollop (8 pc) - Alternating with Cherry' },
+  { id: 'starDollopContinuousAltCherry', label: 'Continuous Star Dollop - Alternating with Cherry' },
+  { id: 'starDollopAltCherry', label: 'Star Dollop - Alternating with Cherry' },
+  { id: 'starDollopSparseAltCherry', label: 'Sparse Star Dollop - Alternating with Cherry' },
+  { id: 'roundDollopAltCherry', label: 'Continuous Round Tip Dollop - Alternating with Cherry' },
+  { id: 'roundDollopMediumAltCherry', label: 'Round Tip Dollop - Alternating with Cherry' },
+  { id: 'roundDollopSparseAltCherry', label: 'Sparse Round Tip Dollop - Alternating with Cherry' },
 ];
 
 export const DOLLOPS_VARIATIONS_DELUXE = [
@@ -694,30 +1265,33 @@ export const DOLLOPS_VARIATIONS_DELUXE = [
 ];
 
 export const WHIPPED_CREAM_SOLID_VARIATIONS = [
-  { id: 'whippedCreamRosetteContinuous', label: 'Whipped Cream Rosettes (Continuous ~20 pc)' },
-  { id: 'whippedCreamRosette', label: 'Whipped Cream Rosettes (12 pc)' },
+  { id: 'whippedCreamRosetteContinuous', label: 'Continuous Whipped Cream Rosettes' },
+  { id: 'whippedCreamRosette', label: 'Whipped Cream Rosettes' },
+];
+
+export const WHIPPED_CREAM_ALTERNATING_VARIATIONS = [
+  { id: 'whippedCreamRosetteContinuousAlt', label: 'Continuous Whipped Cream Rosettes - Alternating' },
+  { id: 'whippedCreamRosetteAlt', label: 'Whipped Cream Rosettes - Alternating' },
 ];
 
 export const WHIPPED_CREAM_CHERRY_VARIATIONS = [
-  { id: 'whippedCreamRosetteContinuousCherry', label: 'Whipped Cream Rosettes with Cherry (Continuous ~20 pc)' },
-  { id: 'whippedCreamRosetteCherry', label: 'Whipped Cream Rosettes with Cherry (12 pc)' },
-];
-
-export const WHIPPED_CREAM_STRAWBERRY_VARIATIONS = [
-  { id: 'whippedCreamRosetteContinuousStrawberry', label: 'Whipped Cream Rosettes with Strawberry (Continuous ~20 pc)' },
-  { id: 'whippedCreamRosetteStrawberry', label: 'Whipped Cream Rosettes with Strawberry (12 pc)' },
+  { id: 'whippedCreamRosetteContinuousCherry', label: 'Continuous Whipped Cream Rosettes with Cherry' },
+  { id: 'whippedCreamRosetteCherry', label: 'Whipped Cream Rosettes with Cherry' },
 ];
 
 export const WHIPPED_CREAM_VARIATIONS = [
   ...WHIPPED_CREAM_SOLID_VARIATIONS,
+  ...WHIPPED_CREAM_ALTERNATING_VARIATIONS,
   ...WHIPPED_CREAM_CHERRY_VARIATIONS,
-  ...WHIPPED_CREAM_STRAWBERRY_VARIATIONS,
 ];
 
 export const FRUIT_CONFECTION_RIM_OPTIONS = [
-  { id: 'hersheysKissRim', label: "Hershey's Kisses Rim 🍫" },
-  { id: 'ferreroRocherRim', label: 'Ferrero Rocher Rim 🌰' },
-  { id: 'cherryRim', label: 'Cherry Rim 🍒' },
+  { id: 'hersheysKissRim', label: "Hershey's Kisses Rim" },
+  { id: 'hersheysKissRimSparse', label: 'Hershey and Ferrero' },
+  { id: 'ferreroRocherRim', label: 'Ferrero Rocher Rim' },
+  { id: 'ferreroRocherRimSparse', label: 'Ferrero and Cherry' },
+  { id: 'cherryRim', label: 'Cherry Rim' },
+  { id: 'cherryRimSparse', label: 'Cherry and Hershey' },
 ];
 
 // Whipped Cream Rosettes' own Plain/With Cherry/With Strawberry blended

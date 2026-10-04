@@ -67,6 +67,7 @@ test('single-design reads scope the lookup to the authenticated owner', async ()
 test('updates ignore ownership and thumbnail fields supplied by the caller', async () => {
   let capturedFilter;
   let capturedUpdate;
+  mock.method(Design, 'findOne', async () => ({ _id: designId, sentToBakery: false }));
   mock.method(Design, 'findOneAndUpdate', async (filter, update) => {
     capturedFilter = filter;
     capturedUpdate = update;
@@ -88,6 +89,19 @@ test('updates ignore ownership and thumbnail fields supplied by the caller', asy
   assert.deepEqual(capturedUpdate, { $set: { name: 'Updated' } });
 });
 
+test('updates reject designs that have already been sent to bakery', async () => {
+  mock.method(Design, 'findOne', async () => ({ _id: designId, sentToBakery: true }));
+  const res = response();
+  await updateDesign(request({
+    body: {
+      name: 'Tampered Name',
+    },
+  }), res);
+
+  assert.equal(res.statusCode, 403);
+  assert.match(res.body.message, /permanently locked/i);
+});
+
 test('new designs derive ownership from the authenticated account', async () => {
   mock.method(Design.prototype, 'save', async function save() { return this; });
   const res = response();
@@ -104,3 +118,43 @@ test('new designs derive ownership from the authenticated account', async () => 
   assert.equal(String(res.body.owner), String(ownerId));
   assert.equal(res.body.userId, null);
 });
+
+test('auto-naming assigns Unnamed 1 initially, increments, and reclaims lowest untaken numbers when earlier names are renamed or deleted', async () => {
+  mock.method(Design.prototype, 'save', async function save() { return this; });
+
+  // 1. Initial design gets "Unnamed 1"
+  mock.method(Design, 'find', async () => []);
+  const res1 = response();
+  await createDesign(request({ body: { config: { layers: 1 } } }), res1);
+  assert.equal(res1.statusCode, 201);
+  assert.equal(res1.body.name, 'Unnamed 1');
+
+  // 2. Next design gets "Unnamed 2" when "Unnamed 1" exists
+  mock.method(Design, 'find', async () => [{ name: 'Unnamed 1' }]);
+  const res2 = response();
+  await createDesign(request({ body: { config: { layers: 1 } } }), res2);
+  assert.equal(res2.statusCode, 201);
+  assert.equal(res2.body.name, 'Unnamed 2');
+
+  // 3. When "Unnamed 2" and "Unnamed 3" exist (because "Unnamed 1" was renamed/deleted), reclaims "Unnamed 1"
+  mock.method(Design, 'find', async () => [
+    { name: 'Celebration Cake' },
+    { name: 'Unnamed 2' },
+    { name: 'Unnamed 3' },
+  ]);
+  const res3 = response();
+  await createDesign(request({ body: { config: { layers: 1 } } }), res3);
+  assert.equal(res3.statusCode, 201);
+  assert.equal(res3.body.name, 'Unnamed 1');
+
+  // 4. When "Unnamed 1" and "Unnamed 3" exist (gap at 2), reclaims "Unnamed 2"
+  mock.method(Design, 'find', async () => [
+    { name: 'Unnamed 1' },
+    { name: 'Unnamed 3' },
+  ]);
+  const res4 = response();
+  await createDesign(request({ body: { config: { layers: 1 } } }), res4);
+  assert.equal(res4.statusCode, 201);
+  assert.equal(res4.body.name, 'Unnamed 2');
+});
+

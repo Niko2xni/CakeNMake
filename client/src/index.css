@@ -119,6 +119,19 @@ textarea {
   -webkit-tap-highlight-color: transparent;
 }
 
+.cn-designer-tool-panel button:not(:disabled) {
+  cursor: pointer;
+}
+
+.cn-designer-tool-panel button:disabled {
+  cursor: not-allowed;
+}
+
+.cn-designer-tool-panel button * {
+  pointer-events: none;
+  cursor: inherit;
+}
+
 /* Bakery application shell */
 .cn-bakery-nav {
   position: fixed;
@@ -137,6 +150,13 @@ textarea {
 .cn-bakery-more-backdrop,
 .cn-bakery-chat-back {
   display: none;
+}
+
+.cn-bakery-content {
+  margin-left: 70px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 @media (max-width: 767px) {
@@ -525,4 +545,88 @@ textarea {
 
 .flavor-btn.active .flavor-label {
   color: var(--cake-text);
+}
+
+/* Custom styled scrollbar */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--primary) / 0.5) hsl(var(--muted) / 0.3);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: hsl(var(--muted) / 0.3);
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(var(--primary) / 0.5);
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary) / 0.8);
+}
+
+/* Hide scrollbars on mobile / touch panels */
+.no-scrollbar {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+.no-scrollbar::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar-button,
+.no-scrollbar::-webkit-scrollbar-thumb,
+.no-scrollbar::-webkit-scrollbar-track,
+.no-scrollbar::-webkit-scrollbar-corner {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+/* Pricing modal responsive scrollbar: completely hidden on mobile/touch, styled on desktop */
+.pricing-modal-scroll {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+.pricing-modal-scroll::-webkit-scrollbar,
+.pricing-modal-scroll::-webkit-scrollbar-button,
+.pricing-modal-scroll::-webkit-scrollbar-thumb,
+.pricing-modal-scroll::-webkit-scrollbar-track,
+.pricing-modal-scroll::-webkit-scrollbar-corner {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+@media (min-width: 768px) and (pointer: fine) {
+  .pricing-modal-scroll {
+    scrollbar-width: thin !important;
+    scrollbar-color: hsl(var(--primary) / 0.5) hsl(var(--muted) / 0.3) !important;
+  }
+  .pricing-modal-scroll::-webkit-scrollbar {
+    display: block !important;
+    width: 6px !important;
+    height: 6px !important;
+  }
+  .pricing-modal-scroll::-webkit-scrollbar-button {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+  .pricing-modal-scroll::-webkit-scrollbar-track {
+    background: hsl(var(--muted) / 0.3) !important;
+    border-radius: 9999px !important;
+  }
+  .pricing-modal-scroll::-webkit-scrollbar-thumb {
+    background: hsl(var(--primary) / 0.5) !important;
+    border-radius: 9999px !important;
+  }
+  .pricing-modal-scroll::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--primary) / 0.8) !important;
+  }
 }

@@ -2571,12 +2571,26 @@ function buildPipingRingRaw(tip, material, { radius, y, rand = Math.random, scal
       const mesh = instanceAroundRing(getUnitGeometry('whippedCreamRosette'), material, { ringRadius: radius, y, count, rand, scale: dScale });
       return maybeAddCherries(mesh, count, dScale, null, 0.40, 0.58, { step: 2 });
     }
+    case 'whippedCreamRosetteContinuousAlt': {
+      const rawCount = Math.round((radius * Math.PI * 2) / (0.345 * scale));
+      const count = Math.max(12, rawCount % 2 === 0 ? rawCount : rawCount + 1);
+      const dScale = scale * 0.48;
+      const mesh = instanceAroundRing(getUnitGeometry('whippedCreamRosette'), material, { ringRadius: radius, y, count, rand, scale: dScale, secondaryMaterial: secMat });
+      return maybeAddCherries(mesh, count, dScale, null, 0.40, 0.58, { step: 2 });
+    }
     case 'whippedCreamRosette': {
       // Standard spaced ring (≈12 pc on standard cake)
       // dScale=0.56*scale => each rosette outer approx 0.779; ring radius ~3.24.
       const count = Math.max(8, Math.round((radius * Math.PI * 2) / (0.570 * scale)));
       const dScale = scale * 0.56;
       const mesh = instanceAroundRing(getUnitGeometry('whippedCreamRosette'), material, { ringRadius: radius, y, count, rand, scale: dScale });
+      return maybeAddCherries(mesh, count, dScale, null, 0.46, 0.58);
+    }
+    case 'whippedCreamRosetteAlt': {
+      const rawCount = Math.round((radius * Math.PI * 2) / (0.570 * scale));
+      const count = Math.max(8, rawCount % 2 === 0 ? rawCount : rawCount + 1);
+      const dScale = scale * 0.56;
+      const mesh = instanceAroundRing(getUnitGeometry('whippedCreamRosette'), material, { ringRadius: radius, y, count, rand, scale: dScale, secondaryMaterial: secMat });
       return maybeAddCherries(mesh, count, dScale, null, 0.46, 0.58);
     }
     case 'whippedCreamRosetteSparse': {

@@ -20,7 +20,12 @@ export default function SideSection({ side, structure, activeLayer = 0, onChange
 
   const updateSide = (nextSide) => {
     if (!isIndividual) {
-      onChange(nextSide);
+      const layersCount = Math.max(structure?.layers || 2, 2);
+      const layerTreatments = Array.from(
+        { length: layersCount },
+        () => ({ ...nextSide })
+      );
+      onChange({ ...nextSide, layerTreatments });
       return;
     }
 

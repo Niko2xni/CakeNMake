@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Trash2, RotateCcw, Sparkles, Loader2, MoreVertical, Info, AlertCircle, ArrowRight, ChevronDown, CheckCircle2 } from 'lucide-react';
 import ClientNavbar from '@/components/client/ClientNavbar';
 import { designApi } from '@/services/api';
+import { useDragToScroll } from '@/hooks/useDragToScroll';
 
 export default function Trash() {
   const [trashedDesigns, setTrashedDesigns] = useState([]);
@@ -15,6 +16,8 @@ export default function Trash() {
   const [activeMenu, setActiveMenu] = useState(null);
   const [detailsModal, setDetailsModal] = useState({ open: false, design: null });
   const [deleteTarget, setDeleteTarget] = useState(null);
+
+  useDragToScroll();
 
   useEffect(() => {
     fetchTrashedDesigns();
@@ -135,6 +138,19 @@ export default function Trash() {
     setActiveMenu(null);
   };
 
+  const handleMenuToggle = (event, id) => {
+    event.stopPropagation();
+    const currentActiveId = typeof activeMenu === 'string' ? activeMenu : activeMenu?.id;
+    if (currentActiveId === id) {
+      setActiveMenu(null);
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const placement = spaceBelow < 250 ? 'up' : 'down';
+    setActiveMenu({ id, placement });
+  };
+
   const daysRemaining = (design) => {
     const trashedAt = new Date(design.trashedAt || design.lastEdited);
     if (Number.isNaN(trashedAt.getTime())) return 30;
@@ -147,7 +163,7 @@ export default function Trash() {
     : new Intl.NumberFormat('en-PH', { style: 'currency', currency: design.lastEstimate.currency || 'PHP' }).format(design.lastEstimate.totalMinor / 100);
 
   return (
-    <div className="cn-app-page cn-trash-page min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-orange-50 ml-[70px]">
+    <div className="cn-app-page cn-trash-page min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-orange-50">
       <ClientNavbar />
       <div className="cn-trash-shell max-w-6xl mx-auto px-6 py-8">
         <div className="cn-page-header cn-trash-header text-center mb-12">
@@ -165,13 +181,13 @@ export default function Trash() {
 
         <div className="cn-trash-summary">
           <div>
-            <span aria-label={`${loading ? 'Loading' : trashedDesigns.length} of 5 designs`}>
+            <span aria-label={`${loading ? 'Loading' : trashedDesigns.length} of 20 designs`}>
               <strong aria-hidden="true">{loading ? '—' : trashedDesigns.length}</strong>
-              <span aria-hidden="true"> of 5 designs</span>
+              <span aria-hidden="true"> of 20 designs</span>
             </span>
             <span aria-hidden="true">·</span>
             <span>Kept for 30 days</span>
-            {!loading && trashedDesigns.length >= 4 && <em>Almost full</em>}
+            {!loading && trashedDesigns.length >= 19 && <em>Almost full</em>}
           </div>
           <button
             type="button"
@@ -190,7 +206,7 @@ export default function Trash() {
             <h2 id="trash-information-title">How Trash works</h2>
             <ul>
               <li><strong>30-day recovery</strong><span>Deleted designs remain available before automatic removal.</span></li>
-              <li><strong>Five-design capacity</strong><span>Moving a sixth design to Trash removes the oldest one.</span></li>
+              <li><strong>Twenty-design capacity</strong><span>Moving a 21st design to Trash removes the oldest one.</span></li>
               <li><strong>Restore anytime</strong><span>Move a design back to your recent work during its recovery window.</span></li>
               <li><strong>Permanent deletion</strong><span>A permanently deleted design cannot be recovered.</span></li>
             </ul>
@@ -235,88 +251,100 @@ export default function Trash() {
             <div>
               <div className="cn-trash-grid">
               {trashedDesigns.map((design) => (
-                <article key={design._id} className="cn-trash-card flex flex-col">
-                  <div className="cn-trash-card-media relative bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-pink-100 transition-colors group">
-                    {/* 3-dot menu icon */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveMenu(activeMenu === design._id ? null : design._id);
-                      }}
-                      aria-label={`Open actions for ${design.name}`}
-                      aria-haspopup="menu"
-                      aria-expanded={activeMenu === design._id}
-                      className={`cn-trash-card-menu absolute top-2 right-2 p-2 rounded shadow-md z-10 transition-all duration-200
-                        ${
-                          activeMenu === design._id
-                            ? 'bg-gray-700 text-white opacity-100'
-                            : 'bg-white text-gray-600 opacity-100 hover:bg-gray-700 hover:text-white'
-                        }
-                      `}
-                    >
-                      <MoreVertical className="w-4 h-4 transition-colors duration-200" />
-                    </button>
+                <article key={design._id} className="cn-design-card cn-trash-card">
+                  <div className="cn-design-thumbnail cn-trash-thumbnail">
+                    {design.thumbnail ? (
+                      <img 
+                        src={design.thumbnail} 
+                        alt={design.name} 
+                        onError={(e) => {
+                          if (design.thumbnailFallback && e.currentTarget.src !== design.thumbnailFallback) {
+                            e.currentTarget.src = design.thumbnailFallback;
+                          }
+                        }}
+                      />
+                    ) : (
+                      <span className="cn-design-placeholder">
+                        <Trash2 className="w-8 h-8 opacity-40 text-[var(--cn-cherry)]" aria-hidden="true" />
+                      </span>
+                    )}
+                  </div>
 
-                    {/* Dropdown menu */}
-                    {activeMenu === design._id && (
-                      <div className="dropdown-menu absolute top-10 right-2 bg-white rounded-lg shadow-xl border border-gray-200 z-20 w-48" role="menu">
-                        <div className="p-3 border-b border-gray-100">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="font-medium text-gray-800 truncate">{design.name}</span>
+                  <div className="cn-design-meta cn-trash-meta">
+                    <div className="cn-design-meta-info">
+                      <h3>{design.name || 'Untitled design'}</h3>
+                      <p>Deleted {formatDate(design.trashedAt || design.lastEdited)}</p>
+                      <div className="cn-trash-badge-row">
+                        <span className="cn-trash-days-badge">{daysRemaining(design)} days left to restore</span>
+                      </div>
+                      <div className="mt-2.5">
+                        <button
+                          type="button"
+                          className="cn-trash-restore-btn"
+                          onClick={() => handleRestore(design._id)}
+                          disabled={Boolean(pendingAction)}
+                          aria-label={`Restore design ${design.name || ''}`}
+                        >
+                          {pendingAction === `restore-${design._id}` ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+                          ) : (
+                            <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+                          )}
+                          Restore design
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="cn-design-menu-wrap">
+                      <button
+                        type="button"
+                        className="cn-design-menu-trigger"
+                        onClick={(e) => handleMenuToggle(e, design._id)}
+                        aria-label={`Open actions for ${design.name}`}
+                        aria-haspopup="menu"
+                        aria-expanded={(typeof activeMenu === 'string' ? activeMenu === design._id : activeMenu?.id === design._id)}
+                      >
+                        <MoreVertical className="w-4 h-4" aria-hidden="true" />
+                      </button>
+
+                      {/* Dropdown menu */}
+                      {(typeof activeMenu === 'string' ? activeMenu === design._id : activeMenu?.id === design._id) && (
+                        <div
+                          ref={(node) => {
+                            if (!node) return;
+                            const rect = node.getBoundingClientRect();
+                            const bottomLimit = window.innerHeight - 76;
+                            if (rect.bottom > bottomLimit && rect.top > 180) {
+                              node.classList.add('is-up');
+                            }
+                          }}
+                          className={`dropdown-menu cn-design-menu ${activeMenu?.placement === 'up' ? 'is-up' : ''}`}
+                          role="menu"
+                        >
+                          <div className="p-2 border-b border-[var(--cn-line)] mb-1">
+                            <span className="font-semibold text-xs text-[var(--cn-ink)] truncate block">{design.name}</span>
+                            <p className="text-[10px] text-[var(--cn-muted)] mt-0.5">Deleted {formatDate(design.trashedAt || design.lastEdited)}</p>
                           </div>
-                          <p className="text-xs text-gray-500">Deleted {formatDate(design.lastEdited)}</p>
-                        </div>
-                        <div className="p-1">
                           <button
                             type="button"
                             role="menuitem"
                             onClick={() => handleShowDetails(design)}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
                           >
-                            <Info className="w-4 h-4" />
+                            <Info className="w-3.5 h-3.5" aria-hidden="true" />
                             Details
                           </button>
                           <button
                             type="button"
                             role="menuitem"
+                            className="is-danger"
                             onClick={() => { setDeleteTarget(design); setActiveMenu(null); }}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors"
                           >
-                            <Trash2 className="w-4 h-4" />
-                            Delete Permanently
+                            <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                            Delete permanently
                           </button>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="aspect-video bg-white rounded-xl flex items-center justify-center overflow-hidden">
-                      {design.thumbnail ? (
-                        <img 
-                          src={design.thumbnail} 
-                          alt={design.name} 
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            if (design.thumbnailFallback) {
-                              e.target.src = design.thumbnailFallback;
-                            }
-                          }}
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-                          <Trash2 className="w-16 h-16 text-gray-400" />
                         </div>
                       )}
                     </div>
-                  </div>
-                  <div className="cn-trash-card-details">
-                    <h3>{design.name}</h3>
-                    <p className="cn-trash-deleted-date">Deleted {formatDate(design.trashedAt || design.lastEdited)}</p>
-                    <span>{daysRemaining(design)} days left to restore</span>
-                    <button type="button" onClick={() => handleRestore(design._id)} disabled={Boolean(pendingAction)}>
-                      {pendingAction === `restore-${design._id}` ? <Loader2 className="animate-spin" aria-hidden="true" /> : <RotateCcw aria-hidden="true" />}
-                      Restore design
-                    </button>
                   </div>
                 </article>
               ))}

@@ -26,7 +26,7 @@ export default function LayerTabStrip({ layers, activeLayer, onLayerChange }) {
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
-          Tier {i + 1}
+          {layers === 2 ? (i === 0 ? 'Bottom Tier' : 'Top Tier') : (i === 0 ? 'Bottom Tier' : i === 1 ? 'Top Tier' : `Tier ${i + 1}`)}
         </button>
       ))}
     </div>

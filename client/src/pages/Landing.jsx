@@ -59,6 +59,10 @@ const questions = [
     title: 'What happens after I finish?',
     answer: 'Review the complete cake brief, save your design, and share it with the bakery so the conversation begins with everyone looking at the same cake.',
   },
+  {
+    title: 'How do payments, down payments, and fulfillment work?',
+    answer: 'Sending your design to the bakery requires a 50% down payment to confirm your booking and reserve baker scheduling. The remaining 50% balance must be settled upon pickup or delivery. Custom cakes will only be released upon complete balance payment. CakeNMake and the partner bakeries are not liable for non-fulfillment or delays resulting from uncollected or unpaid balances.',
+  },
 ];
 
 export default function Landing() {
@@ -397,7 +401,7 @@ export default function Landing() {
                 <li><Check size={17} aria-hidden="true" /> Keep the design and estimate together</li>
                 <li><Check size={17} aria-hidden="true" /> Give your baker a clearer starting point</li>
               </ul>
-              <Link to="/login" className="inline-link">Try the designer <ArrowRight size={17} /></Link>
+              <Link to="/designer" className="inline-link">Try the designer <ArrowRight size={17} /></Link>
               <aside className="brief-note">
                 <span>Why it matters</span>
                 <p>“Something like this” becomes one cake both you and your baker can see.</p>

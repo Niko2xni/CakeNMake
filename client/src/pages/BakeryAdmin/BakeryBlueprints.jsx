@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { bakeryApi } from '@/services/api';
 import { safeExternalUrl } from '@/lib/safe-url';
 import CustomScrollbar from '@/components/shared/CustomScrollbar';
+import { AdminRowsSkeleton } from '@/components/shared/PageLoadingSkeleton';
 
 export default function BakeryBlueprints() {
   const [records, setRecords] = useState([]);
@@ -50,7 +51,7 @@ export default function BakeryBlueprints() {
       </header>
       <CustomScrollbar className="flex-1" contentClassName="p-4 space-y-2">
         {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-        {loading && <p>Loading blueprints…</p>}
+        {loading && <div role="status" aria-label="Loading blueprints"><AdminRowsSkeleton count={6} /></div>}
         {!loading && !error && !records.length && <p className="text-sm text-gray-500">No blueprints submitted yet.</p>}
         {records.map((record) => (
           <div key={record.id} className="flex flex-wrap items-center gap-4 rounded-xl border border-pink-100 px-4 py-3">

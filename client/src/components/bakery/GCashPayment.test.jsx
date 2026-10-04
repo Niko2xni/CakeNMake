@@ -13,6 +13,7 @@ it('submits automatically only after simulated payment and does not require open
   render(<GCashPayment total={1950} selectedDate={date} onPaymentComplete={submit} onPaid={open} />);
   expect(submit).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Pay ₱975 via GCash' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Yes, Confirm & Pay' }));
   await act(async () => { vi.advanceTimersByTime(1799); });
   expect(submit).not.toHaveBeenCalled();
   await act(async () => { vi.advanceTimersByTime(1); });
@@ -26,6 +27,7 @@ it('shows a failed submission and retries without charging again', async () => {
   const submit = vi.fn().mockRejectedValueOnce(new Error('Storage unavailable')).mockResolvedValueOnce(undefined);
   render(<GCashPayment total={1950} selectedDate={new Date(2026, 9, 10)} onPaymentComplete={submit} />);
   fireEvent.click(screen.getByRole('button', { name: 'Pay ₱975 via GCash' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Yes, Confirm & Pay' }));
   await act(async () => { vi.advanceTimersByTime(1800); });
   expect(screen.getByRole('alert')).toHaveTextContent('Storage unavailable');
   expect(screen.getByRole('button', { name: 'Open Bakery Chat' })).toBeDisabled();

@@ -5,6 +5,7 @@ import { BrowserRouter as Router, Navigate, Route, Routes } from 'react-router-d
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
+import PageLoadingSkeleton from '@/components/shared/PageLoadingSkeleton';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import RoleRoute from '@/components/RoleRoute';
 import ScrollToTop from './components/ScrollToTop';
@@ -31,18 +32,16 @@ import BakeryChat from '@/pages/BakeryAdmin/BakeryChat';
 import BakeryAssets from '@/pages/BakeryAdmin/BakeryAssets';
 import BakeryBilling from '@/pages/BakeryAdmin/BakeryBilling';
 import BakeryBlueprints from '@/pages/BakeryAdmin/BakeryBlueprints';
+import BakeryTemplates from '@/pages/BakeryAdmin/BakeryTemplates';
+import BakeryDesigner from '@/pages/BakeryAdmin/BakeryDesigner';
 import BakeryProfile from '@/pages/BakeryAdmin/BakeryProfile';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
 
-  // Show loading spinner while checking app public settings or auth
+  // Keep the active route's layout visible while public settings or auth load.
   if (isLoadingPublicSettings || isLoadingAuth) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-pink-50">
-        <div className="w-8 h-8 border-4 border-pink-200 border-t-pink-600 rounded-full animate-spin"></div>
-      </div>
-    );
+    return <PageLoadingSkeleton />;
   }
 
   // Handle authentication errors
@@ -77,10 +76,12 @@ const AuthenticatedApp = () => {
         <Route path="/chats" element={<Chats />} />
 
         <Route element={<RoleRoute allowedRoles={['bakery_staff', 'bakery_admin', 'platform_admin']} />}>
+          <Route path="/bakery/designer" element={<BakeryDesigner />} />
           <Route path="/bakery" element={<BakeryAdminLayout />}>
             <Route index element={<BakeryDashboard />} />
             <Route path="reservations" element={<BakeryReservations />} />
             <Route path="pricing" element={<BakeryPricing />} />
+            <Route path="templates" element={<BakeryTemplates />} />
             <Route path="transactions" element={<BakeryTransactions />} />
             <Route path="chats" element={<BakeryChat />} />
             <Route path="assets" element={<BakeryAssets />} />

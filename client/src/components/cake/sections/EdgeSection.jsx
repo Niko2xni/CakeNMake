@@ -23,17 +23,13 @@ const EMPTY_MIDDLE_SLOT = () => ({
 // Design's per-tier Individual mode.
 export default function EdgeSection({
   edge,
-  structure,
-  activeLayer = 0,
   onChange,
   onActiveSlotChange,
   sugarColor,
   onSugarColorChange,
   layerCount,
+  structure,
 }) {
-  const isIndividual = structure?.layerDesign === 'individual' && structure?.layers > 1;
-  const tierLabel = (label) => (isIndividual ? `Tier ${activeLayer + 1} ${label}` : label);
-
   // Middle/All only make sense once there's an actual seam between two
   // tiers to place a ring at — on a 1-tier cake there's nothing physically
   // "middle" about, so the toggle row stays exactly Top/Bottom/Both, the
@@ -228,7 +224,7 @@ export default function EdgeSection({
         <div className="space-y-4">
           <div className="space-y-3">
             <div className="space-y-3">
-              <span className="text-xs font-semibold text-foreground block mb-2">{tierLabel('Border Piping')}</span>
+              <span className="text-xs font-semibold text-foreground block mb-2">Border Piping</span>
               <VariantRow
                 variants={BORDER_PIPING_VARIATIONS_DELUXE}
                 currentSlot={currentSlot}
@@ -240,7 +236,7 @@ export default function EdgeSection({
             </div>
 
             <VariantRow
-              label={tierLabel('Beaded Trim')}
+              label="Beaded Trim"
               variants={BEADED_TRIM_VARIATIONS_DELUXE}
               currentSlot={currentSlot}
               updateSlot={updateSlot}
@@ -251,7 +247,7 @@ export default function EdgeSection({
             />
 
             <div>
-              <span className="text-xs font-semibold text-foreground block mb-2">{tierLabel('Dollops')}</span>
+              <span className="text-xs font-semibold text-foreground block mb-2">Dollops</span>
               <VariantRow
                 variants={DOLLOPS_VARIATIONS_DELUXE}
                 currentSlot={currentSlot}
@@ -263,7 +259,7 @@ export default function EdgeSection({
             </div>
 
             <div>
-              <span className="text-xs font-semibold text-foreground block mb-2">{tierLabel('Whipped Cream Rosettes')}</span>
+              <span className="text-xs font-semibold text-foreground block mb-2">Whipped Cream Rosettes</span>
               <VariantRow
                 variants={WHIPPED_CREAM_VARIATIONS}
                 currentSlot={currentSlot}
@@ -275,7 +271,7 @@ export default function EdgeSection({
             </div>
 
             <div>
-              <span className="text-xs font-semibold text-foreground block mb-2">{tierLabel('Edible Delicates')}</span>
+              <span className="text-xs font-semibold text-foreground block mb-2">Edible Delicates</span>
               <VariantRow
                 variants={FRUIT_CONFECTION_RIM_OPTIONS}
                 currentSlot={currentSlot}

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Banknote, TrendingUp, Clock, User } from 'lucide-react';
 import CustomScrollbar from '@/components/shared/CustomScrollbar';
+import { AdminRowsSkeleton } from '@/components/shared/PageLoadingSkeleton';
+import { Skeleton } from '@/components/ui/skeleton';
 import { transactionApi } from '@/services/api';
 
 const STATUS_META = {
@@ -48,7 +50,11 @@ export default function BakeryTransactions() {
       </header>
 
       {/* Summary cards */}
-      {summary && (
+      {loading ? (
+        <div className="flex-shrink-0 grid grid-cols-1 sm:grid-cols-3 gap-3 px-6 py-4 border-b border-pink-100" role="status" aria-label="Loading transaction summary">
+          {[0, 1, 2].map((item) => <div key={item} className="space-y-3 rounded-xl border border-pink-100 p-4"><Skeleton className="h-3 w-2/3" /><Skeleton className="h-6 w-1/2" /></div>)}
+        </div>
+      ) : summary && (
         <div className="flex-shrink-0 grid grid-cols-3 gap-3 px-6 py-4 border-b border-pink-100">
           <div className="rounded-xl border border-pink-100 bg-pink-50/50 px-4 py-3 flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center flex-shrink-0">
@@ -84,7 +90,9 @@ export default function BakeryTransactions() {
 
       <CustomScrollbar className="flex-1" contentClassName="p-4">
         {loading ? (
-          <p className="text-sm text-gray-400 text-center py-8">Loading transactions...</p>
+          <div role="status" aria-label="Loading transactions">
+            <AdminRowsSkeleton count={6} avatar />
+          </div>
         ) : transactions.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-8">No transactions yet.</p>
         ) : (

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { listPresets, updatePresetPrice, listChangeLog } = require('../controllers/pricingController');
-const { cancelScheduled, createDraft, discardDraft, getWorkspace, publishDraftNow, scheduleDraft, updateDraftItem } = require('../controllers/priceBookController');
+const { cancelScheduled, createDraft, discardDraft, getWorkspace, publishDraftNow, scheduleDraft, updateDraftItem, updateDraftRates } = require('../controllers/priceBookController');
 const authenticate = require('../middleware/authenticate');
 const {
   loadAppUser,
@@ -16,6 +16,7 @@ router.use(requirePlatformMembership);
 router.get('/', requireRole('bakery_staff', 'bakery_admin', 'platform_admin'), getWorkspace);
 router.post('/draft', requireRole('bakery_admin', 'platform_admin'), createDraft);
 router.patch('/draft/items/:componentKey', requireRole('bakery_admin', 'platform_admin'), updateDraftItem);
+router.patch('/draft/rates', requireRole('bakery_admin', 'platform_admin'), updateDraftRates);
 router.post('/draft/schedule', requireRole('bakery_admin', 'platform_admin'), scheduleDraft);
 router.post('/draft/publish-now', requireRole('bakery_admin', 'platform_admin'), publishDraftNow);
 router.delete('/draft', requireRole('bakery_admin', 'platform_admin'), discardDraft);

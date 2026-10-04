@@ -37,7 +37,7 @@ exports.getDesigns = async (req, res) => {
     const trashOnly = req.query.isTrashed === 'true';
     const designs = await Design.find({ ...ownerFilter(req), isTrashed: trashOnly })
       .sort({ lastEdited: -1 })
-      .limit(trashOnly ? 5 : 3);
+      .limit(trashOnly ? 5 : 20);
     return res.json(designs);
   } catch (error) {
     console.error('Error fetching designs:', error);
@@ -58,14 +58,20 @@ exports.getDesignById = async (req, res) => {
 
 exports.createDesign = async (req, res) => {
   try {
-    const { config, lastEstimate } = req.body;
+    const { config, lastEstimate, thumbnail, thumbnailFallback, thumbnailAsset } = req.body;
     if (!config || typeof config !== 'object' || Array.isArray(config)) {
       return res.status(400).json({ message: 'A valid design configuration is required' });
     }
     let name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
-    if (!name) {
-      const count = await Design.countDocuments(ownerFilter(req));
-      name = `Untitled ${count + 1}`;
+    const isAutoName = !name || /^(?:Unnamed|Untitled)(?:\s+\d+)?$/i.test(name);
+    if (isAutoName) {
+      const existing = await Design.find({ ...ownerFilter(req), isTrashed: false }, { name: 1 });
+      const existingNames = new Set(existing.map((d) => (d.name || '').trim().toLowerCase()));
+      let num = 1;
+      while (existingNames.has(`unnamed ${num}`) || existingNames.has(`untitled ${num}`)) {
+        num++;
+      }
+      name = `Unnamed ${num}`;
     }
     if (name.length > 100) return res.status(400).json({ message: 'Design name is too long' });
 
@@ -74,6 +80,11 @@ exports.createDesign = async (req, res) => {
       config,
       owner: req.user._id,
       lastEstimate: lastEstimate || undefined,
+      thumbnail: typeof thumbnail === 'string' ? thumbnail : undefined,
+      thumbnailFallback: typeof thumbnailFallback === 'string' ? thumbnailFallback : undefined,
+      thumbnailAsset: thumbnailAsset && typeof thumbnailAsset === 'object' ? thumbnailAsset : undefined,
+      sentToBakery: req.body.sentToBakery === true,
+      isDuplicated: req.body.isDuplicated === true,
     });
     return res.status(201).json(await design.save());
   } catch (error) {
@@ -85,6 +96,13 @@ exports.createDesign = async (req, res) => {
 exports.updateDesign = async (req, res) => {
   if (invalidDesignId(req, res)) return;
   try {
+    const existing = await Design.findOne(ownedDesignFilter(req));
+    if (!existing) return notFound(res);
+
+    if (existing.sentToBakery) {
+      return res.status(403).json({ message: 'This design has already been submitted to the bakery and is permanently locked.' });
+    }
+
     const updates = {};
     if (req.body.name !== undefined) {
       if (typeof req.body.name !== 'string' || !req.body.name.trim() || req.body.name.trim().length > 100) {
@@ -97,8 +115,11 @@ exports.updateDesign = async (req, res) => {
         return res.status(400).json({ message: 'Invalid design configuration' });
       }
       updates.config = req.body.config;
+      updates.isDuplicated = false;
     }
+    if (req.body.isDuplicated !== undefined) updates.isDuplicated = Boolean(req.body.isDuplicated);
     if (req.body.lastEstimate !== undefined) updates.lastEstimate = req.body.lastEstimate;
+    if (req.body.sentToBakery !== undefined) updates.sentToBakery = Boolean(req.body.sentToBakery);
 
     const design = await Design.findOneAndUpdate(
       ownedDesignFilter(req),

@@ -1,11 +1,16 @@
 import React from 'react';
 import { Link, Unlink } from 'lucide-react';
 
-export default function TierDesignControl({ structure, onChange }) {
+export default function TierDesignControl({ structure, onChange, onToggle }) {
   const toggleTierDesign = () => {
-    onChange({
+    const nextDesign = structure.layerDesign === 'individual' ? 'uniform' : 'individual';
+    if (onToggle) {
+      onToggle(nextDesign);
+      return;
+    }
+    onChange?.({
       ...structure,
-      layerDesign: structure.layerDesign === 'individual' ? 'uniform' : 'individual',
+      layerDesign: nextDesign,
     });
   };
 

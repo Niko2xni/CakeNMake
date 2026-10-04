@@ -11,8 +11,11 @@ import {
   buildBeadedTrimRing,
   buildStrawberryRimRing,
   buildHersheysKissRimRing,
+  buildHersheysKissRimRingSparse,
   buildFerreroRocherRimRing,
+  buildFerreroRocherRimRingSparse,
   buildCherryRimRing,
+  buildCherryRimRingSparse,
   buildBasketballRimRing,
   buildSoccerBallRimRing,
   buildCheckerSideSquares,
@@ -28,7 +31,29 @@ import {
   computeEdgeTrimRadius,
 } from './DecorationSets';
 import { getFrostingMaterial, applyVerticalGradientUV } from './frostingMaterial';
-import { SUGAR_COLORS, TOP_SURFACE_SLOTS, computeSlotPosition, getSlotById, PLACE_ITEM_RADII } from '../../lib/cakeConfig';
+import {
+  SUGAR_COLORS,
+  TOP_SURFACE_SLOTS,
+  computeSlotPosition,
+  getSlotById,
+  PLACE_ITEM_RADII,
+  CENTER_ITEM_RADII,
+  getCenterItemRadius,
+  getItemFootprint,
+  doFootprintsClash,
+  isFootprintInBoundary,
+  CENTER_BOUNDARY_RESERVE,
+  getCenterPlacementBoundaryRadius,
+  getEdgeDelicatesObstacles,
+  getDelicatesAwareBoundaryRadius,
+  pruneItemsCollidingWithEdgeDelicates,
+  getEdgeFerreroObstacles,
+  getFerreroAwareBoundaryRadius,
+  pruneItemsCollidingWithEdgeFerrero,
+  isFootprintCollidingWithText,
+  getCenterItemLimit,
+  getCenterItemCount,
+} from '../../lib/cakeConfig';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 import { getPacificoFont, getHandwrittenFont, areFontsReady, onFontsReady } from './cakeFonts';
 import { makePRNG, hashStr } from './cakeMath';
@@ -37,10 +62,18 @@ import {
   PIPING_FLAVOR_COLORS,
   FILLING_COLORS,
   INTERIOR_PREVIEW_CLIP_PLANES,
+  INTERIOR_PREVIEW_CLIP_PLANES_2WAY,
+  INTERIOR_PREVIEW_FROSTING_3WAY_PLANES,
+  INTERIOR_PREVIEW_DRIP_3WAY_PLANES,
   GLAZE_PATTERN_CARVES,
   getRenderDimensions,
 } from './cakeConstants';
-import { disposeSceneObject, registerNewChildrenForClipping } from './sceneUtils';
+import {
+  disposeSceneObject,
+  registerNewChildrenForClipping,
+  getInteriorPreviewClippingConfig,
+  isAngleUnclippedByPlanes,
+} from './sceneUtils';
 import {
   buildSpongeProfileGeometry,
   buildFillingProfileGeometry,
@@ -199,7 +232,7 @@ export function getTierGlazeProfileOptions({
 // the top-level imported build functions above, plus a `prng || rand`
 // fallback that's been removed here since every call site already passes
 // prng explicitly (rand for the real render, Math.random for the ghost).
-export function buildAndAddDecoration(targetGroup, setId, x, y, z, scaleFactor, decorColor, prng, orientation) {
+export function buildAndAddDecoration(targetGroup, setId, x, y, z, scaleFactor, decorColor, prng, orientation, colorId = null) {
   const edibleDelicateScale = [
     'strawberry',
     'cherry',
@@ -300,32 +333,16 @@ export function buildAndAddDecoration(targetGroup, setId, x, y, z, scaleFactor, 
       bevelSize: 0.035,
       bevelSegments: 4,
     });
+    applyVerticalGradientUV(letterGeo);
     letterGeo.computeBoundingBox();
     const bbox = letterGeo.boundingBox;
-    const letterMat = getFrostingMaterial(decorColor);
+    const letterMat = getFrostingMaterial(decorColor, colorId);
     const letterMesh = new THREE.Mesh(letterGeo, letterMat);
-    // TextGeometry is authored in the XY plane (character reads right-side
-    // up looking down -Z) -- rotate -90° around X to lay it flat on the
-    // cake's XZ top surface, same convention the main text block's own
-    // textGroup.rotation.x = -Math.PI / 2 uses. THREE applies a mesh's own
-    // rotation to its local geometry BEFORE its position is added, so the
-    // rotation above remaps local axes onto the parent-space position
-    // offset below: local X stays X, local Z (the extrusion depth) becomes
-    // parent-space Y, and local Y (the glyph's height) becomes parent-space
-    // -Z. Only X/Z are centered here -- both purely horizontal (which way
-    // the glyph sits left/right and front/back on the surface), with no
-    // effect on resting height. Y is deliberately left alone: the mesh's
-    // local origin needs to stay at the glyph's BASE (y=0), not its
-    // vertical middle, so it rests flush on the cake surface at 0° tilt
-    // like every other decoration -- rotating around the glyph's true
-    // vertical center (which sits above this base, at roughly half the
-    // extrusion depth) is handled separately by buildRotatedDecoration,
-    // which measures the whole built mesh's real center via Box3 and pivots
-    // around that without needing the mesh itself to be self-centered.
-    letterMesh.rotation.x = -Math.PI / 2;
+    // Stand upright facing front to the user (facing along +Z toward camera, height along +Y,
+    // resting flush on surface at base y=0, centered horizontally on X and thickness on Z)
     const centerX = -0.5 * (bbox.min.x + bbox.max.x);
-    const centerZ = 0.5 * (bbox.min.y + bbox.max.y);
-    letterMesh.position.set(x + centerX * scaleFactor, y, z + centerZ * scaleFactor);
+    const centerZ = -0.5 * (bbox.min.z + bbox.max.z);
+    letterMesh.position.set(x + centerX * scaleFactor, y - bbox.min.y * scaleFactor, z + centerZ * scaleFactor);
     letterMesh.scale.setScalar(scaleFactor);
     letterMesh.castShadow = true;
     letterMesh.receiveShadow = true;
@@ -419,6 +436,31 @@ function clearGhostGroup(group) {
 // DecorationPreview.jsx's camera-fit already uses) and cached by design,
 // so buildRotatedDecoration below always has the real number to pivot
 // around regardless of each design's own internal convention.
+/**
+ * Computes a bounding box for an object while ignoring any decorative stems,
+ * sticks, or secondary appendages marked with userData.ignoreGrounding (e.g. cherry stem).
+ */
+export function computeGroundingBox(object) {
+  const box = new THREE.Box3();
+  const tempBox = new THREE.Box3();
+  let found = false;
+
+  object.traverse((child) => {
+    if (child.userData.ignoreGrounding) return;
+    if (child.geometry) {
+      if (!child.geometry.boundingBox) {
+        child.geometry.computeBoundingBox();
+      }
+      tempBox.copy(child.geometry.boundingBox);
+      tempBox.applyMatrix4(child.matrixWorld);
+      box.union(tempBox);
+      found = true;
+    }
+  });
+
+  return (!found || box.isEmpty()) ? new THREE.Box3().setFromObject(object) : box;
+}
+
 const _designCenterOffsetCache = {};
 function getDesignCenterOffset(designId, orientation) {
   const cacheKey = `${designId}__${orientation || 'default'}`;
@@ -429,10 +471,11 @@ function getDesignCenterOffset(designId, orientation) {
   // measures a design's own geometry -- multiplied back out by the real
   // render scale at use time in buildRotatedDecoration below.
   buildAndAddDecoration(scratch, designId, 0, 0, 0, 1, '#F6DEAB', Math.random, orientation);
-  const box = new THREE.Box3().setFromObject(scratch);
+  scratch.updateMatrixWorld(true);
+  const box = computeGroundingBox(scratch);
   const sphere = new THREE.Sphere();
   box.getBoundingSphere(sphere);
-  const offset = { x: sphere.center.x, y: sphere.center.y, z: sphere.center.z };
+  const offset = { x: sphere.center.x, y: sphere.center.y, z: sphere.center.z, minY: box.min.y };
 
   // Deliberately not disposing scratch's meshes -- same shared-geometry/
   // material caching reasoning as elsewhere in this file (these meshes
@@ -461,8 +504,13 @@ function getDesignCenterOffset(designId, orientation) {
 // identical to the old (tiltX, rotationY, 0) 'XYZ' set, so existing placed
 // items render exactly as before. Added as a trailing param so any other
 // caller (e.g. DecorationPreview) keeps working unchanged.
-export function buildRotatedDecoration(designId, orientation, tiltX, rotationY, scale, color, prng, rollRight = 0) {
+//
+// normal (optional, THREE.Vector3): local surface normal of the cake dome/bump
+// at the drop point. When provided, aligns the anchor to hug the slope of the hill.
+export function buildRotatedDecoration(designId, orientation, tiltX, rotationY, scale, color, prng, rollRight = 0, colorId = null) {
   const anchor = new THREE.Group();
+  anchor.userData.designId = designId;
+
   const offset = getDesignCenterOffset(designId, orientation);
   const rotationCore = new THREE.Group();
   rotationCore.position.set(offset.x * scale, offset.y * scale, offset.z * scale);
@@ -471,10 +519,199 @@ export function buildRotatedDecoration(designId, orientation, tiltX, rotationY, 
   rotationCore.rotation.set(tiltX, rotationY, -rollRight, 'ZXY');
   const meshGroup = new THREE.Group();
   meshGroup.position.set(-offset.x * scale, -offset.y * scale, -offset.z * scale);
-  buildAndAddDecoration(meshGroup, designId, 0, 0, 0, scale, color, prng, orientation);
+  buildAndAddDecoration(meshGroup, designId, 0, 0, 0, scale, color, prng, orientation, colorId);
   rotationCore.add(meshGroup);
   anchor.add(rotationCore);
+
+  const localUp = new THREE.Vector3(0, 1, 0).applyEuler(rotationCore.rotation);
+  anchor.userData.localUpY = localUp.y;
+
+  // Grounding: Ensure the lowest point of the rotated decoration rests
+  // at anchor Y = 0 in local space, regardless of orientation or tilt angle.
+  // For items with thin stems/sticks (like cherries), grounds by the main body.
+  anchor.updateMatrixWorld(true);
+  const bbox = computeGroundingBox(anchor);
+  if (isFinite(bbox.min.y)) {
+    rotationCore.position.y -= bbox.min.y;
+    anchor.updateMatrixWorld(true);
+  }
+
   return anchor;
+}
+
+/**
+ * Calculates the exact 3D surface point on top of the cake at (x, z),
+ * following the dome bump and shoulder bevel smoothly with no jumps.
+ */
+export function getCakeTopSurfacePoint(x, z, topMetrics) {
+  if (!topMetrics) {
+    return { y: 0 };
+  }
+  const { baseY = 0, domeHeight = 0, radius = 4 } = topMetrics;
+  const r = Math.sqrt(x * x + z * z);
+  const R = Math.max(0.1, radius - 0.18); // shoulder radius where dome meets bevel
+
+  let y = baseY;
+
+  if (r < R) {
+    const factor = 1 - (r / R) * (r / R);
+    y = baseY + domeHeight * factor;
+  } else {
+    // Shoulder bevel curve down to the cake's outer rim
+    const bevelWidth = Math.max(0.01, radius - R);
+    const dr = Math.min(bevelWidth, r - R);
+    const t = dr / bevelWidth;
+    const drop = 0.15 * Math.sin((Math.PI / 2) * t);
+    y = baseY - drop;
+  }
+
+  return { y };
+}
+
+/**
+ * Ensures that any placed or previewed decoration lands flush on the cake surface
+ * no matter what angle or tilt it has.
+ * Reads the actual bottom contact points of the rotated mesh relative to the cake's
+ * surface elevation directly underneath, guaranteeing zero floating at any angle.
+ * For items with stems (like cherries), only reads the fruit body so the cherry
+ * body rests firmly on the surface.
+ */
+export function getDecorationLandingY(anchor, px, pz, topMetrics) {
+  const fallbackY = getCakeTopSurfacePoint(px, pz, topMetrics).y;
+  if (!anchor || !topMetrics) return fallbackY;
+
+  anchor.updateMatrixWorld(true);
+  const bbox = computeGroundingBox(anchor);
+  if (!isFinite(bbox.min.y)) return fallbackY;
+
+  const height = Math.max(0.01, bbox.max.y - bbox.min.y);
+  // Bottom contact band: vertices within the lowest 15% of the object height (or 0.12 units)
+  const contactThreshold = bbox.min.y + Math.min(height * 0.15, 0.12);
+
+  const contactPoints = [];
+  let lowestVertex = null;
+  let lowestY = Infinity;
+
+  anchor.traverse((child) => {
+    if (!child.isMesh || !child.geometry) return;
+    if (child.userData.ignoreGrounding) return; // Skip stem, stick, or secondary appendages
+    const pos = child.geometry.attributes.position;
+    if (!pos) return;
+    const v = new THREE.Vector3();
+    const stride = Math.max(1, Math.floor(pos.count / 32));
+    for (let i = 0; i < pos.count; i += stride) {
+      v.fromBufferAttribute(pos, i);
+      v.applyMatrix4(child.matrixWorld);
+      if (v.y < lowestY) {
+        lowestY = v.y;
+        lowestVertex = { dx: v.x, dy: v.y, dz: v.z };
+      }
+      if (v.y <= contactThreshold && contactPoints.length < 80) {
+        contactPoints.push({ dx: v.x, dy: v.y, dz: v.z });
+      }
+    }
+  });
+
+  if (lowestVertex) {
+    contactPoints.push(lowestVertex);
+  }
+
+  // Fallback if no vertices were collected (e.g. custom procedural object)
+  if (contactPoints.length === 0) {
+    contactPoints.push({ dx: 0, dy: bbox.min.y, dz: 0 });
+    const midX = (bbox.min.x + bbox.max.x) * 0.5;
+    const midZ = (bbox.min.z + bbox.max.z) * 0.5;
+    contactPoints.push({ dx: midX, dy: bbox.min.y, dz: midZ });
+  }
+
+  // Find the exact landing Y so that every contact point sits on or above the cake surface
+  // (i.e. the lowest contact point touches the cake surface directly underneath it)
+  let maxLandingY = -Infinity;
+  for (const pt of contactPoints) {
+    const worldX = px + pt.dx;
+    const worldZ = pz + pt.dz;
+    const surfaceY = getCakeTopSurfacePoint(worldX, worldZ, topMetrics).y;
+    const requiredY = surfaceY - pt.dy;
+    if (requiredY > maxLandingY) {
+      maxLandingY = requiredY;
+    }
+  }
+
+  // Base nestle into frosting so it sits firmly on the cake with zero daylight
+  let nestle = 0.015;
+
+  const designId = anchor.userData?.designId;
+  const isLetter = typeof designId === 'string' &&
+    (designId.startsWith('letterUpper') || designId.startsWith('letterLower'));
+
+  // When conical/pointy items (like Hershey's Kiss) are tilted upside down,
+  // bury them progressively deeper into the frosting the more they tilt upside down,
+  // so the pointy tip sinks well into the cake and the wider cone body is firmly grounded.
+  if (designId === 'hersheysKisses') {
+    const upY = anchor.userData.localUpY ?? 1.0;
+    if (upY < 0) {
+      // upY ranges from 0 (on its side) to -1.0 (pointing straight down).
+      // Smoothly scale up extra bury to ~0.20 units as it goes upside down.
+      const upsideDownFactor = Math.abs(upY);
+      nestle += upsideDownFactor * 0.20;
+    }
+  } else if (designId === 'strawberry') {
+    const upY = anchor.userData.localUpY ?? 1.0;
+    // Base extra nestle so strawberry rests firmly in frosting on all sides:
+    nestle += 0.02;
+    // Bury upright strawberry into frosting so the pointy apex tip doesn't float or balance on a point:
+    if (upY >= 0) {
+      nestle += upY * 0.035;
+    } else {
+      // Bury upside-down strawberry into frosting so the crown/leaves sit embedded:
+      const upsideDownFactor = Math.abs(upY);
+      nestle += upsideDownFactor * 0.07;
+    }
+  } else if (designId === 'oreo' || designId === 'chocolateBear') {
+    const upY = anchor.userData.localUpY ?? 1.0;
+    // For every angle tilt (0 -> 90 deg), bury progressively into frosting:
+    const tiltFactor = Math.min(1.0, Math.max(0, 1.0 - upY));
+    nestle += tiltFactor * 0.08;
+
+    // As it goes upside down (past 90 deg toward 180 deg), bury even deeper just like Hershey's:
+    if (upY < 0) {
+      const upsideDownFactor = Math.abs(upY);
+      nestle += upsideDownFactor * 0.16;
+    }
+  } else if (designId === 'ferreroRocher') {
+    const upY = anchor.userData.localUpY ?? 1.0;
+    nestle += 0.045;
+    if (upY < 0) {
+      nestle += Math.abs(upY) * 0.04;
+    }
+  } else if (designId === 'cherry') {
+    const upY = anchor.userData.localUpY ?? 1.0;
+    nestle += 0.04;
+    if (upY < 0) {
+      nestle += Math.abs(upY) * 0.04;
+    }
+  } else if (designId === 'basketball' || designId === 'soccerball') {
+    const upY = anchor.userData.localUpY ?? 1.0;
+    nestle += 0.045;
+    if (upY < 0) {
+      nestle += Math.abs(upY) * 0.04;
+    }
+  } else if (designId === 'fruitRing') {
+    nestle += 0.035;
+  } else if (isLetter) {
+    const upY = anchor.userData.localUpY ?? 1.0;
+    // Minimal nestle when standing straight up so letters are crisp and clearly visible on top of frosting:
+    nestle = 0.008;
+
+    // Peak bury when lying flat on the surface (around 90 deg tilt, upY close to 0):
+    // When upright (upY -> 1) or completely upside down (upY -> -1), extra tilt bury eases off
+    // so the letter rests cleanly on the surface without sinking deep into the cake.
+    const sideTiltFactor = 1.0 - Math.abs(upY);
+    nestle += sideTiltFactor * 0.09;
+  }
+
+  const landingY = (isFinite(maxLandingY) ? maxLandingY : fallbackY) - nestle;
+  return landingY;
 }
 
 // isCenterTool/parseCenterTool: module scope (not closure-local) so both
@@ -490,6 +727,10 @@ function parseCenterTool(toolType) {
   return { designId, orientation: orientationTag === 'default' ? null : orientationTag };
 }
 
+function isButtercreamLetterDesign(designId) {
+  return designId?.startsWith('letterUpper') || designId?.startsWith('letterLower');
+}
+
 // Place-tab items (cherry, strawberry, candle, chocolateChip, rosette,
 // piping) — formerly slot-snapped onto TOP_SURFACE_SLOTS, now placed
 // freeform with real-size collision checking, same idea as Center tools
@@ -500,7 +741,20 @@ function isPlaceItemTool(toolType) {
   return typeof toolType === 'string' && Object.prototype.hasOwnProperty.call(PLACE_ITEM_RADII, toolType);
 }
 
-const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, onPlace, onSelectTool, thumbnailMode = false }, ref) {
+const CakeScene = React.forwardRef(function CakeScene({
+  cakeConfig,
+  activeTool,
+  onPlace,
+  onSelectTool,
+  onPlacementBlocked,
+  selectedCenterItemId = null,
+  onCenterItemSelect,
+  onDeleteCenterItem,
+  onPlacedItemsChange,
+  thumbnailMode = false,
+  disabled = false,
+  readOnly = false,
+}, ref) {
   const mountRef = useRef(null);
   const sceneRef = useRef(null);
   const rendererRef = useRef(null);
@@ -512,10 +766,18 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
   const mouseRef = useRef({ isDown: false, prevX: 0, prevY: 0, moved: false });
   const autoRotateRef = useRef(false);
   const activeToolRef = useRef(activeTool);
+  const disabledRef = useRef(disabled);
+  const readOnlyRef = useRef(readOnly);
   const onPlaceRef = useRef(onPlace);
   const onSelectToolRef = useRef(onSelectTool);
+  const onPlacementBlockedRef = useRef(onPlacementBlocked);
+  const onCenterItemSelectRef = useRef(onCenterItemSelect);
+  const onDeleteCenterItemRef = useRef(onDeleteCenterItem);
+  const onPlacedItemsChangeRef = useRef(onPlacedItemsChange);
+  const selectedCenterItemIdRef = useRef(selectedCenterItemId);
   const lastMousePosRef = useRef({ x: 0, y: 0 });
   const cakeConfigRef = useRef(cakeConfig);
+  const lastValidGhostDropRef = useRef(null);
   const [error, setError] = useState(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [fontsReady, setFontsReady] = useState(() => areFontsReady());
@@ -526,6 +788,8 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
   // Predefined slot & ghost preview refs
   const slotsGroupRef = useRef(null);
   const ghostGroupRef = useRef(null);
+  const selectionOverlayGroupRef = useRef(null);
+  const refreshSelectionOverlayRef = useRef(null);
   const hoveredSlotRef = useRef(null);
   // Set inside the main scene-setup effect once updateCenterGhost/
   // updatePlaceItemGhost exist; called from the activeTool-sync effect
@@ -535,6 +799,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
   // canvas.
   const refreshGhostRef = useRef(null);
   const topMetricsRef = useRef({ baseY: 0, domeHeight: 0, topY: 0, radius: 4 });
+  const handleResizeRef = useRef(null);
 
   // Update visual slot markers and ghost preview
   const updateSlotVisuals = useCallback(() => {
@@ -549,7 +814,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       slotsGroup.remove(child);
     }
 
-    if (!activeToolRef.current) {
+    if (!activeToolRef.current || cakeConfigRef.current?.interiorPreview) {
       clearGhostGroup(ghostGroup);
       return;
     }
@@ -623,9 +888,23 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
     resetCamera: () => {
       const camera = cameraRef.current;
       const controls = controlsRef.current;
+      const mount = mountRef.current;
       if (!camera || !controls) return;
       camera.position.set(0, 8, 22);
       controls.target.set(0, 4, 0);
+      if (mount && mount.clientWidth && mount.clientHeight) {
+        const aspect = mount.clientWidth / mount.clientHeight;
+        const baseFov = 40;
+        const baseAspect = 1.6;
+        if (aspect < baseAspect) {
+          const fovRad = 2 * Math.atan(Math.tan((baseFov * Math.PI) / 360) * (baseAspect / aspect));
+          camera.fov = Math.min(62, Math.max(35, (fovRad * 180) / Math.PI));
+        } else {
+          camera.fov = baseFov;
+        }
+        camera.aspect = aspect;
+        camera.updateProjectionMatrix();
+      }
       controls.update();
     },
     captureScreenshot: () => {
@@ -805,6 +1084,124 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       }
 
       return result;
+    },
+
+    // 8-Angle Template Camera Screenshot Engine
+    // Captures exactly 8 high-definition multi-angle views around the cake
+    // for use in template catalogs, slideshows, and details modals.
+    captureTemplateViews: ({ quality = 0.92, width = 800, height = 800 } = {}) => {
+      const renderer = rendererRef.current;
+      const scene = sceneRef.current;
+      const cakeGroup = cakeGroupRef.current;
+      if (!renderer || !scene || !cakeGroup) return [];
+
+      const deg = THREE.MathUtils.degToRad;
+      const tiers = Math.max(1, Number(cakeConfigRef.current?.layers) || 1);
+      const eyeTilt = deg(tiers <= 1 ? 16 : tiers === 2 ? 11 : 8);
+      const isoTilt = deg(tiers <= 1 ? 26 : tiers === 2 ? 20 : 15);
+
+      const shots = [
+        { label: 'Front View', angle: '0°', azimuth: deg(0), tilt: eyeTilt },
+        { label: 'Front-Right Angle', angle: '45°', azimuth: deg(45), tilt: isoTilt },
+        { label: 'Right Side View', angle: '90°', azimuth: deg(90), tilt: eyeTilt },
+        { label: 'Back-Right Angle', angle: '135°', azimuth: deg(135), tilt: isoTilt },
+        { label: 'Back View', angle: '180°', azimuth: deg(180), tilt: eyeTilt },
+        { label: 'Back-Left Angle', angle: '225°', azimuth: deg(225), tilt: isoTilt },
+        { label: 'Left Side View', angle: '270°', azimuth: deg(270), tilt: eyeTilt },
+        { label: 'Top-Down View', angle: 'Top', azimuth: deg(0), tilt: Math.PI / 2 },
+      ];
+
+      const prevSlotsVisible = slotsGroupRef.current ? slotsGroupRef.current.visible : true;
+      const prevGhostVisible = ghostGroupRef.current ? ghostGroupRef.current.visible : true;
+      const prevClipStates = coveringMaterialsRef.current.map((mat) => mat.clippingPlanes);
+      const prevRotation = cakeGroup.rotation.clone();
+      const prevSize = renderer.getSize(new THREE.Vector2());
+      const prevPixelRatio = renderer.getPixelRatio();
+      const views = [];
+
+      try {
+        coveringMaterialsRef.current.forEach((mat) => { mat.clippingPlanes = []; });
+        if (slotsGroupRef.current) slotsGroupRef.current.visible = false;
+        if (ghostGroupRef.current) ghostGroupRef.current.visible = false;
+        cakeGroup.rotation.set(0, 0, 0);
+        cakeGroup.updateMatrixWorld(true);
+
+        const box = new THREE.Box3().setFromObject(cakeGroup);
+        if (box.isEmpty()) return [];
+        const center = box.getCenter(new THREE.Vector3());
+        const dims = box.getSize(new THREE.Vector3());
+        const ringRadius = Math.max(dims.x, dims.z) / 2;
+        const minRadius = Math.max(dims.x, dims.y, dims.z) / 2;
+
+        const points = [];
+        for (let i = 0; i < 32; i++) {
+          const a = (i / 32) * Math.PI * 2;
+          for (const y of [box.min.y, box.max.y]) {
+            points.push(new THREE.Vector3(center.x + Math.cos(a) * ringRadius, y, center.z + Math.sin(a) * ringRadius));
+          }
+        }
+
+        const FIT = 0.90;
+        const fov = 32;
+        const projected = new THREE.Vector3();
+        const camera = new THREE.PerspectiveCamera(fov, 1, 0.1, 300);
+
+        renderer.setPixelRatio(1);
+
+        for (const shot of shots) {
+          camera.aspect = width / height;
+          camera.up.set(0, shot.tilt >= Math.PI / 2 ? 0 : 1, shot.tilt >= Math.PI / 2 ? -1 : 0);
+          const horizontalFactor = Math.cos(shot.tilt);
+          const dir = new THREE.Vector3(
+            Math.sin(shot.azimuth) * horizontalFactor,
+            Math.sin(shot.tilt),
+            Math.cos(shot.azimuth) * horizontalFactor
+          );
+
+          const place = (d) => {
+            camera.position.copy(center).addScaledVector(dir, d);
+            camera.lookAt(center);
+            camera.updateProjectionMatrix();
+            camera.updateMatrixWorld(true);
+          };
+          const fits = (d) => {
+            place(d);
+            return points.every((p) => {
+              projected.copy(p).project(camera);
+              return Math.abs(projected.x) <= FIT && Math.abs(projected.y) <= FIT && projected.z < 1;
+            });
+          };
+
+          let lo = minRadius;
+          let hi = minRadius * 40;
+          for (let i = 0; i < 28; i++) {
+            const mid = (lo + hi) / 2;
+            if (fits(mid)) hi = mid; else lo = mid;
+          }
+          place(hi);
+
+          renderer.setSize(width, height, false);
+          renderer.render(scene, camera);
+          const url = renderer.domElement.toDataURL('image/jpeg', quality);
+          views.push({
+            label: shot.label,
+            angle: shot.angle,
+            url,
+          });
+        }
+      } catch (err) {
+        console.warn('Template 8-angle capture failed:', err);
+        return [];
+      } finally {
+        renderer.setPixelRatio(prevPixelRatio);
+        renderer.setSize(prevSize.x, prevSize.y, false);
+        cakeGroup.rotation.copy(prevRotation);
+        coveringMaterialsRef.current.forEach((mat, i) => { mat.clippingPlanes = prevClipStates[i]; });
+        if (slotsGroupRef.current) slotsGroupRef.current.visible = prevSlotsVisible;
+        if (ghostGroupRef.current) ghostGroupRef.current.visible = prevGhostVisible;
+      }
+
+      return views;
     }
   }));
 
@@ -812,16 +1209,94 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
     activeToolRef.current = activeTool;
     updateSlotVisuals();
     refreshGhostRef.current?.();
+    refreshSelectionOverlayRef.current?.();
   }, [activeTool, updateSlotVisuals]);
   useEffect(() => { onPlaceRef.current = onPlace; }, [onPlace]);
   useEffect(() => { onSelectToolRef.current = onSelectTool; }, [onSelectTool]);
+  useEffect(() => { onPlacementBlockedRef.current = onPlacementBlocked; }, [onPlacementBlocked]);
+  useEffect(() => { onCenterItemSelectRef.current = onCenterItemSelect; }, [onCenterItemSelect]);
+  useEffect(() => { onDeleteCenterItemRef.current = onDeleteCenterItem; }, [onDeleteCenterItem]);
+  useEffect(() => { onPlacedItemsChangeRef.current = onPlacedItemsChange; }, [onPlacedItemsChange]);
+  useEffect(() => {
+    selectedCenterItemIdRef.current = selectedCenterItemId;
+    refreshSelectionOverlayRef.current?.();
+  }, [selectedCenterItemId]);
+  useEffect(() => {
+    disabledRef.current = disabled;
+    if (disabled) {
+      if (ghostGroupRef.current) clearGhostGroup(ghostGroupRef.current);
+      if (selectionOverlayGroupRef.current) {
+        while (selectionOverlayGroupRef.current.children.length > 0) {
+          const child = selectionOverlayGroupRef.current.children[0];
+          disposeSceneObject(child);
+          selectionOverlayGroupRef.current.remove(child);
+        }
+      }
+      if (hoveredSlotRef.current) {
+        hoveredSlotRef.current = null;
+        updateSlotVisuals();
+      }
+    }
+    if (controlsRef.current) {
+      controlsRef.current.enabled = !disabled;
+    }
+  }, [disabled, updateSlotVisuals]);
+
+  useEffect(() => {
+    readOnlyRef.current = readOnly;
+    if (readOnly) {
+      if (ghostGroupRef.current) clearGhostGroup(ghostGroupRef.current);
+      if (selectionOverlayGroupRef.current) {
+        while (selectionOverlayGroupRef.current.children.length > 0) {
+          const child = selectionOverlayGroupRef.current.children[0];
+          disposeSceneObject(child);
+          selectionOverlayGroupRef.current.remove(child);
+        }
+      }
+      if (hoveredSlotRef.current) {
+        hoveredSlotRef.current = null;
+        updateSlotVisuals();
+      }
+      if (rendererRef.current?.domElement) {
+        rendererRef.current.domElement.style.cursor = '';
+      }
+    }
+  }, [readOnly, updateSlotVisuals]);
 
   // Trigger a scene rebuild when fonts finish loading asynchronously
   useEffect(() => {
     if (fontsReady) return;
     onFontsReady(() => setFontsReady(true));
   }, [fontsReady]);
-  useEffect(() => { cakeConfigRef.current = cakeConfig; }, [cakeConfig]);
+  useEffect(() => {
+    cakeConfigRef.current = cakeConfig;
+    if (cakeConfig?.interiorPreview) {
+      if (ghostGroupRef.current) clearGhostGroup(ghostGroupRef.current);
+      if (slotsGroupRef.current) {
+        while (slotsGroupRef.current.children.length > 0) {
+          const child = slotsGroupRef.current.children[0];
+          disposeSceneObject(child);
+          slotsGroupRef.current.remove(child);
+        }
+      }
+      if (selectionOverlayGroupRef.current) {
+        while (selectionOverlayGroupRef.current.children.length > 0) {
+          const child = selectionOverlayGroupRef.current.children[0];
+          disposeSceneObject(child);
+          selectionOverlayGroupRef.current.remove(child);
+        }
+      }
+      hoveredSlotRef.current = null;
+      lastValidGhostDropRef.current = null;
+      if (rendererRef.current?.domElement) {
+        rendererRef.current.domElement.style.cursor = '';
+      }
+    } else {
+      updateSlotVisuals();
+      refreshGhostRef.current?.();
+      refreshSelectionOverlayRef.current?.();
+    }
+  }, [cakeConfig, updateSlotVisuals]);
 
   const buildCake = useCallback(() => {
     if (!sceneRef.current || !cakeGroupRef.current) return;
@@ -856,7 +1331,8 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       surfaceFrostingColorId = null,
       layerSurfaceFrostingColors = [],
       layerSurfaceFrostingColorIds = [],
-      centerDecorationColor = '#F6DEAB', centerTextColor = '#F6DEAB',
+      centerDecorationColor = '#F6DEAB', centerDecorationColorId = null,
+      centerTextColor = '#F6DEAB', centerTextColorId = null, centerTextColorMode = 'uniform',
       // Surface Treatment is Glaze-only now (Textured Buttercream moved to
       // exteriorFinishStyle — see the frostGeo branch below, and
       // cakeConfig.js's comment on exteriorFinish for why). Glaze is built
@@ -1086,6 +1562,35 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       lastFrostColor = frostColor;
       const fillColor = fillingKey ? FILLING_COLORS[fillingKey] : null;
 
+      const tierHasFrost = Boolean(frostColor && exteriorFinishStyle !== 'naked');
+      const tierHasGlaze = isIndividual
+        ? (layerSurfaceTreatmentModes?.[i] === 'glaze')
+        : (surfaceTreatmentMode === 'glaze');
+      const tierHasSideDrip = isIndividual
+        ? (sideNoNameSetId === 'drip')
+        : (sharedSideTreatment.sideNoNameSetId === 'drip');
+      const tierHasDrip = tierHasGlaze || tierHasSideDrip;
+      const tierHasSideDecor = isIndividual
+        ? Boolean(
+            (sideNoNameSetId && sideNoNameSetId !== 'drip') ||
+            sideCheckeredPatternSetId ||
+            sideTrianglePatternSetId ||
+            sideDecorationSetId
+          )
+        : Boolean(
+            (sharedSideTreatment.sideNoNameSetId && sharedSideTreatment.sideNoNameSetId !== 'drip') ||
+            sharedSideTreatment.sideCheckeredPatternSetId ||
+            sharedSideTreatment.sideTrianglePatternSetId ||
+            sharedSideTreatment.sideDecorationSetId
+          );
+
+      const tierClipConfig = getInteriorPreviewClippingConfig({
+        hasFrosting: tierHasFrost,
+        hasDrip: tierHasDrip,
+        hasSide: tierHasSideDecor,
+        interiorPreview,
+      });
+
       // Build layer with separate sections: Sponge Body + Filling Layers + Frosting Shell
 
       // Calculate sponge height (subtract filling space if enabled)
@@ -1099,8 +1604,8 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         const tierTopY = currentY + height + (frostColor && exteriorFinishStyle !== 'naked' ? FROST_H : 0) + 0.05;
         const dripRing = buildDripRing(radius, sideNoNameColor, rand);
         dripRing.position.y = tierTopY;
-        dripRing.material.clippingPlanes = interiorPreview ? INTERIOR_PREVIEW_CLIP_PLANES : [];
-        dripRing.material.clipIntersection = true;
+        dripRing.material.clippingPlanes = tierClipConfig.drip.planes;
+        dripRing.material.clipIntersection = tierClipConfig.drip.clipIntersection;
         dripRing.material.clipShadows = true;
         coveringMaterialsRef.current.push(dripRing.material);
         group.add(dripRing);
@@ -1651,12 +2156,15 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         // stacking is robust and doesn't depend on getting that matching
         // exactly right.)
 
-        const spongeGeo = buildSpongeProfileGeometry(radius - 0.02, spongeSectionHeight, {
+        const isFrostedTier = Boolean(frostColor && exteriorFinishStyle !== 'naked');
+        const spongeRadius = isFrostedTier ? radius - 0.08 : radius - 0.02;
+        const spongeGeo = buildSpongeProfileGeometry(spongeRadius, spongeSectionHeight, {
           // Only the very last tier's very last section gets the pointy
           // dome top — intermediate tiers (with another tier stacked on
           // them) get a flat top so the next tier sits flush against it.
-          topBumpHeight: (isTopSection && i === layerCount - 1) ? domeAmount : 0,
+          topBumpHeight: (isTopSection && i === layerCount - 1) ? (isFrostedTier ? Math.max(0, domeAmount - 0.02) : domeAmount) : 0,
           bottomSocketHeight,
+          bevelSize: isFrostedTier ? 0.22 : 0.18,
           // Flush (no taper) on any face that meets a filling layer, so the
           // filling can sit flat against it with no gap.
           bevelTop: !(fillingActive && s < fillingLayers),
@@ -1823,8 +2331,8 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         // Interior Preview cutaway — real geometric clipping, not an overlay.
         // clipIntersection must be set even when clippingPlanes is empty so
         // it's already correct the moment interiorPreview turns on.
-        frostMat.clippingPlanes = interiorPreview ? INTERIOR_PREVIEW_CLIP_PLANES : [];
-        frostMat.clipIntersection = true;
+        frostMat.clippingPlanes = tierClipConfig.frosting.planes;
+        frostMat.clipIntersection = tierClipConfig.frosting.clipIntersection;
         frostMat.clipShadows = true;
         coveringMaterialsRef.current.push(frostMat);
         // Unified organic frosting geometry (replaces separate cylinder and caps)
@@ -1892,7 +2400,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       if (sideNoNameSetId === 'whippedSkirt') {
         const startIdx = group.children.length;
         addWhippedCreamSkirt(group, radius, currentY, height, sideNoNameColor);
-        registerNewChildrenForClipping(group, startIdx, coveringMaterialsRef, interiorPreview);
+        registerNewChildrenForClipping(group, startIdx, coveringMaterialsRef, interiorPreview, tierClipConfig.side.planes, tierClipConfig.side.clipIntersection);
       }
 
       // Checkered/Triangle Pattern's standoff above the tier radius has to
@@ -1993,8 +2501,8 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           colorId: sideCheckeredColorId,
         });
         checkerSide.position.y = currentY + height / 2;
-        checkerSide.material.clippingPlanes = interiorPreview ? INTERIOR_PREVIEW_CLIP_PLANES : [];
-        checkerSide.material.clipIntersection = true;
+        checkerSide.material.clippingPlanes = tierClipConfig.side.planes;
+        checkerSide.material.clipIntersection = tierClipConfig.side.clipIntersection;
         checkerSide.material.clipShadows = true;
         coveringMaterialsRef.current.push(checkerSide.material);
         group.add(checkerSide);
@@ -2044,8 +2552,8 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           embedOverride: exteriorFinishStyle === 'texturedButtercream' ? 0.02 : undefined,
         });
         triangleSide.position.y = currentY + height / 2;
-        triangleSide.material.clippingPlanes = interiorPreview ? INTERIOR_PREVIEW_CLIP_PLANES : [];
-        triangleSide.material.clipIntersection = true;
+        triangleSide.material.clippingPlanes = tierClipConfig.side.planes;
+        triangleSide.material.clipIntersection = tierClipConfig.side.clipIntersection;
         triangleSide.material.clipShadows = true;
         coveringMaterialsRef.current.push(triangleSide.material);
         group.add(triangleSide);
@@ -2090,12 +2598,14 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         : sideDecorationRadius;
 
       if (sideDecorationSetId === 'scatterPearls') {
+        const startIdx = group.children.length;
         const pearlRand = makePRNG(hashStr(`pearls-${cakeSize}-${sideDecorationVariant}-tier${i}`));
         const pearls = buildScatterPearlsRing(sideDecorationRadius, height * 0.92, sideDecorationColor, sideDecorationColorId, pearlRand, {
           variant: sideScatterPearlsSetId || 'randomScatter'
         });
         pearls.position.y = currentY + height / 2;
         group.add(pearls);
+        registerNewChildrenForClipping(group, startIdx, coveringMaterialsRef, interiorPreview, tierClipConfig.side.planes, tierClipConfig.side.clipIntersection);
       }
 
       layerGlazeDescriptors.push({
@@ -2112,6 +2622,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           : surfaceTreatmentColorHex,
         mode: isIndividual ? (layerSurfaceTreatmentModes[i] || null) : surfaceTreatmentMode,
         pattern: isIndividual ? (layerSurfaceTreatmentPatterns[i] || 'longGaps') : surfaceTreatmentPattern,
+        sideDecor: tierHasSideDecor,
         // This tier's OWN Side coverage — not the topmost tier's — so a
         // lower tier's glaze recedes under ITS OWN Side pattern, not
         // whatever the top tier happens to have. glazeSideCoverageFn, not
@@ -2123,12 +2634,15 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       });
 
       if (sideDecorationSetId === 'pipingScrolls') {
+        const startIdx = group.children.length;
         const scrolls = buildPipingScrolls(ridgedTextureRadius, height * 0.85, sideDecorationColor, sideDecorationColorId, sidePipingScrollsSetId || 'waveRope');
         scrolls.position.y = currentY + height / 2;
         group.add(scrolls);
+        registerNewChildrenForClipping(group, startIdx, coveringMaterialsRef, interiorPreview, tierClipConfig.side.planes, tierClipConfig.side.clipIntersection);
       }
 
       if (sideDecorationSetId === 'sunshinePlay') {
+        const startIdx = group.children.length;
         // A single accent piece stuck to one spot on the wall (see
         // buildSunshinePlay's own doc comment) rather than a treatment
         // that wraps/tiles around it like the others here — it positions
@@ -2160,15 +2674,19 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         );
         sunshine.position.y = currentY + height / 2;
         group.add(sunshine);
+        registerNewChildrenForClipping(group, startIdx, coveringMaterialsRef, interiorPreview, tierClipConfig.side.planes, tierClipConfig.side.clipIntersection);
       }
 
       if (sideDecorationSetId === 'victorianLambeth') {
+        const startIdx = group.children.length;
         const lambeth = buildVictorianLambeth(ridgedTextureRadius + lambethStandoff, lambethHeight, sideDecorationColor, undefined, sideVictorianLambethSetId || 'classic', sideDecorationColorId);
         lambeth.position.y = currentY + height / 2 + lambethVerticalOffset;
         group.add(lambeth);
+        registerNewChildrenForClipping(group, startIdx, coveringMaterialsRef, interiorPreview, tierClipConfig.side.planes, tierClipConfig.side.clipIntersection);
       }
 
       if (sideDecorationSetId === 'chevronPattern') {
+        const startIdx = group.children.length;
         const chevron = buildChevronSideStripes(ridgedTextureRadius, height * 0.92, {
           setId: sideChevronPatternSetId || 'multiColor',
           color: sideChevronColor,
@@ -2183,6 +2701,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         });
         chevron.position.y = currentY + height / 2;
         group.add(chevron);
+        registerNewChildrenForClipping(group, startIdx, coveringMaterialsRef, interiorPreview, tierClipConfig.side.planes, tierClipConfig.side.clipIntersection);
       }
 
       if (i === 0 && layerCount >= 2) {
@@ -2211,6 +2730,22 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       radius: topRadius,
     };
 
+    const overallHasFrost = Boolean(lastFrostColor && exteriorFinishStyle !== 'naked');
+    const overallHasGlaze = surfaceTreatmentMode === 'glaze';
+    const overallHasSideDrip = sharedSideTreatment.sideNoNameSetId === 'drip';
+    const overallHasSideDecor = Boolean(
+      (sharedSideTreatment.sideNoNameSetId && sharedSideTreatment.sideNoNameSetId !== 'drip') ||
+      sharedSideTreatment.sideCheckeredPatternSetId ||
+      sharedSideTreatment.sideTrianglePatternSetId ||
+      sharedSideTreatment.sideDecorationSetId
+    );
+    const overallClipConfig = getInteriorPreviewClippingConfig({
+      hasFrosting: overallHasFrost,
+      hasDrip: overallHasGlaze || overallHasSideDrip,
+      hasSide: overallHasSideDecor,
+      interiorPreview,
+    });
+
     // Surface > No Name > Drip — a real covering treatment, so (unlike the
     // decorations below) it's built OUTSIDE the interiorPreview gate and
     // registers into coveringMaterialsRef so Interior Preview's wedge
@@ -2222,8 +2757,8 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
     if (!isIndividual && sideNoNameSetId === 'drip') {
       const dripRing = buildDripRing(topRadius, sideNoNameColor, rand);
       dripRing.position.y = topY;
-      dripRing.material.clippingPlanes = interiorPreview ? INTERIOR_PREVIEW_CLIP_PLANES : [];
-      dripRing.material.clipIntersection = true;
+      dripRing.material.clippingPlanes = overallClipConfig.drip.planes;
+      dripRing.material.clipIntersection = overallClipConfig.drip.clipIntersection;
       dripRing.material.clipShadows = true;
       coveringMaterialsRef.current.push(dripRing.material);
       group.add(dripRing);
@@ -2478,13 +3013,20 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           // FROST_CAP_H + tierSeamOverlap, which would otherwise shift
           // every window down relative to the Side decoration.
           coverageFn: lastActiveSideCoverageFn
-            ? (angle, y) => lastActiveSideCoverageFn(Math.PI / 2 - angle, lastFrostMeshY + y)
+            ? (angle, y) => {
+                if (interiorPreview && overallClipConfig.side.planes?.length) {
+                  if (!isAngleUnclippedByPlanes(angle, overallClipConfig.side.planes, overallClipConfig.side.clipIntersection)) {
+                    return 0;
+                  }
+                }
+                return lastActiveSideCoverageFn(Math.PI / 2 - angle, lastFrostMeshY + y);
+              }
             : undefined,
         },
       );
       const glazeMat = makeGlazeMaterial(surfaceTreatmentColorHex);
-      glazeMat.clippingPlanes = interiorPreview ? INTERIOR_PREVIEW_CLIP_PLANES : [];
-      glazeMat.clipIntersection = true;
+      glazeMat.clippingPlanes = overallClipConfig.drip.planes;
+      glazeMat.clipIntersection = overallClipConfig.drip.clipIntersection;
       glazeMat.clipShadows = true;
       coveringMaterialsRef.current.push(glazeMat);
       const glaze = new THREE.Mesh(glazeGeo, glazeMat);
@@ -2510,6 +3052,12 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           fillingHeight: FILLING_H,
           carve,
         });
+        const tierClipConfig = getInteriorPreviewClippingConfig({
+          hasFrosting: Boolean(descriptor.hasFrosting),
+          hasDrip: true,
+          hasSide: Boolean(descriptor.sideDecor),
+          interiorPreview,
+        });
         const glazeGeo = buildGlazeGeometry(
           descriptor.radius + (descriptor.hasFrosting ? 0.06 : 0),
           descriptor.totalHeight,
@@ -2531,13 +3079,20 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
             // wrapper, needing the same counter-reflection to correctly
             // read Glaze's raw angle.
             coverageFn: descriptor.coverageFn
-              ? (angle, y) => descriptor.coverageFn(Math.PI / 2 - angle, descriptor.frostMeshY + y)
+              ? (angle, y) => {
+                  if (interiorPreview && tierClipConfig.side.planes?.length) {
+                    if (!isAngleUnclippedByPlanes(angle, tierClipConfig.side.planes, tierClipConfig.side.clipIntersection)) {
+                      return 0;
+                    }
+                  }
+                  return descriptor.coverageFn(Math.PI / 2 - angle, descriptor.frostMeshY + y);
+                }
               : undefined,
           },
         );
         const glazeMat = makeGlazeMaterial(descriptor.color);
-        glazeMat.clippingPlanes = interiorPreview ? INTERIOR_PREVIEW_CLIP_PLANES : [];
-        glazeMat.clipIntersection = true;
+        glazeMat.clippingPlanes = tierClipConfig.drip.planes;
+        glazeMat.clipIntersection = tierClipConfig.drip.clipIntersection;
         glazeMat.clipShadows = true;
         coveringMaterialsRef.current.push(glazeMat);
         const glaze = new THREE.Mesh(glazeGeo, glazeMat);
@@ -2574,13 +3129,20 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
             // the descriptor.currentY + y (not y - descriptor.height/2)
             // and Math.PI/2 - angle reasoning.
             coverageFn: descriptor.coverageFn
-              ? (angle, y) => descriptor.coverageFn(Math.PI / 2 - angle, descriptor.frostMeshY + y)
+              ? (angle, y) => {
+                  if (interiorPreview && overallClipConfig.side.planes?.length) {
+                    if (!isAngleUnclippedByPlanes(angle, overallClipConfig.side.planes, overallClipConfig.side.clipIntersection)) {
+                      return 0;
+                    }
+                  }
+                  return descriptor.coverageFn(Math.PI / 2 - angle, descriptor.frostMeshY + y);
+                }
               : undefined,
           },
         );
         const glazeMat = makeGlazeMaterial(descriptor.color);
-        glazeMat.clippingPlanes = interiorPreview ? INTERIOR_PREVIEW_CLIP_PLANES : [];
-        glazeMat.clipIntersection = true;
+        glazeMat.clippingPlanes = overallClipConfig.drip.planes;
+        glazeMat.clipIntersection = overallClipConfig.drip.clipIntersection;
         glazeMat.clipShadows = true;
         coveringMaterialsRef.current.push(glazeMat);
         const glaze = new THREE.Mesh(glazeGeo, glazeMat);
@@ -2606,7 +3168,10 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       if (toppings.includes('cherry')) {
         for (let i = 0; i < 8; i++) {
           const angle = (i / 8) * Math.PI * 2;
-          addCherry(group, Math.cos(angle) * topRadius * 0.6, topY, Math.sin(angle) * topRadius * 0.6, rand);
+          const px = Math.cos(angle) * topRadius * 0.6;
+          const pz = Math.sin(angle) * topRadius * 0.6;
+          const py = getCakeTopSurfacePoint(px, pz, topMetricsRef.current).y - 0.04;
+          addCherry(group, px, py, pz, rand);
         }
       }
 
@@ -2615,9 +3180,12 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         for (let i = 0; i < 80; i++) {
           const angle = rand() * Math.PI * 2;
           const r = rand() * topRadius * 0.85;
+          const px = Math.cos(angle) * r;
+          const pz = Math.sin(angle) * r;
+          const py = getCakeTopSurfacePoint(px, pz, topMetricsRef.current).y + 0.02;
           const sGeo = new THREE.CylinderGeometry(0.075, 0.075, 0.30, 6);
           const sprinkle = new THREE.Mesh(sGeo, new THREE.MeshStandardMaterial({ color: sprinkleColors[Math.floor(rand() * sprinkleColors.length)] }));
-          sprinkle.position.set(Math.cos(angle) * r, topY + 0.15, Math.sin(angle) * r);
+          sprinkle.position.set(px, py, pz);
           sprinkle.rotation.x = rand() * Math.PI;
           sprinkle.rotation.z = rand() * Math.PI;
           group.add(sprinkle);
@@ -2628,14 +3196,20 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         const candleCount = Math.min(layerCount + 2, 7);
         for (let i = 0; i < candleCount; i++) {
           const angle = (i / candleCount) * Math.PI * 2;
-          addCandle(group, Math.cos(angle) * topRadius * 0.5, topY, Math.sin(angle) * topRadius * 0.5, rand);
+          const px = Math.cos(angle) * topRadius * 0.5;
+          const pz = Math.sin(angle) * topRadius * 0.5;
+          const py = getCakeTopSurfacePoint(px, pz, topMetricsRef.current).y - 0.02;
+          addCandle(group, px, py, pz, rand);
         }
       }
 
       if (toppings.includes('strawberries')) {
         for (let i = 0; i < 6; i++) {
           const angle = (i / 6) * Math.PI * 2 + 0.3;
-          addStrawberry(group, Math.cos(angle) * topRadius * 0.55, topY, Math.sin(angle) * topRadius * 0.55);
+          const px = Math.cos(angle) * topRadius * 0.55;
+          const pz = Math.sin(angle) * topRadius * 0.55;
+          const py = getCakeTopSurfacePoint(px, pz, topMetricsRef.current).y - 0.04;
+          addStrawberry(group, px, py, pz);
         }
       }
 
@@ -2643,14 +3217,20 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         for (let i = 0; i < 40; i++) {
           const angle = rand() * Math.PI * 2;
           const r = rand() * topRadius * 0.8;
-          addChocolateChip(group, Math.cos(angle) * r, topY, Math.sin(angle) * r);
+          const px = Math.cos(angle) * r;
+          const pz = Math.sin(angle) * r;
+          const py = getCakeTopSurfacePoint(px, pz, topMetricsRef.current).y - 0.02;
+          addChocolateChip(group, px, py, pz);
         }
       }
 
       if (toppings.includes('rosettes')) {
         for (let i = 0; i < 6; i++) {
           const angle = (i / 6) * Math.PI * 2;
-          addRosette(group, Math.cos(angle) * topRadius * 0.7, topY, Math.sin(angle) * topRadius * 0.7, frostColor2);
+          const px = Math.cos(angle) * topRadius * 0.7;
+          const pz = Math.sin(angle) * topRadius * 0.7;
+          const py = getCakeTopSurfacePoint(px, pz, topMetricsRef.current).y - 0.02;
+          addRosette(group, px, py, pz, frostColor2);
         }
       }
 
@@ -2685,13 +3265,8 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       //    identically to before this change.
       const REFERENCE_TOP_RADIUS = 4;
       const centerDecorScale = topRadius / REFERENCE_TOP_RADIUS;
-      const centerSurfaceR = topRadius - 0.15; // same edge clearance placedItems' dome formula uses below
       const centerSurfaceY = (x, z) => {
-        const r = Math.sqrt(x * x + z * z);
-        if (r < centerSurfaceR) {
-          return topLayerBaseY + topLayerDomeHeight * (1 - (r / centerSurfaceR) * (r / centerSurfaceR));
-        }
-        return topY;
+        return getCakeTopSurfacePoint(x, z, topMetricsRef.current).y;
       };
 
       // Center > Decorations — 6-Variation Parametric Placement System
@@ -2725,44 +3300,27 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       }
 
       // ── Center's exclusive top-surface placement zone ───────────────────
-      // Center items must stay clear of both the raw cake edge and
-      // whatever the Edge Tab is currently doing with it. pipingTips.js
-      // has a dozen+ tip styles (star, shell, scallopedDollop, lambeth,
-      // ...) with their own tubeRadius/depth (up to ~0.34 units each) --
-      // rather than tracing every style's exact inward reach, 0.75 is a
-      // deliberately conservative reserve that clears all of them. With no
-      // edge piping active, 0.15 matches the baseline clearance
-      // centerSurfaceY above already uses for the general top surface.
-      const topEdgeSlot = edgeMode === 'both' ? edgeBoth : edgeTop;
-      const edgeHasTopPiping = Boolean(topEdgeSlot?.pipingTip);
-      const EDGE_RESERVED_WIDTH = edgeHasTopPiping ? 0.75 : 0.15;
-      const centerPlacementBoundaryRadius = Math.max(0, topRadius - EDGE_RESERVED_WIDTH);
+      // Single constant boundary reserve (0.75 units) that all Center designs
+      // strictly respect at all times. This permanently reserves the outer rim
+      // for Edge designs, guaranteeing that if the user later selects or changes
+      // an Edge design (piping, beaded trim, fruit rim rings, etc.), the edge
+      // treatment will NEVER overlay or clash with already-placed Center designs.
+      // No smart detector is needed on Edge designs because Center designs never
+      // cross this fine line boundary.
+      const centerPlacementBoundaryRadius = getCenterPlacementBoundaryRadius(topRadius);
 
-      // Per-design footprint radius, for keeping placed items clear of the
-      // boundary and of each other. DECORATION_SPACING above was already
-      // tuned per design to avoid that design's own items overlapping each
-      // other in the old preset patterns, so half of it is a reasonable
-      // stand-in for "how big is one of these" without needing the actual
-      // mesh files for every design (several of which -- Ferrero Rocher,
-      // Hershey's Kiss, Chocolate Bear, Basketball, Soccer Ball -- aren't
-      // available outside buildAndAddDecoration itself).
+      // Smart Detector: true physical footprint radii for Center items
+      // Calibrated to the exact visual 3D mesh dimensions so that items sit
+      // cleanly next to each other and never overlap, clash, or clip into each other.
       const centerItemRadii = {};
-      Object.keys(DECORATION_SPACING).forEach((designId) => {
-        centerItemRadii[designId] = (DECORATION_SPACING[designId] * centerDecorScale) / 2;
+      Object.keys(CENTER_ITEM_RADII).forEach((designId) => {
+        centerItemRadii[designId] = getCenterItemRadius(designId, centerDecorScale);
       });
-
-      topMetricsRef.current = {
-        ...topMetricsRef.current,
-        centerDecorScale,
-        centerPlacementBoundaryRadius,
-        centerItemRadii,
-        // Place-tab items (cherry, strawberry, etc.) share Center's boundary
-        // (same top surface, same edge-treatment clearance) but use their
-        // own fixed radii, not scaled by centerDecorScale -- these items
-        // never had a "decor scale" concept before and keep their real-world
-        // size regardless of the Center decoration scale slider.
-        placeItemRadii: PLACE_ITEM_RADII,
-      };
+      for (let i = 0; i < 26; i++) {
+        const ch = String.fromCharCode(65 + i);
+        centerItemRadii[`letterUpper${ch}`] = getCenterItemRadius(`letterUpper${ch}`, centerDecorScale);
+        centerItemRadii[`letterLower${ch}`] = getCenterItemRadius(`letterLower${ch}`, centerDecorScale);
+      }
 
       // ── Text-Aware Collision Bounds Calculation ─────────────────────────
       const isHandwritten = centerTextFont === 'handwritten';
@@ -2812,15 +3370,28 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         });
       };
 
-      const isCollidingWithText = (x, z, textBounds) => {
-        if (!textBounds || textBounds.length === 0) return false;
-        for (let i = 0; i < textBounds.length; i++) {
-          const b = textBounds[i];
-          if (x >= b.minX && x <= b.maxX && z >= b.minZ && z <= b.maxZ) {
-            return true;
-          }
-        }
-        return false;
+      const isScriptOrHand = isHandwritten || centerTextFont === 'default';
+      const activeTextBounds = computeActiveTextBounds(activeTextSlots, isScriptOrHand, topRadius, 0.08);
+
+      const edgeConfig = cakeConfig?.edge || { mode: edgeMode, top: edgeTop, bottom: edgeBottom, both: edgeBoth };
+      const edgeObstacles = getEdgeDelicatesObstacles(edgeConfig, topRadius, exteriorFinishStyle);
+      const delicatesBoundaryRadius = getDelicatesAwareBoundaryRadius(topRadius, edgeConfig, exteriorFinishStyle);
+      const isDelicatesEdgeOnTop = edgeObstacles.length > 0;
+
+      topMetricsRef.current = {
+        ...topMetricsRef.current,
+        centerDecorScale,
+        centerPlacementBoundaryRadius: isDelicatesEdgeOnTop ? delicatesBoundaryRadius : centerPlacementBoundaryRadius,
+        isFerreroRocherEdgeOnTop: isDelicatesEdgeOnTop,
+        isDelicatesEdgeOnTop,
+        edgeObstacles,
+        activeTextBounds,
+        centerItemRadii,
+        // Place-tab items (cherry, strawberry, etc.) share Center's boundary
+        // (same top surface, same edge-treatment clearance) but use their
+        // own fixed radii, not scaled by centerDecorScale -- these items
+        // keep their real-world size regardless of the Center decoration scale slider.
+        placeItemRadii: PLACE_ITEM_RADII,
       };
 
       // Center decorations are now placed individually via click-and-drop
@@ -2831,7 +3402,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
 
       const textSlots = activeTextSlots;
       if (textSlots.length > 0 && activeFont) {
-        const textMat = getFrostingMaterial(centerTextColor);
+        const textMat = getFrostingMaterial(centerTextColor, centerTextColorId);
         const textGroup = new THREE.Group();
 
         textSlots.forEach((slot) => {
@@ -2930,14 +3501,17 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       const FRUIT_RIM_BUILDERS = {
         strawberryRim: buildStrawberryRimRing,
         hersheysKissRim: buildHersheysKissRimRing,
+        hersheysKissRimSparse: buildHersheysKissRimRingSparse,
         ferreroRocherRim: buildFerreroRocherRimRing,
+        ferreroRocherRimSparse: buildFerreroRocherRimRingSparse,
         cherryRim: buildCherryRimRing,
+        cherryRimSparse: buildCherryRimRingSparse,
         basketballRim: buildBasketballRimRing,
         soccerBallRim: buildSoccerBallRimRing,
       };
       for (const { slot, y, radius: edgeRadius, isBottom } of edgeSlotsToRender) {
         const baseTip = typeof slot?.pipingTip === 'string'
-          ? slot.pipingTip.replace(/Cherry$/, '').replace(/Strawberry$/, '').replace(/Alt$/, '')
+          ? slot.pipingTip.replace(/Alt$/, '').replace(/Cherry$/, '').replace(/Strawberry$/, '')
           : '';
         const isDollop = baseTip.toLowerCase().includes('dollop');
         const isWhippedCreamEdge = baseTip.startsWith('whippedCreamRosette');
@@ -2982,17 +3556,39 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       }
 
       // Edge > Middle (Layer 1 shelf design ring for 2-layer cakes).
-      if (layerCount >= 2 && edgeMiddle?.pipingTip) {
-        const middleTip = edgeMiddle.pipingTip;
-        const middleRadius = getMiddlePipingRadius(topRadius);
-        const middleY = ledgeY + 0.045;
-        const middleBeadedPattern = BEADED_TRIM_PATTERNS[middleTip];
+      const activeMiddleSlot = edgeMiddle?.pipingTip ? edgeMiddle : (edgeMode === 'both' ? edgeBoth : null);
+      if (layerCount >= 2 && activeMiddleSlot?.pipingTip) {
+        const middleTip = activeMiddleSlot.pipingTip;
         const middleFruitRimBuilder = FRUIT_RIM_BUILDERS[middleTip];
+        const middleBeadedPattern = BEADED_TRIM_PATTERNS[middleTip];
+
+        const baseMiddleTip = typeof middleTip === 'string'
+          ? middleTip.replace(/Alt$/, '').replace(/Cherry$/, '').replace(/Strawberry$/, '')
+          : '';
+        const isMiddleDollop = baseMiddleTip.toLowerCase().includes('dollop');
+        const isMiddleWhippedCream = baseMiddleTip.startsWith('whippedCreamRosette');
+        const isMiddleShell = ['shell', 'reverseShell', 'elongatedShell'].includes(baseMiddleTip);
+        const isMiddleBead = baseMiddleTip === 'bead';
+        const isMiddleZigzag = baseMiddleTip === 'zigzag';
+        const isMiddleWave = baseMiddleTip === 'wavePiping';
+        const isMiddleRope = ['ropeTwist', 'ropeTwistClassic'].includes(baseMiddleTip);
+
+        const middleDecoKind = middleBeadedPattern
+          ? 'beadedTrim'
+          : (middleFruitRimBuilder ? middleTip : (isMiddleWhippedCream ? baseMiddleTip : (isMiddleDollop ? baseMiddleTip : (isMiddleShell ? baseMiddleTip : (isMiddleBead ? 'bead' : (isMiddleZigzag ? 'zigzag' : (isMiddleWave ? 'wavePiping' : (isMiddleRope ? baseMiddleTip : 'piping'))))))));
+
+        const middleRadius = computeEdgeTrimRadius(topRadius + lastGlazeMaxProtrusion, middleDecoKind, exteriorFinishStyle, true);
+
+        const middleY = middleFruitRimBuilder
+          ? (ledgeY + 0.04)
+          : middleBeadedPattern
+          ? (ledgeY + 0.02)
+          : (ledgeY + 0.03);
 
         if (middleBeadedPattern) {
           const middleTrim = buildBeadedTrimRing(
             middleRadius,
-            edgeMiddle.pipingColor || lastFrostColor,
+            activeMiddleSlot.pipingColor || lastFrostColor,
             rand,
             { pattern: middleBeadedPattern },
           );
@@ -3000,17 +3596,17 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           middleTrim.receiveShadow = true;
           group.add(middleTrim);
         } else if (middleFruitRimBuilder) {
-          group.add(middleFruitRimBuilder(middleRadius, middleY, rand, { isBottom: false }));
+          group.add(middleFruitRimBuilder(middleRadius, middleY, rand, { isBottom: true }));
         } else {
           const middlePipingMat = getFrostingMaterial(
-            edgeMiddle.pipingColor || lastFrostColor,
-            edgeMiddle.pipingColorId,
+            activeMiddleSlot.pipingColor || lastFrostColor,
+            activeMiddleSlot.pipingColorId,
           );
           const isAltTip = typeof middleTip === 'string' && middleTip.includes('Alt');
           const secondaryMat = isAltTip
             ? getFrostingMaterial(
-                edgeMiddle.pipingSecondaryColor || '#D6293E',
-                edgeMiddle.pipingSecondaryColorId,
+                activeMiddleSlot.pipingSecondaryColor || '#D6293E',
+                activeMiddleSlot.pipingSecondaryColorId,
               )
             : null;
           const middlePiping = buildPipingRing(middleTip, middlePipingMat, {
@@ -3027,8 +3623,18 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         }
       }
 
-      // Slot-placed and manually placed items
-      for (const item of placedItems) {
+      // Slot-placed and manually placed items (filtered against Edge Edible Delicates if active)
+      const itemsToRender = isDelicatesEdgeOnTop
+        ? pruneItemsCollidingWithEdgeDelicates(
+            placedItems,
+            edgeConfig,
+            topRadius,
+            centerDecorScale,
+            exteriorFinishStyle
+          )
+        : placedItems;
+
+      for (const item of itemsToRender) {
         let px, pz, py;
         const slot = item.slotId ? getSlotById(item.slotId) : null;
         if (slot) {
@@ -3047,30 +3653,33 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           pz = Math.sin(angle) * clampedR;
         }
 
-        const R = topRadius - 0.15;
-        const r = Math.sqrt(px * px + pz * pz);
-        if (r < R) {
-          py = topLayerBaseY + topLayerDomeHeight * (1 - (r / R) * (r / R));
-        } else {
-          py = topY;
-        }
+        const isCenter = item.type && item.type.startsWith('center-');
+        const centerToolParsed = isCenter ? parseCenterTool(item.type) : null;
 
         const itemGroup = new THREE.Group();
         itemGroup.userData.slotId = item.slotId || null;
+        itemGroup.userData.placedItemId = item.id || null;
+        itemGroup.userData.itemType = item.type || null;
 
         if (item.type === 'piping') {
           const pipeColor = (item.colorId && SUGAR_COLORS.find(c => c.id === item.colorId)?.hex) || PIPING_FLAVOR_COLORS[item.flavor] || '#FFAB00';
+          py = getCakeTopSurfacePoint(px, pz, topMetricsRef.current).y - 0.015;
           addPipingPattern(itemGroup, px, py, pz, item.pattern || 'shell', pipeColor);
         } else if (item.type === 'cherry') {
+          py = getCakeTopSurfacePoint(px, pz, topMetricsRef.current).y - 0.045;
           addCherry(itemGroup, px, py, pz, rand);
         } else if (item.type === 'strawberry') {
+          py = getCakeTopSurfacePoint(px, pz, topMetricsRef.current).y - 0.045;
           addStrawberry(itemGroup, px, py, pz);
         } else if (item.type === 'candle') {
+          py = getCakeTopSurfacePoint(px, pz, topMetricsRef.current).y - 0.02;
           addCandle(itemGroup, px, py, pz, rand);
         } else if (item.type === 'chocolateChip') {
+          py = getCakeTopSurfacePoint(px, pz, topMetricsRef.current).y - 0.02;
           addChocolateChip(itemGroup, px, py, pz);
         } else if (item.type === 'rosette') {
           const roseColor = (item.colorId && SUGAR_COLORS.find(c => c.id === item.colorId)?.hex) || frostColor2;
+          py = getCakeTopSurfacePoint(px, pz, topMetricsRef.current).y - 0.025;
           addRosette(itemGroup, px, py, pz, roseColor);
         } else if (item.type && item.type.startsWith('doodle-')) {
           const [_, shapeId, colorId] = item.type.split('-');
@@ -3079,12 +3688,24 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           // Format: 'center-{designId}-{orientation}', e.g.
           // 'center-oreo-standing' or 'center-strawberry-default'.
           // designId itself never contains '-', so a plain split is safe.
-          const [, designId, orientationTag] = item.type.split('-');
-          const orientation = orientationTag === 'default' ? null : orientationTag;
+          const { designId, orientation } = centerToolParsed;
           const tiltX = item.tiltX !== undefined ? item.tiltX : 0;
           const rotationY = item.rotation !== undefined ? item.rotation : 0;
           const tiltZ = item.tiltZ !== undefined ? item.tiltZ : 0;
-          const rotatedGroup = buildRotatedDecoration(designId, orientation, tiltX, rotationY, centerDecorScale, centerDecorationColor, rand, tiltZ);
+          const itemColor = isButtercreamLetterDesign(designId)
+            ? centerTextColor
+            : centerDecorationColor;
+          const itemColorId = isButtercreamLetterDesign(designId)
+            ? (centerTextColorMode === 'individual' ? (item.colorId || item.sugarColor?.colorId) : centerTextColorId)
+            : centerDecorationColorId;
+          const resolvedItemColor = itemColorId
+            ? (SUGAR_COLORS.find((color) => color.id === itemColorId)?.hex || itemColor)
+            : itemColor;
+          const rotatedGroup = buildRotatedDecoration(
+            designId, orientation, tiltX, rotationY,
+            centerDecorScale, resolvedItemColor, rand, tiltZ, itemColorId
+          );
+          py = getDecorationLandingY(rotatedGroup, px, pz, topMetricsRef.current);
           rotatedGroup.position.set(px, py, pz);
           itemGroup.add(rotatedGroup);
         }
@@ -3102,6 +3723,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
 
     // Update slot markers and ghost previews after build
     updateSlotVisuals();
+    refreshSelectionOverlayRef.current?.();
 
     // Interior Preview's cutaway is now real geometric clipping, applied
     // directly to covering materials (currently just frostMat) at the point
@@ -3204,8 +3826,14 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       scene.add(ghostGroup);
       ghostGroupRef.current = ghostGroup;
 
+      const selectionOverlayGroup = new THREE.Group();
+      scene.add(selectionOverlayGroup);
+      selectionOverlayGroupRef.current = selectionOverlayGroup;
+
+      let isContextLost = false;
       const clock = new THREE.Clock();
       const animate = () => {
+        if (isContextLost) return;
         animFrameRef.current = requestAnimationFrame(animate);
         const t = clock.getElapsedTime();
 
@@ -3220,7 +3848,11 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           cakeGroup.position.y = baselineYRef.current;
         }
 
-        renderer.render(scene, camera);
+        try {
+          renderer.render(scene, camera);
+        } catch (err) {
+          // Ignore render errors when WebGL context is lost
+        }
       };
       animate();
 
@@ -3231,14 +3863,28 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         if (w === 0 || h === 0) return;
         const aspect = w / h;
         camera.aspect = aspect;
+
+        // Auto-frame: Adjust camera FOV so the whole cake stays fully visible when viewport aspect narrows
+        const baseFov = 40;
+        const baseAspect = 1.6;
+        if (aspect < baseAspect) {
+          const fovRad = 2 * Math.atan(Math.tan((baseFov * Math.PI) / 360) * (baseAspect / aspect));
+          camera.fov = Math.min(62, Math.max(35, (fovRad * 180) / Math.PI));
+        } else {
+          camera.fov = baseFov;
+        }
+
         camera.updateProjectionMatrix();
         thumbnailCamera.aspect = aspect;
         thumbnailCamera.updateProjectionMatrix();
         renderer.setSize(w, h);
       };
 
+      handleResizeRef.current = handleResize;
+
       const resizeObserver = new ResizeObserver(handleResize);
       resizeObserver.observe(mount);
+      window.addEventListener('resize', handleResize);
       handleResize();
 
       const getMouseNDC = (clientX, clientY) => {
@@ -3257,68 +3903,128 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         const ndc = getMouseNDC(clientX, clientY);
         const raycaster = new THREE.Raycaster();
         raycaster.setFromCamera(ndc, cameraRef.current);
-        const { topY } = topMetricsRef.current;
-        const planeY = cakeGroupRef.current.position.y + topY;
+        const { baseY = 0, domeHeight = 0, topY } = topMetricsRef.current;
+        // Use realistic top surface height (accounting for dome bump) to align raycasts accurately
+        const surfaceLevel = domeHeight > 0 ? baseY + domeHeight * 0.5 : (topY ?? baseY);
+        const planeY = cakeGroupRef.current.position.y + surfaceLevel;
         const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -planeY);
         const hit = new THREE.Vector3();
-        raycaster.ray.intersectPlane(plane, hit);
-        if (!hit) return null;
+        const hitResult = raycaster.ray.intersectPlane(plane, hit);
+        if (!hitResult) return null;
         const localHit = cakeGroupRef.current.worldToLocal(hit.clone());
         return { x: localHit.x, z: localHit.z };
       };
 
-      // A small fixed gap enforced between any two freeform items' edges --
-      // just enough that they read as two distinct objects instead of
-      // fused/clipped into one, without leaving the kind of wide, sparse
-      // spacing the old slot-grid system had. Not proportional to item
-      // size on purpose: a percentage-based gap would still look wide on
-      // large items (Oreo, chocolate bear) and this is meant to be
-      // "barely there" regardless of what's being placed.
-      const MIN_ITEM_GAP = 0.03;
+      const clearSelectionOverlay = () => {
+        const overlay = selectionOverlayGroupRef.current;
+        if (!overlay) return;
+        while (overlay.children.length > 0) {
+          const child = overlay.children[0];
+          disposeSceneObject(child);
+          overlay.remove(child);
+        }
+      };
 
-      // centerItemRadii/placeItemRadii (both computed from
-      // DECORATION_SPACING, see its own comment above) were originally
-      // tuned as "how far apart do these need to be centered in a ring so
-      // they don't overlap", which bakes in some breathing room beyond the
-      // item's own true visual size -- reasonable for laying out an even
-      // ring, but it meant the overlap check here was blocking a drop
-      // while there was still visible daylight between the two items on
-      // screen. Since the exact mesh footprint isn't available for every
-      // design (several designs' source files aren't in this project),
-      // COLLISION_RADIUS_FACTOR shrinks just the pairwise item-to-item
-      // check by a flat amount to close most of that gap -- the cake-edge
-      // boundary check below is untouched, since that one really does need
-      // the fuller radius to keep an item from visually hanging off the
-      // edge.
-      const COLLISION_RADIUS_FACTOR = 0.55;
+      const findSelectableItemAt = (clientX, clientY) => {
+        if (!cameraRef.current || !cakeGroupRef.current) return null;
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(getMouseNDC(clientX, clientY), cameraRef.current);
+        const hits = raycaster.intersectObjects(cakeGroupRef.current.children, true);
+        for (const hit of hits) {
+          let current = hit.object;
+          while (current) {
+            if (current.userData?.placedItemId && current.userData.itemType?.startsWith('center-')) {
+              return { id: current.userData.placedItemId, group: current };
+            }
+            current = current.parent;
+          }
+        }
+        return null;
+      };
 
-      // Resolves a candidate Center drop point: boundary AND overlap are
-      // both hard-blocked (with the small MIN_ITEM_GAP above), so items can
-      // no longer be dropped on top of / clipping into each other or
-      // stacked. A click either lands cleanly at that exact point or the
-      // drop is rejected outright -- the ghost preview (see
-      // updateCenterGhost) still tracks the raw cursor position and shows
-      // red/green regardless, so the person can freely hover over an
-      // invalid spot to see why, without the ghost itself being blocked.
-      const resolveCenterDrop = (designId, orientation, x, z) => {
-        const { centerPlacementBoundaryRadius, centerItemRadii } = topMetricsRef.current;
-        const itemR = centerItemRadii?.[designId] ?? 0.5;
-        const boundaryR = centerPlacementBoundaryRadius ?? 0;
-        const distFromCenter = Math.sqrt(x * x + z * z);
-        if (distFromCenter + itemR > boundaryR) {
-          return { x, z, valid: false };
+      const updateSelectionOverlay = (clientX = lastMousePosRef.current.x, clientY = lastMousePosRef.current.y) => {
+        const overlay = selectionOverlayGroupRef.current;
+        if (!overlay) return null;
+        clearSelectionOverlay();
+        if (activeToolRef.current || cakeConfigRef.current?.interiorPreview) {
+          renderer.domElement.style.cursor = '';
+          return null;
         }
 
+        const hovered = findSelectableItemAt(clientX, clientY);
+        const selected = selectedCenterItemIdRef.current
+          ? findSelectableItemAtForId(selectedCenterItemIdRef.current)
+          : null;
+        if (hovered?.group) {
+          const hoverHelper = new THREE.BoxHelper(hovered.group, '#F6A6C1');
+          hoverHelper.material.depthTest = false;
+          hoverHelper.material.depthWrite = false;
+          hoverHelper.material.transparent = true;
+          hoverHelper.material.opacity = 0.55;
+          overlay.add(hoverHelper);
+        }
+        if (selected?.group && selected.id !== hovered?.id) {
+          const selectedHelper = new THREE.BoxHelper(selected.group, '#F04F87');
+          selectedHelper.material.depthTest = false;
+          selectedHelper.material.depthWrite = false;
+          selectedHelper.material.transparent = true;
+          selectedHelper.material.opacity = 0.95;
+          overlay.add(selectedHelper);
+        }
+        renderer.domElement.style.cursor = hovered ? 'pointer' : '';
+        return hovered?.id || null;
+      };
+
+      const findSelectableItemAtForId = (itemId) => {
+        if (!cakeGroupRef.current) return null;
+        let match = null;
+        cakeGroupRef.current.traverse((object) => {
+          if (!match && object.userData?.placedItemId === itemId && object.userData?.itemType?.startsWith('center-')) {
+            match = { id: itemId, group: object };
+          }
+        });
+        return match;
+      };
+      refreshSelectionOverlayRef.current = () => updateSelectionOverlay();
+
+      // A small fixed gap enforced between any two freeform items' edges --
+      // Smart Collision Detector:
+      // Reads the true physical geometric footprint of each item (circles for spherical
+      // items, oriented bounding boxes for standing Oreos & letters).
+      // Acknowledges all available free distance and allows tight placement in available
+      // space without penetrating or clashing with neighboring items.
+      const resolveCenterDrop = (designId, orientation, x, z, rotation = 0, tiltX = 0, tiltZ = 0) => {
         const placedItems = cakeConfigRef.current?.placedItems || [];
+        const limit = getCenterItemLimit(designId);
+        if (limit !== null && getCenterItemCount(placedItems, designId) >= limit) {
+          return { x, z, valid: false, reason: 'limit' };
+        }
+
+        const centerDecorScale = topMetricsRef.current?.centerDecorScale ?? 1;
+        const candidateToolType = `center-${designId}-${orientation || 'default'}`;
+        const candidateFp = getItemFootprint({ type: candidateToolType, x, z, rotation, tiltX, tiltZ }, centerDecorScale);
+
+        const { centerPlacementBoundaryRadius, radius, edgeObstacles = [], activeTextBounds = [] } = topMetricsRef.current || {};
+        const boundaryR = centerPlacementBoundaryRadius ?? ((radius || 4) * 0.88);
+        if (!isFootprintInBoundary(candidateFp, boundaryR, radius)) {
+          return { x, z, valid: false, reason: 'boundary' };
+        }
+
+        for (const obs of edgeObstacles) {
+          if (doFootprintsClash(candidateFp, obs, 0.02)) {
+            return { x, z, valid: false, reason: 'edge-overlap' };
+          }
+        }
+
+        if (isFootprintCollidingWithText(candidateFp, activeTextBounds)) {
+          return { x, z, valid: false, reason: 'text-overlap' };
+        }
+
         for (const item of placedItems) {
-          if (!item.type || !item.type.startsWith('center-')) continue;
-          const other = parseCenterTool(item.type);
-          const otherR = centerItemRadii?.[other.designId] ?? 0.5;
-          const dx = (item.x || 0) - x;
-          const dz = (item.z || 0) - z;
-          const dist = Math.sqrt(dx * dx + dz * dz);
-          if (dist < (itemR + otherR) * COLLISION_RADIUS_FACTOR + MIN_ITEM_GAP) {
-            return { x, z, valid: false };
+          if (!item?.type) continue;
+          const otherFp = getItemFootprint(item, centerDecorScale);
+          if (doFootprintsClash(candidateFp, otherFp, 0.01)) {
+            return { x, z, valid: false, reason: 'overlap' };
           }
         }
 
@@ -3326,35 +4032,34 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       };
 
       // Resolves a candidate Place-tab drop point (cherry, strawberry,
-      // candle, chocolateChip, rosette, piping): same idea as Center above
-      // -- boundary and overlap (with the same small MIN_ITEM_GAP and
-      // COLLISION_RADIUS_FACTOR) are both hard-blocked, so these can't clip
-      // into each other or anything Center has placed either.
+      // candle, chocolateChip, rosette, piping): checks boundary and overlap
+      // against all items with true geometric footprints.
       const resolvePlaceItemDrop = (toolType, x, z) => {
-        const { centerPlacementBoundaryRadius, placeItemRadii, centerItemRadii } = topMetricsRef.current;
-        const itemR = placeItemRadii?.[toolType] ?? 0.5;
-        const boundaryR = centerPlacementBoundaryRadius ?? 0;
-        const distFromCenter = Math.sqrt(x * x + z * z);
-        if (distFromCenter + itemR > boundaryR) {
-          return { x, z, valid: false };
+        const centerDecorScale = topMetricsRef.current?.centerDecorScale ?? 1;
+        const candidateFp = getItemFootprint({ type: toolType, x, z }, centerDecorScale);
+
+        const { centerPlacementBoundaryRadius, radius, edgeObstacles = [], activeTextBounds = [] } = topMetricsRef.current || {};
+        const boundaryR = centerPlacementBoundaryRadius ?? ((radius || 4) * 0.88);
+        if (!isFootprintInBoundary(candidateFp, boundaryR, radius)) {
+          return { x, z, valid: false, reason: 'boundary' };
+        }
+
+        for (const obs of edgeObstacles) {
+          if (doFootprintsClash(candidateFp, obs, 0.02)) {
+            return { x, z, valid: false, reason: 'edge-overlap' };
+          }
+        }
+
+        if (isFootprintCollidingWithText(candidateFp, activeTextBounds)) {
+          return { x, z, valid: false, reason: 'text-overlap' };
         }
 
         const placedItems = cakeConfigRef.current?.placedItems || [];
         for (const item of placedItems) {
-          let otherR;
-          if (isPlaceItemTool(item.type)) {
-            otherR = placeItemRadii?.[item.type] ?? 0.5;
-          } else if (item.type && item.type.startsWith('center-')) {
-            const other = parseCenterTool(item.type);
-            otherR = centerItemRadii?.[other.designId] ?? 0.5;
-          } else {
-            continue;
-          }
-          const dx = (item.x || 0) - x;
-          const dz = (item.z || 0) - z;
-          const dist = Math.sqrt(dx * dx + dz * dz);
-          if (dist < (itemR + otherR) * COLLISION_RADIUS_FACTOR + MIN_ITEM_GAP) {
-            return { x, z, valid: false };
+          if (!item?.type) continue;
+          const otherFp = getItemFootprint(item, centerDecorScale);
+          if (doFootprintsClash(candidateFp, otherFp, 0.01)) {
+            return { x, z, valid: false, reason: 'overlap' };
           }
         }
 
@@ -3382,19 +4087,53 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       };
 
       const tryPlace = (clientX, clientY) => {
-        if (!activeToolRef.current) return;
+        if (!activeToolRef.current || cakeConfigRef.current?.interiorPreview) return;
         const tool = activeToolRef.current;
         const toolType = typeof tool === 'object' ? tool.type : tool;
 
         if (isCenterTool(toolType)) {
-          const local = raycastLocalXZ(clientX, clientY);
-          if (!local) return;
           const { designId, orientation } = parseCenterTool(toolType);
-          const resolved = resolveCenterDrop(designId, orientation, local.x, local.z);
-          if (!resolved.valid) return; // hard block (out of bounds or overlaps another item) -- snap back, no-op
           const rotationY = typeof tool === 'object' ? (tool.rotationY || 0) : 0;
           const rotationX = typeof tool === 'object' ? (tool.rotationX || 0) : 0;
           const rotationZ = typeof tool === 'object' ? (tool.rotationZ || 0) : 0;
+          const rotationRad = THREE.MathUtils.degToRad(rotationY);
+          const tiltXRad = THREE.MathUtils.degToRad(rotationX);
+          const tiltZRad = THREE.MathUtils.degToRad(rotationZ);
+
+          // If the user clicked where the ghost indicator was actively showing green,
+          // prefer that exact valid position to prevent mouse-release micro-jitter
+          // (especially at shallow camera angles where a 1px twitch shifts raycasts)
+          let resolved = null;
+          const cached = lastValidGhostDropRef.current;
+          if (
+            cached &&
+            cached.toolType === toolType &&
+            Math.hypot(cached.clientX - clientX, cached.clientY - clientY) < 35
+          ) {
+            resolved = resolveCenterDrop(designId, orientation, cached.x, cached.z, rotationRad, tiltXRad, tiltZRad);
+          }
+
+          if (!resolved || !resolved.valid) {
+            const local = raycastLocalXZ(clientX, clientY);
+            if (!local) return;
+            resolved = resolveCenterDrop(designId, orientation, local.x, local.z, rotationRad, tiltXRad, tiltZRad);
+          }
+
+          if (!resolved.valid) {
+            onPlacementBlockedRef.current?.(resolved.reason || 'overlap');
+            return; // hard block (out of bounds or overlaps another item or at max limit) -- snap back, no-op
+          }
+          const placedItems = cakeConfigRef.current?.placedItems || [];
+          const currentCount = getCenterItemCount(placedItems, designId);
+          const limit = getCenterItemLimit(designId);
+          const isLetter = isButtercreamLetterDesign(designId);
+          const letterColorId = cakeConfigRef.current?.centerTextColorId || 'vanilla';
+          const isFlavor = ['vanilla', 'chocolate', 'strawberry', 'cheese', 'ube', 'mocha'].includes(letterColorId);
+          const letterSugarColor = {
+            mode: isFlavor ? 'default' : 'colorOverride',
+            colorId: letterColorId,
+          };
+
           onPlaceRef.current?.({
             type: toolType,
             x: resolved.x,
@@ -3402,15 +4141,39 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
             rotation: THREE.MathUtils.degToRad(rotationY),
             tiltX: THREE.MathUtils.degToRad(rotationX),
             tiltZ: THREE.MathUtils.degToRad(rotationZ),
+            colorId: isLetter ? letterColorId : undefined,
+            sugarColor: isLetter ? letterSugarColor : undefined,
           });
+
+          lastValidGhostDropRef.current = null;
+
+          if (limit !== null && currentCount + 1 >= limit) {
+            onSelectToolRef.current?.(null);
+          }
           return;
         }
 
         if (isPlaceItemTool(toolType)) {
-          const local = raycastLocalXZ(clientX, clientY);
-          if (!local) return;
-          const resolved = resolvePlaceItemDrop(toolType, local.x, local.z);
-          if (!resolved.valid) return; // hard block (out of bounds or overlaps another item) -- snap back, no-op
+          let resolved = null;
+          const cached = lastValidGhostDropRef.current;
+          if (
+            cached &&
+            cached.toolType === toolType &&
+            Math.hypot(cached.clientX - clientX, cached.clientY - clientY) < 35
+          ) {
+            resolved = resolvePlaceItemDrop(toolType, cached.x, cached.z);
+          }
+
+          if (!resolved || !resolved.valid) {
+            const local = raycastLocalXZ(clientX, clientY);
+            if (!local) return;
+            resolved = resolvePlaceItemDrop(toolType, local.x, local.z);
+          }
+
+          if (!resolved.valid) {
+            onPlacementBlockedRef.current?.(resolved.reason || 'overlap');
+            return; // hard block (out of bounds or overlaps another item) -- snap back, no-op
+          }
           onPlaceRef.current?.({
             type: toolType,
             x: resolved.x,
@@ -3419,6 +4182,8 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
             pattern: tool?.pattern || 'shell',
             colorId: tool?.colorId || 'vanilla',
           });
+
+          lastValidGhostDropRef.current = null;
           return;
         }
 
@@ -3441,6 +4206,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         const ghostGroup = ghostGroupRef.current;
         if (!ghostGroup) return;
         clearGhostGroup(ghostGroup);
+        if (cakeConfigRef.current?.interiorPreview) return;
         const tool = activeToolRef.current;
         if (!tool) return;
         const toolType = typeof tool === 'object' ? tool.type : tool;
@@ -3448,22 +4214,33 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         const local = raycastLocalXZ(clientX, clientY);
         if (!local) return;
         const { designId, orientation } = parseCenterTool(toolType);
+        const rotationDeg = typeof tool === 'object' ? (tool.rotationY || 0) : 0;
+        const tiltDeg = typeof tool === 'object' ? (tool.rotationX || 0) : 0;
+        const rollDeg = typeof tool === 'object' ? (tool.rotationZ || 0) : 0;
+        const rotationRad = THREE.MathUtils.degToRad(rotationDeg);
+        const tiltXRad = THREE.MathUtils.degToRad(tiltDeg);
+        const tiltZRad = THREE.MathUtils.degToRad(rollDeg);
         // resolved.x/z always equal the raw cursor position (raycastLocalXZ
         // above) regardless of resolved.valid -- only the drop itself
         // (tryPlace) is blocked on invalid, not the hover preview. That's
         // what lets the ghost freely hover over a spot that's too close to
         // another item or past the edge, tinted red, rather than being
         // yanked back to the last valid spot.
-        const resolved = resolveCenterDrop(designId, orientation, local.x, local.z);
-        const { baseY, domeHeight, topY, radius, centerDecorScale } = topMetricsRef.current;
+        const resolved = resolveCenterDrop(designId, orientation, local.x, local.z, rotationRad, tiltXRad, tiltZRad);
+        const { centerDecorScale } = topMetricsRef.current;
         const scale = centerDecorScale ?? 1;
-        const R = radius - 0.15;
-        const r = Math.sqrt(resolved.x * resolved.x + resolved.z * resolved.z);
-        const y = r < R ? baseY + domeHeight * (1 - (r / R) * (r / R)) : topY;
 
-        const rotationDeg = typeof tool === 'object' ? (tool.rotationY || 0) : 0;
-        const tiltDeg = typeof tool === 'object' ? (tool.rotationX || 0) : 0;
-        const rollDeg = typeof tool === 'object' ? (tool.rotationZ || 0) : 0;
+        if (resolved.valid) {
+          lastValidGhostDropRef.current = {
+            toolType,
+            x: resolved.x,
+            z: resolved.z,
+            clientX,
+            clientY,
+          };
+        } else {
+          lastValidGhostDropRef.current = null;
+        }
 
         // Real mesh preview, not a placeholder shape -- same
         // buildRotatedDecoration used by the actual placed render below,
@@ -3472,9 +4249,17 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         const rotatedGroup = buildRotatedDecoration(
           designId, orientation,
           THREE.MathUtils.degToRad(tiltDeg), THREE.MathUtils.degToRad(rotationDeg),
-          scale, cakeConfigRef.current?.centerDecorationColor || '#F6DEAB', Math.random,
-          THREE.MathUtils.degToRad(rollDeg)
+          scale,
+          isButtercreamLetterDesign(designId)
+            ? cakeConfigRef.current?.centerTextColor || '#F6DEAB'
+            : cakeConfigRef.current?.centerDecorationColor || '#F6DEAB',
+          Math.random,
+          THREE.MathUtils.degToRad(rollDeg),
+          isButtercreamLetterDesign(designId)
+            ? cakeConfigRef.current?.centerTextColorId
+            : cakeConfigRef.current?.centerDecorationColorId
         );
+        const y = getDecorationLandingY(rotatedGroup, resolved.x, resolved.z, topMetricsRef.current);
         rotatedGroup.position.set(resolved.x, y, resolved.z);
         tintAsGhost(rotatedGroup, resolved.valid);
         ghostGroup.add(rotatedGroup);
@@ -3484,6 +4269,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         const ghostGroup = ghostGroupRef.current;
         if (!ghostGroup) return;
         clearGhostGroup(ghostGroup);
+        if (cakeConfigRef.current?.interiorPreview) return;
         const tool = activeToolRef.current;
         if (!tool) return;
         const toolType = typeof tool === 'object' ? tool.type : tool;
@@ -3493,10 +4279,20 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         // See updateCenterGhost's comment above -- resolved.x/z always
         // track the raw cursor, resolved.valid only affects the tint.
         const resolved = resolvePlaceItemDrop(toolType, local.x, local.z);
-        const { baseY, domeHeight, topY, radius } = topMetricsRef.current;
-        const R = radius - 0.15;
-        const r = Math.sqrt(resolved.x * resolved.x + resolved.z * resolved.z);
-        const surfaceY = r < R ? baseY + domeHeight * (1 - (r / R) * (r / R)) : topY;
+        if (resolved.valid) {
+          lastValidGhostDropRef.current = {
+            toolType,
+            x: resolved.x,
+            z: resolved.z,
+            clientX,
+            clientY,
+          };
+        } else {
+          lastValidGhostDropRef.current = null;
+        }
+
+        const surfacePt = getCakeTopSurfacePoint(resolved.x, resolved.z, topMetricsRef.current);
+        const surfaceY = surfacePt.y - 0.015;
 
         const ghostContainer = new THREE.Group();
         const ghostRand = makePRNG(12345);
@@ -3521,6 +4317,10 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       };
 
       refreshGhostRef.current = () => {
+        if (cakeConfigRef.current?.interiorPreview) {
+          if (ghostGroupRef.current) clearGhostGroup(ghostGroupRef.current);
+          return;
+        }
         const tool = activeToolRef.current;
         if (!tool) return; // typeof null === 'object' in JS -- must check this first, or the ternary below reads .type off null
         const toolType = typeof tool === 'object' ? tool.type : tool;
@@ -3532,7 +4332,7 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       };
 
       const handleMouseDown = (e) => {
-        if (e.button !== THREE.MOUSE.LEFT) return;
+        if (disabledRef.current || e.button !== THREE.MOUSE.LEFT) return;
         mouseRef.current.isDown = true;
         mouseRef.current.moved = false;
         mouseRef.current.prevX = e.clientX;
@@ -3540,17 +4340,25 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       };
 
       const handleMouseMove = (e) => {
+        if (disabledRef.current || readOnlyRef.current) return;
         lastMousePosRef.current = { x: e.clientX, y: e.clientY };
         if (mouseRef.current.isDown) {
           const dx = e.clientX - mouseRef.current.prevX;
           const dy = e.clientY - mouseRef.current.prevY;
-          if (Math.abs(dx) > 2 || Math.abs(dy) > 2) mouseRef.current.moved = true;
+          if (Math.abs(dx) > 5 || Math.abs(dy) > 5) mouseRef.current.moved = true;
           mouseRef.current.prevX = e.clientX;
           mouseRef.current.prevY = e.clientY;
         }
 
-        // Hover feedback: freeform ghost for Center tools and Place-tab
-        // item tools, slot-snap detection for whatever's left (doodles).
+        if (cakeConfigRef.current?.interiorPreview) {
+          if (ghostGroupRef.current) clearGhostGroup(ghostGroupRef.current);
+          clearSelectionOverlay();
+          renderer.domElement.style.cursor = '';
+          return;
+        }
+
+        // Armed tools get their placement ghost; with nothing armed, hover
+        // outlines selectable placed Text items instead.
         if (activeToolRef.current) {
           const tool = activeToolRef.current;
           const toolType = typeof tool === 'object' ? tool.type : tool;
@@ -3565,14 +4373,29 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
               updateSlotVisuals();
             }
           }
+        } else {
+          updateSelectionOverlay(e.clientX, e.clientY);
         }
       };
 
       const handleMouseUp = (e) => {
+        if (disabledRef.current || readOnlyRef.current || cakeConfigRef.current?.interiorPreview) return;
         const wasDown = mouseRef.current.isDown;
         const wasDrag = mouseRef.current.moved;
         mouseRef.current.isDown = false;
         if (wasDown && !wasDrag && e.button === THREE.MOUSE.LEFT) {
+          const selectable = findSelectableItemAt(e.clientX, e.clientY);
+          if (selectable) {
+            onCenterItemSelectRef.current?.(selectable.id);
+            onSelectToolRef.current?.(null);
+            updateSelectionOverlay(e.clientX, e.clientY);
+            return;
+          }
+          if (!activeToolRef.current) {
+            onCenterItemSelectRef.current?.(null);
+            updateSelectionOverlay(e.clientX, e.clientY);
+            return;
+          }
           tryPlace(e.clientX, e.clientY);
         }
       };
@@ -3585,24 +4408,51 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         if (ghostGroupRef.current) {
           clearGhostGroup(ghostGroupRef.current);
         }
+        lastValidGhostDropRef.current = null;
+        clearSelectionOverlay();
+        renderer.domElement.style.cursor = '';
       };
 
       const el = renderer.domElement;
 
       const handleContextLost = (e) => {
         e.preventDefault();
+        isContextLost = true;
         console.warn('WebGL context lost. Pausing animation frame.');
         cancelAnimationFrame(animFrameRef.current);
       };
 
       const handleContextRestored = () => {
         console.info('WebGL context restored. Rebuilding scene and restarting animation.');
+        isContextLost = false;
         buildCake();
         animate();
       };
 
       const handleKeyDown = (e) => {
-        // Key map (while a Center design is armed):
+        if (disabledRef.current || readOnlyRef.current) return;
+        if (['INPUT', 'TEXTAREA'].includes(e.target?.tagName) || e.target?.isContentEditable) return;
+
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          if (activeToolRef.current) {
+            onSelectToolRef.current?.(null);
+            activeToolRef.current = null;
+          } else {
+            onCenterItemSelectRef.current?.(null);
+          }
+          refreshGhostRef.current?.();
+          refreshSelectionOverlayRef.current?.();
+          return;
+        }
+
+        if ((e.key === 'Delete' || e.key === 'Backspace') && !activeToolRef.current && selectedCenterItemIdRef.current) {
+          e.preventDefault();
+          onDeleteCenterItemRef.current?.();
+          return;
+        }
+
+        // Key map (while a Center design is armed OR a placed Center item is selected on the cake):
         //   W / S  = tilt up / down      (pitch, rotationX)
         //   A / D  = tilt left / right   (roll,  rotationZ)
         //   Q / E  = rotate left / right (spin,  rotationY)
@@ -3614,30 +4464,70 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         const isYawLeft = e.key === 'q' || e.key === 'Q';
         const isYawRight = e.key === 'e' || e.key === 'E';
         if (!isYawLeft && !isYawRight && !isPitchUp && !isPitchDown && !isRollLeft && !isRollRight) return;
-        if (!onSelectToolRef.current) return;
-        const tool = activeToolRef.current;
-        const toolType = typeof tool === 'object' ? tool.type : tool;
-        if (!isCenterTool(toolType)) return;
-        e.preventDefault(); // don't also scroll the page while rotating
-        const currentYaw = typeof tool === 'object' ? (tool.rotationY || 0) : 0;
-        const currentPitch = typeof tool === 'object' ? (tool.rotationX || 0) : 0;
-        const currentRoll = typeof tool === 'object' ? (tool.rotationZ || 0) : 0;
+
         const yawStep = isYawLeft ? -15 : isYawRight ? 15 : 0;
         const pitchStep = isPitchUp ? 15 : isPitchDown ? -15 : 0;
         const rollStep = isRollRight ? 15 : isRollLeft ? -15 : 0;
-        const rotatedTool = {
-          type: toolType,
-          rotationY: ((currentYaw + yawStep) % 360 + 360) % 360,
-          rotationX: ((currentPitch + pitchStep) % 360 + 360) % 360,
-          rotationZ: ((currentRoll + rollStep) % 360 + 360) % 360,
-        };
-        onSelectToolRef.current(rotatedTool);
-        // onSelectTool updates React state asynchronously -- activeToolRef
-        // won't pick up the new rotation until the next render's effect
-        // runs, so set it here directly too, or the ghost refresh below
-        // would still read the stale pre-rotation value.
-        activeToolRef.current = rotatedTool;
-        refreshGhostRef.current?.();
+
+        // Case A: A Center design is armed for placement
+        if (activeToolRef.current && onSelectToolRef.current) {
+          const tool = activeToolRef.current;
+          const toolType = typeof tool === 'object' ? tool.type : tool;
+          if (!isCenterTool(toolType)) return;
+          e.preventDefault(); // don't also scroll the page while rotating
+          const currentYaw = typeof tool === 'object' ? (tool.rotationY || 0) : 0;
+          const currentPitch = typeof tool === 'object' ? (tool.rotationX || 0) : 0;
+          const currentRoll = typeof tool === 'object' ? (tool.rotationZ || 0) : 0;
+          const rotatedTool = {
+            type: toolType,
+            rotationY: ((currentYaw + yawStep) % 360 + 360) % 360,
+            rotationX: ((currentPitch + pitchStep) % 360 + 360) % 360,
+            rotationZ: ((currentRoll + rollStep) % 360 + 360) % 360,
+          };
+          onSelectToolRef.current(rotatedTool);
+          activeToolRef.current = rotatedTool;
+          refreshGhostRef.current?.();
+          return;
+        }
+
+        // Case B: A placed Center decoration or text item is selected on the cake
+        if (!activeToolRef.current && selectedCenterItemIdRef.current) {
+          const placedItems = cakeConfigRef.current?.placedItems || [];
+          const selectedItem = placedItems.find((it) => it.id === selectedCenterItemIdRef.current);
+          if (!selectedItem || !selectedItem.type?.startsWith('center-')) return;
+
+          e.preventDefault();
+          const currentYaw = ((selectedItem.rotation || 0) * 180) / Math.PI;
+          const currentPitch = ((selectedItem.tiltX || 0) * 180) / Math.PI;
+          const currentRoll = ((selectedItem.tiltZ || 0) * 180) / Math.PI;
+
+          const nextYaw = ((currentYaw + yawStep) % 360 + 360) % 360;
+          const nextPitch = ((currentPitch + pitchStep) % 360 + 360) % 360;
+          const nextRoll = ((currentRoll + rollStep) % 360 + 360) % 360;
+
+          const nextRotation = (nextYaw * Math.PI) / 180;
+          const nextTiltX = (nextPitch * Math.PI) / 180;
+          const nextTiltZ = (nextRoll * Math.PI) / 180;
+
+          if (cakeConfigRef.current?.placedItems) {
+            cakeConfigRef.current = {
+              ...cakeConfigRef.current,
+              placedItems: cakeConfigRef.current.placedItems.map((it) =>
+                it.id === selectedItem.id
+                  ? { ...it, rotation: nextRotation, tiltX: nextTiltX, tiltZ: nextTiltZ }
+                  : it
+              ),
+            };
+          }
+
+          onPlacedItemsChangeRef.current?.((currentItems) =>
+            (currentItems || []).map((it) =>
+              it.id === selectedItem.id
+                ? { ...it, rotation: nextRotation, tiltX: nextTiltX, tiltZ: nextTiltZ }
+                : it
+            )
+          );
+        }
       };
 
       el.addEventListener('webglcontextlost', handleContextLost, false);
@@ -3654,8 +4544,11 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
       setIsLoaded(true);
 
       return () => {
+        isContextLost = true;
         cancelAnimationFrame(animFrameRef.current);
+        window.removeEventListener('resize', handleResize);
         resizeObserver.disconnect();
+        handleResizeRef.current = null;
         el.removeEventListener('webglcontextlost', handleContextLost);
         el.removeEventListener('webglcontextrestored', handleContextRestored);
         if (!thumbnailMode) {
@@ -3667,8 +4560,11 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
         }
         controls.dispose();
         controlsRef.current = null;
-        mount.removeChild(renderer.domElement);
+        if (mount.contains(renderer.domElement)) {
+          mount.removeChild(renderer.domElement);
+        }
         renderer.dispose();
+        renderer.forceContextLoss?.();
       };
     } catch (err) {
       console.error('Three.js initialization error:', err);
@@ -3678,10 +4574,13 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
 
   useEffect(() => {
     buildCake();
+    handleResizeRef.current?.();
   }, [buildCake]);
 
+  const isInteriorPreview = Boolean(cakeConfig?.interiorPreview);
   const armedToolType = typeof activeTool === 'object' ? activeTool?.type : activeTool;
-  const isFreeformArmed = isCenterTool(armedToolType) || isPlaceItemTool(armedToolType);
+  const isFreeformArmed = !readOnly && !isInteriorPreview && (isCenterTool(armedToolType) || isPlaceItemTool(armedToolType));
+  const isToolActive = !readOnly && !isInteriorPreview && Boolean(activeTool);
 
   return (
     <div className="w-full h-full rounded-2xl overflow-hidden relative">
@@ -3694,14 +4593,24 @@ const CakeScene = React.forwardRef(function CakeScene({ cakeConfig, activeTool, 
           </div>
         </div>
       ) : !isLoaded ? (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
-          <div className="w-8 h-8 border-4 border-gray-200 border-t-gray-600 rounded-full animate-spin"></div>
+        <div role="status" aria-label="Loading cake preview" className="absolute inset-0 z-10 flex items-center justify-center overflow-hidden bg-gradient-to-b from-pink-50 to-orange-50">
+          <div className="animate-pulse">
+            <div className="mx-auto h-14 w-14 rounded-t-3xl border border-white bg-pink-200/80" />
+            <div className="h-20 w-40 rounded-xl border border-white bg-rose-200/80" />
+            <div className="mx-auto h-5 w-48 rounded-b-full bg-orange-100" />
+          </div>
         </div>
       ) : null}
       <div
         ref={mountRef}
         className={`w-full h-full ${
-          isFreeformArmed ? 'cursor-none' : activeTool ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing'
+          disabled
+            ? 'pointer-events-none'
+            : isFreeformArmed
+              ? 'cursor-none'
+              : isToolActive
+                ? 'cursor-crosshair'
+                : 'cursor-grab active:cursor-grabbing'
         }`}
       />
     </div>

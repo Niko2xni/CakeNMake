@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, ChevronRight, X, Calendar, Banknote, FileText, MessageCircle, User } from 'lucide-react';
 import CustomScrollbar from '@/components/shared/CustomScrollbar';
+import { AdminRowsSkeleton } from '@/components/shared/PageLoadingSkeleton';
 import { safeExternalUrl } from '@/lib/safe-url';
 import { bakeryApi } from '@/services/api'; // adjust path if api.js lives elsewhere
 
@@ -112,7 +113,9 @@ export default function BakeryReservations() {
 
         <CustomScrollbar className="flex-1" contentClassName="p-3">
           {loading ? (
-            <p className="text-sm text-gray-400 text-center py-8">Loading reservations...</p>
+            <div role="status" aria-label="Loading reservations" className="p-1">
+              <AdminRowsSkeleton count={6} avatar />
+            </div>
           ) : filtered.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-8">No reservations found.</p>
           ) : (

@@ -2,12 +2,54 @@ import React, { useState } from 'react';
 import { addDays, addMonths, subMonths, format, isSameDay, startOfToday, startOfMonth, endOfMonth, eachDayOfInterval, isBefore, isAfter, isSameMonth } from 'date-fns';
 import { CalendarDays, Info, ChevronLeft, ChevronRight } from 'lucide-react';
 
-function calcComplexityDays(config) {
-  const { layers = 1, toppings = [], placedItems = [] } = config;
-  let days = layers; // 1–3 base days
-  days += Math.ceil(toppings.length / 2);
-  days += Math.ceil((placedItems || []).length / 3);
-  return Math.max(1, Math.min(7, days)); // clamp 1–7
+export function countUsedTabs(config = {}) {
+  let tabsCount = 1; // Fundamentals is always used (+1 day)
+
+  // Side tab:
+  const hasSide = Boolean(
+    config.side?.mode ||
+    config.sideDecorationSetId ||
+    config.sideCheckeredPatternSetId ||
+    config.sideTrianglePatternSetId ||
+    config.sideStripedPatternSetId ||
+    config.sideVictorianLambethSetId ||
+    config.sideChevronPatternSetId ||
+    config.sideNoNameSetId ||
+    (config.side?.items && config.side.items.length > 0)
+  );
+  if (hasSide) tabsCount += 1;
+
+  // Center tab:
+  const hasCenter = Boolean(
+    (Array.isArray(config.placedItems) && config.placedItems.length > 0) ||
+    (Array.isArray(config.place?.items) && config.place.items.length > 0) ||
+    (Array.isArray(config.center?.items) && config.center.items.length > 0) ||
+    (config.center?.text && (config.center.text.top?.trim() || config.center.text.middle?.trim() || config.center.text.bottom?.trim())) ||
+    config.centerButtercreamText
+  );
+  if (hasCenter) tabsCount += 1;
+
+  // Edge tab:
+  const hasEdge = Boolean(
+    config.edge?.top?.piping?.tip ||
+    config.edge?.bottom?.piping?.tip ||
+    config.edge?.both?.piping?.tip ||
+    config.edge?.middle?.piping?.tip ||
+    config.edge?.top?.decorations?.setId ||
+    config.edge?.bottom?.decorations?.setId ||
+    config.edge?.both?.decorations?.setId ||
+    config.edgeTopDesign ||
+    config.edgeBottomDesign ||
+    config.edgeBothDesign ||
+    config.edgeMiddleDesign
+  );
+  if (hasEdge) tabsCount += 1;
+
+  return tabsCount;
+}
+
+export function calcComplexityDays(config) {
+  return countUsedTabs(config);
 }
 
 export default function DeliveryCalendar({ config, selectedDate, onSelect }) {
@@ -17,14 +59,18 @@ export default function DeliveryCalendar({ config, selectedDate, onSelect }) {
 
   const today = startOfToday();
   const earliest = addDays(today, totalBuffer);
+  let earliestDeliverable = earliest;
+  while (earliestDeliverable.getDay() === 0 || earliestDeliverable.getDay() === 6) {
+    earliestDeliverable = addDays(earliestDeliverable, 1);
+  }
   const maxDate = addMonths(today, 4); // 4 months in advance
 
-  const [currentMonth, setCurrentMonth] = useState(startOfMonth(earliest));
+  const [currentMonth, setCurrentMonth] = useState(startOfMonth(earliestDeliverable));
 
   const goToPreviousMonth = () => {
     const newMonth = subMonths(currentMonth, 1);
     // Don't allow going before the earliest month
-    if (!isBefore(newMonth, startOfMonth(earliest))) {
+    if (!isBefore(newMonth, startOfMonth(earliestDeliverable))) {
       setCurrentMonth(newMonth);
     }
   };
@@ -61,7 +107,7 @@ export default function DeliveryCalendar({ config, selectedDate, onSelect }) {
       <div className="flex items-start gap-2 bg-primary/5 border border-primary/20 rounded-xl px-3 py-2.5 mb-4">
         <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
         <p className="text-xs text-foreground/70">
-          Your cake requires <span className="font-semibold text-foreground">{complexityDays} day{complexityDays > 1 ? 's' : ''}</span> to bake + <span className="font-semibold text-foreground">3 days</span> preparation &amp; payment. Earliest delivery: <span className="font-semibold text-foreground">{format(earliest, 'MMM d, yyyy')}</span>.
+          Your cake requires <span className="font-semibold text-foreground">{totalBuffer} days</span> to deliver. Earliest delivery: <span className="font-semibold text-foreground">{format(earliestDeliverable, 'MMM d, yyyy')}</span>.
         </p>
       </div>
 
@@ -69,7 +115,7 @@ export default function DeliveryCalendar({ config, selectedDate, onSelect }) {
       <div className="flex items-center justify-between mb-4">
         <button
           onClick={goToPreviousMonth}
-          disabled={isSameMonth(currentMonth, startOfMonth(earliest))}
+          disabled={isSameMonth(currentMonth, startOfMonth(earliestDeliverable))}
           className="p-2 rounded-lg hover:bg-primary/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
         >
           <ChevronLeft className="w-5 h-5" />
@@ -98,10 +144,11 @@ export default function DeliveryCalendar({ config, selectedDate, onSelect }) {
             const isSelected = selectedDate && isSameDay(day, selectedDate);
             const dayOfWeek = day.getDay();
             const isSunday = dayOfWeek === 0;
+            const isSaturday = dayOfWeek === 6;
             const isBeforeEarliest = isBefore(day, earliest);
             const isAfterMax = isAfter(day, maxDate);
             const isCurrentMonth = isSameMonth(day, currentMonth);
-            const isDisabled = isSunday || isBeforeEarliest || isAfterMax;
+            const isDisabled = isSunday || isSaturday || isBeforeEarliest || isAfterMax;
 
             return (
               <button

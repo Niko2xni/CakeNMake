@@ -78,15 +78,23 @@ export function computeEdgeTrimY(topSurfaceY, radius, decorationType = 'piping',
   const isFruitRim = [
     'strawberryRim',
     'hersheysKissRim',
+    'hersheysKissRimSparse',
     'ferreroRocherRim',
+    'ferreroRocherRimSparse',
     'oreoRim',
     'cherryRim',
+    'cherryRimSparse',
     'basketballRim',
     'soccerBallRim',
   ].includes(decorationType);
 
   if (isBottom) {
     if (isFruitRim) {
+      if (decorationType === 'ferreroRocherRim' || decorationType === 'ferreroRocherRimSparse' || decorationType === 'hersheysKissRimSparse') return 0.14;
+      if (decorationType === 'cherryRim' || decorationType === 'cherryRimSparse') return 0.06;
+      if (decorationType === 'strawberryRim') return 0.05;
+      if (decorationType === 'hersheysKissRim') return 0.04;
+      if (decorationType === 'basketballRim' || decorationType === 'soccerBallRim') return 0.02;
       return 0.0;
     }
     // Bottom edge decorations rest on top of the cake board / plate plane
@@ -96,31 +104,14 @@ export function computeEdgeTrimY(topSurfaceY, radius, decorationType = 'piping',
     }
     return -0.05;
   }
-  if (isFruitRim) {
-    return decorationType === 'strawberryRim' ? topSurfaceY - 0.04 : topSurfaceY;
-  }
   if (exteriorFinishStyle === 'naked') {
-    // compactDepth + extraInset below (0.10–0.16 depending on cake size
-    // and decoration type — see the numbers this replaced) were tuned
-    // assuming there's a frosting cap to recess the trim into. Naked's
-    // top is bare flat sponge meeting the side wall at a hard, unbeveled
-    // 90° corner — there's no material there to sink into, and no bevel
-    // to visually absorb it either. Any real dip below the true top
-    // surface doesn't nestle in, it punches straight through that corner
-    // into the side wall's own geometry, which is exactly the
-    // dripping/smearing artifact in the screenshots. topSurfaceY already
-    // carries a small +0.05 buffer above the true flat surface (see
-    // topY's own definition in CakeScene.jsx), which compactDepth alone
-    // already exceeds on every realistic cake size — so this isn't a
-    // constant that needs re-tuning, Naked genuinely needs a different
-    // formula, not a different number in the same one. A small fixed
-    // recess keeps it visually flush without ever going negative.
-    return topSurfaceY - 0.02;
+    return isFruitRim ? topSurfaceY - 0.05 : topSurfaceY - 0.02;
   }
   const compactDepth = Math.min(0.12, Math.max(0.06, radius * 0.08));
   const finishDepth = 0.06;
   const extraInset = decorationType === 'beadedTrim' ? 0.02 : 0.04;
-  return topSurfaceY - (compactDepth + extraInset + finishDepth);
+  const fruitExtraSink = isFruitRim ? ((decorationType === 'strawberryRim' || decorationType === 'oreoRim') ? 0.04 : 0.02) : 0;
+  return topSurfaceY - (compactDepth + extraInset + finishDepth + fruitExtraSink);
 }
 
 export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', exteriorFinishStyle = 'fullyFrosted', isBottom = false) {
@@ -139,7 +130,7 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
   const isDollopType = isWhippedCream || decorationType === 'dollops' || (typeof decorationType === 'string' && decorationType.toLowerCase().includes('dollop'));
 
   const baseTip = typeof decorationType === 'string'
-    ? decorationType.replace(/Cherry$/, '').replace(/Strawberry$/, '').replace(/Alt$/, '')
+    ? decorationType.replace(/Alt$/, '').replace(/Cherry$/, '').replace(/Strawberry$/, '')
     : decorationType;
   let topDollopInset = 0.76;
   if (baseTip === 'starDollopContinuous') {
@@ -175,15 +166,15 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
     bottomRadialInset = -0.592;
   } else if (baseTip === 'roundDollop' || baseTip === 'kissDollop') {
     bottomRadialInset = -0.40;
-  } else if (baseTip === 'ferreroRocherRim') {
+  } else if (baseTip === 'ferreroRocherRim' || baseTip === 'ferreroRocherRimSparse') {
     bottomRadialInset = -0.61;
-  } else if (baseTip === 'hersheysKissRim') {
+  } else if (baseTip === 'hersheysKissRim' || baseTip === 'hersheysKissRimSparse') {
     bottomRadialInset = -0.41;
   } else if (baseTip === 'strawberryRim') {
     bottomRadialInset = -0.31;
   } else if (baseTip === 'oreoRim') {
     bottomRadialInset = -0.20;
-  } else if (baseTip === 'cherryRim') {
+  } else if (baseTip === 'cherryRim' || baseTip === 'cherryRimSparse') {
     bottomRadialInset = -0.36;
   } else if (baseTip === 'basketballRim' || baseTip === 'soccerBallRim') {
     bottomRadialInset = -0.50;
@@ -204,9 +195,12 @@ export function computeEdgeTrimRadius(edgeRadius, decorationType = 'piping', ext
   const topFruitRimInset = {
     strawberryRim: 0.42,
     hersheysKissRim: 0.48,
+    hersheysKissRimSparse: 0.65,
     ferreroRocherRim: 0.65,
+    ferreroRocherRimSparse: 0.65,
     oreoRim: 0.22,
     cherryRim: 0.36,
+    cherryRimSparse: 0.48,
     basketballRim: 0.50,
     soccerBallRim: 0.50,
   }[baseTip];
@@ -442,6 +436,29 @@ export function buildHersheysKissRimRing(radius, y, rand = Math.random, opts = {
   return group;
 }
 
+export function buildHersheysKissRimRingSparse(radius, y, rand = Math.random, opts = {}) {
+  const kissCount = opts.kissesCount ?? Math.max(3, Math.round((radius * Math.PI * 2) / 3.4));
+  const totalCount = kissCount * 2;
+  const kissScale = opts.kissScale ?? 0.36;
+  const ferreroScale = opts.ferreroScale ?? 0.45;
+  const group = new THREE.Group();
+  for (let i = 0; i < totalCount; i++) {
+    const angle = (i / totalCount) * Math.PI * 2;
+    const cx = Math.sin(angle) * radius;
+    const cz = Math.cos(angle) * radius;
+    if (i % 2 === 0) {
+      const rotY = angle + (rand() - 0.5) * 0.3;
+      const kiss = buildHersheysKissMesh(cx, y, cz, kissScale, rotY);
+      group.add(kiss);
+    } else {
+      const truffle = buildFerreroRocherMesh(cx, y, cz, ferreroScale);
+      truffle.rotation.y = rand() * Math.PI * 2;
+      group.add(truffle);
+    }
+  }
+  return group;
+}
+
 /**
  * Ferrero Rocher Truffle Rim — textured hazelnut chocolate truffles lining the cake rim.
  */
@@ -456,6 +473,31 @@ export function buildFerreroRocherRimRing(radius, y, rand = Math.random, opts = 
     const truffle = buildFerreroRocherMesh(cx, y, cz, scale);
     truffle.rotation.y = rand() * Math.PI * 2;
     group.add(truffle);
+  }
+  return group;
+}
+
+export function buildFerreroRocherRimRingSparse(radius, y, rand = Math.random, opts = {}) {
+  const ferreroCount = opts.ferreroCount ?? (Math.max(3, Math.round((radius * Math.PI * 2) / 4.8)) + 1);
+  const totalCount = ferreroCount * 2;
+  const ferreroScale = opts.ferreroScale ?? 0.45;
+  const cherryScale = opts.cherryScale ?? 0.85;
+  const group = new THREE.Group();
+  for (let i = 0; i < totalCount; i++) {
+    const angle = (i / totalCount) * Math.PI * 2;
+    const cx = Math.sin(angle) * radius;
+    const cz = Math.cos(angle) * radius;
+    if (i % 2 === 0) {
+      const truffle = buildFerreroRocherMesh(cx, y, cz, ferreroScale);
+      truffle.rotation.y = rand() * Math.PI * 2;
+      group.add(truffle);
+    } else {
+      const cherry = buildCherryMesh(cx, y, cz, cherryScale, rand);
+      cherry.rotation.y = angle + (rand() - 0.5) * 0.3;
+      cherry.rotation.x = (rand() - 0.5) * 0.06;
+      cherry.rotation.z = (rand() - 0.5) * 0.06;
+      group.add(cherry);
+    }
   }
   return group;
 }
@@ -494,7 +536,7 @@ export function buildOreoRimRing(radius, y, rand = Math.random, opts = {}) {
 
 /** Cherry Rim — complete glossy cherries nestled along the cake edge. */
 export function buildCherryRimRing(radius, y, rand = Math.random, opts = {}) {
-  const count = opts.count ?? 14;
+  const count = opts.count ?? 10;
   const scale = opts.scale ?? 0.85;
   const group = new THREE.Group();
   for (let i = 0; i < count; i++) {
@@ -510,10 +552,35 @@ export function buildCherryRimRing(radius, y, rand = Math.random, opts = {}) {
   return group;
 }
 
+export function buildCherryRimRingSparse(radius, y, rand = Math.random, opts = {}) {
+  const cherryCount = opts.cherryCount ?? Math.max(3, Math.round((radius * Math.PI * 2) / 4.2));
+  const totalCount = cherryCount * 2;
+  const cherryScale = opts.cherryScale ?? 0.85;
+  const kissScale = opts.kissScale ?? 0.36;
+  const group = new THREE.Group();
+  for (let i = 0; i < totalCount; i++) {
+    const angle = (i / totalCount) * Math.PI * 2;
+    const cx = Math.sin(angle) * radius;
+    const cz = Math.cos(angle) * radius;
+    if (i % 2 === 0) {
+      const cherry = buildCherryMesh(cx, y, cz, cherryScale, rand);
+      cherry.rotation.y = angle + (rand() - 0.5) * 0.3;
+      cherry.rotation.x = (rand() - 0.5) * 0.06;
+      cherry.rotation.z = (rand() - 0.5) * 0.06;
+      group.add(cherry);
+    } else {
+      const rotY = angle + (rand() - 0.5) * 0.3;
+      const kiss = buildHersheysKissMesh(cx, y, cz, kissScale, rotY);
+      group.add(kiss);
+    }
+  }
+  return group;
+}
+
 function buildBallRimRing(buildBall, radius, y, rand, opts) {
   const count = opts.count ?? 16;
   const scale = opts.scale ?? 0.18;
-  const surfaceLift = 0.50 * scale;
+  const surfaceLift = 0.40 * scale;
   const group = new THREE.Group();
   for (let i = 0; i < count; i++) {
     const angle = (i / count) * Math.PI * 2;

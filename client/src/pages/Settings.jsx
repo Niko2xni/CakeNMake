@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import ClientNavbar from '@/components/client/ClientNavbar';
 import { useAuth } from '@/lib/AuthContext';
+import { useDragToScroll } from '@/hooks/useDragToScroll';
 import { updateProfile } from 'firebase/auth';
 import { AlertCircle, Bell, CheckCircle2, Loader2, LockKeyhole, Palette, Save, Shield, User } from 'lucide-react';
 
@@ -36,6 +37,8 @@ export default function Settings() {
   const [settings, setSettings] = useState(savedSettings);
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState(null);
+
+  useDragToScroll();
 
   const userSignature = `${user?.uid || ''}:${user?.displayName || ''}:${user?.email || ''}`;
   const email = user?.email || 'No email address available';

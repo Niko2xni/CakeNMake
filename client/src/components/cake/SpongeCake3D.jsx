@@ -422,17 +422,11 @@ export function SpongeCake3D({ flavor }) {
       cancelAnimationFrame(animId);
       ro.disconnect();
       controls.dispose();
+      if (mount.contains(renderer.domElement)) {
+        mount.removeChild(renderer.domElement);
+      }
       renderer.dispose();
-      geometry.dispose();
-      roughMap.dispose();
-      mats.forEach(m => m.dispose());
-      texs.forEach(t => t.dispose());
-      groundGeo.dispose();
-      groundMat.dispose();
-      matsRef.current = null;
-      texsRef.current = null;
-      roughRef.current = null;
-      mount.removeChild(renderer.domElement);
+      renderer.forceContextLoss?.();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

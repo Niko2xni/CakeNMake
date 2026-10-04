@@ -56,6 +56,31 @@ describe('Uniform and Individual tier state', () => {
     expect(legacy.layerSurfaceFrostingColors).toEqual([colorHex('strawberry'), colorHex('mocha')]);
   });
 
+  it('resolves edgeMiddle sugar color overrides correctly in adaptConfigToLegacy', () => {
+    const config = {
+      structure: { size: 'big', layers: 2, layerDesign: 'uniform' },
+      sponge: { flavor: 'vanilla' },
+      filling: { enabled: true, layers: 1, flavor: 'vanilla' },
+      exteriorFinish: { style: 'fullyFrosted', flavor: 'vanilla' },
+      edge: {
+        mode: 'topBottomSeparate',
+        activeSlot: 'middle',
+        middle: {
+          piping: { tip: 'star', colorId: 'vanilla' },
+        },
+      },
+      sugarColorOverrides: {
+        edgeMiddle: { mode: 'colorOverride', colorId: 'pink' },
+      },
+    };
+
+    const legacy = adaptConfigToLegacy(config);
+    expect(legacy.edgeMiddle).toBeDefined();
+    expect(legacy.edgeMiddle.pipingTip).toBe('star');
+    expect(legacy.edgeMiddle.pipingColor).toBe(colorHex('pink'));
+    expect(legacy.edgeMiddle.pipingColorId).toBe('pink');
+  });
+
   it('stores Side choices on the active tier without changing other tiers', () => {
     const side = { mode: null, checkeredPattern: { setId: null } };
     const onChange = vi.fn();
@@ -192,16 +217,16 @@ describe('edge decoration placement', () => {
     expect(screen.queryByText('Scallops')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Star Scallop')).not.toBeInTheDocument();
     expect(screen.getByTitle('Rope Twist')).toBeInTheDocument();
-    expect(screen.getByTitle('Rope Twist (Classic)')).toBeInTheDocument();
+    expect(screen.getByTitle('Rope Twist Classic')).toBeInTheDocument();
     expect(screen.getByTitle('Beaded Trim')).toBeInTheDocument();
     expect(screen.queryByTitle('Trio Beaded Trim')).not.toBeInTheDocument();
     expect(screen.getByTitle('Petite Beaded Trim')).toBeInTheDocument();
     expect(screen.getByText('Dollops')).toBeInTheDocument();
-    expect(screen.getByTitle('Star Dollop (12 pc)')).toBeInTheDocument();
-    expect(screen.getByTitle('Sparse Star Dollop (8 pc)')).toBeInTheDocument();
-    expect(screen.queryByTitle('Star Dollop (12 pc) with Strawberry')).not.toBeInTheDocument();
-    expect(screen.queryByTitle('Sparse Round Tip Dollop (8 pc) with Strawberry')).not.toBeInTheDocument();
-    expect(screen.queryByTitle('Star Dollop (12 pc) - Alternating with Strawberry')).not.toBeInTheDocument();
+    expect(screen.getByTitle('Star Dollop')).toBeInTheDocument();
+    expect(screen.getByTitle('Sparse Star Dollop')).toBeInTheDocument();
+    expect(screen.queryByTitle('Star Dollop with Strawberry')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Sparse Round Tip Dollop with Strawberry')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Star Dollop - Alternating with Strawberry')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Fresh Strawberries Rim 🍓')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Basketball Rim 🏀')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Soccer Ball Rim ⚽')).not.toBeInTheDocument();

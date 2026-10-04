@@ -1,19 +1,29 @@
 import React from 'react';
-import { RotateCw, RotateCcw, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
-import { CENTER_PLACEABLE_DESIGNS, BUTTERCREAM_LETTERS, BUTTERCREAM_LETTERS_UPPER, BUTTERCREAM_LETTERS_LOWER } from '@/lib/cakeConfig';
+import {
+  RotateCw,
+  RotateCcw,
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  MousePointer2,
+  Link,
+  Unlink,
+  Trash2,
+  X,
+} from 'lucide-react';
+import {
+  CENTER_PLACEABLE_DESIGNS,
+  BUTTERCREAM_LETTERS,
+  BUTTERCREAM_LETTERS_UPPER,
+  BUTTERCREAM_LETTERS_LOWER,
+  SUGAR_COLORS,
+  getCenterItemLimit,
+  getCenterItemCount,
+  isCenterItemAtLimit,
+} from '@/lib/cakeConfig';
 import DecorationPreview from './DecorationPreview';
 import SugarColorSection from './SugarColorSection';
-
-const FONTS = [
-  { id: 'script', label: 'Script' },
-  { id: 'handwritten', label: 'Handwritten' },
-];
-
-const TEXT_SLOT_CONFIGS = [
-  { id: 'top', label: 'Top Line', maxLength: 18, placeholder: 'Happy 25th' },
-  { id: 'middle', label: 'Middle Line', maxLength: 24, placeholder: 'Birthday' },
-  { id: 'bottom', label: 'Bottom Line', maxLength: 18, placeholder: 'Sophia!' },
-];
 
 // A letter's toolId is 'center-letter{CHAR}-default' -- same format as any
 // other Center design, just distinguished by the 'letter' designId prefix
@@ -29,32 +39,71 @@ function isLetterToolType(type) {
 // both get the exact same preview + spin/tilt controls for free. Kept as
 // one component instead of duplicated JSX so the two tabs can't drift out
 // of sync with each other.
-function ArmedItemControls({ armedDesign, armedRotation, armedTilt, armedRoll, setArmedRotation, setArmedTilt, setArmedRoll }) {
+function ArmedItemControls({
+  armedDesign,
+  previewColor,
+  previewColorId,
+  armedRotation,
+  armedTilt,
+  armedRoll,
+  setArmedRotation,
+  setArmedTilt,
+  setArmedRoll,
+  onCancel,
+  onDelete,
+  canDelete = false,
+}) {
   if (!armedDesign) return null;
+
   return (
     <>
       <div>
         <DecorationPreview
           designId={armedDesign.designId}
           orientation={armedDesign.orientation}
+          color={previewColor}
+          colorId={previewColorId}
           rotationY={(armedRotation * Math.PI) / 180}
           rotationX={(armedTilt * Math.PI) / 180}
           rotationZ={(armedRoll * Math.PI) / 180}
         />
       </div>
 
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          title="Cancel selection"
+          className="flex-1 h-8 px-3 rounded-lg border border-border/80 bg-muted/60 hover:bg-muted text-xs font-semibold text-foreground flex items-center justify-center gap-1.5 transition-colors"
+        >
+          <X className="w-3.5 h-3.5" />
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={!canDelete}
+          title={canDelete ? "Delete item" : "No placed item to delete"}
+          className="flex-1 h-8 px-3 rounded-lg border border-destructive/30 bg-destructive/10 hover:bg-destructive/20 text-xs font-semibold text-destructive disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 transition-colors"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          Delete
+        </button>
+      </div>
+
       <div className="rounded-xl bg-muted/60 px-3 py-2.5 space-y-3">
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">Rotation (spin)</span>
+            <span className="text-xs text-muted-foreground">Rotate</span>
             <span className="text-xs font-semibold text-foreground">{Math.round(armedRotation)}°</span>
           </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setArmedRotation(armedRotation - 15)}
+              disabled={!armedDesign}
               title="Rotate left 15°"
-              className="w-7 h-7 shrink-0 rounded-full bg-muted text-foreground hover:bg-muted/80 flex items-center justify-center"
+              className="w-7 h-7 shrink-0 rounded-full border border-transparent bg-muted text-foreground hover:border-primary hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-40 flex items-center justify-center"
             >
               <RotateCcw className="w-3.5 h-3.5" />
             </button>
@@ -65,14 +114,16 @@ function ArmedItemControls({ armedDesign, armedRotation, armedTilt, armedRoll, s
               step={1}
               value={armedRotation}
               onChange={(e) => setArmedRotation(Number(e.target.value))}
-              className="flex-1 accent-primary"
+              disabled={!armedDesign}
+              className="flex-1 accent-primary disabled:opacity-40"
               aria-label="Rotation angle"
             />
             <button
               type="button"
               onClick={() => setArmedRotation(armedRotation + 15)}
+              disabled={!armedDesign}
               title="Rotate right 15°"
-              className="w-7 h-7 shrink-0 rounded-full bg-muted text-foreground hover:bg-muted/80 flex items-center justify-center"
+              className="w-7 h-7 shrink-0 rounded-full border border-transparent bg-muted text-foreground hover:border-primary hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-40 flex items-center justify-center"
             >
               <RotateCw className="w-3.5 h-3.5" />
             </button>
@@ -81,15 +132,16 @@ function ArmedItemControls({ armedDesign, armedRotation, armedTilt, armedRoll, s
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">Tilt (left/right)</span>
+            <span className="text-xs text-muted-foreground">Left to Right</span>
             <span className="text-xs font-semibold text-foreground">{Math.round(armedRoll)}°</span>
           </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setArmedRoll(armedRoll - 15)}
+              disabled={!armedDesign}
               title="Tilt left 15°"
-              className="w-7 h-7 shrink-0 rounded-full bg-muted text-foreground hover:bg-muted/80 flex items-center justify-center"
+              className="w-7 h-7 shrink-0 rounded-full border border-transparent bg-muted text-foreground hover:border-primary hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-40 flex items-center justify-center"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
             </button>
@@ -100,14 +152,16 @@ function ArmedItemControls({ armedDesign, armedRotation, armedTilt, armedRoll, s
               step={1}
               value={armedRoll}
               onChange={(e) => setArmedRoll(Number(e.target.value))}
-              className="flex-1 accent-primary"
+              disabled={!armedDesign}
+              className="flex-1 accent-primary disabled:opacity-40"
               aria-label="Left/right tilt angle"
             />
             <button
               type="button"
               onClick={() => setArmedRoll(armedRoll + 15)}
+              disabled={!armedDesign}
               title="Tilt right 15°"
-              className="w-7 h-7 shrink-0 rounded-full bg-muted text-foreground hover:bg-muted/80 flex items-center justify-center"
+              className="w-7 h-7 shrink-0 rounded-full border border-transparent bg-muted text-foreground hover:border-primary hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-40 flex items-center justify-center"
             >
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
@@ -116,15 +170,16 @@ function ArmedItemControls({ armedDesign, armedRotation, armedTilt, armedRoll, s
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">Tilt (up/down)</span>
+            <span className="text-xs text-muted-foreground">Up to Down</span>
             <span className="text-xs font-semibold text-foreground">{Math.round(armedTilt)}°</span>
           </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setArmedTilt(armedTilt - 15)}
+              disabled={!armedDesign}
               title="Tilt down 15°"
-              className="w-7 h-7 shrink-0 rounded-full bg-muted text-foreground hover:bg-muted/80 flex items-center justify-center"
+              className="w-7 h-7 shrink-0 rounded-full border border-transparent bg-muted text-foreground hover:border-primary hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-40 flex items-center justify-center"
             >
               <ChevronDown className="w-3.5 h-3.5" />
             </button>
@@ -135,14 +190,16 @@ function ArmedItemControls({ armedDesign, armedRotation, armedTilt, armedRoll, s
               step={1}
               value={armedTilt}
               onChange={(e) => setArmedTilt(Number(e.target.value))}
-              className="flex-1 accent-primary"
+              disabled={!armedDesign}
+              className="flex-1 accent-primary disabled:opacity-40"
               aria-label="Tilt angle"
             />
             <button
               type="button"
               onClick={() => setArmedTilt(armedTilt + 15)}
+              disabled={!armedDesign}
               title="Tilt up 15°"
-              className="w-7 h-7 shrink-0 rounded-full bg-muted text-foreground hover:bg-muted/80 flex items-center justify-center"
+              className="w-7 h-7 shrink-0 rounded-full border border-transparent bg-muted text-foreground hover:border-primary hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-40 flex items-center justify-center"
             >
               <ChevronUp className="w-3.5 h-3.5" />
             </button>
@@ -166,57 +223,127 @@ function ArmedItemControls({ armedDesign, armedRotation, armedTilt, armedRoll, s
   );
 }
 
+function LetterButton({ letter, isArmed, disabled = false, onSelect, onContextMenu }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => onSelect(letter.toolId)}
+      onContextMenu={onContextMenu}
+      title={letter.label}
+      className={`aspect-square rounded-lg text-sm font-bold transition-all duration-150 border-2 ${
+        disabled
+          ? 'opacity-40 cursor-not-allowed bg-muted border-transparent text-muted-foreground'
+          : isArmed
+          ? 'bg-primary text-primary-foreground border-primary shadow-md scale-[1.05]'
+          : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
+      }`}
+    >
+      {letter.label}
+    </button>
+  );
+}
+
+// Sugar Color renders contextually once a letter design is active in that
+// group — not before the whole grid, and not if no design is selected.
+// The color block is inserted after the LAST button of the active letter's
+// own row (every LETTER_ROW_SIZE-th button), appearing directly below the row.
+const LETTER_ROW_SIZE = 6;
+
+function LetterGroup({
+  label,
+  letters,
+  activeLetterToolId,
+  disabled = false,
+  onSelect,
+  onContextMenu,
+  textColorMode,
+  onToggleTextColorMode,
+  sugarColor,
+  onSugarColorChange,
+}) {
+  const activeIndex = letters.findIndex((l) => l.toolId === activeLetterToolId);
+  let colorBlockInserted = false;
+
+  return (
+    <div>
+      <span className="text-xs font-semibold text-muted-foreground mb-1.5 block">{label}</span>
+      <div className="grid grid-cols-6 gap-1.5">
+        {letters.map((letter, i) => {
+          const isArmed = activeLetterToolId === letter.toolId;
+          const isRowBoundary = (i + 1) % LETTER_ROW_SIZE === 0 || i === letters.length - 1;
+          const showColorHere = activeIndex !== -1 && !colorBlockInserted && i >= activeIndex && isRowBoundary;
+          if (showColorHere) colorBlockInserted = true;
+
+          return (
+            <React.Fragment key={letter.toolId}>
+              <LetterButton
+                letter={letter}
+                isArmed={isArmed}
+                disabled={disabled}
+                onSelect={onSelect}
+                onContextMenu={onContextMenu}
+              />
+              {showColorHere && (
+                <div className="col-span-6 col-span-full w-full pt-2 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground/70">Text Color</p>
+                      <p className="text-[9px] text-muted-foreground mt-0.5">
+                        {textColorMode === 'uniform' ? 'All text share the same color' : 'Each text has its own color'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={onToggleTextColorMode}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold border-2 transition-all duration-200 ${
+                        textColorMode === 'individual'
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
+                      }`}
+                    >
+                      {textColorMode === 'individual'
+                        ? <><Unlink className="w-3 h-3" /> Individual</>
+                        : <><Link className="w-3 h-3" /> Uniform</>}
+                    </button>
+                  </div>
+                  <SugarColorSection
+                    sugarColor={sugarColor}
+                    onChange={onSugarColorChange}
+                    showDefaultColorPicker
+                  />
+                </div>
+              )}
+            </React.Fragment>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // NOTE: single whole-top setting for now, not per-tier — see SurfaceSection
 // for the same caveat. Center's "reset on layer count change" rule (spec §2)
 // implies per-tier awareness eventually; not wired into this pass.
-export default function CenterSection({ center, onChange, activeTool, onSelectTool, placedItems = [], onPlacedItemsChange, sugarColor, onSugarColorChange }) {
-  const mode = center.mode; // 'decorations' | 'text' | null
-  const textCategory = center.textCategory || 'piping'; // 'piping' | 'buttercream' -- only meaningful when mode === 'text'
-  const letterCase = center.letterCase || 'upper'; // 'upper' | 'lower' -- only meaningful when textCategory === 'buttercream'
+export default function CenterSection({
+  center,
+  onChange,
+  activeTool,
+  onSelectTool,
+  placedItems = [],
+  onPlacedItemsChange,
+  sugarColor,
+  onSugarColorChange,
+  selectedItemId,
+  onItemSelect,
+  onDeleteSelectedItem,
+  onTextColorModeChange,
+}) {
+  const mode = center.mode || 'decorations';
+  const selectionMode = activeTool ? 'placement' : 'selection';
+  const textColorMode = center.text?.colorMode || 'uniform';
 
-  // Mutually exclusive tabs -- switching just changes which editor shows
-  // and what's armed by default; it doesn't delete the other mode's stored
-  // value (center.text survives switching to Decorations and back).
-  const switchToDecorations = () => {
-    onSelectTool?.(null);
-    onChange({ ...center, mode: 'decorations' });
-  };
-
-  const switchToText = () => {
-    onSelectTool?.(null);
-    onChange({ ...center, mode: 'text' });
-  };
-
-  const setTextCategory = (category) => {
-    onSelectTool?.(null);
-    onChange({ ...center, mode: 'text', textCategory: category });
-  };
-
-  const setLetterCase = (caseId) => {
-    onSelectTool?.(null);
-    onChange({ ...center, letterCase: caseId });
-  };
-
-  // Click-to-arm: picking a palette item doesn't place anything by
-  // itself, it arms activeTool (shared with Place/Doodles) so the next
-  // click on the cake surface drops it there -- see CakeScene.jsx's
-  // tryPlace/evaluateCenterDrop for the actual boundary + collision
-  // enforcement ("exclusive space" is a placement rule, not a separate
-  // item list -- Center items live in the same placedItems array as
-  // Place-tab/doodle items, tagged with a 'center-' prefixed type).
-  // Buttercream Text letters are armed exactly the same way (see
-  // armLetterTool below) and use this same activeTool/armedDesign
-  // machinery, since a letter is just another 'center-' design as far as
-  // CakeScene.jsx's placement/collision code is concerned.
-  //
-  // activeTool is an object here ({ type, rotationY, rotationX, rotationZ }), not a
-  // bare string -- same shape already used elsewhere for rosette/piping
-  // tools -- so pending rotation (Sims-style, set before the actual drop)
-  // can travel with it. rotationY is yaw (spin left/right, around the
-  // vertical axis), rotationX is pitch (tilt up/down, around the
-  // horizontal axis), rotationZ is roll (tilt left/right, around the axis
-  // pointing at the viewer) -- three independent axes. Re-arming a design
-  // always resets all three to 0, same as picking a fresh item off a shelf.
+  // Click-to-arm: activeTool holds pending item and rotation.
   const armedCenterType = activeTool && typeof activeTool === 'object' && activeTool.type?.startsWith('center-')
     ? activeTool.type
     : null;
@@ -228,45 +355,55 @@ export default function CenterSection({ center, onChange, activeTool, onSelectTo
   const armedTilt = armedCenterType ? (activeTool.rotationX || 0) : 0;
   const armedRoll = armedCenterType ? (activeTool.rotationZ || 0) : 0; // left/right lean, degrees (+ = leans right)
 
+  // Mutually exclusive tabs -- switching changes which editor shows
+  const switchToDecorations = () => {
+    onItemSelect?.(null);
+    onChange({ ...center, mode: 'decorations' });
+  };
+
+  const switchToText = () => {
+    onItemSelect?.(null);
+    onChange({ ...center, mode: 'text', textCategory: 'buttercream' });
+  };
+
+  // Auto-disarm if the currently armed design has reached its maximum limit
+  React.useEffect(() => {
+    if (armedDesign?.designId && isCenterItemAtLimit(placedItems, armedDesign.designId)) {
+      onSelectTool?.(null);
+    }
+  }, [placedItems, armedDesign?.designId, onSelectTool]);
+
   const armDecorationTool = (toolId) => {
+    onItemSelect?.(null);
+    const design = CENTER_PLACEABLE_DESIGNS.find((d) => d.toolId === toolId);
+    if (design && isCenterItemAtLimit(placedItems, design.designId)) {
+      return;
+    }
     const isSameArmed = armedCenterType === toolId;
-    onSelectTool?.(isSameArmed ? null : { type: toolId, rotationY: 0, rotationX: 0, rotationZ: 0 });
+    if (isSameArmed) {
+      onSelectTool?.(null);
+      return;
+    }
+    onSelectTool?.({ type: toolId, rotationY: 0, rotationX: 0, rotationZ: 0 });
     onChange({ ...center, mode: 'decorations' });
   };
 
   const armLetterTool = (toolId) => {
+    onItemSelect?.(null);
     const isSameArmed = armedCenterType === toolId;
-    onSelectTool?.(isSameArmed ? null : { type: toolId, rotationY: 0, rotationX: 0, rotationZ: 0 });
+    if (isSameArmed) {
+      onSelectTool?.(null);
+      return;
+    }
+    onSelectTool?.({ type: toolId, rotationY: 0, rotationX: 0, rotationZ: 0 });
     onChange({ ...center, mode: 'text', textCategory: 'buttercream' });
   };
 
-  // Right-click deselect: only clears the armed tool (activeTool), same as
-  // clicking the already-armed button again would -- doesn't touch
-  // center.mode, so this never affects the Decorations/Text switcher
-  // itself, only whichever design is currently selected.
+  // Right-click deselect: cancels selection
   const deselectArmedTool = (e) => {
     e.preventDefault();
-    if (armedCenterType) onSelectTool?.(null);
-  };
-
-  // Full 0-360deg range, not stepped -- the sliders below drive these
-  // directly with whatever value the person drags to.
-  const setArmedRotation = (degrees) => {
-    if (!armedCenterType) return;
-    const normalized = ((degrees % 360) + 360) % 360;
-    onSelectTool?.({ type: armedCenterType, rotationY: normalized, rotationX: armedTilt, rotationZ: armedRoll });
-  };
-
-  const setArmedTilt = (degrees) => {
-    if (!armedCenterType) return;
-    const normalized = ((degrees % 360) + 360) % 360;
-    onSelectTool?.({ type: armedCenterType, rotationY: armedRotation, rotationX: normalized, rotationZ: armedRoll });
-  };
-
-  const setArmedRoll = (degrees) => {
-    if (!armedCenterType) return;
-    const normalized = ((degrees % 360) + 360) % 360;
-    onSelectTool?.({ type: armedCenterType, rotationY: armedRotation, rotationX: armedTilt, rotationZ: normalized });
+    onItemSelect?.(null);
+    onSelectTool?.(null);
   };
 
   // Decorations and Buttercream Text share one placedItems bucket (both
@@ -279,39 +416,204 @@ export default function CenterSection({ center, onChange, activeTool, onSelectTo
   const placedDecorationItems = placedItems.filter((item) => item.type && item.type.startsWith('center-') && !isLetterToolType(item.type));
   const placedLetterItems = placedItems.filter((item) => isLetterToolType(item.type));
 
-  const clearDecorationItems = () => {
+  const selectedCenterItem = placedItems.find((item) => item.id === selectedItemId) || null;
+  const isSelectedDecoration = Boolean(selectedCenterItem && !isLetterToolType(selectedCenterItem.type));
+  const isSelectedLetter = Boolean(selectedCenterItem && isLetterToolType(selectedCenterItem.type));
+
+  const activeLetterToolId = (selectionMode === 'selection' && isSelectedLetter)
+    ? selectedCenterItem?.type
+    : (armedCenterType && isLetterToolType(armedCenterType) ? armedCenterType : null);
+
+  const selectedDecorationDesign = isSelectedDecoration
+    ? CENTER_PLACEABLE_DESIGNS.find((d) => d.toolId === selectedCenterItem.type)
+    : null;
+  const selectedLetterDesign = isSelectedLetter
+    ? BUTTERCREAM_LETTERS.find((letter) => letter.toolId === selectedCenterItem.type)
+    : null;
+
+  const selectedItemRotation = selectedCenterItem ? ((selectedCenterItem.rotation || 0) * 180) / Math.PI : 0;
+  const selectedItemTilt = selectedCenterItem ? ((selectedCenterItem.tiltX || 0) * 180) / Math.PI : 0;
+  const selectedItemRoll = selectedCenterItem ? ((selectedCenterItem.tiltZ || 0) * 180) / Math.PI : 0;
+
+  // Automatically switch tab if an item on the cake is selected
+  React.useEffect(() => {
+    if (selectedCenterItem) {
+      if (isLetterToolType(selectedCenterItem.type) && mode !== 'text') {
+        onChange({ ...center, mode: 'text', textCategory: 'buttercream' });
+      } else if (!isLetterToolType(selectedCenterItem.type) && mode !== 'decorations') {
+        onChange({ ...center, mode: 'decorations' });
+      }
+    }
+  }, [selectedCenterItem, mode]);
+
+  const updateSelectedItemPose = (changes) => {
+    if (!selectedCenterItem) return;
+    onPlacedItemsChange?.((currentItems) => currentItems.map((item) => (
+      item.id === selectedCenterItem.id ? { ...item, ...changes } : item
+    )));
+  };
+
+  // Full 0-360deg range, not stepped -- the sliders below drive these
+  // directly with whatever value the person drags to.
+  const setArmedRotation = (degrees) => {
+    if (selectionMode === 'selection' && selectedCenterItem) {
+      const normalized = ((degrees % 360) + 360) % 360;
+      updateSelectedItemPose({ rotation: (normalized * Math.PI) / 180 });
+      return;
+    }
+    if (!armedCenterType) return;
+    const normalized = ((degrees % 360) + 360) % 360;
+    onSelectTool?.({ type: armedCenterType, rotationY: normalized, rotationX: armedTilt, rotationZ: armedRoll });
+  };
+
+  const setArmedTilt = (degrees) => {
+    if (selectionMode === 'selection' && selectedCenterItem) {
+      const normalized = ((degrees % 360) + 360) % 360;
+      updateSelectedItemPose({ tiltX: (normalized * Math.PI) / 180 });
+      return;
+    }
+    if (!armedCenterType) return;
+    const normalized = ((degrees % 360) + 360) % 360;
+    onSelectTool?.({ type: armedCenterType, rotationY: armedRotation, rotationX: normalized, rotationZ: armedRoll });
+  };
+
+  const setArmedRoll = (degrees) => {
+    if (selectionMode === 'selection' && selectedCenterItem) {
+      const normalized = ((degrees % 360) + 360) % 360;
+      updateSelectedItemPose({ tiltZ: (normalized * Math.PI) / 180 });
+      return;
+    }
+    if (!armedCenterType) return;
+    const normalized = ((degrees % 360) + 360) % 360;
+    onSelectTool?.({ type: armedCenterType, rotationY: armedRotation, rotationX: armedTilt, rotationZ: normalized });
+  };
+
+  // Decoration controls
+  const decorControlsDesign = selectionMode === 'selection' && isSelectedDecoration
+    ? selectedDecorationDesign
+    : armedDesign;
+  const decorControlsRotation = selectionMode === 'selection' && isSelectedDecoration
+    ? selectedItemRotation
+    : armedRotation;
+  const decorControlsTilt = selectionMode === 'selection' && isSelectedDecoration
+    ? selectedItemTilt
+    : armedTilt;
+  const decorControlsRoll = selectionMode === 'selection' && isSelectedDecoration
+    ? selectedItemRoll
+    : armedRoll;
+
+  const matchingPlacedDecor = placedDecorationItems.filter((item) => {
+    if (selectionMode === 'selection' && isSelectedDecoration) {
+      return item.id === selectedItemId;
+    }
+    return item.type === armedCenterType || (armedDesign && item.type?.startsWith(`center-${armedDesign.designId}-`));
+  });
+  const canDeleteDecor = Boolean(selectedItemId && isSelectedDecoration);
+
+  // Text controls
+  const resolveSugarColorFromItem = (item) => {
+    if (!item) return null;
+    if (item.sugarColor && item.sugarColor.colorId) return item.sugarColor;
+    const cid = item.colorId || 'vanilla';
+    const isFlavor = ['vanilla', 'chocolate', 'strawberry', 'cheese', 'ube', 'mocha'].includes(cid);
+    return { mode: isFlavor ? 'default' : 'colorOverride', colorId: cid };
+  };
+
+  const selectedItemSugarColor = resolveSugarColorFromItem(selectedCenterItem);
+  const activeTextSugarColor = (textColorMode === 'individual' && isSelectedLetter && selectedItemSugarColor)
+    ? selectedItemSugarColor
+    : (sugarColor?.colorId ? sugarColor : { mode: 'default', colorId: 'vanilla' });
+  const previewSugarColor = SUGAR_COLORS.find((color) => color.id === activeTextSugarColor?.colorId)
+    || SUGAR_COLORS.find((color) => color.id === sugarColor?.colorId)
+    || SUGAR_COLORS[0];
+  const previewColor = previewSugarColor?.hex || SUGAR_COLORS[0].hex;
+  const previewColorId = previewSugarColor?.id || 'vanilla';
+  const textControlsDesign = selectionMode === 'selection' && isSelectedLetter
+    ? selectedLetterDesign
+    : armedDesign;
+  const textControlsRotation = selectionMode === 'selection' && isSelectedLetter
+    ? selectedItemRotation
+    : armedRotation;
+  const textControlsTilt = selectionMode === 'selection' && isSelectedLetter
+    ? selectedItemTilt
+    : armedTilt;
+  const textControlsRoll = selectionMode === 'selection' && isSelectedLetter
+    ? selectedItemRoll
+    : armedRoll;
+
+  const matchingPlacedLetters = placedLetterItems.filter((item) => {
+    if (selectionMode === 'selection' && isSelectedLetter) {
+      return item.id === selectedItemId;
+    }
+    return item.type === armedCenterType;
+  });
+  const canDeleteText = Boolean(selectedItemId && isSelectedLetter);
+
+  const handleCancel = () => {
+    onItemSelect?.(null);
     onSelectTool?.(null);
-    onPlacedItemsChange?.(placedItems.filter((item) => !(item.type && item.type.startsWith('center-') && !isLetterToolType(item.type))));
+  };
+
+  const handleDelete = () => {
+    if (selectedItemId) {
+      onDeleteSelectedItem?.();
+      onSelectTool?.(null);
+      onItemSelect?.(null);
+    }
+  };
+
+  const clearDecorationItems = () => {
+    onItemSelect?.(null);
+    onPlacedItemsChange?.((currentItems) => currentItems.filter((item) => !(item.type && item.type.startsWith('center-') && !isLetterToolType(item.type))));
   };
 
   const clearLetterItems = () => {
-    onSelectTool?.(null);
-    onPlacedItemsChange?.(placedItems.filter((item) => !isLetterToolType(item.type)));
+    onItemSelect?.(null);
+    onPlacedItemsChange?.((currentItems) => currentItems.filter((item) => !isLetterToolType(item.type)));
   };
 
-  const updateTextSlot = (slot, value) => {
-    const config = TEXT_SLOT_CONFIGS.find((c) => c.id === slot);
-    const maxLen = config ? config.maxLength : 24;
-    const currentText = center.text || {};
+  const setTextColorMode = (nextMode) => {
+    if (onTextColorModeChange) {
+      onTextColorModeChange(nextMode);
+      return;
+    }
     onChange({
       ...center,
-      text: {
-        ...currentText,
-        [slot]: value.slice(0, maxLen),
-      },
+      text: { ...(center.text || {}), colorMode: nextMode },
     });
   };
 
-  const updateFont = (font) => {
-    onChange({ ...center, text: { ...center.text, font } });
+  const handleTextSugarColorChange = (nextSugarColor) => {
+    const targetColorId = nextSugarColor.colorId || 'vanilla';
+    const isFlavor = ['vanilla', 'chocolate', 'strawberry', 'cheese', 'ube', 'mocha'].includes(targetColorId);
+    const normalizedSugarColor = {
+      mode: nextSugarColor.mode || (isFlavor ? 'default' : 'colorOverride'),
+      colorId: targetColorId,
+    };
+
+    onSugarColorChange?.(normalizedSugarColor);
+
+    if (textColorMode === 'individual') {
+      if (selectedCenterItem && isSelectedLetter) {
+        onPlacedItemsChange?.((currentItems) => currentItems.map((item) => (
+          item.id === selectedCenterItem.id
+            ? { ...item, colorId: targetColorId, sugarColor: normalizedSugarColor }
+            : item
+        )));
+      }
+    } else {
+      // In uniform mode, ensure all placed letters mirror the updated uniform color
+      onPlacedItemsChange?.((currentItems) => currentItems.map((item) => (
+        isLetterToolType(item.type)
+          ? { ...item, colorId: targetColorId, sugarColor: normalizedSugarColor }
+          : item
+      )));
+    }
   };
 
   return (
     <div className="space-y-4">
       <div>
-        <span className="text-xs text-muted-foreground mb-2 block">
-          Decorations or Text — picking one clears the other.
-        </span>
         <div className="flex gap-1 bg-muted/40 rounded-xl p-1">
           <button
             onClick={switchToDecorations}
@@ -334,14 +636,26 @@ export default function CenterSection({ center, onChange, activeTool, onSelectTo
 
       {mode === 'decorations' && (
         <div className="space-y-4">
+          {selectionMode === 'selection' && selectedItemId && isSelectedDecoration && (
+            <div className="flex items-center gap-1.5 rounded-lg bg-primary/10 border border-primary/20 px-2.5 py-1.5 text-xs text-primary">
+              <MousePointer2 className="w-3.5 h-3.5 shrink-0" />
+              <span>Decoration selected on cake</span>
+            </div>
+          )}
+
           <ArmedItemControls
-            armedDesign={armedDesign}
-            armedRotation={armedRotation}
-            armedTilt={armedTilt}
-            armedRoll={armedRoll}
+            armedDesign={decorControlsDesign}
+            previewColor={previewColor}
+            previewColorId={previewColorId}
+            armedRotation={decorControlsRotation}
+            armedTilt={decorControlsTilt}
+            armedRoll={decorControlsRoll}
             setArmedRotation={setArmedRotation}
             setArmedTilt={setArmedTilt}
             setArmedRoll={setArmedRoll}
+            onCancel={handleCancel}
+            onDelete={handleDelete}
+            canDelete={canDeleteDecor}
           />
 
           {placedDecorationItems.length > 0 && (
@@ -362,20 +676,40 @@ export default function CenterSection({ center, onChange, activeTool, onSelectTo
           <div className="grid grid-cols-2 gap-2">
             {CENTER_PLACEABLE_DESIGNS.map((design) => {
               const isArmed = armedCenterType === design.toolId;
+              const limit = getCenterItemLimit(design.designId);
+              const count = getCenterItemCount(placedItems, design.designId);
+              const isMaxReached = limit !== null && count >= limit;
+
               return (
                 <button
                   key={design.toolId}
                   type="button"
+                  disabled={isMaxReached}
                   onClick={() => armDecorationTool(design.toolId)}
                   onContextMenu={deselectArmedTool}
-                  title={design.label}
-                  className={`flex flex-col items-center gap-1.5 rounded-xl p-3 text-center transition-all duration-200 border-2 ${
-                    isArmed
+                  title={isMaxReached ? `${design.label} (Max limit reached: ${limit})` : design.label}
+                  className={`flex flex-col items-center justify-between gap-1.5 rounded-xl p-3 text-center transition-all duration-200 border-2 ${
+                    isMaxReached
+                      ? 'opacity-60 cursor-not-allowed bg-muted/40 border-dashed border-border/60 text-muted-foreground'
+                      : isArmed
                       ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-[1.02]'
                       : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
                   }`}
                 >
                   <span className="text-xs font-semibold">{design.label}</span>
+                  {limit !== null && (
+                    <span
+                      className={`text-[10px] font-medium px-2 py-0.5 rounded-full transition-colors ${
+                        isMaxReached
+                          ? 'bg-destructive/15 text-destructive font-semibold'
+                          : isArmed
+                          ? 'bg-primary-foreground/20 text-primary-foreground'
+                          : 'bg-background/80 text-muted-foreground'
+                      }`}
+                    >
+                      {count} / {limit}{isMaxReached ? ' • Max' : ''}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -385,155 +719,72 @@ export default function CenterSection({ center, onChange, activeTool, onSelectTo
 
       {mode === 'text' && (
         <div className="space-y-4">
-          <div className="flex gap-1 bg-muted/40 rounded-xl p-1">
-            <button
-              onClick={() => setTextCategory('piping')}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
-                textCategory === 'piping' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Piping Text
-            </button>
-            <button
-              onClick={() => setTextCategory('buttercream')}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
-                textCategory === 'buttercream' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Buttercream Text
-            </button>
+          {selectionMode === 'selection' && selectedItemId && isSelectedLetter && (
+            <div className="flex items-center gap-1.5 rounded-lg bg-primary/10 border border-primary/20 px-2.5 py-1.5 text-xs text-primary">
+              <MousePointer2 className="w-3.5 h-3.5 shrink-0" />
+              <span>Text selected on cake</span>
+            </div>
+          )}
+
+          <ArmedItemControls
+            armedDesign={textControlsDesign}
+            previewColor={previewColor}
+            previewColorId={previewColorId}
+            armedRotation={textControlsRotation}
+            armedTilt={textControlsTilt}
+            armedRoll={textControlsRoll}
+            setArmedRotation={setArmedRotation}
+            setArmedTilt={setArmedTilt}
+            setArmedRoll={setArmedRoll}
+            onCancel={handleCancel}
+            onDelete={handleDelete}
+            canDelete={canDeleteText}
+          />
+
+          {placedLetterItems.length > 0 && (
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-xs text-muted-foreground">
+                {placedLetterItems.length}/50 placed{placedLetterItems.length >= 50 ? ' max' : ''}
+              </span>
+              <button
+                type="button"
+                onClick={clearLetterItems}
+                className="text-xs font-semibold text-destructive hover:underline"
+              >
+                Clear All
+              </button>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <LetterGroup
+              label="Uppercase"
+              letters={BUTTERCREAM_LETTERS_UPPER}
+              activeLetterToolId={activeLetterToolId}
+              disabled={isCenterItemAtLimit(placedItems, 'letterUpperA')}
+              onSelect={armLetterTool}
+              onContextMenu={deselectArmedTool}
+              textColorMode={textColorMode}
+              onToggleTextColorMode={() => setTextColorMode(textColorMode === 'individual' ? 'uniform' : 'individual')}
+              sugarColor={activeTextSugarColor}
+              onSugarColorChange={handleTextSugarColorChange}
+            />
+            <LetterGroup
+              label="Lowercase"
+              letters={BUTTERCREAM_LETTERS_LOWER}
+              activeLetterToolId={activeLetterToolId}
+              disabled={isCenterItemAtLimit(placedItems, 'letterLowerA')}
+              onSelect={armLetterTool}
+              onContextMenu={deselectArmedTool}
+              textColorMode={textColorMode}
+              onToggleTextColorMode={() => setTextColorMode(textColorMode === 'individual' ? 'uniform' : 'individual')}
+              sugarColor={activeTextSugarColor}
+              onSugarColorChange={handleTextSugarColorChange}
+            />
           </div>
-
-          {textCategory === 'piping' && (
-            <div className="space-y-3">
-              {TEXT_SLOT_CONFIGS.map((slot) => {
-                const val = center.text?.[slot.id] !== undefined
-                  ? (center.text[slot.id] || '')
-                  : (slot.id === 'middle' ? (center.text?.value || '') : '');
-                return (
-                  <div key={slot.id}>
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-xs font-medium text-foreground">{slot.label}</span>
-                      <span className="text-[10px] text-muted-foreground">
-                        {val.length}/{slot.maxLength}
-                      </span>
-                    </div>
-                    <input
-                      type="text"
-                      value={val}
-                      onChange={(e) => updateTextSlot(slot.id, e.target.value)}
-                      maxLength={slot.maxLength}
-                      placeholder={slot.placeholder}
-                      className="w-full px-3 py-1.5 rounded-xl bg-muted text-sm text-foreground placeholder:text-muted-foreground border-2 border-transparent focus:border-primary/40 outline-none"
-                    />
-                  </div>
-                );
-              })}
-
-              <div className="pt-1">
-                <span className="text-xs text-muted-foreground mb-1.5 block">Font</span>
-                <div className="flex gap-1">
-                  {FONTS.map((f) => (
-                    <button
-                      key={f.id}
-                      onClick={() => updateFont(f.id)}
-                      className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
-                        (center.text?.font || 'script') === f.id
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                      }`}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {textCategory === 'buttercream' && (
-            <div className="space-y-4">
-              <ArmedItemControls
-                armedDesign={armedDesign}
-                armedRotation={armedRotation}
-                armedTilt={armedTilt}
-                armedRoll={armedRoll}
-                setArmedRotation={setArmedRotation}
-                setArmedTilt={setArmedTilt}
-                setArmedRoll={setArmedRoll}
-              />
-
-              {placedLetterItems.length > 0 && (
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-xs text-muted-foreground">
-                    {placedLetterItems.length} placed
-                  </span>
-                  <button
-                    type="button"
-                    onClick={clearLetterItems}
-                    className="text-xs font-semibold text-destructive hover:underline"
-                  >
-                    Clear All
-                  </button>
-                </div>
-              )}
-
-              <div className="flex gap-1 bg-muted/40 rounded-xl p-1">
-                <button
-                  onClick={() => setLetterCase('upper')}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
-                    letterCase === 'upper' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  Uppercase
-                </button>
-                <button
-                  onClick={() => setLetterCase('lower')}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
-                    letterCase === 'lower' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  Lowercase
-                </button>
-              </div>
-
-              <div className="grid grid-cols-6 gap-1.5">
-                {(letterCase === 'upper' ? BUTTERCREAM_LETTERS_UPPER : BUTTERCREAM_LETTERS_LOWER).map((letter) => {
-                  const isArmed = armedCenterType === letter.toolId;
-                  return (
-                    <button
-                      key={letter.toolId}
-                      type="button"
-                      onClick={() => armLetterTool(letter.toolId)}
-                      onContextMenu={deselectArmedTool}
-                      title={letter.label}
-                      className={`aspect-square rounded-lg text-sm font-bold transition-all duration-150 border-2 ${
-                        isArmed
-                          ? 'bg-primary text-primary-foreground border-primary shadow-md scale-[1.05]'
-                          : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
-                      }`}
-                    >
-                      {letter.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
-      {!mode && (
-        <p className="text-xs text-muted-foreground">Pick Decorations or Text above to get started.</p>
-      )}
-
-      {mode === 'text' && textCategory === 'piping' && (
-        <SugarColorSection
-          sugarColor={sugarColor}
-          onChange={onSugarColorChange}
-          showDefaultColorPicker
-        />
-      )}
     </div>
   );
 }

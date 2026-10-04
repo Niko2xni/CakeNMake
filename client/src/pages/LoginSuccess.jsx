@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { isSignInWithEmailLink, signInWithEmailLink } from "firebase/auth";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import AuthLayout from "@/components/AuthLayout";
 import { auth, firebaseConfigured } from "@/lib/firebase";
 
@@ -44,7 +45,11 @@ export default function LoginSuccess() {
       {error ? (
         <p className="text-sm text-destructive">{error}</p>
       ) : (
-        <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" aria-label="Signing in" />
+        <div role="status" aria-label="Signing you in" className="space-y-3">
+          <Skeleton className="mx-auto h-10 w-10 rounded-full" />
+          <Skeleton className="mx-auto h-4 w-40" />
+          <Skeleton className="mx-auto h-3 w-56 max-w-full" />
+        </div>
       )}
     </AuthLayout>
   );

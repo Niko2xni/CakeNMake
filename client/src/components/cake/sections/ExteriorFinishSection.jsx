@@ -12,7 +12,11 @@ export default function ExteriorFinishSection({ exterior, structure, activeLayer
       newLayerStyles[activeLayer] = style;
       onChange({ ...exterior, layerStyles: newLayerStyles });
     } else {
-      onChange({ ...exterior, style });
+      onChange({
+        ...exterior,
+        style,
+        layerStyles: Array(structure?.layers || 2).fill(style),
+      });
     }
   };
 
@@ -22,7 +26,11 @@ export default function ExteriorFinishSection({ exterior, structure, activeLayer
       newLayerFlavors[activeLayer] = flavor;
       onChange({ ...exterior, layerFlavors: newLayerFlavors });
     } else {
-      onChange({ ...exterior, flavor });
+      onChange({
+        ...exterior,
+        flavor,
+        layerFlavors: Array(structure?.layers || 2).fill(flavor),
+      });
     }
   };
 
@@ -32,7 +40,11 @@ export default function ExteriorFinishSection({ exterior, structure, activeLayer
       newLayerTextures[activeLayer] = buttercreamTexture;
       onChange({ ...exterior, layerButtercreamTextures: newLayerTextures });
     } else {
-      onChange({ ...exterior, buttercreamTexture });
+      onChange({
+        ...exterior,
+        buttercreamTexture,
+        layerButtercreamTextures: Array(structure?.layers || 2).fill(buttercreamTexture),
+      });
     }
   };
 

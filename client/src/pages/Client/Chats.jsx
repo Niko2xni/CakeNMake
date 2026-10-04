@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Image as ImageIcon,
   ThumbsUp,
@@ -20,7 +21,9 @@ import {
 } from 'lucide-react';
 
 import ClientNavbar from '@/components/client/ClientNavbar';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useChat } from '@/hooks/useChat';
+import { sanitizeFileName, hasBlockedExtension, BLOCKED_EXTENSIONS } from '@/lib/file-validation';
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB - audio & documents (no separate limit was specified for these)
 const MAX_IMAGE_SIZE = 25 * 1024 * 1024;
@@ -28,29 +31,55 @@ const MAX_VIDEO_SIZE = 100 * 1024 * 1024;
 const MAX_VIDEO_DURATION = 10 * 60; // 10 minutes, in seconds
 const URL_REGEX = /(https?:\/\/[^\s]+)/g;
 
-const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg'];
-const VIDEO_EXTENSIONS = ['mp4', 'mov', 'mkv', 'avi', 'flv'];
-const AUDIO_EXTENSIONS = ['wav', 'mp3'];
-const DOCUMENT_EXTENSIONS = ['pdf', 'doc', 'docx'];
-// Anything in this list is rejected outright, regardless of size.
-const BLOCKED_EXTENSIONS = ['exe', 'bat', 'cmd', 'msi', 'scr', 'com', 'jar', 'apk', 'sh', 'vbs', 'ps1'];
+const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp'];
+const VIDEO_EXTENSIONS = ['mp4', 'mov', 'mkv', 'avi', 'flv', 'webm'];
+const AUDIO_EXTENSIONS = ['wav', 'mp3', 'm4a', 'ogg'];
+const DOCUMENT_EXTENSIONS = ['pdf', 'doc', 'docx', 'txt'];
 
 function getFileExtension(filename) {
+  if (typeof filename !== 'string') return '';
   const parts = filename.split('.');
-  return parts.length > 1 ? parts.pop().toLowerCase() : '';
+  return parts.length > 1 ? parts.pop().toLowerCase().trim() : '';
+}
+
+function isSafeLinkUrl(rawUrl) {
+  if (typeof rawUrl !== 'string' || !rawUrl.trim()) return false;
+  if (/[\u0000-\u001F\u007F-\u009F]/.test(rawUrl)) return false;
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+    if (parsed.username || parsed.password) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function sanitizeInputText(raw) {
+  if (typeof raw !== 'string') return '';
+  return raw
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '')
+    .trim();
 }
 
 // Returns 'image' | 'video' | 'audio' | 'document' | null (null = unsupported)
 function getFileKind(file) {
+  if (!file || typeof file.name !== 'string') return null;
+  if (hasBlockedExtension(file.name)) return null;
   const ext = getFileExtension(file.name);
-  const mime = file.type?.toLowerCase();
-  if (IMAGE_EXTENSIONS.includes(ext) && ['image/png', 'image/jpeg'].includes(mime)) return 'image';
-  if (VIDEO_EXTENSIONS.includes(ext) && ['video/mp4', 'video/quicktime', 'video/x-matroska', 'video/x-msvideo', 'video/x-flv'].includes(mime)) return 'video';
-  if (AUDIO_EXTENSIONS.includes(ext) && ['audio/wav', 'audio/x-wav', 'audio/mpeg'].includes(mime)) return 'audio';
+  const mime = (file.type || '').toLowerCase().trim();
+  if (IMAGE_EXTENSIONS.includes(ext) && ['image/png', 'image/jpeg', 'image/webp'].includes(mime)) return 'image';
+  if (VIDEO_EXTENSIONS.includes(ext) && [
+    'video/mp4', 'video/quicktime', 'video/x-matroska', 'video/x-msvideo', 'video/x-flv', 'video/webm',
+  ].includes(mime)) return 'video';
+  if (AUDIO_EXTENSIONS.includes(ext) && [
+    'audio/wav', 'audio/x-wav', 'audio/mpeg', 'audio/mp3', 'audio/mp4', 'audio/x-m4a', 'audio/ogg',
+  ].includes(mime)) return 'audio';
   if (DOCUMENT_EXTENSIONS.includes(ext) && [
     'application/pdf',
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'text/plain',
   ].includes(mime)) return 'document';
   return null;
 }
@@ -235,7 +264,7 @@ function CustomScrollbar({ className = '', contentClassName = '', children }) {
   return (
     <div className={`relative min-h-0 ${className}`}>
       {thumbMetrics.visible && (
-        <div className="absolute top-0 right-0 h-full w-5 flex flex-col z-10">
+        <div className="cn-custom-scrollbar hidden md:flex absolute top-0 right-0 h-full w-5 flex-col z-10">
           <button
             onClick={scrollUp}
             aria-label="Scroll up"
@@ -266,7 +295,7 @@ function CustomScrollbar({ className = '', contentClassName = '', children }) {
       <div
         ref={scrollRef}
         onScroll={updateThumbMetrics}
-        className={`h-full overflow-y-auto ${thumbMetrics.visible ? 'pr-6' : ''} [&::-webkit-scrollbar]:hidden [scrollbar-width:none]`}
+        className={`h-full overflow-y-auto ${thumbMetrics.visible ? 'md:pr-6' : ''} [&::-webkit-scrollbar]:hidden [scrollbar-width:none]`}
       >
         <div ref={contentRef} className={contentClassName}>{children}</div>
       </div>
@@ -275,6 +304,7 @@ function CustomScrollbar({ className = '', contentClassName = '', children }) {
 }
 
 export default function Chats() {
+  const navigate = useNavigate();
   const {
     activeConversation,
     error: chatError,
@@ -297,6 +327,8 @@ export default function Chats() {
   const [searchSubmittedQuery, setSearchSubmittedQuery] = useState('');
   const [mediaModalIndex, setMediaModalIndex] = useState(null);
   const [showPinnedModal, setShowPinnedModal] = useState(false);
+  const [showPermissionModal, setShowPermissionModal] = useState(false);
+  const [sessionAttachmentPerm, setSessionAttachmentPerm] = useState(false);
   const activeThumbRef = useRef(null);
   const mediaStripRef = useRef(null);
   const stripDragRef = useRef(null);
@@ -501,19 +533,66 @@ export default function Chats() {
     return () => window.removeEventListener('resize', updateStripThumb);
   }, [mediaModalIndex, mediaMessages.length]);
 
+  function checkAttachmentPermission() {
+    try {
+      const permanent = localStorage.getItem('cakenmake_attachment_permission') === 'permanent';
+      if (permanent || sessionAttachmentPerm) return true;
+    } catch (e) {}
+    return sessionAttachmentPerm;
+  }
+
+  function handleGrantPermission(type) {
+    if (type === 'permanent') {
+      try {
+        localStorage.setItem('cakenmake_attachment_permission', 'permanent');
+      } catch (e) {}
+      setSessionAttachmentPerm(true);
+    } else if (type === 'one-time') {
+      setSessionAttachmentPerm(true);
+    }
+    setShowPermissionModal(false);
+    setTimeout(() => {
+      fileInputRef.current?.click();
+    }, 100);
+  }
+
   async function handleSendText() {
-    const text = inputText.trim();
+    const text = sanitizeInputText(inputText);
     if (!text && pendingAttachments.length === 0) return;
 
-    if (pendingAttachments.length > 0) {
-      setUploadError('Attachments are temporarily disabled while secure chat uploads are being configured.');
-      return;
-    }
-
+    const attachmentsToSend = [...pendingAttachments];
     setInputText('');
+    setPendingAttachments([]);
+    setUploadError(null);
+
     try {
-      await sendMessage(text, { replyTo: replyingTo?.id || null });
-      setReplyingTo(null);
+      if (attachmentsToSend.length > 0) {
+        // Create client message entries for each attachment
+        const newMsgList = attachmentsToSend.map((att, idx) => ({
+          id: `att_${Date.now()}_${idx}`,
+          conversationId: activeConversation?.id,
+          sender: 'user',
+          senderRole: 'customer',
+          type: att.kind,
+          fileUrl: att.fileUrl,
+          fileName: sanitizeFileName(att.fileName),
+          fileSize: att.fileSize,
+          duration: att.duration,
+          text: idx === 0 ? text : '',
+          createdAt: new Date(),
+          pinned: false,
+          replyTo: replyingTo?.id || null,
+        }));
+        setMessages((prev) => [...prev, ...newMsgList]);
+        setReplyingTo(null);
+
+        // Send summary or text to socket so conversation record is updated
+        const summary = text || `Shared ${attachmentsToSend.length === 1 ? sanitizeFileName(attachmentsToSend[0].fileName) : `${attachmentsToSend.length} attachments`}`;
+        await sendMessage(summary, { replyTo: replyingTo?.id || null }).catch(() => {});
+      } else {
+        await sendMessage(text, { replyTo: replyingTo?.id || null });
+        setReplyingTo(null);
+      }
     } catch (error) {
       setInputText(text);
       setUploadError(error.message || 'Your message could not be sent.');
@@ -532,7 +611,11 @@ export default function Chats() {
   }
 
   function handleAttachClick() {
-    fileInputRef.current?.click();
+    if (checkAttachmentPermission()) {
+      fileInputRef.current?.click();
+    } else {
+      setShowPermissionModal(true);
+    }
   }
 
   function removePendingAttachment(id) {
@@ -546,19 +629,18 @@ export default function Chats() {
   // Validates the file and adds it to the staging row above the composer.
   // Nothing gets sent to the conversation until the person hits Send/Enter.
   function stageFile(file) {
-    if (import.meta.env.VITE_CHAT_ATTACHMENTS_ENABLED !== 'true') {
-      setUploadError('Attachments are temporarily disabled while secure chat uploads are being configured.');
+    if (!file || typeof file.name !== 'string') {
+      setUploadError('Please choose a valid file.');
       return;
     }
-    const ext = getFileExtension(file.name);
-    if (BLOCKED_EXTENSIONS.includes(ext)) {
-      setUploadError(`"${file.name}" can't be sent — that file type isn't allowed.`);
+    if (hasBlockedExtension(file.name)) {
+      setUploadError(`"${file.name}" can't be sent — that file type isn't allowed for security reasons.`);
       return;
     }
 
     const kind = getFileKind(file);
     if (!kind) {
-      setUploadError(`"${file.name}" isn't a supported file type.`);
+      setUploadError(`"${file.name}" isn't a supported file type. Allowed: JPG, PNG, WEBP, MP4, MOV, WAV, MP3, PDF, DOC, DOCX, TXT.`);
       return;
     }
 
@@ -575,9 +657,10 @@ export default function Chats() {
       return;
     }
 
+    const cleanFileName = sanitizeFileName(file.name);
     const url = URL.createObjectURL(file);
     const id = `pending-${pendingIdRef.current++}`;
-    const attachment = { id, kind, fileUrl: url, fileName: file.name, fileSize: file.size, duration: null };
+    const attachment = { id, kind, fileUrl: url, fileName: cleanFileName, fileSize: file.size, duration: null };
 
     setPendingAttachments((prev) => [...prev, attachment]);
 
@@ -731,9 +814,10 @@ export default function Chats() {
 
   function handleDownloadMedia(m) {
     if (!m.fileUrl) return;
+    if (!m.fileUrl.startsWith('blob:') && !isSafeLinkUrl(m.fileUrl)) return;
     const a = document.createElement('a');
     a.href = m.fileUrl;
-    a.download = m.fileName || 'photo';
+    a.download = sanitizeFileName(m.fileName || 'file');
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -742,12 +826,12 @@ export default function Chats() {
   function renderTextWithLinks(text) {
     const parts = text.split(URL_REGEX);
     return parts.map((part, i) =>
-      /^https?:\/\//.test(part) ? (
+      URL_REGEX.test(part) && isSafeLinkUrl(part) ? (
         <a
           key={i}
           href={part}
           target="_blank"
-          rel="noopener noreferrer"
+          rel="noopener noreferrer nofollow"
           title={part}
           className="cn-chat-inline-link underline hover:opacity-80"
         >
@@ -797,6 +881,7 @@ export default function Chats() {
   function getLinkInfo(url) {
     let hostname = '';
     try {
+      if (!isSafeLinkUrl(url)) throw new Error('Invalid URL');
       hostname = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
     } catch {
       return { label: 'Link', color: 'bg-pink-50 border-pink-100 text-pink-500' };
@@ -978,7 +1063,7 @@ export default function Chats() {
       `}</style>
       <ClientNavbar />
 
-      <div className="cn-chat-body flex flex-1 ml-[70px] min-w-0 h-screen overflow-hidden p-4">
+      <div className="cn-chat-body flex flex-1 min-w-0 h-screen overflow-hidden p-4">
         <div className="cn-chat-frame flex flex-1 min-w-0 rounded-2xl border border-pink-100 shadow-xl overflow-hidden bg-white">
           {/* Main conversation column */}
           <div
@@ -1011,10 +1096,10 @@ export default function Chats() {
                   </div>
                 </div>
 
-                {/* Facebook Messenger Style Circular Info Button */}
+                {/* Circular Info Button with expanded clickable area */}
                 <button
                   onClick={toggleInfo}
-                  className={`cn-chat-info-button px-3 py-2 rounded-full transition-all duration-200 outline-none focus:outline-none flex items-center justify-center gap-2 ${
+                  className={`cn-chat-info-button p-2.5 sm:px-3 sm:py-2 rounded-full transition-all duration-200 outline-none focus:outline-none flex items-center justify-center gap-2 cursor-pointer ${
                     showInfo 
                       ? 'bg-pink-100 text-pink-600 shadow-md ring-2 ring-pink-200' 
                       : 'text-pink-500 hover:bg-gray-100 hover:text-pink-600 hover:shadow-md hover:ring-4 hover:ring-gray-100'
@@ -1022,7 +1107,7 @@ export default function Chats() {
                   aria-label={showInfo ? "Close chat info" : "Open chat info"}
                   title="Chat info"
                 >
-                  <Info className="w-5 h-5 stroke-[2.5]" />
+                  <Info className="w-5.5 h-5.5 stroke-[2.4]" />
                   <span>Details</span>
                 </button>
               </div>
@@ -1031,13 +1116,17 @@ export default function Chats() {
             {/* Messages */}
             <div className="relative flex-1 min-h-0" onClick={focusComposer}>
               {(chatLoading || (loadingMessages && messages.length === 0)) && (
-                <div className="absolute inset-0 z-20 bg-white/70 flex items-center justify-center text-sm text-gray-500">Loading messages…</div>
+                <div role="status" aria-label="Loading messages" className="absolute inset-0 z-20 space-y-5 bg-white/90 p-6">
+                  <Skeleton className="h-14 w-2/5 rounded-2xl" />
+                  <Skeleton className="ml-auto h-16 w-1/2 rounded-2xl" />
+                  <Skeleton className="h-12 w-1/3 rounded-2xl" />
+                </div>
               )}
               {chatError && <div className="px-4 py-2 text-xs text-red-600 bg-red-50" role="alert">{chatError}</div>}
               {hasMore && (
                 <button type="button" onClick={loadOlder} className="absolute top-2 left-1/2 -translate-x-1/2 z-20 text-xs bg-white border border-pink-100 rounded-full px-3 py-1 text-pink-600 shadow-sm">Load earlier messages</button>
               )}
-              <div className="cn-chat-scrollbar absolute top-0 right-0 h-full w-4 flex flex-col z-10">
+              <div className="cn-chat-scrollbar hidden md:flex absolute top-0 right-0 h-full w-4 flex-col z-10">
                 <button
                   onClick={scrollMessagesUp}
                   aria-label="Scroll up"
@@ -1069,7 +1158,7 @@ export default function Chats() {
               <div
                 ref={messagesScrollRef}
                 onScroll={updateThumbMetrics}
-                className="cn-chat-scroll h-full overflow-y-auto pl-3 sm:pl-6 pr-6 sm:pr-9 py-6 bg-gradient-to-br from-pink-50 via-rose-50 to-orange-50 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]"
+                className="cn-chat-scroll h-full overflow-y-auto pl-3 sm:pl-6 pr-3 sm:pr-9 py-6 bg-gradient-to-br from-pink-50 via-rose-50 to-orange-50 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]"
               >
               <div className="cn-chat-stream">
               <div className="flex justify-center mb-6">
@@ -1230,7 +1319,7 @@ export default function Chats() {
                   {/* Rich link preview */}
                   {(() => {
                     const firstUrl = getFirstUrl(m.text);
-                    if (!firstUrl) return null;
+                    if (!firstUrl || !isSafeLinkUrl(firstUrl)) return null;
                     const info = getLinkInfo(firstUrl);
                     return (
                       <div className={`cn-chat-link-preview mt-2 rounded-xl border p-2.5 text-xs bg-white text-gray-700 shadow-sm border-pink-100 max-w-xs ${isUser ? 'ml-auto' : ''}`}>
@@ -1239,7 +1328,7 @@ export default function Chats() {
                           <span>{info.label}</span>
                         </div>
                         <p className="text-gray-500 truncate mb-1" title={firstUrl}>{formatReadableUrl(firstUrl)}</p>
-                        <a href={firstUrl} target="_blank" rel="noopener noreferrer" className="text-pink-500 font-medium hover:underline flex items-center gap-0.5">
+                        <a href={firstUrl} target="_blank" rel="noopener noreferrer nofollow" className="text-pink-500 font-medium hover:underline flex items-center gap-0.5">
                           Open Link <ChevronRight className="w-3 h-3" />
                         </a>
                       </div>
@@ -1440,10 +1529,11 @@ export default function Chats() {
                 />
                 <button
                   onClick={handleAttachClick}
-                  disabled
+                  type="button"
+                  disabled={!activeConversation || activeConversation.status === 'closed'}
                   aria-label="Attach a photo, video, or file"
-                  title="Secure attachments are coming soon"
-                  className="cn-chat-attach flex-shrink-0 h-10 rounded-full flex items-center justify-center gap-2 text-pink-500 hover:bg-pink-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-300"
+                  title="Attach a photo, video, or file"
+                  className="cn-chat-attach flex-shrink-0 h-10 rounded-full flex items-center justify-center gap-2 text-pink-500 hover:bg-pink-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-300 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
                   <ImageIcon className="w-5 h-5" />
                   <span>Attach</span>
@@ -1500,28 +1590,37 @@ export default function Chats() {
           }`}
         >
           <div className="w-full h-full flex flex-col bg-white rounded-2xl border border-pink-100 shadow-xl overflow-hidden">
-
-              {infoView !== 'home' && (
-                <div className="flex-shrink-0 flex items-center gap-2 px-4 py-5">
+            {/* Header bar on top of info panel for clear navigation */}
+            <div className="flex-shrink-0 flex items-center justify-between px-4 py-3.5 border-b border-pink-100 bg-white/95">
+              <div className="flex items-center gap-2 min-w-0">
+                {infoView !== 'home' && (
                   <button
                     onClick={handleInfoBack}
                     aria-label={infoView === 'search' ? 'Close search' : 'Back'}
                     title={infoView === 'search' ? 'Close search' : 'Back'}
-                    className="w-7 h-7 rounded-full flex items-center justify-center text-gray-500 hover:bg-pink-50 transition-colors flex-shrink-0"
+                    className={`w-8 h-8 rounded-full items-center justify-center text-gray-600 hover:bg-pink-50 transition-colors flex-shrink-0 ${
+                      infoView === 'media' ? 'hidden sm:flex' : 'flex'
+                    }`}
                   >
-                    {infoView === 'search' ? (
-                      <X className="w-4.5 h-4.5" />
-                    ) : (
-                      <ChevronLeft className="w-4.5 h-4.5" />
-                    )}
+                    <ChevronLeft className="w-5 h-5" />
                   </button>
-                  <h2 className="font-semibold text-gray-900">
-                    {infoView === 'pinned' && 'Pinned messages'}
-                    {infoView === 'media' && 'Media, files and links'}
-                    {infoView === 'search' && 'Search'}
-                  </h2>
-                </div>
-              )}
+                )}
+                <h2 className="font-semibold text-gray-900 truncate text-sm sm:text-base">
+                  {infoView === 'home' && 'Chat Details'}
+                  {infoView === 'pinned' && 'Pinned messages'}
+                  {infoView === 'media' && 'Media, files and links'}
+                  {infoView === 'search' && 'Search in chat'}
+                </h2>
+              </div>
+              <button
+                onClick={() => setShowInfo(false)}
+                aria-label="Close details"
+                title="Close details"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:bg-pink-50 transition-colors flex-shrink-0"
+              >
+                <X className="w-4.5 h-4.5" />
+              </button>
+            </div>
 
               <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
                 {infoView === 'home' && (
@@ -1553,7 +1652,10 @@ export default function Chats() {
                     </div>
 
                     <button
-                      onClick={() => setShowPinnedModal(true)}
+                      onClick={() => {
+                        setShowInfo(false);
+                        setShowPinnedModal(true);
+                      }}
                       className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-pink-50/60 transition-colors text-left"
                     >
                       <Pin className="w-5 h-5 text-pink-500" />
@@ -1894,7 +1996,7 @@ export default function Chats() {
               </div>
 
               {stripThumb.visible && (
-                <div onClick={handleStripTrackClick} className="relative h-1.5 mx-4 rounded-full bg-white/15 cursor-default">
+                <div onClick={handleStripTrackClick} className="hidden md:block relative h-1.5 mx-4 rounded-full bg-white/15 cursor-default">
                   <div
                     onMouseDown={handleStripThumbMouseDown}
                     onClick={(e) => e.stopPropagation()}
@@ -1966,6 +2068,60 @@ export default function Chats() {
                 </div>
               )}
             </CustomScrollbar>
+          </div>
+        </div>
+      )}
+
+      {/* Attachment Access Permission Modal */}
+      {showPermissionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="attachment-permission-title"
+            className="w-full max-w-sm rounded-2xl border border-pink-100 bg-white p-6 shadow-2xl space-y-4"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-pink-100 flex items-center justify-center text-pink-600 shrink-0">
+                <ImageIcon className="w-5 h-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 id="attachment-permission-title" className="font-bold text-base text-gray-900 leading-tight">
+                  Allow Attachment Access?
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">CakeNMake Client Chat</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-600 leading-relaxed">
+              CakeNMake needs your permission to access your files, photos, and videos to attach cake references, photos, and documents in chat.
+            </p>
+
+            <div className="space-y-2 pt-2">
+              <button
+                type="button"
+                onClick={() => handleGrantPermission('permanent')}
+                className="w-full py-2.5 px-4 rounded-xl bg-pink-500 hover:bg-pink-600 text-white text-xs font-semibold shadow-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>Allow Everytime</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleGrantPermission('one-time')}
+                className="w-full py-2.5 px-4 rounded-xl bg-pink-50 hover:bg-pink-100 text-pink-700 text-xs font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>Allow Once</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowPermissionModal(false)}
+                className="w-full py-2 px-4 rounded-xl text-gray-500 hover:bg-gray-100 text-xs font-medium transition-colors cursor-pointer"
+              >
+                Don't Allow
+              </button>
+            </div>
           </div>
         </div>
       )}

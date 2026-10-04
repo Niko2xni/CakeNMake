@@ -140,8 +140,10 @@ export function getSharedCherryBasalCollarGeometry() {
  * - High-gloss maraschino / fresh dark cherry glaze
  * - Embedded base sitting naturally nestled in cake frosting
  */
-export function buildCherryMesh(x = 0, y = 0, z = 0, scale = 1.0, rand = Math.random) {
+export function buildCherryMesh(x = 0, y = 0, z = 0, scale = 1.0, rand = Math.random, opts = {}) {
   const root = new THREE.Group();
+  const hasStem = opts?.stem !== false;
+  root.userData.hasStem = hasStem;
 
   const bodyGeo = getSharedCherryBodyGeometry();
   const bodyMat = getSharedCherryBodyMaterial();
@@ -152,42 +154,51 @@ export function buildCherryMesh(x = 0, y = 0, z = 0, scale = 1.0, rand = Math.ra
   const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
   bodyMesh.castShadow = true;
   bodyMesh.receiveShadow = true;
+  bodyMesh.userData.isCherryBody = true;
   root.add(bodyMesh);
 
-  // Basal Collar inside the top depression (approx y = 0.52 above embedded baseline)
-  const collarGeo = getSharedCherryBasalCollarGeometry();
-  const collarMesh = new THREE.Mesh(collarGeo, stemMat);
-  collarMesh.position.set(0, 0.52, 0);
-  collarMesh.castShadow = true;
-  root.add(collarMesh);
+  if (hasStem) {
+    // Basal Collar inside the top depression (approx y = 0.52 above embedded baseline)
+    const collarGeo = getSharedCherryBasalCollarGeometry();
+    const collarMesh = new THREE.Mesh(collarGeo, stemMat);
+    collarMesh.position.set(0, 0.52, 0);
+    collarMesh.castShadow = true;
+    collarMesh.userData.ignoreGrounding = true;
+    collarMesh.userData.isStem = true;
+    root.add(collarMesh);
 
-  // Curved Stem
-  const tiltAngle = (rand() * Math.PI * 2);
-  const bendAmount = 0.12 + rand() * 0.10;
-  const curvePoints = [
-    new THREE.Vector3(0, 0.52, 0),
-    new THREE.Vector3(Math.cos(tiltAngle) * 0.03, 0.68, Math.sin(tiltAngle) * 0.03),
-    new THREE.Vector3(Math.cos(tiltAngle) * (bendAmount * 0.6), 0.88, Math.sin(tiltAngle) * (bendAmount * 0.6)),
-    new THREE.Vector3(Math.cos(tiltAngle) * bendAmount, 1.08, Math.sin(tiltAngle) * bendAmount),
-    new THREE.Vector3(Math.cos(tiltAngle) * (bendAmount * 1.12), 1.15, Math.sin(tiltAngle) * (bendAmount * 1.12)),
-  ];
+    // Curved Stem
+    const tiltAngle = (rand() * Math.PI * 2);
+    const bendAmount = 0.12 + rand() * 0.10;
+    const curvePoints = [
+      new THREE.Vector3(0, 0.52, 0),
+      new THREE.Vector3(Math.cos(tiltAngle) * 0.03, 0.68, Math.sin(tiltAngle) * 0.03),
+      new THREE.Vector3(Math.cos(tiltAngle) * (bendAmount * 0.6), 0.88, Math.sin(tiltAngle) * (bendAmount * 0.6)),
+      new THREE.Vector3(Math.cos(tiltAngle) * bendAmount, 1.08, Math.sin(tiltAngle) * bendAmount),
+      new THREE.Vector3(Math.cos(tiltAngle) * (bendAmount * 1.12), 1.15, Math.sin(tiltAngle) * (bendAmount * 1.12)),
+    ];
 
-  const stemCurve = new THREE.CatmullRomCurve3(curvePoints);
-  const stemGeo = new THREE.TubeGeometry(stemCurve, 16, 0.022, 8, false);
-  const stemMesh = new THREE.Mesh(stemGeo, stemMat);
-  stemMesh.castShadow = true;
-  root.add(stemMesh);
+    const stemCurve = new THREE.CatmullRomCurve3(curvePoints);
+    const stemGeo = new THREE.TubeGeometry(stemCurve, 16, 0.022, 8, false);
+    const stemMesh = new THREE.Mesh(stemGeo, stemMat);
+    stemMesh.castShadow = true;
+    stemMesh.userData.ignoreGrounding = true;
+    stemMesh.userData.isStem = true;
+    root.add(stemMesh);
 
-  // Stem Tip Cut Node / Bud
-  const tipGeo = new THREE.CylinderGeometry(0.032, 0.024, 0.04, 8);
-  const tipMesh = new THREE.Mesh(tipGeo, tipMat);
-  const lastPt = curvePoints[curvePoints.length - 1];
-  tipMesh.position.copy(lastPt);
-  tipMesh.position.y += 0.015;
-  tipMesh.rotation.z = Math.cos(tiltAngle) * 0.2;
-  tipMesh.rotation.x = -Math.sin(tiltAngle) * 0.2;
-  tipMesh.castShadow = true;
-  root.add(tipMesh);
+    // Stem Tip Cut Node / Bud
+    const tipGeo = new THREE.CylinderGeometry(0.032, 0.024, 0.04, 8);
+    const tipMesh = new THREE.Mesh(tipGeo, tipMat);
+    const lastPt = curvePoints[curvePoints.length - 1];
+    tipMesh.position.copy(lastPt);
+    tipMesh.position.y += 0.015;
+    tipMesh.rotation.z = Math.cos(tiltAngle) * 0.2;
+    tipMesh.rotation.x = -Math.sin(tiltAngle) * 0.2;
+    tipMesh.castShadow = true;
+    tipMesh.userData.ignoreGrounding = true;
+    tipMesh.userData.isStem = true;
+    root.add(tipMesh);
+  }
 
   root.scale.set(scale, scale, scale);
   root.position.set(x, y, z);

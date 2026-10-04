@@ -149,13 +149,13 @@ export function adaptConfigToLegacy(newConfig) {
   const fillingSugarColorData = resolveContextSugarColorWithId('filling');
   const fillingSugarColorHex = fillingSugarColorData?.hex || null;
   const fillingSugarColorId = fillingSugarColorData?.id || null;
-  const layerFillingSugarColors = Array.from({ length: layers }, (_, index) => resolveContextSugarColor('filling', index));
+  const layerFillingSugarColors = Array.from({ length: layers }, (_, index) => resolveContextSugarColor('filling', isIndividual ? index : null));
   // Mirrors layerSurfaceFrostingColorIds below for 'exterior' — the id
   // half of layerFillingSugarColors, needed so CakeScene can look up
   // pattern/gradient/metallic SUGAR_COLORS (Marble, Ombré, Rainbow Swirl,
   // Gold Shimmer, Watercolor Pastel Mix, Red-White Gradient) instead of
   // falling back to their flat hex — see fillingPipingColorId below.
-  const layerFillingSugarColorIds = Array.from({ length: layers }, (_, index) => resolveContextSugarColorWithId('filling', index)?.id || null);
+  const layerFillingSugarColorIds = Array.from({ length: layers }, (_, index) => resolveContextSugarColorWithId('filling', isIndividual ? index : null)?.id || null);
   // Piping color always follows the Filling Flavor's own Sugar Color —
   // the override hex when Pick Color is set, otherwise the flavor's
   // natural color — for every Piping Design state, not just Mashed
@@ -210,8 +210,8 @@ export function adaptConfigToLegacy(newConfig) {
   const sugarColorData = resolveContextSugarColorWithId('exterior');
   const surfaceFrostingColorHex = sugarColorData?.hex || null;
   const surfaceFrostingColorId = sugarColorData?.id || null;
-  const layerSurfaceFrostingColors = Array.from({ length: layers }, (_, index) => resolveContextSugarColor('exterior', index));
-  const layerSurfaceFrostingColorIds = Array.from({ length: layers }, (_, index) => resolveContextSugarColorWithId('exterior', index)?.id || null);
+  const layerSurfaceFrostingColors = Array.from({ length: layers }, (_, index) => resolveContextSugarColor('exterior', isIndividual ? index : null));
+  const layerSurfaceFrostingColorIds = Array.from({ length: layers }, (_, index) => resolveContextSugarColorWithId('exterior', isIndividual ? index : null)?.id || null);
   // Passed through separately (not yet read by CakeScene) so the person's
   // chosen color for a future Pick Color variant isn't lost — same
   // "implemented: false but data-preserved" pattern as the unbuilt
@@ -252,14 +252,16 @@ export function adaptConfigToLegacy(newConfig) {
   });
   const layerSurfaceTreatmentColors = Array.from({ length: layers }, (_, index) => (
     layerSurfaceTreatmentModes[index] === 'glaze'
-      ? (resolveContextSugarColor('surface', index, true) || resolveColor('vanilla'))
+      ? (resolveContextSugarColor('surface', isIndividual ? index : null, true) || resolveColor('vanilla'))
       : null
   ));
   const layerSurfaceTreatmentPatterns = Array.from({ length: layers }, (_, index) => (
     (surfaceTreatment.layerTreatments?.[index] || surfaceTreatment).pattern || 'longGaps'
   ));
 
-  const centerSugarColorHex = resolveContextSugarColor('center', null, true);
+  const centerSugarColorData = resolveContextSugarColorWithId('center', null, true);
+  const centerSugarColorHex = centerSugarColorData?.hex || null;
+  const centerSugarColorId = centerSugarColorData?.id || null;
   const centerDecorationColor = centerSugarColorHex || resolveColor(center.decorations?.colorId);
   const rawTop = center.text?.top ?? '';
   const rawMiddle = center.text?.middle ?? '';
@@ -271,6 +273,8 @@ export function adaptConfigToLegacy(newConfig) {
   const centerText = [rawTop, rawMiddle, rawBottom].filter(Boolean).join('\n');
   const centerTextFont = center.text?.font || 'script';
   const centerTextColor = centerSugarColorHex || resolveColor(center.text?.colorId);
+  const centerTextColorId = centerSugarColorId || center.text?.colorId || null;
+  const centerTextColorMode = center.text?.colorMode || 'uniform';
 
   // ── Edge — Top+Bottom-separate XOR Both (genuine delete, spec §4b).
   // Resolve all three slots regardless of mode; CakeScene only needs to
@@ -299,11 +303,7 @@ export function adaptConfigToLegacy(newConfig) {
   const edgeBottom = resolveEdgeSlot(edge.bottom, 'edgeBottom');
   const edgeBoth = resolveEdgeSlot(edge.both, 'edgeBoth');
   // Middle — piping only (no decoration setId), always resolved regardless of edgeMode
-  const edgeMiddle = {
-    pipingTip: edge.middle?.piping?.tip || null,
-    pipingColor: resolveColor(edge.middle?.piping?.colorId),
-    pipingSecondaryColor: resolveColor(edge.middle?.piping?.secondaryColorId || 'red'),
-  };
+  const edgeMiddle = resolveEdgeSlot(edge.middle, 'edgeMiddle');
 
   // ── Side — exactly one of seven treatments is active at a time
   // (`side.mode`), each with its own dedicated field so switching between
@@ -315,107 +315,97 @@ export function adaptConfigToLegacy(newConfig) {
   // at the data layer instead of by convention, and CakeScene needs no
   // renderer changes since the values it reads are shaped identically to
   // before, just computed differently here.
-  const sideMode = side.mode || null;
-  const DECORATION_MODES = ['scatterPearls', 'pipingScrolls', 'sunshinePlay', 'chevronPattern', 'victorianLambeth'];
-  const NO_NAME_MODES = ['whippedSkirt', 'drip'];
+  const resolveSideTreatment = (targetSide, index = null) => {
+    const sideMode = targetSide?.mode || null;
+    const DECORATION_MODES = ['scatterPearls', 'pipingScrolls', 'sunshinePlay', 'chevronPattern', 'victorianLambeth'];
+    const NO_NAME_MODES = ['whippedSkirt', 'drip'];
 
-  const sideDecorationSetId = DECORATION_MODES.includes(sideMode) ? sideMode : null;
-  const sideSugarColorHex = resolveContextSugarColor('side', null, true);
-  // Id counterpart of sideSugarColorHex — moved up here (was previously
-  // declared down by sideCheckeredColorId) since sideDecorationColorId
-  // below needs it too, and every other Side treatment's own colorId
-  // reuses this same 'side' context resolution.
-  const sideSugarColorData = resolveContextSugarColorWithId('side', null, true);
-  const sideDecorationColor = sideDecorationSetId
-    ? (sideSugarColorHex || resolveColor(side[sideDecorationSetId]?.colorId))
-    : resolveColor(undefined);
-  // Id counterpart of sideDecorationColor — shared by every DECORATION_MODES
-  // treatment (Scatter Pearls, Piping Scrolls, Sunshine Play, Victorian
-  // Lambeth; Chevron Pattern has since split off its own dedicated
-  // sideChevronColorId above but is still nominally in this list). Same
-  // reasoning as sideCheckeredColorId: without this, getFrostingMaterial
-  // can't build the real pattern/gradient/metallic material for Marble/
-  // Ombré/Rainbow Swirl/Gold Shimmer/Watercolor Pastel Mix/Red-White
-  // Gradient, and those six silently degrade to a flat swatch.
-  const sideDecorationColorId = sideDecorationSetId
-    ? (sideSugarColorData?.id || side[sideDecorationSetId]?.colorId || null)
-    : null;
+    const sideDecorationSetId = DECORATION_MODES.includes(sideMode) ? sideMode : null;
+    const sideSugarColorHex = resolveContextSugarColor('side', index, true);
+    const sideSugarColorData = resolveContextSugarColorWithId('side', index, true);
+    const sideDecorationColor = sideDecorationSetId
+      ? (sideSugarColorHex || resolveColor(targetSide[sideDecorationSetId]?.colorId))
+      : resolveColor(undefined);
+    const sideDecorationColorId = sideDecorationSetId
+      ? (sideSugarColorData?.id || targetSide[sideDecorationSetId]?.colorId || null)
+      : null;
 
-  const sideNoNameSetId = NO_NAME_MODES.includes(sideMode) ? sideMode : null;
-  const sideNoNameColor = sideNoNameSetId
-    ? (sideSugarColorHex || resolveColor(side[sideNoNameSetId]?.colorId))
-    : resolveColor(undefined);
+    const sideNoNameSetId = NO_NAME_MODES.includes(sideMode) ? sideMode : null;
+    const sideNoNameColor = sideNoNameSetId
+      ? (sideSugarColorHex || resolveColor(targetSide[sideNoNameSetId]?.colorId))
+      : resolveColor(undefined);
 
-  // Checkered Pattern — its own field regardless of mode (4 variants live
-  // under checkeredPattern.setId), only "active" when it's the chosen
-  // side.mode. Not hidden by regionsHidden — like the old Surface fields,
-  // this IS the thing Interior Preview needs to clip through, not
-  // something Interior Preview hides.
-  const sideCheckeredPatternSetId = sideMode === 'checkeredPattern'
-    ? (side.checkeredPattern?.setId || null)
-    : null;
-  // NEW capability, not yet read by CakeScene.jsx: Checkered Pattern is now
-  // tintable (previously locked to black+white). Passed through so the
-  // color isn't lost once the checkered-square builder is updated to
-  // accept a tint — see the follow-up note where this adapter is used.
-  const sideCheckeredColor = sideSugarColorHex || resolveColor(side.checkeredPattern?.colorId);
-  // Id counterpart of sideCheckeredColor, same reasoning as
-  // fillingPipingColorId/surfaceFrostingColorId above — getFrostingMaterial
-  // needs the actual SUGAR_COLORS id (not just its flat hex fallback) to
-  // build the real pattern/gradient/metallic material for Marble/Ombré/
-  // Rainbow Swirl/Gold Shimmer/Watercolor Pastel Mix/Red-White Gradient;
-  // without it those six silently degrade to a flat swatch — which is
-  // ALSO what buildCheckerSquareMaterial (DecorationSets.jsx) built
-  // regardless, since it never accepted a colorId at all until now.
-  const sideCheckeredColorId = sideSugarColorData?.id || side.checkeredPattern?.colorId || null;
+    const sideCheckeredPatternSetId = sideMode === 'checkeredPattern'
+      ? (targetSide.checkeredPattern?.setId || null)
+      : null;
+    const sideCheckeredColor = sideSugarColorHex || resolveColor(targetSide.checkeredPattern?.colorId);
+    const sideCheckeredColorId = sideSugarColorData?.id || targetSide.checkeredPattern?.colorId || null;
 
-  // Triangle Pattern — duplicate of Checkered Pattern's exact resolution:
-  // its own field regardless of mode (6 variants live under
-  // trianglePattern.setId), only "active" when it's the chosen side.mode.
-  // Tintable via SUGAR_COLORS same as Checkered.
-  const sideTrianglePatternSetId = sideMode === 'trianglePattern'
-    ? (side.trianglePattern?.setId || null)
-    : null;
-  const sideTriangleColor = sideSugarColorHex || resolveColor(side.trianglePattern?.colorId);
-  // Id counterpart of sideTriangleColor — same reasoning as
-  // sideCheckeredColorId above (Triangle Pattern is a duplicate of
-  // Checkered Pattern's whole architecture, so it inherited the same gap).
-  const sideTriangleColorId = sideSugarColorData?.id || side.trianglePattern?.colorId || null;
+    const sideTrianglePatternSetId = sideMode === 'trianglePattern'
+      ? (targetSide.trianglePattern?.setId || null)
+      : null;
+    const sideTriangleColor = sideSugarColorHex || resolveColor(targetSide.trianglePattern?.colorId);
+    const sideTriangleColorId = sideSugarColorData?.id || targetSide.trianglePattern?.colorId || null;
 
-  const sideChevronPatternSetId = sideMode === 'chevronPattern'
-    ? (side.chevronPattern?.setId || 'multiColor')
-    : null;
-  const sideChevronColor = sideSugarColorHex || resolveColor(side.chevronPattern?.colorId);
-  // Id counterpart of sideChevronColor — only actually used by the
-  // 'twoTone'/single-color Chevron variants (see buildChevronSideStripes'
-  // per-row color logic in DecorationSets.jsx); 'multiColor' ignores both
-  // this and sideChevronColor entirely, cycling its own fixed palette
-  // instead — Color Override is already disabled for that variant in
-  // SideSection.jsx, so there's nothing to fix there. Two-Tone's secondary
-  // row is resolved separately below.
-  const sideChevronColorId = sideSugarColorData?.id || side.chevronPattern?.colorId || null;
-  const sideChevronSecondaryColorId = side.chevronPattern?.secondaryColorId || 'red';
-  const sideChevronSecondaryColor = resolveColor(sideChevronSecondaryColorId);
+    const sideChevronPatternSetId = sideMode === 'chevronPattern'
+      ? (targetSide.chevronPattern?.setId || 'multiColor')
+      : null;
+    const sideChevronColor = sideSugarColorHex || resolveColor(targetSide.chevronPattern?.colorId);
+    const sideChevronColorId = sideSugarColorData?.id || targetSide.chevronPattern?.colorId || null;
+    const sideChevronSecondaryColorId = targetSide.chevronPattern?.secondaryColorId || 'red';
+    const sideChevronSecondaryColor = resolveColor(sideChevronSecondaryColorId);
 
-  const sideScatterPearlsSetId = sideMode === 'scatterPearls'
-    ? (side.scatterPearls?.setId || 'randomScatter')
-    : null;
+    const sideScatterPearlsSetId = sideMode === 'scatterPearls'
+      ? (targetSide.scatterPearls?.setId || 'randomScatter')
+      : null;
 
-  const sidePipingScrollsSetId = sideMode === 'pipingScrolls'
-    ? (side.pipingScrolls?.setId || 'waveRope')
-    : null;
+    const sidePipingScrollsSetId = sideMode === 'pipingScrolls'
+      ? (targetSide.pipingScrolls?.setId || 'waveRope')
+      : null;
 
-  const sideSunshinePlaySetId = sideMode === 'sunshinePlay'
-    ? (side.sunshinePlay?.setId || 'rainbowArc')
-    : null;
+    const sideSunshinePlaySetId = sideMode === 'sunshinePlay'
+      ? (targetSide.sunshinePlay?.setId || 'rainbowArc')
+      : null;
 
-  const sideVictorianLambethSetId = sideMode === 'victorianLambeth'
-    ? (side.victorianLambeth?.setId || 'classic')
-    : null;
+    const sideVictorianLambethSetId = sideMode === 'victorianLambeth'
+      ? (targetSide.victorianLambeth?.setId || 'classic')
+      : null;
+
+    return {
+      sideDecorationSetId,
+      sideDecorationColor,
+      sideDecorationColorId,
+      sideCheckeredPatternSetId,
+      sideCheckeredColor,
+      sideCheckeredColorId,
+      sideTrianglePatternSetId,
+      sideTriangleColor,
+      sideTriangleColorId,
+      sideChevronPatternSetId,
+      sideChevronColor,
+      sideChevronColorId,
+      sideChevronSecondaryColor,
+      sideChevronSecondaryColorId,
+      sideScatterPearlsSetId,
+      sidePipingScrollsSetId,
+      sideSunshinePlaySetId,
+      sideVictorianLambethSetId,
+      sideNoNameSetId,
+      sideNoNameColor,
+    };
+  };
+
+  const primarySide = isIndividual ? (side.layerTreatments?.[0] || side) : side;
+  const primarySideResolved = resolveSideTreatment(primarySide, isIndividual ? 0 : null);
+  const layerSideTreatments = Array.from({ length: layers }, (_, index) => {
+    const tierSide = isIndividual ? (side.layerTreatments?.[index] || side) : side;
+    return resolveSideTreatment(tierSide, isIndividual ? index : null);
+  });
 
   // ── Place — maps place.items to placedItems format for CakeScene, PricingPanel, etc.
   const placeItems = Array.isArray(place.items) ? place.items : [];
   const mappedPlaceItems = placeItems.map(item => ({
+    id: item.id || item.slotId || null,
     slotId: item.slotId || null,
     type: item.type,
     x: item.position?.x !== undefined ? item.position.x : (item.x || 0),
@@ -426,7 +416,8 @@ export function adaptConfigToLegacy(newConfig) {
     stackLevel: item.stackLevel || 1,
     flavor: item.flavor || 'vanilla',
     pattern: item.pattern || 'shell',
-    colorId: item.colorId || 'vanilla',
+    colorId: item.sugarColor?.colorId || item.colorId || 'vanilla',
+    sugarColor: item.sugarColor || null,
     price: item.price || 0,
   }));
 
@@ -496,6 +487,7 @@ export function adaptConfigToLegacy(newConfig) {
 
     // Center
     centerDecorationColor,
+    centerDecorationColorId: centerSugarColorId || center.decorations?.colorId || null,
     centerText,
     centerTextTop,
     centerTextMiddle,
@@ -503,6 +495,8 @@ export function adaptConfigToLegacy(newConfig) {
     centerTextSpacing,
     centerTextFont,
     centerTextColor,
+    centerTextColorId,
+    centerTextColorMode,
 
     // Edge
     edgeMode,
@@ -513,33 +507,9 @@ export function adaptConfigToLegacy(newConfig) {
     edgeMiddle,
 
     // Side — exactly one of seven treatments active at a time via
-    // side.mode (see above). sideDecorationSetId/sideNoNameSetId/
-    // sideCheckeredPatternSetId are already rendered in CakeScene.jsx,
-    // register into coveringMaterialsRef, and now come mutually-exclusive
-    // by construction rather than by convention. sideCheckeredColor is new
-    // — Checkered Pattern is tintable now, but CakeScene's checkered-square
-    // builder doesn't accept a tint yet, so this is passed through
-    // un-rendered until that follow-up lands.
-    sideDecorationSetId,
-    sideDecorationColor,
-    sideDecorationColorId,
-    sideCheckeredPatternSetId,
-    sideCheckeredColor,
-    sideCheckeredColorId,
-    sideTrianglePatternSetId,
-    sideTriangleColor,
-    sideTriangleColorId,
-    sideChevronPatternSetId,
-    sideChevronColor,
-    sideChevronColorId,
-    sideChevronSecondaryColor,
-    sideChevronSecondaryColorId,
-    sideScatterPearlsSetId,
-    sidePipingScrollsSetId,
-    sideSunshinePlaySetId, // Sunshine Play's setId (Rainbow Arc is the only design today)
-    sideVictorianLambethSetId,
-    sideNoNameSetId,
-    sideNoNameColor,
+    // side.mode (see above).
+    ...primarySideResolved,
+    layerSideTreatments,
 
     // Place
     placeItems,
@@ -566,9 +536,16 @@ export function adaptConfigToLegacy(newConfig) {
 }
 
 export function adaptConfigFromLegacy(legacyConfig) {
+  if (!legacyConfig) return DEFAULT_CONFIG;
+
   // If the config is already in new format, return it as-is
-  if (legacyConfig.structure !== undefined) {
+  if (legacyConfig.structure !== undefined || legacyConfig.sponge !== undefined) {
     return legacyConfig;
+  }
+
+  // If legacy config embedded the original modern config
+  if (legacyConfig._newConfig) {
+    return legacyConfig._newConfig;
   }
 
   // Convert legacy config to new bakery-style format
@@ -599,7 +576,7 @@ export function adaptConfigFromLegacy(legacyConfig) {
     },
 
     exteriorFinish: {
-      style: 'fullyFrosted', // Default for legacy configs
+      style: legacyConfig.exteriorFinishStyle || 'fullyFrosted',
       flavor: legacyConfig.frostingColor || 'vanilla',
       buttercreamTexture: legacyConfig.buttercreamTexture || 'ridged',
       layerStyles: [],
@@ -612,30 +589,34 @@ export function adaptConfigFromLegacy(legacyConfig) {
     },
 
     sugarColor: {
-      mode: 'default',
-      colorId: null,
+      mode: legacyConfig.sugarColorMode || 'default',
+      colorId: legacyConfig.surfaceFrostingColorId || null,
     },
+
+    sugarColorOverrides: legacyConfig.sugarColorOverrides || {},
 
     surfaceTreatment: {
-      mode: null,
-      colorId: null,
+      mode: legacyConfig.surfaceTreatmentMode || null,
+      pattern: legacyConfig.surfaceTreatmentPattern || 'longGaps',
+      colorId: legacyConfig.surfaceTreatmentColorId || null,
     },
 
-    center: {
-      mode: null,
+    center: legacyConfig.center || {
+      mode: 'decorations',
       decorations: { setId: null, variation: 'outerRing', colorId: 'vanilla' },
       text: { value: '', font: 'default' },
     },
 
-    edge: {
-      mode: 'topBottomSeparate',
-      activeSlot: 'top',
-      top: { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
-      bottom: { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
-      both: { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
+    edge: legacyConfig.edge || {
+      mode: legacyConfig.edgeMode || 'topBottomSeparate',
+      activeSlot: legacyConfig.edgeActiveSlot || 'top',
+      top: legacyConfig.edgeTop || { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
+      bottom: legacyConfig.edgeBottom || { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
+      both: legacyConfig.edgeBoth || { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
+      middle: legacyConfig.edgeMiddle || { decorations: { setId: null, colorId: 'vanilla' }, piping: { tip: null, colorId: 'vanilla' } },
     },
 
-    side: {
+    side: legacyConfig.side || {
       mode: null,
       checkeredPattern: { setId: null, colorId: 'vanilla' },
       trianglePattern: { setId: null, colorId: 'vanilla' },
@@ -647,11 +628,11 @@ export function adaptConfigFromLegacy(legacyConfig) {
 
     place: {
       items: legacyConfig.place?.items || (legacyConfig.placedItems || []).map((item, idx) => ({
-        id: item.slotId || `legacy-${idx}`,
+        id: item.slotId || item.id || `legacy-${idx}`,
         slotId: item.slotId || null,
         type: item.type,
-        position: { x: item.x || 0, y: 0, z: item.z || 0 },
-        rotation: { x: 0, y: item.rotation || 0, z: 0 },
+        position: { x: item.x || 0, y: item.y || 0, z: item.z || 0 },
+        rotation: { x: item.tiltX || 0, y: item.rotation || 0, z: item.tiltZ || 0 },
         tiltX: item.tiltX || 0,
         tiltZ: item.tiltZ || 0,
         flavor: item.flavor || 'vanilla',

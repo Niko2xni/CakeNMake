@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Lock, Loader2, AlertTriangle } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import AuthLayout from "@/components/AuthLayout";
 import { auth, firebaseConfigured, missingFirebaseConfigMessage } from "@/lib/firebase";
 import { confirmPasswordReset, verifyPasswordResetCode } from "firebase/auth";
@@ -66,7 +67,11 @@ export default function ResetPassword() {
   if (verifying) {
     return (
       <AuthLayout icon={Lock} title="Checking reset link" subtitle="Please wait">
-        <Loader2 className="w-6 h-6 mx-auto animate-spin" />
+        <div role="status" aria-label="Checking reset link" className="space-y-3">
+          <Skeleton className="h-10 w-full rounded-xl" />
+          <Skeleton className="h-10 w-full rounded-xl" />
+          <Skeleton className="h-11 w-full rounded-xl" />
+        </div>
       </AuthLayout>
     );
   }

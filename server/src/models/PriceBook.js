@@ -19,6 +19,8 @@ priceItemSchema.virtual('customerEstimateMinor').get(function getEstimate() {
   return this.costBasisMinor + this.markupMinor;
 });
 
+const { DEFAULT_RATES } = require('../services/cakePricingRules');
+
 const priceBookSchema = new mongoose.Schema({
   platform: { type: mongoose.Schema.Types.ObjectId, ref: 'Platform', required: true, index: true },
   version: { type: Number, required: true, min: 1 },
@@ -28,6 +30,7 @@ const priceBookSchema = new mongoose.Schema({
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   scheduledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   items: { type: [priceItemSchema], default: [] },
+  rates: { type: mongoose.Schema.Types.Mixed, default: () => JSON.parse(JSON.stringify(DEFAULT_RATES)) },
 }, { timestamps: true, toJSON: { virtuals: true } });
 
 priceBookSchema.index({ platform: 1, version: 1 }, { unique: true });

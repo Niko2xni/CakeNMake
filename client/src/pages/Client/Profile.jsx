@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ClientNavbar from '@/components/client/ClientNavbar';
 import { useAuth } from '@/lib/AuthContext';
+import { useDragToScroll } from '@/hooks/useDragToScroll';
 import { auth, facebookProvider, googleProvider, storage } from '@/lib/firebase';
 import { accountApi } from '@/services/api';
 import { User, Facebook, Globe, Mail, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
@@ -36,6 +37,8 @@ const SOCIAL_CONFIG = {
 export default function Profile() {
   const { user, account, refreshAccount } = useAuth();
   const fileInputRef = useRef(null);
+
+  useDragToScroll();
   const [connectingProvider, setConnectingProvider] = useState(null);
   const [disconnectingProvider, setDisconnectingProvider] = useState(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
@@ -323,7 +326,7 @@ export default function Profile() {
   };
 
   return (
-    <div className="cn-app-page cn-profile-page min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-orange-50 ml-[70px]">
+    <div className="cn-app-page cn-profile-page min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-orange-50">
       <ClientNavbar />
 
       <div className="cn-profile-shell max-w-5xl mx-auto px-6 py-8">

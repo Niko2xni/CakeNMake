@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { CreditCard, Sparkles, Receipt, ArrowUpRight, Check, AlertCircle, RefreshCw } from 'lucide-react';
 import CustomScrollbar from '@/components/shared/CustomScrollbar';
+import { AdminRowsSkeleton } from '@/components/shared/PageLoadingSkeleton';
+import { Skeleton } from '@/components/ui/skeleton';
 import { billingApi } from '@/services/api'; // Adjust path based on your API setup
 import { safeExternalUrl } from '@/lib/safe-url';
 
@@ -68,7 +70,13 @@ export default function BakeryBilling() {
 
       <CustomScrollbar className="flex-1" contentClassName="p-6 space-y-6">
         {loading ? (
-          <p className="text-sm text-gray-400 text-center py-8">Loading billing configuration...</p>
+          <div role="status" aria-label="Loading billing configuration" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[0, 1, 2].map((item) => <Skeleton key={item} className="h-32 rounded-xl" />)}
+            </div>
+            <Skeleton className="h-6 w-48" />
+            <AdminRowsSkeleton count={4} />
+          </div>
         ) : (
           <>
             {/* Overview & Tier Status Cards */}
