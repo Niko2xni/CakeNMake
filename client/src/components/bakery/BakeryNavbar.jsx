@@ -5,7 +5,6 @@ import {
   ClipboardList,
   Tag,
   MessageCircle,
-  Receipt,
   FileText,
   LayoutTemplate,
   Store,
@@ -16,12 +15,11 @@ import {
 } from 'lucide-react';
 
 const NAV_ITEMS = [
-  { to: '/bakery/reservations', icon: ClipboardList, label: 'Reservations' },
+  { to: '/bakery/orders', icon: ClipboardList, label: 'Orders' },
   { to: '/bakery/pricing', icon: Tag, label: 'Pricing' },
   { to: '/bakery/templates', icon: LayoutTemplate, label: 'Templates' },
   { to: '/bakery/billing', icon: CreditCard, label: 'Billing' },
   { to: '/bakery/chats', icon: MessageCircle, label: 'Chats' },
-  { to: '/bakery/transactions', icon: Receipt, label: 'Transactions' },
   { to: '/bakery/blueprints', icon: FileText, label: 'Blueprints' },
   { to: '/bakery/profile', icon: Store, label: 'Profile' },
 ];

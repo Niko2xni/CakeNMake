@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Search, ChevronRight, X, Calendar, Banknote, FileText, MessageCircle, User } from 'lucide-react';
 import CustomScrollbar from '@/components/shared/CustomScrollbar';
 import { AdminRowsSkeleton } from '@/components/shared/PageLoadingSkeleton';
 import { safeExternalUrl } from '@/lib/safe-url';
-import { bakeryApi } from '@/services/api'; // adjust path if api.js lives elsewhere
 
 
 const STATUS_TABS = [
@@ -30,63 +29,27 @@ function formatPeso(amount) {
   return `₱${Number(amount || 0).toLocaleString()}`;
 }
 
-export default function BakeryReservations() {
-  const [reservations, setReservations] = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function BakeryReservations({ reservations, loading, selected, setSelected, onStatusChange, updatingStatus, statusError }) {
   const [activeTab, setActiveTab] = useState('all');
   const [search, setSearch] = useState('');
-  const [selected, setSelected] = useState(null);
-  const [updatingStatus, setUpdatingStatus] = useState(false);
-
-  useEffect(() => {
-    loadReservations();
-  }, [activeTab]);
-
-  async function loadReservations() {
-    setLoading(true);
-    try {
-      const data = await bakeryApi.getReservations(activeTab);
-      setReservations(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error('Failed to load reservations', err);
-      setReservations([]);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleStatusChange(id, status) {
-    setUpdatingStatus(true);
-    try {
-      const updated = await bakeryApi.updateReservationStatus(id, status);
-      setReservations((prev) => prev.map((r) => (r._id === id ? updated : r)));
-      setSelected(updated);
-    } catch (err) {
-      console.error('Failed to update status', err);
-    } finally {
-      setUpdatingStatus(false);
-    }
-  }
 
   const filtered = reservations.filter((r) => {
+    if (activeTab !== 'all' && r.status !== activeTab) return false;
     if (!search.trim()) return true;
-    return (r.user?.displayName || r.user?.name || '').toLowerCase().includes(search.toLowerCase());
+    return (r.user?.displayName || r.user?.name || '').toLowerCase().includes(search.trim().toLowerCase());
   });
 
   return (
-    <div className="cn-bakery-reservations flex h-full">
+    <div className="cn-bakery-reservations flex h-full min-h-0">
       {/* Main list */}
-      <div className="flex-1 min-w-0 rounded-2xl border border-pink-100 shadow-xl bg-white flex flex-col overflow-hidden">
-        <header className="flex-shrink-0 border-b border-pink-100 px-6 py-4">
-          <h1 className="text-lg font-bold text-gray-900">Reservations</h1>
-          <p className="text-sm text-gray-500">Incoming cake orders for Mamshie Bakery</p>
-        </header>
+      <div className="flex-1 min-w-0 bg-white flex flex-col overflow-hidden">
 
         <div className="flex-shrink-0 px-4 pt-3">
           <div className="relative mb-3">
             <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
+              aria-label="Search reservations by customer name"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by customer name"
@@ -98,6 +61,7 @@ export default function BakeryReservations() {
             {STATUS_TABS.map((tab) => (
               <button
                 key={tab.key}
+                aria-pressed={activeTab === tab.key}
                 onClick={() => setActiveTab(tab.key)}
                 className={`flex-shrink-0 text-sm px-3 py-2 font-medium border-b-2 transition-colors whitespace-nowrap ${
                   activeTab === tab.key
@@ -126,7 +90,7 @@ export default function BakeryReservations() {
                   <button
                     key={r._id}
                     onClick={() => setSelected(r)}
-                    className={`w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
+                    className={`w-full flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
                       selected?._id === r._id
                         ? 'border-pink-300 bg-pink-50/60'
                         : 'border-pink-100 hover:bg-pink-50/40'
@@ -136,13 +100,14 @@ export default function BakeryReservations() {
                       <User className="w-5 h-5 text-gray-500" />
                     </div>
 
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-[120px]">
                       <p className="text-sm font-semibold text-gray-900 truncate">
                         {r.user?.displayName || r.user?.name || 'Unknown customer'}
                       </p>
                       <p className="text-xs text-gray-500">
                         Pickup {formatDate(r.pickupDate)} · {formatPeso(r.totalPrice)}
                       </p>
+                      <p className="text-xs text-gray-500">Down payment: {formatPeso(r.downPayment?.amount)} · {r.downPayment?.isPaid ? 'Paid' : 'Unpaid'}</p>
                     </div>
 
                     <span className={`text-[11px] font-medium px-2 py-1 rounded-full border flex-shrink-0 ${meta.color}`}>
@@ -159,7 +124,7 @@ export default function BakeryReservations() {
       </div>
 
       {/* Detail panel - same floating-card pattern as Chats.jsx's Chat info panel, no animation */}
-      <div className={`cn-reservation-detail flex-shrink-0 overflow-hidden ${selected ? 'is-open w-[26rem] ml-4' : 'w-0 ml-0'}`}>
+      <div className={`cn-reservation-detail flex-shrink-0 overflow-hidden ${selected ? 'is-open w-[22rem] lg:w-[26rem] ml-4' : 'w-0 ml-0'}`}>
         {selected && (
           <div className="w-full h-full flex flex-col bg-white rounded-2xl border border-pink-100 shadow-xl overflow-hidden">
             <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-pink-100">
@@ -203,13 +168,14 @@ export default function BakeryReservations() {
               </div>
 
               <div>
+                {statusError && <p role="alert" className="mb-2 text-sm text-red-600">{statusError}</p>}
                 <p className="text-xs font-medium text-gray-500 mb-1.5">Update status</p>
                 <div className="flex flex-wrap gap-1.5">
                   {STATUS_TABS.filter((t) => t.key !== 'all').map((tab) => (
                     <button
                       key={tab.key}
                       disabled={updatingStatus}
-                      onClick={() => handleStatusChange(selected._id, tab.key)}
+                      onClick={() => onStatusChange(selected._id, tab.key)}
                       className={`text-xs px-2.5 py-1.5 rounded-full border transition-colors ${
                         selected.status === tab.key
                           ? 'bg-pink-500 text-white border-pink-500'

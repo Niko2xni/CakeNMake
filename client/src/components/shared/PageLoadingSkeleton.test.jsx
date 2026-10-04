@@ -19,6 +19,7 @@ const routedPages = [
   '/chats',
   '/bakery',
   '/bakery/',
+  '/bakery/orders',
   '/bakery/designer',
   '/bakery/reservations',
   '/bakery/pricing',

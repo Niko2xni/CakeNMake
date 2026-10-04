@@ -10,9 +10,9 @@ async function listTransactions(req, res) {
     const summary = reservations.reduce(
       (acc, r) => {
         acc.totalReservations += 1;
+        acc.totalRevenueExpected += r.totalPrice || 0;
         if (r.downPayment?.isPaid) {
           acc.totalDownPaymentsCollected += r.downPayment.amount || 0;
-          acc.totalRevenueExpected += r.totalPrice || 0;
         } else {
           acc.pendingCount += 1;
         }

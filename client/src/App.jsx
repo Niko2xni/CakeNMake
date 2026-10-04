@@ -25,8 +25,7 @@ import Trash from '@/pages/Client/Trash';
 import Chats from '@/pages/Client/Chats';
 import BakeryAdminLayout from '@/pages/BakeryAdmin/BakeryAdminLayout';
 import BakeryPricing from '@/pages/BakeryAdmin/BakeryPricing';
-import BakeryReservations from '@/pages/BakeryAdmin/BakeryReservations';
-import BakeryTransactions from '@/pages/BakeryAdmin/BakeryTransactions';
+import BakeryOrders from '@/pages/BakeryAdmin/BakeryOrders';
 import BakeryChat from '@/pages/BakeryAdmin/BakeryChat';
 import BakeryBilling from '@/pages/BakeryAdmin/BakeryBilling';
 import BakeryBlueprints from '@/pages/BakeryAdmin/BakeryBlueprints';
@@ -76,13 +75,14 @@ const AuthenticatedApp = () => {
         <Route element={<RoleRoute allowedRoles={['bakery_staff', 'bakery_admin', 'platform_admin']} />}>
           <Route path="/bakery/designer" element={<BakeryDesigner />} />
           <Route path="/bakery" element={<BakeryAdminLayout />}>
-            <Route index element={<Navigate to="reservations" replace />} />
-            <Route path="reservations" element={<BakeryReservations />} />
+            <Route index element={<Navigate to="orders" replace />} />
+            <Route path="orders" element={<BakeryOrders />} />
+            <Route path="reservations" element={<Navigate to="/bakery/orders" replace />} />
             <Route path="pricing" element={<BakeryPricing />} />
             <Route path="templates" element={<BakeryTemplates />} />
-            <Route path="transactions" element={<BakeryTransactions />} />
+            <Route path="transactions" element={<Navigate to="/bakery/orders?tab=payments" replace />} />
             <Route path="chats" element={<BakeryChat />} />
-            <Route path="assets" element={<Navigate to="/bakery/reservations" replace />} />
+            <Route path="assets" element={<Navigate to="/bakery/orders" replace />} />
             <Route path="billing" element={<BakeryBilling />} />
             <Route path="blueprints" element={<BakeryBlueprints />} />
             <Route path="profile" element={<BakeryProfile />} />
