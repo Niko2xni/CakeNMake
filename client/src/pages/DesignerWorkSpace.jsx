@@ -1142,11 +1142,12 @@ export default function DesignerWorkSpace() {
         <div className={`hidden md:block w-[280px] lg:w-[320px] xl:w-[340px] max-w-[40vw] p-2 sm:p-3 shrink-0 ${isBreakdownOpen ? 'pointer-events-none opacity-50 select-none' : ''}`}>
           {orderComplete ? (
             <div className="h-full">
-              <BakeryChatPanel onNotificationChange={setChatNotifications} />
+              <BakeryChatPanel onNotificationChange={setChatNotifications} config={config} onChange={setConfig} quote={quote} />
             </div>
           ) : (
             <ToolPanel
               config={config}
+              quote={quote}
               onChange={setConfig}
               onReset={() => {
                 setConfig(INITIAL_CONFIG);
@@ -1183,11 +1184,12 @@ export default function DesignerWorkSpace() {
         {/* Mobile Panel */}
         {orderComplete ? (
           <div className="md:hidden fixed bottom-0 inset-x-0 h-[360px] max-h-[50vh] bg-card border-t border-border/40 z-30 shadow-2xl p-2">
-            <BakeryChatPanel onNotificationChange={setChatNotifications} />
+            <BakeryChatPanel onNotificationChange={setChatNotifications} config={config} onChange={setConfig} quote={quote} />
           </div>
         ) : (
           <MobileDraggableToolPanel
             panelOpen={panelOpen && !isBreakdownOpen}
+            quote={quote}
             onClose={() => setPanelOpen(false)}
             mainAreaRef={mainAreaRef}
             config={config}

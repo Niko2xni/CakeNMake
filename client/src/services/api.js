@@ -2,6 +2,18 @@ import { auth } from '@/lib/firebase';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
+export const cakeAiApi = {
+  sendMessage: (messages, config) =>
+    fetch(`${API_BASE_URL}/cake-ai/message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages, config }),
+    }).then((response) => {
+      if (!response.ok) throw new Error(`Cake AI request failed (${response.status})`);
+      return response.json();
+    }),
+};
+
 const parseJsonResponse = async (response) => {
   const data = await response.json().catch(() => ({}));
 

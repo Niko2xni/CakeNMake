@@ -4,6 +4,7 @@ const designRoutes = require("./routes/designRoutes");
 const authRoutes = require("./routes/authRoutes");
 const accountRoutes = require('./routes/accountRoutes');
 const conversationRoutes = require('./routes/conversationRoutes');
+const cakeAiRoutes = require('./routes/cakeAi.routes');
 const { corsOptions } = require('./config/origins');
 
 const app = express();
@@ -27,6 +28,7 @@ app.use("/api/designs", designRoutes);
 app.use("/api/auth", authRoutes);
 app.use('/api/account', accountRoutes);
 app.use('/api/conversations', conversationRoutes);
+app.use('/api/cake-ai', cakeAiRoutes);
 
 const reservationRoutes = require('./routes/reservationRoutes');
 app.use('/api/bakery/reservations', reservationRoutes);

@@ -6,8 +6,32 @@ import { Separator } from '@/components/ui/separator';
 import { useChat } from '@/hooks/useChat';
 import { useAuth } from '@/lib/AuthContext';
 import BakeryChat from './BakeryChat';
+import AIChatPanel from '@/components/cake/AIChatPanel';
 
-export default function BakeryChatPanel({ onNotificationChange }) {
+export default function BakeryChatPanel({ onNotificationChange, config, onChange, quote }) {
+  const [mode, setMode] = useState('bakery');
+  const canDesignWithAi = Boolean(config && onChange);
+  return (
+    <div className="flex flex-col h-full min-h-0">
+      {canDesignWithAi && (
+        <div className="flex gap-2 pb-2 shrink-0">
+          <Button size="sm" variant={mode === 'bakery' ? 'default' : 'outline'} onClick={() => setMode('bakery')}>Bakery Chat</Button>
+          <Button size="sm" variant={mode === 'ai' ? 'default' : 'outline'} onClick={() => setMode('ai')}>Cake AI</Button>
+        </div>
+      )}
+      <div className={`${mode === 'bakery' || !canDesignWithAi ? 'flex' : 'hidden'} flex-col flex-1 min-h-0`}>
+        <BakerySupportPanel onNotificationChange={onNotificationChange} />
+      </div>
+      {canDesignWithAi && (
+        <div className={`${mode === 'ai' ? 'flex' : 'hidden'} flex-col flex-1 min-h-0 bg-card rounded-2xl border border-border/50 p-4`}>
+          <AIChatPanel config={config} onChange={onChange} quote={quote} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BakerySupportPanel({ onNotificationChange }) {
   const { account, isAuthenticated } = useAuth();
   if (!isAuthenticated || !account) {
     return (
