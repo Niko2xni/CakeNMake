@@ -3,6 +3,14 @@ import { auth } from '@/lib/firebase';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
 export const cakeAiApi = {
+  describeReference: (image, prompt, signal) => fetch(`${API_BASE_URL}/cake-ai/reference`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image, prompt }), signal,
+  }).then(async response => {
+    const data = await response.json();
+    if (!response.ok) throw Object.assign(new Error('Reference image failed'), { validationMessage: data.error });
+    return data.description;
+  }),
   sendMessage: (messages, config) =>
     fetch(`${API_BASE_URL}/cake-ai/message`, {
       method: 'POST',

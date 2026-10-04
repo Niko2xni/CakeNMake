@@ -6,6 +6,7 @@ const { callOpenRouter } = require('../services/openRouterCakeAi');
 const { callVercel } = require('../services/vercelCakeAi');
 const { SUGAR_COLORS, CENTER_PLACEABLE_DESIGNS } = require('../../lib/cakeConfig');
 const { validateCakeAiPrompt } = require('../services/cakeAiPromptValidation');
+const { validReferenceImage, describeCakeReference } = require('../services/cakeAiReference');
 
 const router = Router();
 const AI_PROVIDER = (process.env.AI_PROVIDER || 'gemini').toLowerCase();
@@ -64,6 +65,21 @@ async function callAnthropic(messages, config) {
     tools: CAKE_AI_TOOLS,
   });
 }
+
+router.post('/reference', async (req, res) => {
+  const { image, prompt } = req.body || {};
+  const validation = validateCakeAiPrompt([{ role: 'user', content: prompt }], {});
+  if (validation) return res.status(validation.status).json({ error: validation.message });
+  if (!validReferenceImage(image)) return res.status(400).json({ error: 'Please attach a compressed JPEG cake image smaller than 350 KB.' });
+  if (!['vercel', 'openrouter'].includes(AI_PROVIDER)) return res.status(503).json({ error: 'Reference images currently require Vercel or OpenRouter with an image-capable model.' });
+  try {
+    const description = await describeCakeReference(image, { provider: AI_PROVIDER });
+    if (description.includes('NO_CAKE_REFERENCE')) return res.status(422).json({ error: 'Please choose a reference showing a cake or cake decorations.' });
+    return res.json({ description });
+  } catch {
+    return res.status(502).json({ error: 'Could not read this image. Check that your configured vision model supports images, then try again.' });
+  }
+});
 
 router.post('/message', async (req, res) => {
   const { messages, config } = req.body || {};

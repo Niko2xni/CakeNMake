@@ -1,0 +1,11 @@
+# Cake reference images and dictation
+
+Customers can attach one JPEG, PNG or WebP cake reference using the Reference image button. They can send it with instructions or alone. The designer interprets its appearance using supported cake options; exact replication of unsupported decorations is not guaranteed.
+
+The browser accepts files up to 10 MB, downsizes the longest edge to 768 pixels, and re-encodes JPEG to remove embedded metadata. The compressed upload is limited to 350 KB. A separate vision request produces a short cake description with a 240-token output cap and low image detail. Subsequent editing/tool requests receive only that description. Neither the original nor compressed image is stored in saved conversations. The filename and design description remain in chat. Successful analysis is reused when retrying a failed edit while the attachment remains selected.
+
+Image references currently support AI_PROVIDER=vercel or openrouter. The active model must support image inputs. Optionally set AI_GATEWAY_VISION_MODEL or OPENROUTER_VISION_MODEL to use a different vision model; otherwise the regular configured model is used. Restart the server after environment changes. Image analysis is an additional billed request; speech dictation makes no audio API requests.
+
+The microphone uses browser SpeechRecognition/webkitSpeechRecognition, activated only by a click. Unsupported browsers disable the microphone. Permission and recognition errors are shown. Dictated text fills the editable input and is never sent automatically. Listening stops when the panel is hidden, the design changes, the page goes into the background, or the component unmounts. Deploy over HTTPS for microphone access. Some browsers send audio to their own online recognition service; the composer discloses this.
+
+Reference input is validated before provider calls, uses fixed gateway endpoints rather than fetching arbitrary URLs, and cannot call editing tools. The vision system prompt treats image text as untrusted and excludes embedded instructions. The existing cake prompt validation and tool validation remain in effect for the resulting description and the customer's text.

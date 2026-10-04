@@ -9,6 +9,17 @@ vi.mock('@/services/api', () => ({ cakeAiApi: { sendMessage: vi.fn() } }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe('imported Cake AI tool conversation', () => {
+  it('renders assistant Markdown as paragraphs, emphasis and lists without embedding HTML or remote images', () => {
+    const content = '**Exterior:** ivory frosting.\n\n- **Border:** chocolate piping\n- **Center:** truffles\n\nReview your cake.\n\n<img src="https://example.com/unsafe.png">\n\n![remote](https://example.com/image.png)';
+    const session = { ready: true, history: [], display: [{ role: 'assistant', content }], input: '', thinking: false,
+      setHistory: vi.fn(), setDisplay: vi.fn(), setInput: vi.fn(), setThinking: vi.fn() };
+    const { container } = render(<AIChatPanel config={DEFAULT_CONFIG} onChange={vi.fn()} session={session} />);
+    expect(screen.getByText('Exterior:').tagName).toBe('STRONG');
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    expect(screen.getByText('Review your cake.').tagName).toBe('P');
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.textContent).not.toContain('**');
+  });
   it('does not apply a delayed cake edit after leaving the designer', async () => {
     let finish;
     cakeAiApi.sendMessage.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));

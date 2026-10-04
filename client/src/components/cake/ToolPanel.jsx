@@ -452,7 +452,7 @@ export default function ToolPanel({
         >
           {/* Keep the conversation mounted when switching to manual design. */}
             <div className={`flex-1 p-4 min-h-0 flex-col ${modeUi === 'ai' ? 'flex' : 'hidden'}`} aria-hidden={modeUi !== 'ai'}>
-              <AIChatPanel config={config} onChange={onChange} quote={quote} session={aiChatSession} />
+              <AIChatPanel config={config} onChange={onChange} quote={quote} session={aiChatSession} active={modeUi === 'ai'} />
             </div>
           {modeUi !== 'ai' && (
             <>

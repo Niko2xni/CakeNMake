@@ -9,10 +9,11 @@ export function emptyCakeAiConversation() {
 
 // Keep complete user/tool exchanges together, never orphan tool results.
 export function recentCakeAiHistory(history) {
-  const starts = history.flatMap((message, index) => message.role === 'user' && typeof message.content === 'string' ? [index] : []);
+  const isPrompt = message => message.role === 'user' && (typeof message.content === 'string' || message.content?.some(block => block.type === 'text'));
+  const starts = history.flatMap((message, index) => isPrompt(message) ? [index] : []);
   let result = history.slice(starts.at(-4) ?? 0);
   while (JSON.stringify(result).length > 50000) {
-    const next = result.findIndex((message, index) => index > 0 && message.role === 'user' && typeof message.content === 'string');
+    const next = result.findIndex((message, index) => index > 0 && isPrompt(message));
     if (next < 0) return [];
     result = result.slice(next);
   }

@@ -24,7 +24,7 @@ export default function BakeryChatPanel({ onNotificationChange, config, onChange
       </div>
       {canDesignWithAi && (
         <div className={`${mode === 'ai' ? 'flex' : 'hidden'} flex-col flex-1 min-h-0 bg-card rounded-2xl border border-border/50 p-4`}>
-          <AIChatPanel config={config} onChange={onChange} quote={quote} session={aiChatSession} />
+          <AIChatPanel config={config} onChange={onChange} quote={quote} session={aiChatSession} active={mode === 'ai'} />
         </div>
       )}
     </div>
