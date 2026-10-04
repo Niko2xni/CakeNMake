@@ -13,7 +13,7 @@ describe('imported Cake AI tool conversation', () => {
     const config = structuredClone(DEFAULT_CONFIG);
     const onChange = vi.fn();
     cakeAiApi.sendMessage
-      .mockResolvedValueOnce({ stop_reason: 'tool_use', content: [
+      .mockResolvedValueOnce({ stop_reason: 'tool_use', reasoning_details: [{ type: 'reasoning.encrypted', data: 'opaque' }], content: [
         { type: 'tool_use', id: 'flavor', name: 'set_sponge_flavor', input: { flavor: 'chocolate' } },
         { type: 'tool_use', id: 'finish', name: 'set_exterior_finish', input: { flavor: 'chocolate' } },
       ] })
@@ -30,6 +30,7 @@ describe('imported Cake AI tool conversation', () => {
     const [history, sentConfig] = cakeAiApi.sendMessage.mock.calls[1];
     expect(sentConfig).toEqual(finalConfig);
     expect(history[2].content.map(result => result.tool_use_id)).toEqual(['flavor', 'finish']);
+    expect(history[1].reasoning_details).toEqual([{ type: 'reasoning.encrypted', data: 'opaque' }]);
   });
 
   it('shows an API failure and allows another message', async () => {

@@ -1,8 +1,8 @@
 // aiCakeTools.js
 //
-// Tool schemas for the Cake AI, plus the executor that applies each tool
+// Validated executor that applies each Cake AI tool
 // call to the SAME config shape ToolPanel's sections already mutate.
-// Every enum below is read live from cakeConfig.js — nothing is
+// Tool schemas are imported from aiCakeToolSchemas.js; their enums use cakeConfig.js — nothing is
 // hand-copied — so a new SIDE_TREATMENTS entry or SUGAR_COLORS swatch is
 // automatically something the AI can use, with no second file to update.
 //
@@ -16,15 +16,6 @@
 
 import {
   SIZE_OPTIONS,
-  LAYER_OPTIONS,
-  FINISH_STYLES,
-  BUTTERCREAM_TEXTURES,
-  FILLING_LAYER_OPTIONS,
-  FILLING_PIPING_DESIGNS,
-  SUGAR_COLORS,
-  SUGAR_COLOR_MODES,
-  GLAZE_PATTERNS,
-  SIDE_TREATMENTS,
   CHECKERED_PATTERN_SETS,
   TRIANGLE_PATTERN_SETS,
   CHEVRON_PATTERN_SETS,
@@ -36,147 +27,66 @@ import {
   TOP_SURFACE_SLOTS,
   DEFAULT_CONFIG,
   computeSlotPosition,
+  getTopTierRadiusFromConfig,
+  getCenterItemLimit,
+  getCenterItemCount,
+  getItemFootprint,
+  doFootprintsClash,
+  isFootprintInBoundary,
+  getEdgeDelicatesObstacles,
+  getDelicatesAwareBoundaryRadius,
 } from '@/lib/cakeConfig';
-import { FLAVOR_ORDER, FROSTING_FILLING_FLAVOR_ORDER } from '@/lib/cakeFlavors';
 
-const ids = (arr, key = 'id') => arr.map((o) => o[key]);
+import { CAKE_AI_TOOLS } from './aiCakeToolSchemas';
+import { syncTierDesignOnToggle } from './tierDesignSync';
+export { CAKE_AI_TOOLS };
 
-// ─── Tool schemas (sent to the model) ──────────────────────────────────
-// v1 scope: whole-cake edits only. Per-tier ("Individual" Tier Design)
-// edits are deliberately out of scope for now — `activeLayer` lives as
-// local React state inside ToolPanel, not in config, so the AI (running
-// server-side, stateless per request) has no reliable way to know which
-// tier the person is "looking at." Extending to per-tier edits later
-// means either lifting activeLayer into config or having the AI always
-// pass an explicit tierIndex and apply to both tiers when omitted.
-export const CAKE_AI_TOOLS = [
-  {
-    name: 'set_structure',
-    description: 'Change the cake size and/or number of tiers.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        size: { type: 'string', enum: ids(SIZE_OPTIONS) },
-        layers: { type: 'integer', enum: ids(LAYER_OPTIONS) },
-      },
-    },
-  },
-  {
-    name: 'set_sponge_flavor',
-    description: 'Change the sponge (cake base) flavor. Whole-cake only.',
-    input_schema: {
-      type: 'object',
-      properties: { flavor: { type: 'string', enum: FLAVOR_ORDER } },
-      required: ['flavor'],
-    },
-  },
-  {
-    name: 'set_filling',
-    description: "Enable/disable filling, set its layer count and/or flavor. Filling and Sponge Flavor only apply while Exterior Finish's style is 'naked'.",
-    input_schema: {
-      type: 'object',
-      properties: {
-        enabled: { type: 'boolean' },
-        layers: { type: 'integer', enum: ids(FILLING_LAYER_OPTIONS) },
-        flavor: { type: 'string', enum: FROSTING_FILLING_FLAVOR_ORDER },
-        pipingDesign: { type: 'string', enum: [...ids(FILLING_PIPING_DESIGNS), 'none'] },
-      },
-    },
-  },
-  {
-    name: 'set_exterior_finish',
-    description: 'Change the base coating style, its eating flavor, and (for Textured Buttercream) which texture variant.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        style: { type: 'string', enum: ids(FINISH_STYLES) },
-        flavor: { type: 'string', enum: FROSTING_FILLING_FLAVOR_ORDER },
-        buttercreamTexture: { type: 'string', enum: ids(BUTTERCREAM_TEXTURES) },
-      },
-    },
-  },
-  {
-    name: 'set_sugar_color',
-    description: "Change what the coating looks like: 'default' matches the flavor's natural color, 'colorOverride' picks a flat color via colorId. Applies to the whole-cake exterior finish color (use the `context` field to target Filling, Side, or Glaze/Surface color instead).",
-    input_schema: {
-      type: 'object',
-      properties: {
-        context: { type: 'string', enum: ['exterior', 'filling', 'side', 'surface'], description: 'Which region this color applies to. Defaults to exterior.' },
-        mode: { type: 'string', enum: ids(SUGAR_COLOR_MODES) },
-        colorId: { type: 'string', enum: ids(SUGAR_COLORS) },
-      },
-    },
-  },
-  {
-    name: 'set_surface_treatment',
-    description: 'Turn Glaze on/off and pick its drip pattern. Glaze can be combined with any Exterior Finish style.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        enabled: { type: 'boolean' },
-        pattern: { type: 'string', enum: ids(GLAZE_PATTERNS) },
-      },
-    },
-  },
-  {
-    name: 'set_side_treatment',
-    description: 'Set the vertical side-wall treatment (only one is active at a time) and its variant/set.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        mode: { type: 'string', enum: [...ids(SIDE_TREATMENTS), 'none'] },
-        setId: {
-          type: 'string',
-          description: 'The variant id, valid values depend on `mode`: ' +
-            `checkeredPattern: ${ids(CHECKERED_PATTERN_SETS).join(', ')} | ` +
-            `trianglePattern: ${ids(TRIANGLE_PATTERN_SETS).join(', ')} | ` +
-            `chevronPattern: ${ids(CHEVRON_PATTERN_SETS).join(', ')} | ` +
-            `scatterPearls: ${ids(SCATTER_PEARLS_SETS).join(', ')} | ` +
-            `pipingScrolls: ${ids(PIPING_SCROLLS_SETS).join(', ')} | ` +
-            `sunshinePlay: ${ids(SUNSHINE_PLAY_SETS).join(', ')} | ` +
-            `victorianLambeth: ${ids(VICTORIAN_LAMBETH_SETS).join(', ')}`,
-        },
-      },
-      required: ['mode'],
-    },
-  },
-  {
-    name: 'place_center_decoration',
-    description: 'Place a decoration on the top-center of the cake (e.g. a cherry, chocolate bear, basketball). Places at a default top-surface slot rather than an exact clicked point — the person can still drag/reposition it manually afterward.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        designId: { type: 'string', enum: ids(CENTER_PLACEABLE_DESIGNS, 'designId') },
-        slot: { type: 'string', enum: ['center-0', 'inner-0', 'outer-0'], description: 'Defaults to center-0 (dead center) if omitted.' },
-      },
-      required: ['designId'],
-    },
-  },
-  {
-    name: 'clear_center_decorations',
-    description: 'Remove all placed center decorations/text from the top of the cake.',
-    input_schema: { type: 'object', properties: {} },
-  },
-  {
-    name: 'get_current_quote',
-    description: "Return the customer's current live price estimate (already computed for the current design) so you can answer pricing questions honestly instead of guessing.",
-    input_schema: { type: 'object', properties: {} },
-  },
-];
+const sideSets = {
+  checkeredPattern: CHECKERED_PATTERN_SETS, trianglePattern: TRIANGLE_PATTERN_SETS,
+  chevronPattern: CHEVRON_PATTERN_SETS, scatterPearls: SCATTER_PEARLS_SETS,
+  pipingScrolls: PIPING_SCROLLS_SETS, sunshinePlay: SUNSHINE_PLAY_SETS,
+  victorianLambeth: VICTORIAN_LAMBETH_SETS,
+};
+
+export function validateCakeAiTool(name, input) {
+  const tool = CAKE_AI_TOOLS.find(candidate => candidate.name === name);
+  if (!tool) return `Unknown cake tool '${name}'.`;
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return 'Tool input must be an object.';
+  const { properties, required = [] } = tool.input_schema;
+  for (const key of required) if (!Object.hasOwn(input, key)) return `Missing required argument '${key}'.`;
+  for (const [key, value] of Object.entries(input)) {
+    const schema = properties[key];
+    if (!Object.hasOwn(properties, key)) return `Unknown argument '${key}'.`;
+    if (schema.type === 'integer' ? !Number.isInteger(value) : typeof value !== schema.type) return `Invalid type for '${key}'.`;
+    if (schema.enum && !schema.enum.includes(value)) return `Unsupported value for '${key}': ${value}.`;
+  }
+  if (Object.keys(properties).length && !Object.keys(input).length) return 'Supply at least one edit.';
+  if (name === 'set_side_treatment' && input.setId && !sideSets[input.mode]?.some(set => set.id === input.setId)) return 'This side variant does not belong to the selected treatment.';
+  return null;
+}
 
 // ─── Executor: tool_use input -> config mutation ───────────────────────
 // `ctx` = { config, onChange, quote }. Returns a small JSON-able summary
 // fed back to the model as the tool_result, and a human-readable label
 // used to render an "AI changed: ..." chip in the chat transcript.
 export function applyCakeAiTool(name, input, ctx) {
+  const error = validateCakeAiTool(name, input);
+  if (error) return { error };
   const { config, onChange, quote } = ctx;
+  const tiers = config.structure?.layers || 1;
 
   switch (name) {
     case 'set_structure': {
       const nextStructure = { ...config.structure, ...input };
-      const tierCountChanged = input.layers != null && input.layers !== config.structure?.layers;
+      if (nextStructure.size === 'small' && nextStructure.layers > 1) {
+        if (input.layers > 1) return { error: 'Small cakes support one tier only. Select a big cake for two tiers.' };
+        nextStructure.layers = 1;
+      }
+      if (nextStructure.layers === 1) nextStructure.layerDesign = 'uniform';
+      const realSize = SIZE_OPTIONS.find(option => option.id === nextStructure.size).dimensions;
+      const tierCountChanged = nextStructure.layers !== config.structure?.layers;
       if (!tierCountChanged) {
-        onChange({ ...config, structure: nextStructure });
+        onChange({ ...config, structure: nextStructure, realSize: { ...realSize } });
         return { label: 'Updated cake structure', result: nextStructure };
       }
       // Mirror ToolPanel.handleStructureChange: shrinking/growing tier
@@ -188,17 +98,18 @@ export function applyCakeAiTool(name, input, ctx) {
       const legacyPlacedItems = (config.placedItems || []).filter(
         (item) => !(typeof item.type === 'string' && item.type.startsWith('center-'))
       );
-      onChange({
+      onChange(syncTierDesignOnToggle({
         ...config,
         structure: nextStructure,
+        realSize: { ...realSize },
         place: { ...(config.place || {}), items: centerItems },
         placedItems: legacyPlacedItems,
-      });
+      }, nextStructure.layerDesign, 0));
       return { label: `Set cake to ${nextStructure.layers} tier(s)`, result: nextStructure };
     }
 
     case 'set_sponge_flavor': {
-      const nextSponge = { ...config.sponge, flavor: input.flavor };
+      const nextSponge = { ...config.sponge, flavor: input.flavor, layerFlavors: Array(tiers).fill(input.flavor) };
       onChange({ ...config, sponge: nextSponge });
       return { label: `Sponge flavor → ${input.flavor}`, result: nextSponge };
     }
@@ -206,8 +117,8 @@ export function applyCakeAiTool(name, input, ctx) {
     case 'set_filling': {
       const nextFilling = { ...config.filling };
       if (input.enabled != null) nextFilling.enabled = input.enabled;
-      if (input.layers != null) { nextFilling.layers = input.layers; nextFilling.enabled = true; }
-      if (input.flavor != null) nextFilling.flavor = input.flavor;
+      if (input.layers != null) { nextFilling.layers = input.layers; if (input.enabled == null) nextFilling.enabled = true; }
+      if (input.flavor != null) { nextFilling.flavor = input.flavor; nextFilling.layerFlavors = Array(tiers).fill(input.flavor); }
       if (input.pipingDesign != null) {
         nextFilling.piping = { ...nextFilling.piping, tip: input.pipingDesign === 'none' ? null : input.pipingDesign };
       }
@@ -217,6 +128,9 @@ export function applyCakeAiTool(name, input, ctx) {
 
     case 'set_exterior_finish': {
       const nextExterior = { ...config.exteriorFinish, ...input };
+      if (input.style) nextExterior.layerStyles = Array(tiers).fill(input.style);
+      if (input.flavor) nextExterior.layerFlavors = Array(tiers).fill(input.flavor);
+      if (input.buttercreamTexture) nextExterior.layerButtercreamTextures = Array(tiers).fill(input.buttercreamTexture);
       onChange({ ...config, exteriorFinish: nextExterior });
       return { label: `Exterior finish → ${nextExterior.style}`, result: nextExterior };
     }
@@ -231,10 +145,12 @@ export function applyCakeAiTool(name, input, ctx) {
         : context === 'side' ? 'side'
         : 'surface';
       const current = config.sugarColorOverrides?.[key] || DEFAULT_CONFIG.sugarColor;
-      const next = { ...current, ...(input.mode ? { mode: input.mode } : {}), ...(input.colorId ? { colorId: input.colorId } : {}) };
+      const next = { ...current, ...(input.mode ? { mode: input.mode } : input.colorId ? { mode: 'colorOverride' } : {}), ...(input.colorId ? { colorId: input.colorId } : {}) };
+      const overrides = { ...(config.sugarColorOverrides || {}), [key]: next };
+      for (let tier = 0; tier < tiers; tier++) overrides[`${key}-${tier}`] = { ...next };
       onChange({
         ...config,
-        sugarColorOverrides: { ...(config.sugarColorOverrides || {}), [key]: next },
+        sugarColorOverrides: overrides,
       });
       return { label: `${context} color → ${next.colorId || next.mode}`, result: next };
     }
@@ -243,6 +159,11 @@ export function applyCakeAiTool(name, input, ctx) {
       const next = { ...config.surfaceTreatment };
       if (input.enabled != null) next.mode = input.enabled ? 'glaze' : null;
       if (input.pattern != null) next.pattern = input.pattern;
+      next.layerTreatments = Array.from({ length: tiers }, (_, index) => ({
+        ...(config.surfaceTreatment?.layerTreatments?.[index] || {}),
+        ...(input.enabled != null ? { mode: next.mode } : {}),
+        ...(input.pattern != null ? { pattern: next.pattern } : {}),
+      }));
       onChange({ ...config, surfaceTreatment: next });
       return { label: next.mode ? `Glaze → ${next.pattern}` : 'Glaze removed', result: next };
     }
@@ -253,6 +174,11 @@ export function applyCakeAiTool(name, input, ctx) {
       if (mode && input.setId) {
         next[mode] = { ...(config.side?.[mode] || {}), setId: input.setId };
       }
+      next.layerTreatments = Array.from({ length: tiers }, (_, index) => ({
+        ...(config.side?.layerTreatments?.[index] || config.side), mode,
+        ...(mode && input.setId ? { [mode]: { ...(config.side?.layerTreatments?.[index]?.[mode] || next[mode]), setId: input.setId } } : {}),
+        layerTreatments: undefined,
+      }));
       onChange({ ...config, side: next });
       return { label: mode ? `Side → ${mode} (${input.setId || 'default'})` : 'Side treatment removed', result: next };
     }
@@ -260,15 +186,30 @@ export function applyCakeAiTool(name, input, ctx) {
     case 'place_center_decoration': {
       const design = CENTER_PLACEABLE_DESIGNS.find((d) => d.designId === input.designId);
       if (!design) return { label: 'Unknown decoration', error: `No design '${input.designId}'` };
-      const slot = TOP_SURFACE_SLOTS.find((s) => s.id === (input.slot || 'center-0')) || TOP_SURFACE_SLOTS[0];
-      // topRadius isn't known server-side / outside CakeScene — for a
-      // dead-center placement (the default) x/z are 0 regardless, which
-      // covers the common "put a cherry on top" case without needing the
-      // real cake radius. Non-center slots need topRadius plumbed in from
-      // CakeScene if you want this to place accurately off-center.
-      const { x, z } = computeSlotPosition(slot, 4);
-      const newItem = { type: design.toolId, x, y: 0, z, rotationY: 0, rotationX: 0 };
-      const items = [...(config.place?.items || []), newItem];
+      const existing = config.place?.items || [];
+      const limit = getCenterItemLimit(input.designId);
+      if (limit != null && getCenterItemCount(existing, input.designId) >= limit) return { error: `Decoration limit reached for ${design.label}.` };
+      const radius = getTopTierRadiusFromConfig(config);
+      const scale = radius / 4;
+      const style = config.structure?.layerDesign === 'individual'
+        ? config.exteriorFinish?.layerStyles?.[tiers - 1] || config.exteriorFinish?.style
+        : config.exteriorFinish?.style;
+      const boundary = getDelicatesAwareBoundaryRadius(radius, config.edge, style);
+      const obstacles = getEdgeDelicatesObstacles(config.edge, radius, style);
+      const slots = input.slot ? TOP_SURFACE_SLOTS.filter(slot => slot.id === input.slot) : TOP_SURFACE_SLOTS;
+      let newItem;
+      for (const slot of slots) {
+        const position = computeSlotPosition(slot, radius);
+        const candidate = { type: design.toolId, ...position, y: 0, rotation: 0, tiltX: 0, tiltZ: 0 };
+        const footprint = getItemFootprint(candidate, scale);
+        if (!isFootprintInBoundary(footprint, boundary, radius)) continue;
+        if (obstacles.some(obstacle => doFootprintsClash(footprint, obstacle, 0.02))) continue;
+        if (existing.some(item => doFootprintsClash(footprint, getItemFootprint(item, scale), 0.01))) continue;
+        newItem = { ...candidate, id: crypto.randomUUID() };
+        break;
+      }
+      if (!newItem) return { error: 'No available position for this decoration. Move an item or choose another slot.' };
+      const items = [...existing, newItem];
       onChange({ ...config, place: { ...(config.place || {}), items } });
       return { label: `Placed ${design.label}`, result: newItem };
     }
@@ -277,7 +218,7 @@ export function applyCakeAiTool(name, input, ctx) {
       const items = (config.place?.items || []).filter(
         (item) => !(typeof item.type === 'string' && item.type.startsWith('center-'))
       );
-      onChange({ ...config, place: { ...(config.place || {}), items } });
+      onChange({ ...config, place: { ...(config.place || {}), items }, placedItems: (config.placedItems || []).filter(item => !item.type?.startsWith('center-')) });
       return { label: 'Cleared center decorations', result: items };
     }
 

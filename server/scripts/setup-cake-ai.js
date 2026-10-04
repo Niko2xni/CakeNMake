@@ -12,6 +12,10 @@ for (const [srcRel, outRel] of pairs) {
   const srcPath = path.join(root, srcRel);
   const outPath = path.join(root, outRel);
   let text = fs.readFileSync(srcPath, 'utf8').replace(/\r\n/g, '\n');
+  // Convert named local imports generically so adding catalog imports does
+  // not require updating a hard-coded multiline match in this generator.
+  text = text.replace(/import\s*\{([^}]+)\}\s*from\s*['"](\.\/[^'"]+)['"];?/g,
+    (_, names, source) => `const {${names}} = require('${source.replace(/\.js$/, '')}');`);
 
   if (srcRel.endsWith('cakeFlavors.js')) {
     text = text.replace("import { FLAVORS } from './cakeFlavors';", "const { FLAVORS } = require('./cakeFlavors');");

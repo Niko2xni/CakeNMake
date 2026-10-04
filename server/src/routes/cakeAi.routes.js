@@ -2,6 +2,7 @@ const { Router } = require('express');
 const { GoogleGenAI } = require('@google/genai');
 const Anthropic = require('@anthropic-ai/sdk');
 const { CAKE_AI_TOOLS } = require('../../lib/aiCakeToolSchemas');
+const { callOpenRouter } = require('../services/openRouterCakeAi');
 
 const router = Router();
 const AI_PROVIDER = (process.env.AI_PROVIDER || 'gemini').toLowerCase();
@@ -51,10 +52,17 @@ async function callAnthropic(messages, config) {
 }
 
 router.post('/message', async (req, res) => {
-  const { messages, config } = req.body;
+  const { messages, config } = req.body || {};
 
-  if (!Array.isArray(messages) || !config) {
+  if (!Array.isArray(messages) || !config || typeof config !== 'object' || Array.isArray(config)) {
     return res.status(400).json({ error: 'messages and config are required' });
+  }
+
+  if (!['gemini', 'anthropic', 'openrouter'].includes(AI_PROVIDER)) {
+    return res.status(503).json({ error: 'Cake AI provider is not configured.' });
+  }
+  if (AI_PROVIDER === 'openrouter' && (!process.env.OPENROUTER_API_KEY?.trim() || !process.env.OPENROUTER_MODEL?.trim())) {
+    return res.status(503).json({ error: 'Configure OPENROUTER_API_KEY and OPENROUTER_MODEL on the server.' });
   }
 
   if (AI_PROVIDER === 'gemini' && !gemini) {
@@ -66,13 +74,15 @@ router.post('/message', async (req, res) => {
   }
 
   try {
-    const response = AI_PROVIDER === 'gemini'
+    const response = AI_PROVIDER === 'openrouter'
+      ? await callOpenRouter(messages, buildSystemPrompt(config))
+      : AI_PROVIDER === 'gemini'
       ? await callGemini(messages, config)
       : await callAnthropic(messages, config);
 
     return res.json(response);
   } catch (err) {
-    console.error('[cake-ai] request failed:', err);
+    console.error('[cake-ai] request failed:', err.message);
     return res.status(502).json({ error: 'Cake AI is temporarily unavailable.' });
   }
 });

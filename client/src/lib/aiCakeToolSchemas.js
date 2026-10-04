@@ -1,8 +1,7 @@
 // lib/aiCakeToolSchemas.js
 //
-// Backend-only. This is the ONLY piece of the Cake AI system that needs
-// to exist on the server: the tool schemas sent to Anthropic so the
-// model knows what it's allowed to call and with what enum values.
+// Shared tool catalog: the executor imports this file and the backend
+// generator converts it to CommonJS. Enum values follow cakeConfig.
 //
 // It reads live off lib/cakeConfig.js / lib/cakeFlavors.js — copies of
 // the exact same files the frontend uses (see note below) — so the tool
@@ -43,6 +42,7 @@ import {
   SUNSHINE_PLAY_SETS,
   VICTORIAN_LAMBETH_SETS,
   CENTER_PLACEABLE_DESIGNS,
+  TOP_SURFACE_SLOTS,
 } from './cakeConfig.js';
 import { FLAVOR_ORDER, FROSTING_FILLING_FLAVOR_ORDER } from './cakeFlavors.js';
 
@@ -146,14 +146,14 @@ export const CAKE_AI_TOOLS = [
       type: 'object',
       properties: {
         designId: { type: 'string', enum: ids(CENTER_PLACEABLE_DESIGNS, 'designId') },
-        slot: { type: 'string', enum: ['center-0', 'inner-0', 'outer-0'], description: 'Defaults to center-0 (dead center) if omitted.' },
+        slot: { type: 'string', enum: ids(TOP_SURFACE_SLOTS), description: 'Optional exact slot. If omitted, finds the first available position, starting at the center.' },
       },
       required: ['designId'],
     },
   },
   {
     name: 'clear_center_decorations',
-    description: 'Remove all placed center decorations/text from the top of the cake.',
+    description: 'Remove all placed center decorations and individually placed letters. Does not clear fixed piping text lines.',
     input_schema: { type: 'object', properties: {} },
   },
   {

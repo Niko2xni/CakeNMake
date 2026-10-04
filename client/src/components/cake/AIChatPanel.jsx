@@ -54,7 +54,9 @@ export default function AIChatPanel({ config, onChange, quote }) {
 
         if (response.stop_reason !== 'tool_use') {
           const finalText = response.content.find((b) => b.type === 'text')?.text || '';
-          setHistory([...nextHistory, { role: 'assistant', content: response.content }]);
+          setHistory([...nextHistory, { role: 'assistant', content: response.content,
+            ...(response.reasoning_details ? { reasoning_details: response.reasoning_details } : {}),
+          }]);
           setDisplay((prev) => [
             ...prev,
             { role: 'assistant', content: finalText, changes: changesThisTurn.length ? changesThisTurn : undefined },
@@ -81,7 +83,9 @@ export default function AIChatPanel({ config, onChange, quote }) {
 
         nextHistory = [
           ...nextHistory,
-          { role: 'assistant', content: response.content },
+          { role: 'assistant', content: response.content,
+            ...(response.reasoning_details ? { reasoning_details: response.reasoning_details } : {}),
+          },
           { role: 'user', content: toolResults },
         ];
       }
