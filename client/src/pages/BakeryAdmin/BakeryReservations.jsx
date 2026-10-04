@@ -3,6 +3,29 @@ import { Search, ChevronRight, X, Calendar, Banknote, FileText, MessageCircle, U
 import CustomScrollbar from '@/components/shared/CustomScrollbar';
 import { AdminRowsSkeleton } from '@/components/shared/PageLoadingSkeleton';
 import { safeExternalUrl } from '@/lib/safe-url';
+import { useNavigate } from 'react-router-dom';
+import { chatApi } from '@/services/chat-api';
+import { bakeryApi } from '@/services/api';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+
+function DownPaymentForm({ order, onRecordPayment }) {
+  const [method, setMethod] = useState('gcash');
+  const [reference, setReference] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  async function submit(event) {
+    event.preventDefault(); setBusy(true); setError('');
+    try { await onRecordPayment(order._id, { amount: order.downPayment.amount, method, reference }); }
+    catch (failure) { setError(failure.message || 'Could not record payment.'); }
+    finally { setBusy(false); }
+  }
+  return <form onSubmit={submit} className="space-y-3 rounded-xl border border-pink-100 bg-pink-50/40 p-3">
+    <h3 className="text-sm font-semibold">Record down payment</h3><p className="text-xs text-gray-600">Record only after verifying receipt of ₱{Number(order.downPayment.amount).toLocaleString()}. Simulated checkout does not collect money.</p>
+    <label className="block text-xs">Payment method<select value={method} onChange={(e) => setMethod(e.target.value)} className="mt-1 block w-full rounded-lg border p-2 text-sm"><option value="gcash">GCash</option><option value="cash">Cash</option><option value="bank_transfer">Bank transfer</option><option value="other">Other</option></select></label>
+    <label className="block text-xs">Receipt / payment reference<input required maxLength={200} value={reference} onChange={(e) => setReference(e.target.value)} className="mt-1 block w-full rounded-lg border p-2 text-sm" /></label>
+    {error && <p role="alert" className="text-xs text-red-700">{error}</p>}<button disabled={busy || !reference.trim()} className="w-full rounded-lg bg-pink-600 p-2 text-sm text-white disabled:opacity-50">{busy ? 'Recording…' : 'Record verified payment'}</button>
+  </form>;
+}
 
 
 const STATUS_TABS = [
@@ -29,9 +52,30 @@ function formatPeso(amount) {
   return `₱${Number(amount || 0).toLocaleString()}`;
 }
 
-export default function BakeryReservations({ reservations, loading, selected, setSelected, onStatusChange, updatingStatus, statusError }) {
+export default function BakeryReservations({ reservations, loading, selected, setSelected, onStatusChange, updatingStatus, statusError, onRecordPayment }) {
   const [activeTab, setActiveTab] = useState('all');
   const [search, setSearch] = useState('');
+  const navigate = useNavigate();
+  const [openingChat, setOpeningChat] = useState(false);
+  const [chatError, setChatError] = useState('');
+  const [blueprintError, setBlueprintError] = useState('');
+  const [previewUrl, setPreviewUrl] = useState(null);
+  async function openBlueprint() {
+    setBlueprintError('');
+    try {
+      const { url } = await bakeryApi.getBlueprintAccess(selected.blueprint);
+      if (!safeExternalUrl(url)) throw new Error('Invalid blueprint link.');
+      setPreviewUrl(url);
+    } catch (error) { setBlueprintError(error.message || 'Could not access blueprint.'); }
+  }
+  async function openChat() {
+    setOpeningChat(true); setChatError('');
+    try {
+      const { conversation } = await chatApi.openReservationChat(selected._id);
+      navigate(`/bakery/chats?tab=messages&conversation=${encodeURIComponent(conversation.id)}`);
+    } catch (error) { setChatError(error.message || 'Could not open customer chat.'); }
+    finally { setOpeningChat(false); }
+  }
 
   const filtered = reservations.filter((r) => {
     if (activeTab !== 'all' && r.status !== activeTab) return false;
@@ -41,6 +85,7 @@ export default function BakeryReservations({ reservations, loading, selected, se
 
   return (
     <div className="cn-bakery-reservations flex h-full min-h-0">
+      <Dialog open={Boolean(previewUrl)} onOpenChange={(open) => { if (!open) setPreviewUrl(null); }}><DialogContent className="flex h-[85dvh] max-w-5xl flex-col"><DialogHeader><DialogTitle>Blueprint PDF preview</DialogTitle></DialogHeader>{previewUrl && <iframe title="Order blueprint PDF" src={previewUrl} className="min-h-0 w-full flex-1 rounded-lg border" />}</DialogContent></Dialog>
       {/* Main list */}
       <div className="flex-1 min-w-0 bg-white flex flex-col overflow-hidden">
 
@@ -150,6 +195,8 @@ export default function BakeryReservations({ reservations, loading, selected, se
               </div>
 
               <div className="space-y-2">
+                {selected.designName && <p className="text-sm font-semibold">{selected.designName}</p>}
+                {selected.checkoutMode === 'simulated' && <p className="text-xs text-amber-700">Simulated checkout · Payment requires staff verification</p>}
                 <div className="flex items-center gap-2 text-sm text-gray-700">
                   <Calendar className="w-4 h-4 text-pink-500" />
                   Pickup: {formatDate(selected.pickupDate)}
@@ -166,6 +213,9 @@ export default function BakeryReservations({ reservations, loading, selected, se
                   </span>
                 </div>
               </div>
+
+              {!selected.downPayment?.isPaid && onRecordPayment && <DownPaymentForm key={selected._id} order={selected} onRecordPayment={onRecordPayment} />}
+              {selected.downPayment?.isPaid && <p className="break-words text-xs text-gray-500">Payment recorded: {formatDate(selected.downPayment.paidAt)}{selected.downPayment.method && ` · ${selected.downPayment.method}`}{selected.downPayment.paymentReference && ` · Reference: ${selected.downPayment.paymentReference}`}</p>}
 
               <div>
                 {statusError && <p role="alert" className="mb-2 text-sm text-red-600">{statusError}</p>}
@@ -189,7 +239,7 @@ export default function BakeryReservations({ reservations, loading, selected, se
               </div>
 
               <div className="space-y-2 pt-2 border-t border-pink-100">
-                {safeExternalUrl(selected.blueprintUrl) ? (
+                {selected.blueprint ? <button type="button" onClick={openBlueprint} className="flex w-full items-center gap-2 rounded-xl border border-pink-100 px-3 py-2.5 text-sm hover:bg-pink-50"><FileText className="h-4 w-4 text-pink-500" />View blueprint PDF</button> : safeExternalUrl(selected.blueprintUrl) ? (
                   <a
                     href={safeExternalUrl(selected.blueprintUrl)}
                     target="_blank"
@@ -205,14 +255,18 @@ export default function BakeryReservations({ reservations, loading, selected, se
                     Blueprint not ready yet
                   </div>
                 )}
+                {blueprintError && <p role="alert" className="text-xs text-red-700">{blueprintError}</p>}
 
                 <button
                   type="button"
+                  onClick={openChat}
+                  disabled={openingChat}
                   className="w-full flex items-center gap-2 text-sm rounded-xl border border-pink-100 px-3 py-2.5 hover:bg-pink-50 transition-colors text-left"
                 >
                   <MessageCircle className="w-4 h-4 text-pink-500" />
                   Open chat with customer
                 </button>
+                {chatError && <p role="alert" className="text-xs text-red-700">{chatError}</p>}
               </div>
             </CustomScrollbar>
           </div>

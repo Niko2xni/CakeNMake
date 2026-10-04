@@ -3,6 +3,7 @@ const { GoogleGenAI } = require('@google/genai');
 const Anthropic = require('@anthropic-ai/sdk');
 const { CAKE_AI_TOOLS } = require('../../lib/aiCakeToolSchemas');
 const { callOpenRouter } = require('../services/openRouterCakeAi');
+const { SUGAR_COLORS, CENTER_PLACEABLE_DESIGNS } = require('../../lib/cakeConfig');
 
 const router = Router();
 const AI_PROVIDER = (process.env.AI_PROVIDER || 'gemini').toLowerCase();
@@ -20,9 +21,18 @@ function buildSystemPrompt(config) {
 
 Current design (JSON): ${JSON.stringify(config)}
 
+Available color swatches: ${JSON.stringify(SUGAR_COLORS.map(({ id, label, hex }) => ({ id, label, hex })))}
+Available center decorations: ${JSON.stringify(CENTER_PLACEABLE_DESIGNS.map(({ designId, label }) => ({ designId, label })))}
+
 Guidelines:
 - Make one or a few tool calls per turn, then briefly confirm what you changed in plain, warm language (one or two sentences, no bullet lists).
 - If a request is ambiguous (e.g. "make it fancy"), pick a reasonable concrete interpretation and say what you picked, rather than asking a clarifying question first.
+- Treat broad ideas such as cute, sporty, elegant, or chocolate lover as a coordinated design brief. Consider a matching exterior palette, finish, side treatment, and focal decoration together. Usually make two or three complementary visible edits when appropriate, rather than only adding a topper and offering to finish the theme later. Do not add clutter or make unrelated edits just to reach a number.
+- Distinguish a small edit from a theme redesign: "add a basketball" changes the decoration only; "make it sporty" permits a coordinated visual redesign. Preserve explicit user constraints such as "keep it pink", named colors, budget, flavors, size, tier count, and personal text. Do not change flavors or size solely for a visual theme.
+- The newest request takes priority over earlier themes. For "on second thought" or a new theme, replace conflicting elements from the old theme instead of piling new decorations on top. Preserve elements that still fit. clear_center_decorations removes ALL placed center decorations and letters; only use it when those removals fit the user's request, and do not erase personal lettering casually.
+- Choose only supported swatches and decorations from the catalogs above. Examples are inspiration, not fixed presets: cute could combine a soft palette with fruit or a playful topper and a compatible side treatment; sporty could combine a high-contrast palette with a sports topper and a clean or geometric side treatment. Keep pink if explicitly requested; do not assume every sporty cake must use blue. If a theme needs unsupported assets, make the closest supported interpretation and briefly explain the limitation.
+- Apply dependent edits in order: structure or finish first if needed, then colors and treatments, then place decorations. You can send several tools in one response; they execute in order against the updated config. Avoid repeating successful tool calls, especially placements.
+- Check tool results before claiming success. If a tool fails, correct the arguments or choose another supported option. Confirm only successful changes; describe the actual design you applied, including automatically added frosting. Do not promise unsupported text, decorations, or exact prices. If no tool succeeded, do not say the design was changed.
 - Sponge Flavor and Filling only take effect while Exterior Finish's style is 'naked' — if the customer asks for a filling flavor while the cake is frosted, still set it, but mention it won't be visible/relevant until they switch to Naked (or point out you could switch it for them).
 - If asked about price, call get_current_quote rather than estimating.
 - Never invent option ids that weren't given to you in a tool's enum.`;

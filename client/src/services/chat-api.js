@@ -25,6 +25,7 @@ async function chatRequest(path, options = {}) {
 }
 
 export const chatApi = {
+  openReservationChat: (id) => chatRequest(`/bakery/reservations/${id}/chat`, { method: 'POST' }),
   listConversations: () => chatRequest('/conversations'),
   createConversation: (platformId) => chatRequest('/conversations', {
     method: 'POST',

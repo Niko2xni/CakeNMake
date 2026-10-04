@@ -1,5 +1,7 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render as renderComponent, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+const render = (ui, route = '/bakery/chats?tab=messages') => renderComponent(<MemoryRouter initialEntries={[route]}>{ui}</MemoryRouter>);
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 const conversations = [
@@ -22,6 +24,7 @@ const conversations = [
     unreadCount: 2,
   },
 ];
+const { selectConversation } = vi.hoisted(() => ({ selectConversation: vi.fn() }));
 
 vi.mock('@/hooks/useChat', async (importOriginal) => {
   const actual = await importOriginal();
@@ -39,7 +42,7 @@ vi.mock('@/hooks/useChat', async (importOriginal) => {
       loadOlder: vi.fn(),
       refreshConversations: vi.fn(),
       sendMessage: vi.fn(),
-      setActiveConversationId: vi.fn(),
+      setActiveConversationId: selectConversation,
     }),
   };
 });
@@ -51,6 +54,10 @@ beforeAll(() => {
 });
 
 describe('BakeryChat conversation list', () => {
+  it('selects the requested order conversation even when it is not the latest chat', () => {
+    render(<BakeryChat />, '/bakery/chats?tab=messages&conversation=older');
+    expect(selectConversation).toHaveBeenCalledWith('older');
+  });
   it('shows unread activity and orders the newest conversation first', () => {
     render(<BakeryChat />);
 

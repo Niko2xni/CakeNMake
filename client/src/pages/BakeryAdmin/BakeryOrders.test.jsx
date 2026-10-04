@@ -4,9 +4,11 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { bakeryApi, transactionApi } from '@/services/api';
 import BakeryOrders from './BakeryOrders';
+import { chatApi } from '@/services/chat-api';
+vi.mock('@/services/chat-api', () => ({ chatApi: { openReservationChat: vi.fn() } }));
 
 vi.mock('@/services/api', () => ({
-  bakeryApi: { getReservations: vi.fn(), updateReservationStatus: vi.fn() },
+  bakeryApi: { getReservations: vi.fn(), updateReservationStatus: vi.fn(), recordDownPayment: vi.fn(), getBlueprintAccess: vi.fn() },
   transactionApi: { getTransactions: vi.fn() },
 }));
 vi.mock('@/components/shared/CustomScrollbar', () => ({ default: ({ children, className }) => <div className={className}>{children}</div> }));
@@ -35,6 +37,34 @@ beforeEach(() => {
 });
 
 describe('Orders', () => {
+  it('opens the private checkout blueprint through authorized temporary access', async () => {
+    bakeryApi.getReservations.mockResolvedValue([{ ...order, blueprint: 'blueprint-1' }]);
+    bakeryApi.getBlueprintAccess.mockResolvedValue({ url: 'https://example.com/private.pdf' });
+    setup();
+    fireEvent.click(await within(screen.getByRole('tabpanel', { name: 'Reservations' })).findByText('Ana Cruz'));
+    fireEvent.click(screen.getByRole('button', { name: 'View blueprint PDF' }));
+    expect(await screen.findByRole('dialog', { name: 'Blueprint PDF preview' })).toBeVisible();
+    expect(screen.getByTitle('Order blueprint PDF')).toHaveAttribute('src', 'https://example.com/private.pdf');
+    expect(bakeryApi.getBlueprintAccess).toHaveBeenCalledWith('blueprint-1');
+  });
+  it('opens the exact customer conversation from reservation details', async () => {
+    chatApi.openReservationChat.mockResolvedValue({ conversation: { id: 'conversation-1' } });
+    setup('/bakery/orders?tab=payments');
+    fireEvent.click(await screen.findByRole('button', { name: 'Open reservation for Ana Cruz' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open chat with customer' }));
+    await waitFor(() => expect(screen.getByLabelText('Current route')).toHaveTextContent('/bakery/chats?tab=messages&conversation=conversation-1'));
+    expect(chatApi.openReservationChat).toHaveBeenCalledWith('order-1');
+  });
+  it('records a verified down payment and refreshes orders and totals', async () => {
+    bakeryApi.recordDownPayment.mockResolvedValue({});
+    setup('/bakery/orders?tab=payments');
+    fireEvent.click(await screen.findByRole('button', { name: 'Open reservation for Ben Reyes' }));
+    expect(screen.getByRole('button', { name: 'Record verified payment' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Receipt / payment reference'), { target: { value: 'GC-12345' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Record verified payment' }));
+    await waitFor(() => expect(bakeryApi.recordDownPayment).toHaveBeenCalledWith('order-2', { amount: 500, method: 'gcash', reference: 'GC-12345' }));
+    await waitFor(() => expect(transactionApi.getTransactions).toHaveBeenCalledTimes(2));
+  });
   it('preserves reservation search and status filters when switching tabs', async () => {
     setup();
     await within(screen.getByRole('tabpanel', { name: 'Reservations' })).findByText('Ana Cruz');

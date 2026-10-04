@@ -18,7 +18,10 @@ const pricingSnapshotSchema = new mongoose.Schema({
 const reservationSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    design: { type: mongoose.Schema.Types.ObjectId, ref: 'Design', required: true },
+    design: { type: mongoose.Schema.Types.ObjectId, ref: 'Design', required() { return !this.blueprint; } },
+    blueprint: { type: mongoose.Schema.Types.ObjectId, ref: 'Blueprint', immutable: true },
+    designName: { type: String, maxlength: 200 },
+    checkoutMode: { type: String, enum: ['simulated'] },
     platform: { type: mongoose.Schema.Types.ObjectId, ref: 'Platform', required: true },
 
     pickupDate: { type: Date, required: true },
@@ -33,6 +36,8 @@ const reservationSchema = new mongoose.Schema(
       isPaid: { type: Boolean, default: false },
       paymentReference: { type: String, default: null }, // PayMongo reference
       paidAt: { type: Date, default: null },
+      recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      method: { type: String, enum: ['gcash', 'cash', 'bank_transfer', 'other'], default: null },
     },
 
     // Set once the BullMQ/Puppeteer/jsPDF background pipeline finishes.
@@ -47,5 +52,6 @@ const reservationSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+reservationSchema.index({ blueprint: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model('Reservation', reservationSchema);

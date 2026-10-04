@@ -86,6 +86,11 @@ export default function BakeryOrders() {
     }
   }
 
+  async function recordPayment(id, payment) {
+    await bakeryApi.recordDownPayment(id, payment);
+    await Promise.all([loadReservations(), loadPayments()]);
+  }
+
   const cards = summary ? [
     { label: 'Down Payments Collected', value: `₱${Number(summary.totalDownPaymentsCollected || 0).toLocaleString()}`, icon: Banknote },
     { label: 'Total Order Value', value: `₱${Number(summary.totalRevenueExpected || 0).toLocaleString()}`, icon: TrendingUp },
@@ -123,7 +128,7 @@ export default function BakeryOrders() {
       {reservationsError && <LoadError message={reservationsError} onRetry={loadReservations} />}
       <div hidden={Boolean(reservationsError)} className="h-full">
         <BakeryReservations reservations={reservations} loading={reservationsLoading} selected={selected}
-          setSelected={(row) => { setSelected(row); setStatusError(''); }} onStatusChange={updateStatus} updatingStatus={updatingStatus} statusError={statusError} />
+          setSelected={(row) => { setSelected(row); setStatusError(''); }} onStatusChange={updateStatus} updatingStatus={updatingStatus} statusError={statusError} onRecordPayment={recordPayment} />
       </div>
     </section>
     <section id="orders-payments-panel" role="tabpanel" aria-labelledby="orders-payments-tab" hidden={activeTab !== 'payments'} className="flex-1 min-h-0">

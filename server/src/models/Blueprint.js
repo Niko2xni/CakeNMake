@@ -22,6 +22,7 @@ const blueprintSchema = new mongoose.Schema({
   designSnapshot: { type: mongoose.Schema.Types.Mixed, required: true, immutable: true },
   // Customer estimate, not evidence of a real payment or authoritative charge.
   quoteSnapshot: { type: mongoose.Schema.Types.Mixed, default: null, immutable: true },
+  orderPricingSnapshot: { type: mongoose.Schema.Types.Mixed, default: null, immutable: true },
   paymentMode: { type: String, enum: ['simulated'], required: true, immutable: true },
   paymentCompletedAt: { type: Date, required: true, immutable: true },
   status: {

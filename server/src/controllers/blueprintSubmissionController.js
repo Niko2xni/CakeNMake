@@ -2,6 +2,8 @@ const { createHash } = require('node:crypto');
 const Blueprint = require('../models/Blueprint');
 const Platform = require('../models/Platform');
 const storage = require('../services/blueprintStorageService');
+const checkout = require('../services/checkoutReservationService');
+const pricing = require('../services/pricingService');
 
 // Authenticated demo submission. Payment completion is a simulated client assertion,
 // not proof of a real charge. Do not return storage identifiers or PDF URLs.
@@ -31,6 +33,7 @@ async function submitBlueprint(req, res) {
   const customerName = req.user?.displayName || body.customerName?.trim() || 'Guest';
   const submissionHash = createHash('sha256').update(JSON.stringify({ designName, deliveryDate, designSnapshot, quoteSnapshot: quoteSnapshot || null, customerName })).update(buffer).digest('hex');
   let record;
+  let readySaved = false;
   try {
     const platform = await Platform.findOne({ slug: body.platformSlug || 'mamshie-bakery', isActive: true });
     if (!platform) return res.status(404).json({ message: 'Bakery not found.' });
@@ -39,19 +42,26 @@ async function submitBlueprint(req, res) {
     if (existing) {
       if (req.user && String(existing.customer) !== String(req.user._id)) return res.status(403).json({ message: 'Submission belongs to another account.' });
       if (existing.submissionHash !== submissionHash) return res.status(409).json({ message: 'Submission ID already belongs to a different blueprint.' });
-      if (existing.status !== 'failed') return res.status(existing.status === 'ready' ? 200 : 202).json({ submissionId, status: existing.status });
+      if (existing.status !== 'failed') {
+        if (existing.status === 'ready') await checkout.ensureCheckoutReservation(existing);
+        return res.status(existing.status === 'ready' ? 200 : 202).json({ submissionId, status: existing.status });
+      }
       record = await Blueprint.findOneAndUpdate({ ...key, status: 'failed' }, { $set: { status: 'uploading', failureReason: null } }, { new: true });
       if (!record) return res.status(202).json({ submissionId, status: 'uploading' });
     } else {
-      record = await Blueprint.create({ ...key, submissionHash, customer: req.user?._id || null, customerName, designName: designName.trim(), deliveryDate, designSnapshot, quoteSnapshot: quoteSnapshot || null, paymentMode: 'simulated', paymentCompletedAt: new Date() });
+      const orderPricingSnapshot = { ...pricing.buildQuote(designSnapshot, await pricing.getActivePriceBook(platform._id)), calculatedAt: new Date() };
+      if (quoteSnapshot && quoteSnapshot.totalMinor !== orderPricingSnapshot.totalMinor) return res.status(409).json({ message: 'Cake pricing changed. Refresh the quote before checking out.' });
+      record = await Blueprint.create({ ...key, submissionHash, customer: req.user?._id || null, customerName, designName: designName.trim(), deliveryDate, designSnapshot, quoteSnapshot: quoteSnapshot || null, orderPricingSnapshot, paymentMode: 'simulated', paymentCompletedAt: new Date() });
     }
     record.pdf = await storage.uploadBlueprintPdf({ buffer, platformId: platform._id, blueprintId: record._id });
     record.status = 'ready';
     await record.save();
+    readySaved = true;
+    await checkout.ensureCheckoutReservation(record);
     return res.status(201).json({ submissionId, status: 'ready' });
   } catch (error) {
     if (error.code === 11000) return res.status(409).json({ message: 'Submission already in progress. Retry with the same submission ID.' });
-    if (record) {
+    if (record && !readySaved) {
       await Blueprint.updateOne({ _id: record._id }, { $set: { status: 'failed', failureReason: 'PDF storage failed.' } }).catch(() => {});
     }
     console.error('Blueprint submission failed:', error.message);

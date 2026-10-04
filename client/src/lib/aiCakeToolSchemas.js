@@ -96,7 +96,7 @@ export const CAKE_AI_TOOLS = [
   },
   {
     name: 'set_sugar_color',
-    description: "Change what the coating looks like: 'default' matches the flavor's natural color, 'colorOverride' picks a flat color via colorId. Applies to the whole-cake exterior finish color (use the `context` field to target Filling, Side, or Glaze/Surface color instead).",
+    description: "Change what the coating looks like: 'default' matches the flavor's natural color, 'colorOverride' picks a flat color via colorId. Applies to the whole-cake exterior finish color (use the `context` field to target Filling, Side, or Glaze/Surface color instead). An exterior color override adds fully frosted coating to naked tiers so the color is visible; tell the customer when frosting was added. Existing frosted textures are preserved.",
     input_schema: {
       type: 'object',
       properties: {

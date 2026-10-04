@@ -148,11 +148,34 @@ export function applyCakeAiTool(name, input, ctx) {
       const next = { ...current, ...(input.mode ? { mode: input.mode } : input.colorId ? { mode: 'colorOverride' } : {}), ...(input.colorId ? { colorId: input.colorId } : {}) };
       const overrides = { ...(config.sugarColorOverrides || {}), [key]: next };
       for (let tier = 0; tier < tiers; tier++) overrides[`${key}-${tier}`] = { ...next };
+      // A naked tier has no coating to tint. Make an explicit exterior
+      // color request visible, preserving existing frosted textures.
+      let exteriorFinish = config.exteriorFinish;
+      let addedFrosting = false;
+      if (context === 'exterior' && next.mode === 'colorOverride') {
+        const individual = config.structure?.layerDesign === 'individual';
+        const layerStyles = Array.from({ length: tiers }, (_, tier) => {
+          const style = (individual ? exteriorFinish?.layerStyles?.[tier] : null)
+            || exteriorFinish?.style || DEFAULT_CONFIG.exteriorFinish.style;
+          if (style !== 'naked') return style;
+          addedFrosting = true;
+          return 'fullyFrosted';
+        });
+        if (addedFrosting) exteriorFinish = {
+          ...exteriorFinish,
+          style: exteriorFinish?.style === 'naked' ? 'fullyFrosted' : exteriorFinish?.style,
+          layerStyles,
+        };
+      }
       onChange({
         ...config,
+        exteriorFinish,
         sugarColorOverrides: overrides,
       });
-      return { label: `${context} color → ${next.colorId || next.mode}`, result: next };
+      return {
+        label: `${context} color → ${next.colorId || next.mode}${addedFrosting ? ' (added frosting)' : ''}`,
+        result: { ...next, ...(addedFrosting ? { addedFrosting: true, exteriorFinish } : {}) },
+      };
     }
 
     case 'set_surface_treatment': {

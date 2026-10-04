@@ -64,6 +64,30 @@ describe('Cake AI edits without a provider', () => {
     expect(execute('set_filling', { enabled: false, layers: 2 }).next.filling.enabled).toBe(false);
   });
 
+  it('makes a pink exterior visible on a naked cake and reports the added frosting', () => {
+    const { next, response } = execute('set_sugar_color', { colorId: 'pink' });
+    expect(next.exteriorFinish.style).toBe('fullyFrosted');
+    expect(next.exteriorFinish.layerStyles).toEqual(['fullyFrosted']);
+    expect(next.sugarColorOverrides.exterior).toMatchObject({ mode: 'colorOverride', colorId: 'pink' });
+    expect(response.result.addedFrosting).toBe(true);
+    expect(response.label).toContain('added frosting');
+  });
+
+  it('coats only naked tiers while preserving textured buttercream', () => {
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.structure = { ...config.structure, layers: 2, layerDesign: 'individual' };
+    config.exteriorFinish.layerStyles = ['naked', 'texturedButtercream'];
+    const { next } = execute('set_sugar_color', { colorId: 'pink' }, config);
+    expect(next.exteriorFinish.layerStyles).toEqual(['fullyFrosted', 'texturedButtercream']);
+    expect(config.exteriorFinish.layerStyles).toEqual(['naked', 'texturedButtercream']);
+  });
+
+  it.each([{ context: 'filling', colorId: 'pink' }, { mode: 'default' }])(
+    'does not add exterior frosting for %j', input => {
+      expect(execute('set_sugar_color', input).next.exteriorFinish.style).toBe('naked');
+    }
+  );
+
   it('places selectable decorations at the actual top-tier radius', () => {
     const config = structuredClone(DEFAULT_CONFIG);
     config.structure.layers = 2;

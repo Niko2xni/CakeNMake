@@ -6,7 +6,7 @@ import { Separator } from '@/components/ui/separator';
 
 // Static demo GCash reference code — locked to downpayment amount
 function generateRef(amount) {
-  return `GC-${amount}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+  return `DEMO-${amount}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 }
 
 export default function GCashPayment({ total, selectedDate, onPaid, onBack, onPaymentComplete, onBusyChange }) {
@@ -50,9 +50,9 @@ export default function GCashPayment({ total, selectedDate, onPaid, onBack, onPa
         <ChevronLeft className="w-3.5 h-3.5" /> Back to calendar
       </button>
 
-      <p className="font-heading font-bold text-base mb-1">Down Payment via GCash</p>
+      <p className="font-heading font-bold text-base mb-1">Simulated GCash checkout</p>
       <p className="text-xs text-muted-foreground mb-4">
-        Pay 50% now to confirm your order. The remaining balance will be settled on delivery.
+        This demo does not charge money. Submit your order, then arrange the 50% down payment with the bakery. Staff will confirm it after verifying payment.
       </p>
 
       {/* Order summary */}
@@ -71,7 +71,7 @@ export default function GCashPayment({ total, selectedDate, onPaid, onBack, onPa
         </div>
         <Separator className="opacity-40" />
         <div className="flex justify-between text-sm font-bold">
-          <span>Down payment (50% due now)</span>
+          <span>Required down payment (50%)</span>
           <span className="text-primary">₱{downpayment}</span>
         </div>
       </div>
@@ -80,7 +80,7 @@ export default function GCashPayment({ total, selectedDate, onPaid, onBack, onPa
       <div className="border border-border rounded-2xl overflow-hidden mb-4">
         {/* PayMongo header */}
         <div className="bg-[#0040C1] px-4 py-3 flex items-center justify-between">
-          <span className="text-white font-bold text-sm tracking-tight">PayMongo</span>
+          <span className="text-white font-bold text-sm tracking-tight">PayMongo demo</span>
           <Lock className="w-3.5 h-3.5 text-white/70" />
         </div>
 
@@ -92,7 +92,7 @@ export default function GCashPayment({ total, selectedDate, onPaid, onBack, onPa
             </div>
             <div className="flex-1">
               <p className="font-bold text-sm text-[#007DFF]">GCash</p>
-              <p className="text-[10px] text-muted-foreground">You will be redirected to GCash app</p>
+              <p className="text-[10px] text-muted-foreground">Demo only · No GCash redirect or charge</p>
             </div>
             <div className="w-4 h-4 rounded-full border-2 border-[#007DFF] flex items-center justify-center">
               <div className="w-2 h-2 rounded-full bg-[#007DFF]" />
@@ -101,13 +101,13 @@ export default function GCashPayment({ total, selectedDate, onPaid, onBack, onPa
 
           {/* Reference code */}
           <div className="bg-muted/50 rounded-lg px-3 py-2 mb-3">
-            <p className="text-[10px] text-muted-foreground mb-0.5">Reference code (locked to ₱{downpayment})</p>
+            <p className="text-[10px] text-muted-foreground mb-0.5">Demo reference · Not a payment receipt</p>
             <p className="font-mono text-xs font-bold tracking-widest text-foreground">{ref}</p>
           </div>
 
           <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mb-3">
             <ShieldCheck className="w-3 h-3 text-green-500 shrink-0" />
-            Secured by PayMongo • Only ₱{downpayment} will be charged now
+            Simulated payment • No money will be collected
           </div>
 
           {/* Payment terms & liability disclosure */}
@@ -123,7 +123,7 @@ export default function GCashPayment({ total, selectedDate, onPaid, onBack, onPa
       {done ? (
         <div className="text-center py-2">
           <p className="text-2xl mb-1">🎉</p>
-          <p className="font-heading font-bold text-sm text-green-600">Payment confirmed!</p>
+          <p className="font-heading font-bold text-sm text-green-600">{submitted ? 'Order submitted!' : 'Simulated checkout complete'}</p>
           <p className="text-xs text-muted-foreground mb-4">{submitted ? 'Your order has been sent to the bakery.' : submitting ? 'Sending your order to the bakery…' : 'Your order has not been sent yet.'}</p>
           {submissionError && <p role="alert" className="text-xs text-destructive mb-3">{submissionError}</p>}
           {!submitted && !submitting && <Button className="w-full mb-2" onClick={submitOrder}>Retry sending order</Button>}
@@ -131,7 +131,7 @@ export default function GCashPayment({ total, selectedDate, onPaid, onBack, onPa
         </div>
       ) : (
         <Button className="w-full bg-[#007DFF] hover:bg-[#0068D9]" onClick={() => setShowConfirmModal(true)} disabled={paying}>
-          {paying ? 'Processing...' : `Pay ₱${downpayment} via GCash`}
+          {paying ? 'Processing...' : 'Continue simulated checkout'}
         </Button>
       )}
 
@@ -144,7 +144,7 @@ export default function GCashPayment({ total, selectedDate, onPaid, onBack, onPa
                 <ShieldCheck className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h3 className="font-heading font-bold text-base text-foreground leading-tight">Confirm Order &amp; Payment</h3>
+                <h3 className="font-heading font-bold text-base text-foreground leading-tight">Confirm demo order</h3>
                 <p className="text-[11px] text-muted-foreground">Please review these essential terms</p>
               </div>
             </div>
@@ -153,7 +153,7 @@ export default function GCashPayment({ total, selectedDate, onPaid, onBack, onPa
               <div className="flex items-start gap-2">
                 <span className="font-bold text-foreground shrink-0">•</span>
                 <p>
-                  <strong className="text-foreground">50% Down Payment (₱{downpayment}):</strong> Will be charged now via GCash to reserve your bakery slot and initiate preparation.
+                  <strong className="text-foreground">50% Down Payment (₱{downpayment}):</strong> Arrange payment with the bakery after submission. This demo does not charge your account.
                 </p>
               </div>
               <div className="flex items-start gap-2">
@@ -165,7 +165,7 @@ export default function GCashPayment({ total, selectedDate, onPaid, onBack, onPa
               <div className="flex items-start gap-2">
                 <span className="font-bold text-foreground shrink-0">•</span>
                 <p>
-                  <strong className="text-foreground">Permanent Design Lock:</strong> Once paid and sent, this design is permanently finalized for viewing only and cannot be edited.
+                  <strong className="text-foreground">Permanent Design Lock:</strong> Once submitted, this design is permanently finalized for viewing only and cannot be edited.
                 </p>
               </div>
               <div className="flex items-start gap-2">
@@ -195,7 +195,7 @@ export default function GCashPayment({ total, selectedDate, onPaid, onBack, onPa
                   handlePay();
                 }}
               >
-                Yes, Confirm &amp; Pay
+                Submit demo order
               </Button>
             </div>
           </div>

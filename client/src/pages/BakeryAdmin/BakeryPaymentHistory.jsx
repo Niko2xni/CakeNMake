@@ -20,7 +20,10 @@ export default function BakeryPaymentHistory({ payments, loading, onOpenReservat
         <div className="flex-1 min-w-[120px]">
           <p className="text-sm font-semibold text-gray-900">{payment.user?.displayName || payment.user?.name || 'Unknown customer'}</p>
           <p className="text-xs text-gray-500">Reservation date: {date(payment.createdAt)}</p>
+          {payment.designName && <p className="text-xs text-gray-500">{payment.designName}</p>}
+          {payment.checkoutMode === 'simulated' && <p className="text-xs text-amber-700">Simulated checkout</p>}
           {payment.downPayment?.isPaid && <p className="text-xs text-gray-500">Down payment date: {date(payment.downPayment.paidAt)}</p>}
+          {payment.downPayment?.paymentReference && <p className="break-all text-xs text-gray-500">Reference: {payment.downPayment.paymentReference}</p>}
         </div>
         <div className="text-xs text-gray-500">
           <p className="text-sm font-semibold text-gray-900">Order total: {peso(payment.totalPrice)}</p>

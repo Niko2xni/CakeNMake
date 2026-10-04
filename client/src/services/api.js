@@ -193,6 +193,7 @@ export const designApi = {
 
 
 export const bakeryApi = {
+  recordDownPayment: (id, payment) => requestAuthenticatedJson(`${API_BASE_URL}/bakery/reservations/${encodeURIComponent(id)}/down-payment`, { method: 'POST', body: JSON.stringify(payment) }),
   getBlueprints: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/blueprints`),
   getBlueprintAccess: (id, download = false) => requestAuthenticatedJson(`${API_BASE_URL}/bakery/blueprints/${encodeURIComponent(id)}/access?download=${download}`),
   getReservations: async (status) => {

@@ -8,7 +8,7 @@ import PricingPanel from '@/components/cake/PricingPanel';
 import SendBakeryModal from '@/components/bakery/SendBakeryModal';
 import BakeryChatPanel from '@/components/bakery/BakeryChatPanel';
 import GuestAuthModal from '@/components/auth/GuestAuthModal';
-import { Cake, Menu, X, Send, MessageCircle, Palette, Cloud, CloudOff, Loader2, RotateCcw, GripHorizontal, SlidersHorizontal } from 'lucide-react';
+import { Cake, X, Send, Cloud, CloudOff, Loader2, RotateCcw, GripHorizontal, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { blueprintApi, designApi, pricingApi, templateApi } from '@/services/api';
@@ -16,7 +16,7 @@ import { chatApi } from '@/services/chat-api';
 import { format } from 'date-fns';
 import { buildBlueprintDetails } from '@/lib/blueprintDetails';
 import { buildBlueprintPdfBlob } from '@/lib/blueprintPdf';
-import { DEFAULT_CONFIG, getCenterItemLimit, getCenterItemCount, doItemsClash } from '@/lib/cakeConfig';
+import { DEFAULT_CONFIG, getCenterItemLimit, getCenterItemCount } from '@/lib/cakeConfig';
 import { adaptConfigToLegacy, adaptConfigFromLegacy } from '@/lib/configAdapter';
 import useCakeQuote from '@/hooks/use-cake-quote';
 import { useAuth } from '@/lib/AuthContext';
@@ -626,10 +626,10 @@ export default function DesignerWorkSpace() {
     // Post automated order brief into the bakery conversation
     try {
       const convos = await chatApi.listConversations();
-      let convoId = Array.isArray(convos) && convos.length > 0 ? convos[0].id : null;
+      let convoId = convos.conversations?.[0]?.id || null;
       if (!convoId) {
         const created = await chatApi.createConversation();
-        convoId = created?.id;
+        convoId = created?.conversation?.id;
       }
       if (convoId) {
         const totalPesos = quote ? quote.totalMinor / 100 : 0;
@@ -637,7 +637,8 @@ export default function DesignerWorkSpace() {
         const remaining = totalPesos - downpayment;
         const formattedDate = selectedDate ? format(selectedDate, 'MMM d, yyyy') : 'Scheduled Date';
         await chatApi.sendMessage(convoId, {
-          text: `🎂 Cake Order Submitted!\n• Design: "${title}"\n• Delivery Date: ${formattedDate}\n• Down Payment: ₱${downpayment} (Paid via GCash)\n• Remaining Balance: ₱${remaining} (Due upon delivery/pickup)\n\nYour design has been sent to the bakery. Kindly wait for the bakery to reply.`,
+          clientMessageId: `order_${submittedBlueprintRef.current?.submissionId || crypto.randomUUID()}`,
+          text: `🎂 Cake Order Submitted!\n• Design: "${title}"\n• Delivery Date: ${formattedDate}\n• Required Down Payment: ₱${downpayment} (Awaiting staff verification)\n• Remaining Balance: ₱${remaining} (Due upon delivery/pickup)\n\nCheckout was simulated; no money was collected. Please contact the bakery to arrange payment.`,
         });
       }
     } catch (err) {

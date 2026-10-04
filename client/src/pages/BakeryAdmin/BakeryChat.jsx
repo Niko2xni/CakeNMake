@@ -5,6 +5,7 @@ import { AdminRowsSkeleton } from '@/components/shared/PageLoadingSkeleton';
 import { Skeleton } from '@/components/ui/skeleton';
 import { sortConversationsByActivity, useChat } from '@/hooks/useChat';
 import { chatApi } from '@/services/chat-api';
+import { useSearchParams } from 'react-router-dom';
 
 function formatTime(value) {
   if (!value) return '';
@@ -19,6 +20,15 @@ function customerLabel(conversation) {
 
 export default function BakeryChat() {
   const chat = useChat();
+  const [params] = useSearchParams();
+  const requestedConversation = params.get('conversation');
+  const openedRequest = useRef(null);
+  useEffect(() => {
+    if (requestedConversation && openedRequest.current !== requestedConversation && chat.conversations.some((item) => item.id === requestedConversation)) {
+      chat.setActiveConversationId(requestedConversation);
+      openedRequest.current = requestedConversation;
+    }
+  }, [requestedConversation, chat.conversations, chat.setActiveConversationId]);
   const [inputText, setInputText] = useState('');
   const [sendError, setSendError] = useState('');
   const [sending, setSending] = useState(false);

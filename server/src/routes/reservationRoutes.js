@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { listReservations, getReservation, updateStatus } = require('../controllers/reservationController');
+const { listReservations, getReservation, updateStatus, openChat, recordDownPayment } = require('../controllers/reservationController');
 const authenticate = require('../middleware/authenticate');
 const {
   loadAppUser,
@@ -16,5 +16,7 @@ router.use(requirePlatformMembership);
 router.get('/', listReservations);
 router.get('/:id', getReservation);
 router.patch('/:id/status', updateStatus);
+router.post('/:id/chat', openChat);
+router.post('/:id/down-payment', recordDownPayment);
 
 module.exports = router;
