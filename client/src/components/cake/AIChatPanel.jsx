@@ -178,7 +178,7 @@ export default function AIChatPanel({ config, onChange, quote, session, active =
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Header label */}
-      <div className="flex items-center gap-2 pb-3 shrink-0">
+      <div className="flex items-center gap-2 pb-2 md:pb-3 shrink-0">
         <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center shrink-0"><Sparkles className="w-4 h-4 text-primary" /></div>
         <div className="flex-1 min-w-0">
           <p className="text-xs font-heading font-semibold text-foreground">AI Cake Designer</p>
@@ -192,7 +192,7 @@ export default function AIChatPanel({ config, onChange, quote, session, active =
       {session?.error && <p role="status" className="text-xs text-destructive pb-2">{session.error}</p>}
       {unavailable && !session.error && <p role="status" className="text-xs text-muted-foreground pb-2">Loading saved chat...</p>}
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto space-y-3 pr-1 pb-4 min-h-0">
+      <div className="flex-1 overflow-y-auto space-y-2 md:space-y-3 pr-1 pb-2 md:pb-4 min-h-0">
         {display.map((msg, i) => (
           <div key={i} className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             {msg.role === 'assistant' && (
@@ -251,16 +251,16 @@ export default function AIChatPanel({ config, onChange, quote, session, active =
         )}
       {/* Suggestions — only on the untouched greeting screen */}
       {display.length === 1 && (
-        <div className="pl-8 pt-1">
+        <div className="pl-0 md:pl-8 pt-1">
           <p className="text-[10px] text-muted-foreground mb-2">Try an idea</p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-1.5 md:gap-2">
           {SUGGESTIONS.map((s, index) => (
             <button
               key={s}
               title={s}
               disabled={thinking || unavailable || preparing || dictation.listening}
               onClick={() => sendMessage(s)}
-              className="text-[11px] border border-border/60 bg-background hover:bg-primary/5 hover:border-primary/30 rounded-xl px-3 py-2.5 text-foreground/80 transition-colors text-left disabled:opacity-50"
+              className="text-[11px] min-h-11 border border-border/60 bg-background hover:bg-primary/5 hover:border-primary/30 rounded-xl px-2.5 md:px-3 py-2 md:py-2.5 text-foreground/80 transition-colors text-left disabled:opacity-50"
             >
               {['Birthday fun', 'Elegant wedding', 'Chocolate dream', 'Cute unicorn'][index]}
             </button>

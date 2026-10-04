@@ -97,9 +97,9 @@ export default function BakeryOrders() {
     { label: 'Pending Down Payments', value: summary.pendingCount, icon: Clock },
   ] : [];
 
-  return <div className="cn-bakery-orders h-full min-h-0 rounded-2xl border border-pink-100 bg-white shadow-xl flex flex-col overflow-hidden">
+  return <div className="cn-bakery-orders h-full min-h-0 rounded-2xl border border-pink-100 bg-white shadow-sm flex flex-col overflow-hidden">
     <header className="shrink-0 border-b border-pink-100 px-4 py-4 sm:px-6">
-      <h1 className="text-lg font-bold text-gray-900">Orders</h1>
+      <h1 className="text-xl font-bold tracking-tight text-gray-900">Orders</h1>
       <p className="text-sm text-gray-500">Manage cake reservations and payments</p>
     </header>
     <div className="cn-order-summary shrink-0 grid grid-cols-1 sm:grid-cols-3 gap-2 px-4 py-3 sm:px-6 border-b border-pink-100">

@@ -97,8 +97,8 @@ function MobileDraggableToolPanel({
     };
   }, [mainAreaRef]);
 
-  const panelWidth = Math.min(320, containerDimensions.width * 0.88);
-  const panelHeight = Math.min(560, Math.max(280, containerDimensions.height - 32));
+  const panelWidth = Math.min(320, containerDimensions.width - 16);
+  const panelHeight = Math.min(560, Math.max(0, containerDimensions.height - 16));
   const EDGE_PADDING = 8;
   const leftDockX = EDGE_PADDING;
   const rightDockX = Math.max(EDGE_PADDING, containerDimensions.width - panelWidth - EDGE_PADDING);
@@ -158,7 +158,7 @@ function MobileDraggableToolPanel({
           {/* Draggable header bar */}
           <div
             onPointerDown={(e) => dragControls.start(e)}
-            className="w-full flex items-center justify-between px-3 py-2 bg-card/95 backdrop-blur-md rounded-t-2xl border-t border-x border-border/70 cursor-grab active:cursor-grabbing select-none touch-none shadow-sm gap-2"
+            className="w-full min-h-11 flex flex-col items-center justify-center px-3 py-1.5 bg-card/95 backdrop-blur-md rounded-t-2xl border-t border-x border-border/70 cursor-grab active:cursor-grabbing select-none touch-none shadow-sm gap-1"
           >
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted/80 hover:bg-muted transition-colors">
               <GripHorizontal className="w-3.5 h-3.5 text-muted-foreground" />

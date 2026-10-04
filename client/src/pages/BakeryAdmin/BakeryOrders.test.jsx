@@ -37,6 +37,30 @@ beforeEach(() => {
 });
 
 describe('Orders', () => {
+  it('searches reservations by cake and clears unmatched filters', async () => {
+    bakeryApi.getReservations.mockResolvedValue([{ ...order, designName: 'Chocolate celebration' }, unpaid]);
+    setup();
+    await within(screen.getByRole('tabpanel', { name: 'Reservations' })).findByText('Ana Cruz');
+    fireEvent.change(screen.getByLabelText('Search reservations by customer name'), { target: { value: 'Chocolate' } });
+    const list = within(screen.getByRole('tabpanel', { name: 'Reservations' }));
+    expect(list.getByText('Ana Cruz')).toBeVisible();
+    expect(list.queryByText('Ben Reyes')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Search reservations by customer name'), { target: { value: 'missing' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(list.getByText('Ben Reyes')).toBeVisible();
+  });
+  it('filters payment history by paid status and receipt reference', async () => {
+    transactionApi.getTransactions.mockResolvedValue({ transactions: [{ ...order, downPayment: { ...order.downPayment, paymentReference: 'GC-123' } }, unpaid], summary });
+    setup('/bakery/orders?tab=payments');
+    await screen.findByRole('button', { name: 'Open reservation for Ana Cruz' });
+    fireEvent.change(screen.getByLabelText('Filter payment history'), { target: { value: 'unpaid' } });
+    expect(screen.queryByRole('button', { name: 'Open reservation for Ana Cruz' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open reservation for Ben Reyes' })).toBeVisible();
+    fireEvent.change(screen.getByLabelText('Filter payment history'), { target: { value: 'all' } });
+    fireEvent.change(screen.getByLabelText('Search payment history'), { target: { value: 'GC-123' } });
+    expect(screen.getByRole('button', { name: 'Open reservation for Ana Cruz' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Open reservation for Ben Reyes' })).not.toBeInTheDocument();
+  });
   it('opens the private checkout blueprint through authorized temporary access', async () => {
     bakeryApi.getReservations.mockResolvedValue([{ ...order, blueprint: 'blueprint-1' }]);
     bakeryApi.getBlueprintAccess.mockResolvedValue({ url: 'https://example.com/private.pdf' });

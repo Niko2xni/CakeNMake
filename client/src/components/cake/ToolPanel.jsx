@@ -381,7 +381,7 @@ export default function ToolPanel({
       </AnimatePresence>
 
       {/* Mode switcher header */}
-      <div className="px-4 pt-4 pb-3 flex items-center gap-2">
+      <div className="px-3 pt-2 pb-2 md:px-4 md:pt-4 md:pb-3 flex items-center gap-2">
         <button
           onClick={() => setModeUi('design')}
           className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
@@ -451,7 +451,7 @@ export default function ToolPanel({
           aria-hidden={config.interiorPreview}
         >
           {/* Keep the conversation mounted when switching to manual design. */}
-            <div className={`flex-1 p-4 min-h-0 flex-col ${modeUi === 'ai' ? 'flex' : 'hidden'}`} aria-hidden={modeUi !== 'ai'}>
+            <div className={`flex-1 p-3 md:p-4 min-h-0 flex-col ${modeUi === 'ai' ? 'flex' : 'hidden'}`} aria-hidden={modeUi !== 'ai'}>
               <AIChatPanel config={config} onChange={onChange} quote={quote} session={aiChatSession} active={modeUi === 'ai'} />
             </div>
           {modeUi !== 'ai' && (

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Search, ChevronRight, X, Calendar, Banknote, FileText, MessageCircle, User } from 'lucide-react';
 import CustomScrollbar from '@/components/shared/CustomScrollbar';
 import { AdminRowsSkeleton } from '@/components/shared/PageLoadingSkeleton';
@@ -60,6 +60,17 @@ export default function BakeryReservations({ reservations, loading, selected, se
   const [chatError, setChatError] = useState('');
   const [blueprintError, setBlueprintError] = useState('');
   const [previewUrl, setPreviewUrl] = useState(null);
+  useEffect(() => {
+    setChatError('');
+    setBlueprintError('');
+    setPreviewUrl(null);
+  }, [selected?._id]);
+  useEffect(() => {
+    if (!selected || previewUrl) return undefined;
+    const close = event => { if (event.key === 'Escape') setSelected(null); };
+    window.addEventListener('keydown', close);
+    return () => window.removeEventListener('keydown', close);
+  }, [selected, previewUrl, setSelected]);
   async function openBlueprint() {
     setBlueprintError('');
     try {
@@ -80,7 +91,7 @@ export default function BakeryReservations({ reservations, loading, selected, se
   const filtered = reservations.filter((r) => {
     if (activeTab !== 'all' && r.status !== activeTab) return false;
     if (!search.trim()) return true;
-    return (r.user?.displayName || r.user?.name || '').toLowerCase().includes(search.trim().toLowerCase());
+    return [r.user?.displayName, r.user?.name, r.user?.email, r.designName, r._id].filter(Boolean).join(' ').toLowerCase().includes(search.trim().toLowerCase());
   });
 
   return (
@@ -97,9 +108,10 @@ export default function BakeryReservations({ reservations, loading, selected, se
               aria-label="Search reservations by customer name"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by customer name"
+              placeholder="Search customer, cake, email or order ID"
               className="w-full pl-9 py-2 rounded-full bg-pink-50/70 border border-pink-100 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-400"
             />
+            {search && <button type="button" aria-label="Clear reservation search" onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-gray-500"><X className="h-4 w-4" /></button>}
           </div>
 
           <div className="flex gap-1 overflow-x-auto pb-px">
@@ -115,18 +127,20 @@ export default function BakeryReservations({ reservations, loading, selected, se
                 }`}
               >
                 {tab.label}
+                <span aria-hidden="true" className="ml-1.5 text-xs opacity-70">{reservations.filter(r => tab.key === 'all' || r.status === tab.key).length}</span>
               </button>
             ))}
           </div>
         </div>
 
+        <div className="px-4 py-2 text-xs text-gray-500" role="status">{loading ? 'Loading orders…' : `${filtered.length} of ${reservations.length} reservations`}</div>
         <CustomScrollbar className="flex-1" contentClassName="p-3">
           {loading ? (
             <div role="status" aria-label="Loading reservations" className="p-1">
               <AdminRowsSkeleton count={6} avatar />
             </div>
           ) : filtered.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-8">No reservations found.</p>
+            <div className="text-center py-12 px-4"><Calendar className="mx-auto mb-3 h-8 w-8 text-pink-300" /><p className="text-sm font-semibold text-gray-700">No reservations found.</p><p className="mt-1 text-xs text-gray-500">{search || activeTab !== 'all' ? 'Try another search or clear your filters.' : 'Customer reservations will appear here.'}</p>{(search || activeTab !== 'all') && <button type="button" onClick={() => { setSearch(''); setActiveTab('all'); }} className="mt-3 rounded-lg border px-3 py-2 text-sm text-pink-600">Clear filters</button>}</div>
           ) : (
             <div className="space-y-2">
               {filtered.map((r) => {
@@ -134,6 +148,7 @@ export default function BakeryReservations({ reservations, loading, selected, se
                 return (
                   <button
                     key={r._id}
+                    aria-pressed={selected?._id === r._id}
                     onClick={() => setSelected(r)}
                     className={`w-full flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
                       selected?._id === r._id
@@ -149,13 +164,14 @@ export default function BakeryReservations({ reservations, loading, selected, se
                       <p className="text-sm font-semibold text-gray-900 truncate">
                         {r.user?.displayName || r.user?.name || 'Unknown customer'}
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="mt-1 truncate text-xs text-gray-600">{r.designName || 'Custom cake'} · #{r._id.slice(-6)}</p>
+                      <p className="mt-1 text-xs text-gray-500">
                         Pickup {formatDate(r.pickupDate)} · {formatPeso(r.totalPrice)}
                       </p>
                       <p className="text-xs text-gray-500">Down payment: {formatPeso(r.downPayment?.amount)} · {r.downPayment?.isPaid ? 'Paid' : 'Unpaid'}</p>
                     </div>
 
-                    <span className={`text-[11px] font-medium px-2 py-1 rounded-full border flex-shrink-0 ${meta.color}`}>
+                    <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full border flex-shrink-0 ${meta.color}`}>
                       {meta.label}
                     </span>
 

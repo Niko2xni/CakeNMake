@@ -640,3 +640,31 @@ textarea {
     background: hsl(var(--primary) / 0.8) !important;
   }
 }
+
+/* Orders: keep the list easy to scan and reserve emphasis for selected rows. */
+.cn-bakery-orders .cn-order-summary > div { border-color: #f1e7ec; background: #fffafd; }
+.cn-bakery-orders .cn-order-summary > div > svg { box-sizing: content-box; padding: 10px; border-radius: 12px; background: #fce7f3; }
+.cn-bakery-orders .cn-order-summary > div p:last-child { font-size: 1.25rem; line-height: 1.5; }
+.cn-bakery-reservations input { height: 44px; border-radius: 12px; background: #f9fafb; border-color: #e5e7eb; padding-right: 40px; }
+.cn-bakery-reservations button:focus-visible { outline: 2px solid #ec4899; outline-offset: 2px; }
+.cn-reservation-detail > div { box-shadow: none; border-radius: 16px; }
+.cn-reservation-detail form { background: #fff7fb; padding: 16px; }
+.cn-reservation-detail form input, .cn-reservation-detail form select, .cn-reservation-detail form button { min-height: 44px; }
+@media (min-width: 768px) {
+  .cn-bakery-orders { max-width: 1600px; margin-inline: auto; }
+  .cn-payment-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) minmax(220px, .55fr) 16px; }
+  .cn-payment-amounts { border-left: 1px solid #f3e8ee; padding-left: 24px; }
+  .cn-reservation-detail.is-open { margin: 12px 12px 12px 0; }
+}
+@media (max-width: 767px) {
+  .cn-bakery-orders .cn-order-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 12px; gap: 6px; }
+  .cn-bakery-orders .cn-order-summary > div { flex-direction: column; align-items: flex-start; padding: 10px 8px; gap: 6px; }
+  .cn-bakery-orders .cn-order-summary > div > svg { width: 16px; height: 16px; padding: 6px; }
+  .cn-bakery-orders .cn-order-summary > div p:first-child { font-size: 10px; line-height: 1.4; }
+  .cn-bakery-orders .cn-order-summary > div p:last-child { font-size: 15px; overflow-wrap: anywhere; }
+  .cn-payment-amounts { flex-basis: 100%; border-top: 1px solid #f3e8ee; padding-top: 10px; }
+}
+
+@media (max-width: 767px) {
+  .cn-reservation-detail button { min-height: 44px; }
+}
