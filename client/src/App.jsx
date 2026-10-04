@@ -24,12 +24,10 @@ import CakeAI from '@/pages/Client/CakeAI';
 import Trash from '@/pages/Client/Trash';
 import Chats from '@/pages/Client/Chats';
 import BakeryAdminLayout from '@/pages/BakeryAdmin/BakeryAdminLayout';
-import BakeryDashboard from '@/pages/BakeryAdmin/BakeryDashboard';
 import BakeryPricing from '@/pages/BakeryAdmin/BakeryPricing';
 import BakeryReservations from '@/pages/BakeryAdmin/BakeryReservations';
 import BakeryTransactions from '@/pages/BakeryAdmin/BakeryTransactions';
 import BakeryChat from '@/pages/BakeryAdmin/BakeryChat';
-import BakeryAssets from '@/pages/BakeryAdmin/BakeryAssets';
 import BakeryBilling from '@/pages/BakeryAdmin/BakeryBilling';
 import BakeryBlueprints from '@/pages/BakeryAdmin/BakeryBlueprints';
 import BakeryTemplates from '@/pages/BakeryAdmin/BakeryTemplates';
@@ -78,13 +76,13 @@ const AuthenticatedApp = () => {
         <Route element={<RoleRoute allowedRoles={['bakery_staff', 'bakery_admin', 'platform_admin']} />}>
           <Route path="/bakery/designer" element={<BakeryDesigner />} />
           <Route path="/bakery" element={<BakeryAdminLayout />}>
-            <Route index element={<BakeryDashboard />} />
+            <Route index element={<Navigate to="reservations" replace />} />
             <Route path="reservations" element={<BakeryReservations />} />
             <Route path="pricing" element={<BakeryPricing />} />
             <Route path="templates" element={<BakeryTemplates />} />
             <Route path="transactions" element={<BakeryTransactions />} />
             <Route path="chats" element={<BakeryChat />} />
-            <Route path="assets" element={<BakeryAssets />} />
+            <Route path="assets" element={<Navigate to="/bakery/reservations" replace />} />
             <Route path="billing" element={<BakeryBilling />} />
             <Route path="blueprints" element={<BakeryBlueprints />} />
             <Route path="profile" element={<BakeryProfile />} />

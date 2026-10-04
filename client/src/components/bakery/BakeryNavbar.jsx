@@ -2,10 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Cake,
-  LayoutGrid,
   ClipboardList,
   Tag,
-  Boxes,
   MessageCircle,
   Receipt,
   FileText,
@@ -18,12 +16,10 @@ import {
 } from 'lucide-react';
 
 const NAV_ITEMS = [
-  { to: '/bakery', icon: LayoutGrid, label: 'Dashboard' },
   { to: '/bakery/reservations', icon: ClipboardList, label: 'Reservations' },
   { to: '/bakery/pricing', icon: Tag, label: 'Pricing' },
   { to: '/bakery/templates', icon: LayoutTemplate, label: 'Templates' },
   { to: '/bakery/billing', icon: CreditCard, label: 'Billing' },
-  { to: '/bakery/assets', icon: Boxes, label: 'Assets' },
   { to: '/bakery/chats', icon: MessageCircle, label: 'Chats' },
   { to: '/bakery/transactions', icon: Receipt, label: 'Transactions' },
   { to: '/bakery/blueprints', icon: FileText, label: 'Blueprints' },
@@ -55,7 +51,6 @@ export default function BakeryNavbar() {
   }, [moreOpen]);
 
   function isActive(to) {
-    if (to === '/bakery') return location.pathname === '/bakery';
     return location.pathname.startsWith(to);
   }
 
