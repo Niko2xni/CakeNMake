@@ -8,8 +8,9 @@ const privatePdfSchema = new mongoose.Schema({
   uploadedAt: { type: Date, required: true },
 }, { _id: false });
 
-// Separate from authenticated reservations: guest demo checkout does not
-// require a User or Design record. No public PDF URL is stored here.
+// Separate from reservations: simulated checkout stores a snapshot rather than
+// a Design reference. New submissions record their customer; older guest demo
+// records may have no owner. No public PDF URL is stored here.
 const blueprintSchema = new mongoose.Schema({
   platform: { type: mongoose.Schema.Types.ObjectId, ref: 'Platform', required: true, immutable: true },
   submissionId: { type: String, required: true, maxlength: 100, immutable: true },

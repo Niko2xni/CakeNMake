@@ -315,6 +315,7 @@ export default function Chats() {
     messages,
     sendMessage,
     setMessages,
+    restricted,
   } = useChat({ autoCreate: true });
   const [inputText, setInputText] = useState('');
   const [uploadError, setUploadError] = useState(null);
@@ -557,6 +558,7 @@ export default function Chats() {
   }
 
   async function handleSendText() {
+    if (restricted) { setUploadError('Chatting is restricted. Use Orders & Support.'); return; }
     const text = sanitizeInputText(inputText);
     if (!text && pendingAttachments.length === 0) return;
 
@@ -1172,7 +1174,7 @@ export default function Chats() {
                   const isUser = m.sender === 'user';
                   const isHighlighted = highlightId === m.id;
 
-                  if (m.type === 'like') {
+                  if (m.type === 'like' && !['held', 'rejected'].includes(m.moderation)) {
                     return (
                       <div
                         key={m.id}
@@ -1237,6 +1239,7 @@ export default function Chats() {
                       }
                       `}
                     >
+                  {['held', 'rejected'].includes(m.moderation) && <p className="text-xs text-amber-700 text-right">{m.moderation === 'held' ? 'Message held for review' : 'Message filtered after review'}</p>}
                   {/* Reply preview - its own row, above the message row, so it never
                       inflates the height the Pin/Reply buttons center against below */}
                   {m.replyTo && (
@@ -1427,7 +1430,7 @@ export default function Chats() {
           }`}
         >
           <p className="text-[11px] text-gray-400">
-            {formatTime(m.createdAt)}
+            {m.moderation === 'held' ? 'Message held for review' : m.moderation === 'rejected' ? 'Message filtered after review' : formatTime(m.createdAt)}
           </p>
         </div>
       )}
@@ -1530,7 +1533,7 @@ export default function Chats() {
                 <button
                   onClick={handleAttachClick}
                   type="button"
-                  disabled={!activeConversation || activeConversation.status === 'closed'}
+                  disabled={restricted || !activeConversation || activeConversation.status === 'closed'}
                   aria-label="Attach a photo, video, or file"
                   title="Attach a photo, video, or file"
                   className="cn-chat-attach flex-shrink-0 h-10 rounded-full flex items-center justify-center gap-2 text-pink-500 hover:bg-pink-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-300 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
@@ -1545,7 +1548,7 @@ export default function Chats() {
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  disabled={!activeConversation || activeConversation.status === 'closed'}
+                  disabled={restricted || !activeConversation || activeConversation.status === 'closed'}
                   placeholder={activeConversation?.status === 'closed' ? 'This conversation is closed' : `Message ${activeConversation?.platform?.name || BAKERY_NAME}`}
                   maxLength={4000}
                   className="flex-1 px-4 py-2.5 rounded-full bg-pink-50/70 border border-pink-100 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-300 focus:border-transparent"
@@ -1553,7 +1556,7 @@ export default function Chats() {
 
                 <button
                   onClick={handleSendLike}
-                  disabled={!activeConversation || activeConversation.status === 'closed'}
+                  disabled={restricted || !activeConversation || activeConversation.status === 'closed'}
                   aria-label="Send a quick like"
                   title="Send a quick like"
                   className="cn-chat-quick-like flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-pink-500 hover:bg-pink-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-300"
@@ -1563,7 +1566,7 @@ export default function Chats() {
 
                 <button
                   onClick={handleSendText}
-                  disabled={!activeConversation || activeConversation.status === 'closed' || (!inputText.trim() && pendingAttachments.length === 0)}
+                  disabled={restricted || !activeConversation || activeConversation.status === 'closed' || (!inputText.trim() && pendingAttachments.length === 0)}
                   aria-label="Send message"
                   title="Press Enter to send"
                   className="cn-chat-send flex-shrink-0 h-10 rounded-full text-white flex items-center justify-center gap-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-300"

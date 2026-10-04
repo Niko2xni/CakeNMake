@@ -28,6 +28,7 @@ app.use("/api/designs", designRoutes);
 app.use("/api/auth", authRoutes);
 app.use('/api/account', accountRoutes);
 app.use('/api/conversations', conversationRoutes);
+app.use('/api/moderation', require('./routes/moderationRoutes'));
 app.use('/api/cake-ai', cakeAiRoutes);
 
 const reservationRoutes = require('./routes/reservationRoutes');

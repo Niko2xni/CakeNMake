@@ -3,7 +3,7 @@ const Blueprint = require('../models/Blueprint');
 const Platform = require('../models/Platform');
 const storage = require('../services/blueprintStorageService');
 
-// Public demo submission. Payment completion is a simulated client assertion,
+// Authenticated demo submission. Payment completion is a simulated client assertion,
 // not proof of a real charge. Do not return storage identifiers or PDF URLs.
 async function submitBlueprint(req, res) {
   const body = req.body || {};
@@ -28,7 +28,7 @@ async function submitBlueprint(req, res) {
     || !Array.isArray(quoteSnapshot.lineItems))) {
     return res.status(400).json({ message: 'Invalid pricing quote snapshot.' });
   }
-  const customerName = body.customerName?.trim() || 'Guest';
+  const customerName = req.user?.displayName || body.customerName?.trim() || 'Guest';
   const submissionHash = createHash('sha256').update(JSON.stringify({ designName, deliveryDate, designSnapshot, quoteSnapshot: quoteSnapshot || null, customerName })).update(buffer).digest('hex');
   let record;
   try {
@@ -37,12 +37,13 @@ async function submitBlueprint(req, res) {
     const key = { platform: platform._id, submissionId };
     const existing = await Blueprint.findOne(key);
     if (existing) {
+      if (req.user && String(existing.customer) !== String(req.user._id)) return res.status(403).json({ message: 'Submission belongs to another account.' });
       if (existing.submissionHash !== submissionHash) return res.status(409).json({ message: 'Submission ID already belongs to a different blueprint.' });
       if (existing.status !== 'failed') return res.status(existing.status === 'ready' ? 200 : 202).json({ submissionId, status: existing.status });
       record = await Blueprint.findOneAndUpdate({ ...key, status: 'failed' }, { $set: { status: 'uploading', failureReason: null } }, { new: true });
       if (!record) return res.status(202).json({ submissionId, status: 'uploading' });
     } else {
-      record = await Blueprint.create({ ...key, submissionHash, customerName, designName: designName.trim(), deliveryDate, designSnapshot, quoteSnapshot: quoteSnapshot || null, paymentMode: 'simulated', paymentCompletedAt: new Date() });
+      record = await Blueprint.create({ ...key, submissionHash, customer: req.user?._id || null, customerName, designName: designName.trim(), deliveryDate, designSnapshot, quoteSnapshot: quoteSnapshot || null, paymentMode: 'simulated', paymentCompletedAt: new Date() });
     }
     record.pdf = await storage.uploadBlueprintPdf({ buffer, platformId: platform._id, blueprintId: record._id });
     record.status = 'ready';

@@ -116,6 +116,7 @@ export default function ClientNavbar() {
               >
                 <Settings className="w-4 h-4" /> Settings
               </Link>
+              <Link to="/support" role="menuitem" onClick={() => setUserDropdownOpen(false)}><MessageSquare className="w-4 h-4" /> Orders & Support</Link>
               <button type="button" role="menuitem" onClick={handleLogout}>
                 <LogOut className="w-4 h-4" /> Log out
               </button>

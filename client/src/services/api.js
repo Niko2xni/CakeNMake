@@ -33,7 +33,7 @@ const requestJson = async (url, options) => {
 };
 
 export const blueprintApi = {
-  submit: (submission) => requestJson(`${API_BASE_URL}/blueprint-submissions`, {
+  submit: (submission) => requestAuthenticatedJson(`${API_BASE_URL}/blueprint-submissions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(submission),

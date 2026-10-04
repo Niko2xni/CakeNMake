@@ -26,7 +26,9 @@ import Chats from '@/pages/Client/Chats';
 import BakeryAdminLayout from '@/pages/BakeryAdmin/BakeryAdminLayout';
 import BakeryPricing from '@/pages/BakeryAdmin/BakeryPricing';
 import BakeryOrders from '@/pages/BakeryAdmin/BakeryOrders';
-import BakeryChat from '@/pages/BakeryAdmin/BakeryChat';
+import BakeryChatsSection from '@/pages/BakeryAdmin/BakeryChatsSection';
+import CustomerSupport from '@/pages/Client/Support';
+import CustomerRestrictionNotice from '@/components/shared/CustomerRestrictionNotice';
 import BakeryBilling from '@/pages/BakeryAdmin/BakeryBilling';
 import BakeryBlueprints from '@/pages/BakeryAdmin/BakeryBlueprints';
 import BakeryTemplates from '@/pages/BakeryAdmin/BakeryTemplates';
@@ -71,6 +73,7 @@ const AuthenticatedApp = () => {
         <Route path="/cake-ai" element={<CakeAI />} />
         <Route path="/trash" element={<Trash />} />
         <Route path="/chats" element={<Chats />} />
+        <Route path="/support" element={<CustomerSupport />} />
 
         <Route element={<RoleRoute allowedRoles={['bakery_staff', 'bakery_admin', 'platform_admin']} />}>
           <Route path="/bakery/designer" element={<BakeryDesigner />} />
@@ -81,7 +84,7 @@ const AuthenticatedApp = () => {
             <Route path="pricing" element={<BakeryPricing />} />
             <Route path="templates" element={<BakeryTemplates />} />
             <Route path="transactions" element={<Navigate to="/bakery/orders?tab=payments" replace />} />
-            <Route path="chats" element={<BakeryChat />} />
+            <Route path="chats" element={<BakeryChatsSection />} />
             <Route path="assets" element={<Navigate to="/bakery/orders" replace />} />
             <Route path="billing" element={<BakeryBilling />} />
             <Route path="blueprints" element={<BakeryBlueprints />} />
@@ -104,6 +107,7 @@ function App() {
         <Router>
           <ScrollToTop />
           <AuthenticatedApp />
+          <CustomerRestrictionNotice />
         </Router>
         <Toaster />
       </QueryClientProvider>

@@ -45,3 +45,15 @@ export const chatApi = {
     body: JSON.stringify({ status }),
   }),
 };
+
+export const moderationApi = {
+  overview: () => chatRequest('/moderation/overview'),
+  mine: () => chatRequest('/moderation/mine'),
+  evidence: (id) => chatRequest(`/moderation/customers/${id}/evidence`),
+  restrict: (id, payload) => chatRequest(`/moderation/customers/${id}/restriction`, { method: 'POST', body: JSON.stringify(payload) }),
+  review: (id, decision, reason) => chatRequest(`/moderation/messages/${id}/review`, { method: 'POST', body: JSON.stringify({ decision, reason }) }),
+  flag: (id, reason) => chatRequest(`/moderation/messages/${id}/flag`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  createRequest: (payload) => chatRequest('/moderation/requests', { method: 'POST', body: JSON.stringify(payload) }),
+  reply: (id, text, resolve = false) => chatRequest(`/moderation/requests/${id}/reply`, { method: 'POST', body: JSON.stringify({ text, resolve }) }),
+  blueprintAccess: (id) => chatRequest(`/moderation/blueprints/${id}/access`),
+};

@@ -8,8 +8,13 @@ const PORT = process.env.PORT || 5000;
 const httpServer = http.createServer(app);
 initializeSocketServer(httpServer, app);
 
-connectDB().then(() => {
+connectDB().then(async () => {
+  // The partial unique index enforces one open request even under concurrency.
+  await require('./models/SupportRequest').init();
   httpServer.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });
+}).catch((error) => {
+  console.error('Server startup failed:', error.message);
+  process.exitCode = 1;
 });

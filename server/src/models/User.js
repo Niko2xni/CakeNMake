@@ -51,6 +51,20 @@ const userSchema = new mongoose.Schema(
             index: true,
         },
 
+        restriction: {
+            id: { type: mongoose.Schema.Types.ObjectId, default: null },
+            type: { type: String, enum: ['none', 'suspended', 'banned'], default: 'none' },
+            reason: { type: String, maxlength: 1000, default: '' },
+            startedAt: { type: Date, default: null },
+            expiresAt: { type: Date, default: null },
+            staff: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+        },
+        moderationHistory: { type: [{
+            action: String, reason: String, at: Date, expiresAt: Date,
+            staff: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+            message: { type: mongoose.Schema.Types.ObjectId, ref: 'Message' },
+        }], default: [] },
+
         emailVerified: {
             type: Boolean,
             default: false,

@@ -19,6 +19,13 @@ const messageSchema = new mongoose.Schema({
   replyTo: { type: mongoose.Schema.Types.ObjectId, ref: 'Message', default: null },
   readBy: { type: [readReceiptSchema], default: [] },
   editedAt: { type: Date, default: null },
+  moderation: { type: String, enum: ['approved', 'held', 'rejected'], default: 'approved', index: true },
+  flagReason: { type: String, default: '' },
+  flaggedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  reviewedAt: { type: Date, default: null },
+  reviewReason: { type: String, maxlength: 1000, default: '' },
+  moderationHistory: { type: [{ action: String, reason: String, at: Date, staff: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null } }], default: [] },
 }, { timestamps: true });
 
 messageSchema.index({ conversation: 1, createdAt: -1, _id: -1 });

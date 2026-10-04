@@ -11,7 +11,7 @@ function body() {
 }
 function response() { return { status(code) { this.code = code; return this; }, json(value) { this.body = value; return this; } }; }
 
-test('guest submission stores a private PDF without requiring a user or returning file access', async () => {
+test('authenticated submission stores account ownership without returning private file access', async () => {
   mock.method(Platform, 'findOne', async () => ({ _id: 'a'.repeat(24) }));
   mock.method(Blueprint, 'findOne', async () => null);
   let saved;
@@ -21,20 +21,21 @@ test('guest submission stores a private PDF without requiring a user or returnin
   });
   const upload = mock.method(storage, 'uploadBlueprintPdf', async () => ({ publicId: 'private-file', deliveryType: 'private' }));
   const res = response();
-  await submitBlueprint({ body: body() }, res);
+  const customer = { _id: 'c'.repeat(24), displayName: 'Ana Cruz' };
+  await submitBlueprint({ body: body(), user: customer }, res);
   assert.equal(res.code, 201);
   assert.deepEqual(res.body, { submissionId: body().submissionId, status: 'ready' });
-  assert.equal(saved.customerName, 'Guest');
-  assert.equal(saved.customer, undefined);
+  assert.equal(saved.customerName, 'Ana Cruz');
+  assert.equal(saved.customer, customer._id);
   assert.equal(saved.status, 'ready');
   assert.equal(upload.mock.callCount(), 1);
   mock.method(Blueprint, 'findOne', async () => saved);
   const retry = response();
-  await submitBlueprint({ body: body() }, retry);
+  await submitBlueprint({ body: body(), user: customer }, retry);
   assert.equal(retry.code, 200);
   assert.equal(upload.mock.callCount(), 1);
   const conflict = response();
-  await submitBlueprint({ body: { ...body(), designName: 'Different cake' } }, conflict);
+  await submitBlueprint({ body: { ...body(), designName: 'Different cake' }, user: customer }, conflict);
   assert.equal(conflict.code, 409);
 });
 

@@ -1,6 +1,7 @@
 const Message = require('../models/Message');
 const Conversation = require('../models/Conversation');
 const { findAccessibleConversation, httpError } = require('./conversationAccessService');
+const { assertCustomerMayAct, screenMessage } = require('./moderationService');
 
 function normalizeMessageText(value) {
   if (typeof value !== 'string') return '';
@@ -35,10 +36,12 @@ function serializeMessage(message) {
     })),
     createdAt: value.createdAt,
     editedAt: value.editedAt,
+    moderation: value.moderation || 'approved',
   };
 }
 
 async function createMessage({ account, conversationId, text, clientMessageId, replyTo = null }) {
+  account = await assertCustomerMayAct(account);
   const conversation = await findAccessibleConversation(account, conversationId);
   if (conversation.status !== 'open') {
     throw httpError(409, 'CONVERSATION_CLOSED', 'This conversation is closed.');
@@ -50,12 +53,15 @@ async function createMessage({ account, conversationId, text, clientMessageId, r
   if (typeof clientMessageId !== 'string' || !/^[a-zA-Z0-9_-]{8,100}$/.test(clientMessageId)) {
     throw httpError(400, 'INVALID_CLIENT_MESSAGE_ID', 'A valid client message ID is required.');
   }
+  const existing = await Message.findOne({ conversation: conversation._id, sender: account._id, clientMessageId });
+  if (existing) return { conversation, message: await Message.findById(existing._id).populate('sender', 'displayName photoURL'), created: false };
 
   let replyMessage = null;
   if (replyTo) {
-    replyMessage = await Message.findOne({ _id: replyTo, conversation: conversation._id }).select('_id');
+    replyMessage = await Message.findOne({ _id: replyTo, conversation: conversation._id, moderation: { $nin: ['held', 'rejected'] } }).select('_id');
     if (!replyMessage) throw httpError(400, 'INVALID_REPLY', 'The replied-to message was not found.');
   }
+  const screening = await screenMessage(account, conversation._id, clientMessageId, normalizedText);
 
   let message;
   let created = true;
@@ -69,6 +75,9 @@ async function createMessage({ account, conversationId, text, clientMessageId, r
       clientMessageId,
       replyTo: replyMessage?._id || null,
       readBy: [{ user: account._id, readAt: new Date() }],
+      moderation: screening.held ? 'held' : 'approved',
+      flagReason: screening.reason || '',
+      moderationHistory: screening.held ? [{ action: 'flag', reason: screening.reason, at: new Date(), staff: null }] : [],
     });
   } catch (error) {
     if (error.code !== 11000) throw error;
@@ -81,7 +90,7 @@ async function createMessage({ account, conversationId, text, clientMessageId, r
     if (!message) throw error;
   }
 
-  if (created) {
+  if (created && !screening.held) {
     const fromCustomer = account.role === 'customer';
     await Conversation.updateOne(
       { _id: conversation._id },
@@ -96,7 +105,7 @@ async function createMessage({ account, conversationId, text, clientMessageId, r
   }
 
   const populated = await Message.findById(message._id).populate('sender', 'displayName photoURL');
-  return { conversation, message: populated };
+  return { conversation, message: populated, created };
 }
 
 module.exports = { createMessage, normalizeMessageText, serializeMessage };

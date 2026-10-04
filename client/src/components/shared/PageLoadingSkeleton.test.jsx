@@ -17,6 +17,7 @@ const routedPages = [
   '/cake-ai',
   '/trash',
   '/chats',
+  '/support',
   '/bakery',
   '/bakery/',
   '/bakery/orders',

@@ -100,8 +100,8 @@ function AuthenticatedBakeryChatPanel({ onNotificationChange }) {
               <div className="max-w-[80%]">
                 <div className={`rounded-2xl px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap break-words ${isBakery ? 'bg-muted text-foreground rounded-bl-sm' : 'bg-primary text-primary-foreground rounded-br-sm'} ${message.failed ? 'ring-2 ring-destructive' : ''}`}>{message.text}</div>
                 <div className={`flex items-center gap-1 mt-0.5 ${isBakery ? 'justify-start' : 'justify-end'}`}>
-                  <span className="text-[10px] text-muted-foreground">{message.pending ? 'Sending…' : message.failed ? 'Failed' : new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                  {!isBakery && !message.failed && <CheckCheck className="w-3 h-3 text-primary" />}
+                  <span className="text-[10px] text-muted-foreground">{message.moderation === 'held' ? 'Message held for review' : message.moderation === 'rejected' ? 'Message filtered after review' : message.pending ? 'Sending…' : message.failed ? 'Failed' : new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  {!isBakery && !message.failed && !['held', 'rejected'].includes(message.moderation) && <CheckCheck className="w-3 h-3 text-primary" />}
                 </div>
               </div>
             </div>
@@ -112,8 +112,8 @@ function AuthenticatedBakeryChatPanel({ onNotificationChange }) {
       <div className="px-4 pb-4 pt-3 border-t border-border/50 bg-muted/20 shrink-0">
         {(sendError || chat.error) && <p className="text-[11px] text-destructive mb-2" role="alert">{sendError || chat.error}</p>}
         <div className="flex gap-2 items-end">
-          <Textarea value={input} maxLength={4000} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); send(); } }} placeholder="Message the bakery..." className="min-h-[52px] max-h-[80px] text-xs resize-none rounded-xl" />
-          <Button size="icon" className="rounded-xl h-9 w-9 shrink-0" onClick={send} disabled={!input.trim() || sending}>{sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}</Button>
+          <Textarea disabled={chat.restricted} value={input} maxLength={4000} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); send(); } }} placeholder={chat.restricted ? 'Chatting is restricted — use Orders & Support' : 'Message the bakery...'} className="min-h-[52px] max-h-[80px] text-xs resize-none rounded-xl" />
+          <Button size="icon" className="rounded-xl h-9 w-9 shrink-0" onClick={send} disabled={chat.restricted || !input.trim() || sending}>{sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}</Button>
         </div>
       </div>
     </div>

@@ -259,7 +259,8 @@ function PageSkeletonContent({ path }) {
   }
   if (path === '/designer') return <DesignerSkeleton />;
   if (path === '/bakery/designer') return <DesignerSkeleton />;
-  if (path === '/bakery/chats') return <ChatSkeleton />;
+  if (path === '/bakery/chats') return <TableSkeleton summary />;
+  if (path === '/support') return <ClientPage><Skeleton className="h-8 w-60" /><AdminRowsSkeleton count={5} /></ClientPage>;
   if (['/bakery', '/bakery/assets', '/bakery/orders', '/bakery/reservations', '/bakery/transactions'].includes(path)) return <TableSkeleton summary />;
   if (path === '/bakery/blueprints') return <TableSkeleton />;
   if (path === '/bakery/billing') return <AdminPageSkeleton><AdminHeaderSkeleton /><div className="flex-1 space-y-6 overflow-hidden p-6"><div className="grid gap-4 md:grid-cols-3">{[0, 1, 2].map((item) => <Skeleton key={item} className="h-32 rounded-xl" />)}</div><Skeleton className="h-8 w-48" /><AdminRowsSkeleton count={4} /></div></AdminPageSkeleton>;

@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { accountApi } from '@/services/api';
+import { getChatSocket, disconnectChatSocket } from '@/lib/chat-socket';
 
 const AuthContext = createContext();
 
@@ -23,6 +24,25 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
+    if (!account || account.role !== 'customer') return undefined;
+    let active = true;
+    let socket;
+    const refresh = async () => {
+      try {
+        const response = await accountApi.getMe();
+        if (active) setAccount(response.user);
+      } catch { /* Keep existing-order access during a temporary connection failure. */ }
+    };
+    getChatSocket().then((value) => {
+      if (!active) return;
+      socket = value;
+      socket.on('moderation:updated', refresh);
+    }).catch(() => {});
+    const timer = setInterval(refresh, 30000);
+    return () => { active = false; clearInterval(timer); socket?.off('moderation:updated', refresh); };
+  }, [account?._id, account?.id, account?.role]);
+
+  useEffect(() => {
     if (!auth) {
       setAuthChecked(true);
       setIsLoadingAuth(false);
@@ -31,8 +51,11 @@ export const AuthProvider = ({ children }) => {
 
     let active = true;
 
+    let currentUid = null;
     const unsubscribe = onAuthStateChanged(auth, async (nextUser) => {
       if (!active) return;
+      if ((nextUser?.uid || null) !== currentUid) disconnectChatSocket();
+      currentUid = nextUser?.uid || null;
 
       setIsLoadingAuth(true);
       setAuthError(null);
@@ -79,6 +102,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const logout = async (shouldRedirect = true) => {
+    disconnectChatSocket();
     if (auth) {
       await signOut(auth);
     }

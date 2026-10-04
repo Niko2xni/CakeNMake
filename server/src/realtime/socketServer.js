@@ -6,6 +6,7 @@ const { firebaseAdminAuth, firebaseAdminConfigured } = require('../config/fireba
 const { allowedOrigins } = require('../config/origins');
 const { accountPlatformId, findAccessibleConversation } = require('../services/conversationAccessService');
 const { createMessage, serializeMessage } = require('../services/messageService');
+const { visibleMessageFilter, publishMessage } = require('../services/moderationService');
 
 function socketError(code, message) {
   const error = new Error(message);
@@ -27,7 +28,6 @@ function createEventLimiter({ limit, windowMs }) {
   };
 }
 
-const allowMessage = createEventLimiter({ limit: 20, windowMs: 60_000 });
 const allowJoin = createEventLimiter({ limit: 30, windowMs: 60_000 });
 const allowTyping = createEventLimiter({ limit: 1, windowMs: 1_000 });
 const activeConnections = new Map();
@@ -97,7 +97,6 @@ function initializeSocketServer(httpServer, app) {
 
     socket.on('message:send', async (payload = {}, acknowledge) => {
       try {
-        if (!allowMessage(String(account._id))) throw Object.assign(new Error('Too many messages. Try again shortly.'), { code: 'RATE_LIMITED' });
         const result = await createMessage({
           account,
           conversationId: payload.conversationId,
@@ -106,9 +105,7 @@ function initializeSocketServer(httpServer, app) {
           replyTo: payload.replyTo,
         });
         const message = serializeMessage(result.message);
-        io.to(`conversation:${payload.conversationId}`).emit('message:new', message);
-        io.to(`platform:${result.conversation.platform}`).emit('conversation:updated', { conversationId: payload.conversationId });
-        io.to(`user:${result.conversation.customer}`).emit('conversation:updated', { conversationId: payload.conversationId });
+        if (result.created) publishMessage(io, result.conversation, result.message);
         acknowledge?.({ ok: true, message });
       } catch (error) {
         acknowledgeFailure(acknowledge, error);
@@ -120,7 +117,7 @@ function initializeSocketServer(httpServer, app) {
         const conversation = await findAccessibleConversation(account, conversationId);
         const now = new Date();
         await Message.updateMany(
-          { conversation: conversation._id, sender: { $ne: account._id }, 'readBy.user': { $ne: account._id } },
+          { conversation: conversation._id, sender: { $ne: account._id }, 'readBy.user': { $ne: account._id }, ...visibleMessageFilter(account) },
           { $push: { readBy: { user: account._id, readAt: now } } }
         );
         const field = account.role === 'customer' ? 'customerUnreadCount' : 'bakeryUnreadCount';

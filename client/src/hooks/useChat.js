@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { getChatSocket } from '@/lib/chat-socket';
 import { chatApi } from '@/services/chat-api';
+import { activeRestriction } from '@/lib/moderation';
 
 export function normalizeMessage(message) {
   if (!message || typeof message !== 'object') return null;
@@ -119,21 +120,27 @@ export function useChat({ autoCreate = false } = {}) {
 
     const onNewMessage = (message) => {
       if (!message?.id || !message?.conversationId || typeof message.text !== 'string') return;
+      if (['held', 'rejected'].includes(message.moderation) && account.role !== 'customer') return;
       if (message.conversationId === activeIdRef.current) {
         setMessages((current) => uniqueMessages([
           ...current.filter((item) => item.clientMessageId !== message.clientMessageId),
           message,
         ]));
-        chatApi.markRead(message.conversationId)
+        if (!['held', 'rejected'].includes(message.moderation)) chatApi.markRead(message.conversationId)
           .then(() => setConversations((current) => current.map((item) => item.id === message.conversationId ? { ...item, unreadCount: 0 } : item)))
           .catch(() => {});
       }
+      if (['held', 'rejected'].includes(message.moderation)) return;
       setConversations((current) => sortConversationsByActivity(current.map((item) => item.id === message.conversationId
         ? { ...item, lastMessageAt: message.createdAt, lastMessagePreview: message.text }
         : item)));
       refreshConversations().catch(() => {});
     };
     const onConversationUpdated = () => refreshConversations().catch(() => {});
+    const onModerated = ({ conversationId } = {}) => {
+      if (conversationId === activeIdRef.current) loadMessages(conversationId).catch(() => {});
+      refreshConversations().catch(() => {});
+    };
     const onMessageRead = ({ conversationId, userId } = {}) => {
       const accountId = String(account?.id || account?._id || '');
       if (conversationId && userId === accountId) {
@@ -151,6 +158,7 @@ export function useChat({ autoCreate = false } = {}) {
       currentSocket.on('message:new', onNewMessage);
       currentSocket.on('conversation:updated', onConversationUpdated);
       currentSocket.on('message:read', onMessageRead);
+      currentSocket.on('message:moderated', onModerated);
       currentSocket.on('connect', onConnect);
       if (currentSocket.connected) onConnect();
     }).catch((socketError) => setError(socketError.message));
@@ -160,6 +168,7 @@ export function useChat({ autoCreate = false } = {}) {
       currentSocket?.off('message:new', onNewMessage);
       currentSocket?.off('conversation:updated', onConversationUpdated);
       currentSocket?.off('message:read', onMessageRead);
+      currentSocket?.off('message:moderated', onModerated);
       currentSocket?.off('connect', onConnect);
     };
   }, [account, refreshConversations]);
@@ -175,6 +184,7 @@ export function useChat({ autoCreate = false } = {}) {
   }, [activeConversationId]);
 
   const sendMessage = useCallback(async (text, { replyTo = null } = {}) => {
+    if (activeRestriction(account)) throw new Error('Chatting is restricted. Use Support for appeals or an existing order.');
     const normalized = text.trim();
     if (!normalized || !activeConversationId) return null;
     const localId = clientMessageId();
@@ -234,5 +244,6 @@ export function useChat({ autoCreate = false } = {}) {
     sendMessage,
     setActiveConversationId,
     setMessages,
+    restricted: Boolean(activeRestriction(account)),
   };
 }

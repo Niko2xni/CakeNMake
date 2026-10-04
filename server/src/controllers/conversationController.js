@@ -10,6 +10,7 @@ const {
   resolveCustomerPlatform,
 } = require('../services/conversationAccessService');
 const { createMessage, serializeMessage } = require('../services/messageService');
+const { visibleMessageFilter, publishMessage } = require('../services/moderationService');
 
 function serializeConversation(conversation, account) {
   const value = conversation.toObject ? conversation.toObject() : conversation;
@@ -93,7 +94,7 @@ async function getMessages(req, res) {
   try {
     const conversation = await findAccessibleConversation(req.user, req.params.id);
     const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 30, 1), 100);
-    const filter = { conversation: conversation._id };
+    const filter = { conversation: conversation._id, ...visibleMessageFilter(req.user) };
     if (req.query.before) {
       if (!mongoose.isValidObjectId(req.query.before)) throw httpError(400, 'INVALID_CURSOR', 'Invalid message cursor.');
       filter._id = { $lt: req.query.before };
@@ -124,9 +125,7 @@ async function postMessage(req, res) {
     });
     const message = serializeMessage(result.message);
     const io = req.app.get('io');
-    io?.to(`conversation:${req.params.id}`).emit('message:new', message);
-    io?.to(`platform:${result.conversation.platform}`).emit('conversation:updated', { conversationId: req.params.id });
-    io?.to(`user:${result.conversation.customer}`).emit('conversation:updated', { conversationId: req.params.id });
+    if (result.created) publishMessage(io, result.conversation, result.message);
     return res.status(201).json({ message });
   } catch (error) {
     return sendError(res, error);
@@ -138,7 +137,7 @@ async function markRead(req, res) {
     const conversation = await findAccessibleConversation(req.user, req.params.id);
     const now = new Date();
     await Message.updateMany(
-      { conversation: conversation._id, sender: { $ne: req.user._id }, 'readBy.user': { $ne: req.user._id } },
+      { conversation: conversation._id, sender: { $ne: req.user._id }, 'readBy.user': { $ne: req.user._id }, ...visibleMessageFilter(req.user) },
       { $push: { readBy: { user: req.user._id, readAt: now } } }
     );
     const field = req.user.role === 'customer' ? 'customerUnreadCount' : 'bakeryUnreadCount';

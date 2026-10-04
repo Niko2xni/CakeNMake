@@ -4,11 +4,27 @@ import { X, Store } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import DeliveryCalendar from './DeliveryCalendar';
 import GCashPayment from './GCashPayment';
+import { Link } from 'react-router-dom';
+import { useAuth } from '@/lib/AuthContext';
+import { activeRestriction } from '@/lib/moderation';
+import { moderationApi } from '@/services/chat-api';
 
 export default function SendBakeryModal({ config, total, onClose, onOrderComplete, onPaymentComplete }) {
   const [step, setStep] = useState('calendar'); // 'calendar' | 'pay' | 'chat'
   const [selectedDate, setSelectedDate] = useState(null);
   const [busy, setBusy] = useState(false);
+  const { account } = useAuth();
+  const [accessError, setAccessError] = useState('');
+  const restricted = Boolean(activeRestriction(account));
+  async function continueToPayment() {
+    setBusy(true); setAccessError('');
+    try {
+      const data = await moderationApi.mine();
+      if (data.restriction) throw new Error('New orders are restricted. Existing orders remain available through Orders & Support.');
+      setStep('pay');
+    } catch (error) { setAccessError(error.message); }
+    finally { setBusy(false); }
+  }
   const close = () => { if (!busy) onClose(); };
 
   return (
@@ -52,6 +68,8 @@ export default function SendBakeryModal({ config, total, onClose, onOrderComplet
 
         {/* Content */}
         <div className="p-6">
+          {accessError && <p role="alert" className="text-sm text-red-700 mb-3">{accessError}</p>}
+          {!account ? <p className="text-sm">Please <Link to="/login" className="underline">sign in</Link> to submit an order to the bakery.</p> : restricted ? <p className="text-sm">New orders are restricted. <Link to="/support" className="underline">View existing orders or contact the bakery.</Link></p> :
           <AnimatePresence mode="wait">
             {step === 'calendar' && (
               <motion.div key="calendar" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
@@ -61,7 +79,7 @@ export default function SendBakeryModal({ config, total, onClose, onOrderComplet
                   onSelect={setSelectedDate}
                 />
                 {selectedDate && (
-                  <Button className="w-full mt-4" onClick={() => setStep('pay')}>
+                  <Button disabled={busy} className="w-full mt-4" onClick={continueToPayment}>
                     Continue to Payment
                   </Button>
                 )}
@@ -79,7 +97,7 @@ export default function SendBakeryModal({ config, total, onClose, onOrderComplet
                 />
               </motion.div>
             )}
-          </AnimatePresence>
+          </AnimatePresence>}
         </div>
       </motion.div>
     </motion.div>
