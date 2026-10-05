@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { createPortal } from 'react-dom';
+import { motion } from 'framer-motion';
 import { ChevronDown, ChevronUp, LoaderCircle, ReceiptText, TriangleAlert, X } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 
@@ -69,6 +70,15 @@ export default function PricingPanel({ quote, loading, error, onOpenChange }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const lineItems = quote?.lineItems || [];
   const hasOverflow = lineItems.length > 5;
+  const openModal = () => {
+    if (!quote) return;
+    setModalOpen(true);
+    onOpenChange?.(true);
+  };
+  const closeModal = () => {
+    setModalOpen(false);
+    onOpenChange?.(false);
+  };
 
   const isDragScrollingRef = React.useRef(false);
   const startDragYRef = React.useRef(0);
@@ -199,7 +209,7 @@ export default function PricingPanel({ quote, loading, error, onOpenChange }) {
             {/* Line items & total opens detailed breakdown modal */}
             <div
               className="cursor-pointer select-none"
-              onClick={() => quote && setModalOpen(true)}
+              onClick={openModal}
               title="Click to view full breakdown"
             >
               {error && !quote ? (
@@ -225,16 +235,15 @@ export default function PricingPanel({ quote, loading, error, onOpenChange }) {
         )}
       </motion.div>
 
-      <AnimatePresence>
-        {modalOpen && quote && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm" onClick={() => setModalOpen(false)}>
+      {modalOpen && quote && createPortal(
+          <div style={{ zIndex: 10000 }} className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm" onClick={closeModal}>
             <motion.div
               role="dialog"
               aria-modal="true"
               aria-label="Price list breakdown"
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={{ duration: 0.18 }}
               className="w-[360px] max-w-[calc(100vw-2rem)] max-h-[85vh] flex flex-col rounded-2xl border border-border/40 bg-card p-4 sm:p-6 shadow-2xl"
               onClick={(event) => event.stopPropagation()}
             >
@@ -247,7 +256,7 @@ export default function PricingPanel({ quote, loading, error, onOpenChange }) {
                     <h3 className="font-heading text-sm font-bold">Price list breakdown</h3>
                   </div>
                 </div>
-                <button type="button" onClick={() => setModalOpen(false)} className="rounded-full p-1 hover:bg-muted" aria-label="Close">
+                <button type="button" onClick={closeModal} className="rounded-full p-1 hover:bg-muted" aria-label="Close">
                   <X className="h-4 w-4 text-muted-foreground" />
                 </button>
               </div>
@@ -277,9 +286,9 @@ export default function PricingPanel({ quote, loading, error, onOpenChange }) {
                 </p>
               </div>
             </motion.div>
-          </motion.div>
+          </div>,
+          document.body,
         )}
-      </AnimatePresence>
     </>
   );
 }

@@ -44,10 +44,14 @@ async function submitBlueprint(req, res) {
       if (existing.submissionHash !== submissionHash) return res.status(409).json({ message: 'Submission ID already belongs to a different blueprint.' });
       if (existing.status !== 'failed') {
         if (existing.status === 'ready') await checkout.ensureCheckoutReservation(existing);
-        return res.status(existing.status === 'ready' ? 200 : 202).json({ submissionId, status: existing.status });
+        return res.status(existing.status === 'ready' ? 200 : 202).json({
+          submissionId,
+          status: existing.status,
+          platformId: String(existing.platform),
+        });
       }
       record = await Blueprint.findOneAndUpdate({ ...key, status: 'failed' }, { $set: { status: 'uploading', failureReason: null } }, { new: true });
-      if (!record) return res.status(202).json({ submissionId, status: 'uploading' });
+      if (!record) return res.status(202).json({ submissionId, status: 'uploading', platformId: String(platform._id) });
     } else {
       const orderPricingSnapshot = { ...pricing.buildQuote(designSnapshot, await pricing.getActivePriceBook(platform._id)), calculatedAt: new Date() };
       if (quoteSnapshot && quoteSnapshot.totalMinor !== orderPricingSnapshot.totalMinor) return res.status(409).json({ message: 'Cake pricing changed. Refresh the quote before checking out.' });
@@ -58,7 +62,7 @@ async function submitBlueprint(req, res) {
     await record.save();
     readySaved = true;
     await checkout.ensureCheckoutReservation(record);
-    return res.status(201).json({ submissionId, status: 'ready' });
+    return res.status(201).json({ submissionId, status: 'ready', platformId: String(platform._id) });
   } catch (error) {
     if (error.code === 11000) return res.status(409).json({ message: 'Submission already in progress. Retry with the same submission ID.' });
     if (record && !readySaved) {

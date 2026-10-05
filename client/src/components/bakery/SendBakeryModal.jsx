@@ -90,7 +90,7 @@ export default function SendBakeryModal({ config, total, onClose, onOrderComplet
                 <GCashPayment
                   total={total}
                   selectedDate={selectedDate}
-                  onPaid={() => { onOrderComplete?.(selectedDate); onClose(); }}
+                  onPaid={async () => { await onOrderComplete?.(selectedDate); onClose(); }}
                   onPaymentComplete={onPaymentComplete}
                   onBusyChange={setBusy}
                   onBack={() => setStep('calendar')}

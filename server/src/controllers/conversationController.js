@@ -1,7 +1,10 @@
 const mongoose = require('mongoose');
+const { createHash } = require('node:crypto');
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const Reservation = require('../models/Reservation');
+const Blueprint = require('../models/Blueprint');
+const User = require('../models/User');
 const {
   BAKERY_ROLES,
   accountPlatformId,
@@ -132,6 +135,83 @@ async function postMessage(req, res) {
   }
 }
 
+async function postOrderAcknowledgement(req, res) {
+  try {
+    if (req.user.role !== 'customer') throw httpError(403, 'FORBIDDEN', 'Only customers can request an order acknowledgement.');
+    const { submissionId } = req.body || {};
+    if (typeof submissionId !== 'string' || !/^[a-zA-Z0-9_-]{16,100}$/.test(submissionId)) {
+      throw httpError(400, 'INVALID_SUBMISSION_ID', 'A valid order submission ID is required.');
+    }
+
+    const conversation = await findAccessibleConversation(req.user, req.params.id);
+    if (conversation.status !== 'open') {
+      throw httpError(409, 'CONVERSATION_CLOSED', 'This conversation is closed.');
+    }
+    const blueprint = await Blueprint.findOne({
+      submissionId,
+      customer: req.user._id,
+      platform: conversation.platform,
+      status: 'ready',
+    });
+    if (!blueprint) throw httpError(404, 'ORDER_NOT_FOUND', 'The submitted order could not be found.');
+
+    const clientMessageId = `order_received_${createHash('sha256').update(submissionId).digest('hex')}`;
+    const acknowledgementFilter = {
+      conversation: conversation._id,
+      clientMessageId,
+      senderRole: { $in: ['bakery_admin', 'bakery_staff'] },
+    };
+    let message = await Message.findOne(acknowledgementFilter);
+    if (message) return res.status(200).json({ message: serializeMessage(message) });
+
+    const bakerySender = await User.findOne({
+      platform: conversation.platform,
+      role: { $in: ['bakery_admin', 'bakery_staff'] },
+      status: 'active',
+    });
+    if (!bakerySender) {
+      throw httpError(503, 'BAKERY_UNAVAILABLE', 'The bakery cannot receive chat messages right now. Please try again shortly.');
+    }
+
+    const text = "We have received your design and payment details. Please wait for the bakery's reply with the remaining balance, including the delivery fee. Checkout is simulated; no money has been collected.";
+    let created = true;
+    try {
+      message = await Message.create({
+        conversation: conversation._id,
+        sender: bakerySender._id,
+        senderRole: bakerySender.role,
+        type: 'text',
+        text,
+        clientMessageId,
+        readBy: [],
+        moderation: 'approved',
+      });
+    } catch (error) {
+      if (error.code !== 11000) throw error;
+      created = false;
+      message = await Message.findOne(acknowledgementFilter);
+      if (!message) throw error;
+    }
+
+    if (created) {
+      await Conversation.updateOne(
+        { _id: conversation._id },
+        {
+          $set: {
+            lastMessageAt: message.createdAt,
+            lastMessagePreview: text.slice(0, 160),
+          },
+          $inc: { customerUnreadCount: 1 },
+        },
+      );
+      publishMessage(req.app.get('io'), conversation, message);
+    }
+    return res.status(created ? 201 : 200).json({ message: serializeMessage(message) });
+  } catch (error) {
+    return sendError(res, error);
+  }
+}
+
 async function markRead(req, res) {
   try {
     const conversation = await findAccessibleConversation(req.user, req.params.id);
@@ -175,6 +255,7 @@ module.exports = {
   getMessages,
   listConversations,
   markRead,
+  postOrderAcknowledgement,
   postMessage,
   serializeConversation,
   updateStatus,

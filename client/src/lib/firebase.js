@@ -1,6 +1,5 @@
 import { initializeApp } from "firebase/app";
 import {
-  FacebookAuthProvider,
   getAuth,
   GoogleAuthProvider,
 } from "firebase/auth";
@@ -27,9 +26,6 @@ const firebaseApp = isFirebaseConfigured ? initializeApp(firebaseConfig) : null;
 export const auth = firebaseApp ? getAuth(firebaseApp) : null;
 export const storage = firebaseApp ? getStorage(firebaseApp) : null;
 export const googleProvider = new GoogleAuthProvider();
-export const facebookProvider = new FacebookAuthProvider();
-facebookProvider.addScope("email");
-facebookProvider.addScope("public_profile");
 export const firebaseConfigured = isFirebaseConfigured;
 
 export const missingFirebaseConfigMessage =

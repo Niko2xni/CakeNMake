@@ -16,6 +16,7 @@ export default function GCashPayment({ total, selectedDate, onPaid, onBack, onPa
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [done, setDone] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [openingChat, setOpeningChat] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submissionError, setSubmissionError] = useState('');
 
@@ -42,6 +43,18 @@ export default function GCashPayment({ total, selectedDate, onPaid, onBack, onPa
       setPaying(false);
       void submitOrder();
     }, 1800);
+  };
+
+  const openBakeryChat = async () => {
+    setOpeningChat(true);
+    setSubmissionError('');
+    try {
+      await onPaid?.();
+    } catch (error) {
+      setSubmissionError(error.message || 'Your order was submitted, but the bakery chat could not be opened. Please retry.');
+    } finally {
+      setOpeningChat(false);
+    }
   };
 
   return (
@@ -124,10 +137,12 @@ export default function GCashPayment({ total, selectedDate, onPaid, onBack, onPa
         <div className="text-center py-2">
           <p className="text-2xl mb-1">🎉</p>
           <p className="font-heading font-bold text-sm text-green-600">{submitted ? 'Order submitted!' : 'Simulated checkout complete'}</p>
-          <p className="text-xs text-muted-foreground mb-4">{submitted ? 'Your order has been sent to the bakery.' : submitting ? 'Sending your order to the bakery…' : 'Your order has not been sent yet.'}</p>
+          <p className="text-xs text-muted-foreground mb-4">{submitted ? 'Your order has been sent to the bakery.' : submitting ? 'Sending your order to the bakery…' : submissionError ? 'The order or bakery confirmation may still be pending. Retry to finish submitting it.' : 'Your order has not been sent yet.'}</p>
           {submissionError && <p role="alert" className="text-xs text-destructive mb-3">{submissionError}</p>}
           {!submitted && !submitting && <Button className="w-full mb-2" onClick={submitOrder}>Retry sending order</Button>}
-          <Button className="w-full" onClick={onPaid} disabled={!submitted || submitting}>Open Bakery Chat</Button>
+          <Button className="w-full" onClick={openBakeryChat} disabled={!submitted || submitting || openingChat}>
+            {openingChat ? 'Opening Bakery Chat…' : 'Open Bakery Chat'}
+          </Button>
         </div>
       ) : (
         <Button className="w-full bg-[#007DFF] hover:bg-[#0068D9]" onClick={() => setShowConfirmModal(true)} disabled={paying}>

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Store, CheckCheck } from 'lucide-react';
+import { Send, Store, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -69,7 +69,7 @@ export default function BakeryChat({ onClose }) {
                 </div>
                 <div className={`flex items-center gap-1 mt-0.5 ${isBakery ? 'justify-start' : 'justify-end'}`}>
                   <span className="text-[10px] text-muted-foreground">{msg.time}</span>
-                  {!isBakery && <CheckCheck className="w-3 h-3 text-primary" />}
+                  {!isBakery && <Check className="w-3 h-3 text-primary" />}
                 </div>
               </div>
             </div>

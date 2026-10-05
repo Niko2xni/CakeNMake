@@ -6,6 +6,7 @@ const {
   getMessages,
   listConversations,
   markRead,
+  postOrderAcknowledgement,
   postMessage,
   updateStatus,
 } = require('../controllers/conversationController');
@@ -17,6 +18,7 @@ router.get('/', listConversations);
 router.post('/', createConversation);
 router.get('/:id/messages', getMessages);
 router.post('/:id/messages', postMessage);
+router.post('/:id/order-acknowledgement', postOrderAcknowledgement);
 router.patch('/:id/read', markRead);
 router.patch('/:id/status', updateStatus);
 

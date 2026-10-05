@@ -2,9 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ClientNavbar from '@/components/client/ClientNavbar';
 import { useAuth } from '@/lib/AuthContext';
 import { useDragToScroll } from '@/hooks/useDragToScroll';
-import { auth, facebookProvider, googleProvider, storage } from '@/lib/firebase';
+import { auth, googleProvider, storage } from '@/lib/firebase';
 import { accountApi } from '@/services/api';
-import { User, Facebook, Globe, Mail, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { User, Globe, Mail, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { linkWithPopup, reload, unlink, updateProfile } from 'firebase/auth';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { safeMediaUrl } from '@/lib/safe-url';
@@ -24,13 +24,6 @@ const SOCIAL_CONFIG = {
     icon: Globe,
     letter: 'G',
     letterClassName: 'text-[#EA4335]',
-  },
-  'facebook.com': {
-    provider: 'Facebook',
-    color: 'bg-[#1877F2]',
-    icon: Facebook,
-    letter: 'f',
-    letterClassName: 'text-white',
   },
 };
 
@@ -69,8 +62,7 @@ export default function Profile() {
     }
   });
 
-  const providerProfile = (providerData || []).find((profile) => profile.providerId === 'facebook.com')
-    || (providerData || []).find((profile) => profile.email || profile.photoURL)
+  const providerProfile = (providerData || []).find((profile) => profile.email || profile.photoURL)
     || null;
   const synchronizedPhotoURL = user?.photoURL || providerProfile?.photoURL || account?.photoURL || null;
   const displayPhotoURL = safeMediaUrl(photoOverride === undefined ? synchronizedPhotoURL : photoOverride);
@@ -242,11 +234,10 @@ export default function Profile() {
       return;
     }
 
-    const provider = providerId === 'facebook.com' ? facebookProvider : googleProvider;
     setConnectingProvider(providerId);
 
     try {
-      const result = await linkWithPopup(user, provider);
+      const result = await linkWithPopup(user, googleProvider);
       await reload(result.user);
       await result.user.getIdToken(true);
       await refreshAccount();

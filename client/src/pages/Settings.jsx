@@ -50,13 +50,11 @@ export default function Settings() {
   const hasOtpProvider = providerIds.has('emailLink');
   const securityMethod = providerIds.has('google.com')
     ? 'Google sign-in'
-    : providerIds.has('facebook.com')
-      ? 'Facebook sign-in'
-      : hasPasswordProvider
-        ? 'Password sign-in'
-        : hasOtpProvider
-          ? 'Email verification code'
-          : 'Authentication provider';
+    : hasPasswordProvider
+      ? 'Password sign-in'
+      : hasOtpProvider
+        ? 'Email verification code'
+        : 'Authentication provider';
 
   useEffect(() => {
     const next = createFormState(user, readPreferences(user));

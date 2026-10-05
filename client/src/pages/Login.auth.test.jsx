@@ -6,7 +6,7 @@ import Login from './Login';
 import { authApi } from '@/services/api';
 const session = vi.hoisted(() => ({ account: null, isAuthenticated: false, isLoadingAuth: false, authError: null }));
 const firebase = vi.hoisted(() => ({ popup: vi.fn(), custom: vi.fn() }));
-vi.mock('@/lib/firebase', () => ({ auth: {}, firebaseConfigured: true, googleProvider: 'google', facebookProvider: 'facebook' }));
+vi.mock('@/lib/firebase', () => ({ auth: {}, firebaseConfigured: true, googleProvider: 'google' }));
 vi.mock('firebase/auth', () => ({ signInWithPopup: firebase.popup, signInWithCustomToken: firebase.custom }));
 vi.mock('@/lib/AuthContext', () => ({ useAuth: () => session }));
 beforeEach(() => Object.assign(session, { account: null, isAuthenticated: false, isLoadingAuth: false, authError: null }));
@@ -19,12 +19,12 @@ vi.mock('@/services/api', () => ({
 }));
 
 describe('Login auth experience', () => {
-  it('passes Facebook sign-in to the correct provider and opens the completion page', async () => {
-    firebase.popup.mockResolvedValueOnce({ user: { uid: 'facebook-user' } });
+  it('passes Google sign-in to the correct provider and opens the completion page', async () => {
+    firebase.popup.mockResolvedValueOnce({ user: { uid: 'google-user' } });
     render(<MemoryRouter initialEntries={['/login']}><Routes><Route path="/login" element={<Login />} /><Route path="/login-success" element={<div>Completing sign-in</div>} /></Routes></MemoryRouter>);
-    fireEvent.click(screen.getByRole('button', { name: /Continue with Facebook/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Continue with Google/ }));
     expect(await screen.findByText('Completing sign-in')).toBeInTheDocument();
-    expect(firebase.popup).toHaveBeenCalledWith({}, 'facebook');
+    expect(firebase.popup).toHaveBeenCalledWith({}, 'google');
   });
   it('exchanges the verified email OTP for a Firebase session', async () => {
     authApi.verifyEmailOtp.mockResolvedValueOnce({ token: 'custom-token' });
@@ -51,7 +51,7 @@ describe('Login auth experience', () => {
     render(<MemoryRouter><Login /></MemoryRouter>);
     expect(screen.getByRole('alert')).toHaveTextContent('Could not connect to the account server.');
   });
-  it('offers Google, Facebook, and numeric email OTP sign-in', () => {
+  it('offers Google and numeric email OTP sign-in', () => {
     render(
       <MemoryRouter>
         <Login />
@@ -59,7 +59,7 @@ describe('Login auth experience', () => {
     );
 
     expect(screen.getByRole('button', { name: /continue with google/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /continue with facebook/i })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /continue with/i })).toHaveLength(1);
     expect(screen.getByRole('button', { name: /send otp/i })).toBeInTheDocument();
   });
 

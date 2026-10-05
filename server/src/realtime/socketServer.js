@@ -31,6 +31,19 @@ function createEventLimiter({ limit, windowMs }) {
 const allowJoin = createEventLimiter({ limit: 30, windowMs: 60_000 });
 const allowTyping = createEventLimiter({ limit: 1, windowMs: 1_000 });
 const activeConnections = new Map();
+const activeBakeryConnections = new Map();
+const BAKERY_ROLES = new Set(['bakery_staff', 'bakery_admin', 'platform_admin']);
+
+function bakeryPresenceRoom(platformId) {
+  return `bakery-presence:${platformId}`;
+}
+
+function publishBakeryPresence(io, platformId) {
+  if (!platformId) return;
+  io.to(bakeryPresenceRoom(platformId)).emit('bakery:presence', {
+    online: (activeBakeryConnections.get(String(platformId)) || 0) > 0,
+  });
+}
 
 function acknowledgeFailure(acknowledge, error) {
   acknowledge?.({
@@ -70,15 +83,53 @@ function initializeSocketServer(httpServer, app) {
   io.on('connection', async (socket) => {
     const account = socket.account;
     const accountId = String(account._id);
+    const platformId = accountPlatformId(account);
+    const isBakeryAccount = BAKERY_ROLES.has(account.role) && Boolean(platformId);
     activeConnections.set(accountId, (activeConnections.get(accountId) || 0) + 1);
+    if (isBakeryAccount) {
+      const platformKey = String(platformId);
+      activeBakeryConnections.set(platformKey, (activeBakeryConnections.get(platformKey) || 0) + 1);
+    }
     socket.once('disconnect', () => {
       const remaining = Math.max(0, (activeConnections.get(accountId) || 1) - 1);
       if (remaining === 0) activeConnections.delete(accountId);
       else activeConnections.set(accountId, remaining);
+      if (isBakeryAccount) {
+        const platformKey = String(platformId);
+        const remainingBakeryConnections = Math.max(0, (activeBakeryConnections.get(platformKey) || 1) - 1);
+        if (remainingBakeryConnections === 0) activeBakeryConnections.delete(platformKey);
+        else activeBakeryConnections.set(platformKey, remainingBakeryConnections);
+        publishBakeryPresence(io, platformKey);
+      }
     });
     await socket.join(`user:${account._id}`);
-    const platformId = accountPlatformId(account);
     if (platformId) await socket.join(`platform:${platformId}`);
+    if (isBakeryAccount) publishBakeryPresence(io, String(platformId));
+
+    socket.on('bakery:presence:watch', async ({ conversationId } = {}, acknowledge) => {
+      try {
+        if (account.role !== 'customer') throw Object.assign(new Error('Only customers can check bakery presence.'), { code: 'FORBIDDEN' });
+        const conversation = await findAccessibleConversation(account, conversationId);
+        const room = bakeryPresenceRoom(conversation.platform);
+        await socket.join(room);
+        acknowledge?.({
+          ok: true,
+          online: (activeBakeryConnections.get(String(conversation.platform)) || 0) > 0,
+        });
+      } catch (error) {
+        acknowledgeFailure(acknowledge, error);
+      }
+    });
+
+    socket.on('bakery:presence:unwatch', async ({ conversationId } = {}) => {
+      try {
+        if (account.role !== 'customer') return;
+        const conversation = await findAccessibleConversation(account, conversationId);
+        await socket.leave(bakeryPresenceRoom(conversation.platform));
+      } catch {
+        // Invalid presence subscriptions are intentionally ignored.
+      }
+    });
 
     socket.on('conversation:join', async ({ conversationId } = {}, acknowledge) => {
       try {

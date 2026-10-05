@@ -40,6 +40,10 @@ export const chatApi = {
     method: 'POST',
     body: JSON.stringify(payload),
   }),
+  sendOrderAcknowledgement: (conversationId, submissionId) => chatRequest(`/conversations/${conversationId}/order-acknowledgement`, {
+    method: 'POST',
+    body: JSON.stringify({ submissionId }),
+  }),
   markRead: (conversationId) => chatRequest(`/conversations/${conversationId}/read`, { method: 'PATCH' }),
   updateStatus: (conversationId, status) => chatRequest(`/conversations/${conversationId}/status`, {
     method: 'PATCH',

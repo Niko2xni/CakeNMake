@@ -6,14 +6,13 @@ import { Label } from "@/components/ui/label";
 import { CheckCircle2, Loader2, LogIn, Mail, Sparkles, TimerReset } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import GoogleIcon from "@/components/GoogleIcon";
-import { auth, facebookProvider, firebaseConfigured, googleProvider, missingFirebaseConfigMessage } from "@/lib/firebase";
+import { auth, firebaseConfigured, googleProvider, missingFirebaseConfigMessage } from "@/lib/firebase";
 import { signInWithCustomToken, signInWithPopup } from "firebase/auth";
 import { authApi } from "@/services/api";
 import { useAuth } from '@/lib/AuthContext';
 
 const providerOptions = [
   { id: "google", label: "Continue with Google", icon: GoogleIcon },
-  { id: "facebook", label: "Continue with Facebook", icon: ({ className }) => <span className={`${className} font-semibold`}>f</span> },
 ];
 
 export default function GuestAuthModal({
@@ -160,12 +159,12 @@ export default function GuestAuthModal({
     }
   };
 
-  const handleProviderAuth = async (provider) => {
+  const handleProviderAuth = async () => {
     setError("");
     setLoading(true);
     try {
       if (!firebaseConfigured || !auth) throw new Error(missingFirebaseConfigMessage);
-      const userCredential = await signInWithPopup(auth, provider === "google" ? googleProvider : facebookProvider);
+      const userCredential = await signInWithPopup(auth, googleProvider);
       setPendingUser(userCredential.user);
     } catch (authError) {
       setError(authError.code === "auth/popup-closed-by-user" ? "Sign-in was cancelled." : authError.message || "Provider sign-in failed.");
@@ -209,7 +208,7 @@ export default function GuestAuthModal({
                   key={id}
                   variant="outline"
                   className="w-full h-11 text-sm font-medium justify-start gap-3 rounded-xl border-border/80 hover:bg-accent"
-                  onClick={() => handleProviderAuth(id)}
+                  onClick={handleProviderAuth}
                   type="button"
                   disabled={loading || Boolean(pendingUser)}
                 >

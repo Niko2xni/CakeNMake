@@ -6,7 +6,7 @@ import { authApi } from '@/services/api';
 const session = vi.hoisted(() => ({ isAuthenticated: false, isLoadingAuth: false, authError: null }));
 vi.mock('@/lib/AuthContext', () => ({ useAuth: () => session }));
 const firebase = vi.hoisted(() => ({ popup: vi.fn() }));
-vi.mock('@/lib/firebase', () => ({ auth: {}, firebaseConfigured: true, googleProvider: 'google', facebookProvider: 'facebook' }));
+vi.mock('@/lib/firebase', () => ({ auth: {}, firebaseConfigured: true, googleProvider: 'google' }));
 vi.mock('firebase/auth', () => ({ signInWithPopup: firebase.popup, signInWithCustomToken: vi.fn() }));
 beforeEach(() => Object.assign(session, { isAuthenticated: false, isLoadingAuth: false, authError: null }));
 
@@ -24,10 +24,10 @@ describe('GuestAuthModal', () => {
     const onClose = vi.fn();
     const onSuccess = vi.fn();
     const { rerender } = render(<GuestAuthModal isOpen onClose={onClose} onSuccess={onSuccess} />);
-    fireEvent.click(screen.getByRole('button', { name: /Continue with Facebook/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Continue with Google/ }));
     await screen.findByText('Loading your account…');
     expect(onSuccess).not.toHaveBeenCalled();
-    expect(firebase.popup).toHaveBeenCalledWith({}, 'facebook');
+    expect(firebase.popup).toHaveBeenCalledWith({}, 'google');
     session.isAuthenticated = true;
     rerender(<GuestAuthModal isOpen onClose={onClose} onSuccess={onSuccess} />);
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -46,7 +46,7 @@ describe('GuestAuthModal', () => {
     expect(screen.getByText(/sign in to save your design/i)).toBeInTheDocument();
     expect(screen.getByText(/create a free account or log in to save this cake design/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /continue with google/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /continue with facebook/i })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /continue with/i })).toHaveLength(1);
   });
 
   it('renders modal with Send to Bakery title when actionType is order', () => {

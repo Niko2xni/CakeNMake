@@ -889,7 +889,6 @@ export default function Chats() {
       return { label: 'Link', color: 'bg-pink-50 border-pink-100 text-pink-500' };
     }
     const platforms = [
-      { domains: ['facebook.com', 'fb.com', 'fb.watch'], label: 'Facebook', color: 'bg-blue-50 border-blue-100 text-blue-600' },
       { domains: ['youtube.com', 'youtu.be'], label: 'YouTube', color: 'bg-red-50 border-red-100 text-red-600' },
       { domains: ['instagram.com'], label: 'Instagram', color: 'bg-pink-50 border-pink-100 text-pink-600' },
       { domains: ['twitter.com', 'x.com'], label: 'X (Twitter)', color: 'bg-gray-50 border-gray-200 text-gray-700' },

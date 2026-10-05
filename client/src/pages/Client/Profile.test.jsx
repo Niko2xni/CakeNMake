@@ -9,6 +9,7 @@ const mockLinkWithPopup = vi.fn();
 const mockUnlink = vi.fn();
 const mockReload = vi.fn();
 const mockRefreshAccount = vi.fn();
+const mockProfileState = vi.hoisted(() => ({ providerData: [] }));
 
 vi.mock('@/components/client/ClientNavbar', () => ({
   default: () => <div data-testid="client-navbar" />,
@@ -34,7 +35,6 @@ vi.mock('firebase/auth', async () => {
 vi.mock('@/lib/firebase', () => ({
   auth: {},
   googleProvider: {},
-  facebookProvider: {},
   storage: {},
 }));
 
@@ -44,15 +44,7 @@ vi.mock('@/lib/AuthContext', () => ({
       uid: 'test-user',
       displayName: 'Jane Doe',
       email: null,
-      providerData: [
-        {
-          providerId: 'google.com',
-          uid: 'google-123',
-          displayName: 'Jane Doe',
-          email: null,
-          photoURL: 'https://example.com/google-avatar.jpg',
-        },
-      ],
+      providerData: mockProfileState.providerData,
       getIdToken: vi.fn().mockResolvedValue('refreshed-token'),
     },
     account: {
@@ -68,12 +60,21 @@ vi.mock('@/lib/AuthContext', () => ({
 describe('Profile', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockProfileState.providerData = [
+      {
+        providerId: 'google.com',
+        uid: 'google-123',
+        displayName: 'Jane Doe',
+        email: null,
+        photoURL: 'https://example.com/google-avatar.jpg',
+      },
+    ];
     mockRefreshAccount.mockResolvedValue({ firebaseUid: 'test-user' });
     mockReload.mockResolvedValue(undefined);
     localStorage.clear();
   });
 
-  it('uses real auth data and disables email editing while prompting for Facebook connect', () => {
+  it('uses real auth data and disables email editing while showing connected accounts', () => {
     render(<Profile />);
 
     expect(screen.getAllByText('Jane Doe').length).toBeGreaterThan(0);
@@ -82,7 +83,6 @@ describe('Profile', () => {
     const emailRow = screen.getByText('Email address').closest('div');
     expect(emailRow).not.toHaveTextContent('Edit');
     expect(screen.getByText('Google')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: /connect/i }).length).toBeGreaterThan(0);
     expect(screen.queryByText(/using canva/i)).not.toBeInTheDocument();
     expect(screen.getByLabelText(/what are you designing for/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^disconnect$/i })).toBeEnabled();
@@ -120,11 +120,11 @@ describe('Profile', () => {
   });
 
   it('refreshes provider state after connecting another login method', async () => {
+    mockProfileState.providerData = [];
     mockLinkWithPopup.mockResolvedValue({
       user: {
         providerData: [
           { providerId: 'google.com', displayName: 'Jane Doe', email: 'jane@example.com' },
-          { providerId: 'facebook.com', displayName: 'Jane Doe', email: 'jane@example.com' },
         ],
         getIdToken: vi.fn().mockResolvedValue('refreshed-token'),
       },
@@ -135,7 +135,7 @@ describe('Profile', () => {
 
     await waitFor(() => expect(mockLinkWithPopup).toHaveBeenCalledTimes(1));
     expect(mockRefreshAccount).toHaveBeenCalledTimes(1);
-    expect(await screen.findAllByRole('button', { name: /^disconnect$/i })).toHaveLength(2);
+    expect(await screen.findAllByRole('button', { name: /^disconnect$/i })).toHaveLength(1);
   });
 
   it('uploads a selected photo to Firebase Storage and updates the profile', async () => {

@@ -27,7 +27,7 @@ describe('ClientNavbar', () => {
     expect(screen.getByRole('link', { name: /recents/i })).toHaveAttribute('href', '/client');
     expect(screen.getByRole('link', { name: /templates/i })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: /trash/i })).toHaveAttribute('href', '/trash');
-    expect(screen.getByRole('link', { name: /chats/i })).toHaveAttribute('href', '/chats');
+    expect(screen.queryByRole('link', { name: /chats/i })).not.toBeInTheDocument();
   });
 
   it('opens an accessible account menu with profile and settings links', () => {
@@ -41,5 +41,6 @@ describe('ClientNavbar', () => {
     expect(screen.getByRole('menuitem', { name: /settings/i })).toHaveAttribute('href', '/settings');
     expect(screen.getByRole('menuitem', { name: /settings/i })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('menuitem', { name: /profile/i })).not.toHaveAttribute('aria-current');
+    expect(screen.queryByRole('menuitem', { name: /orders & support/i })).not.toBeInTheDocument();
   });
 });

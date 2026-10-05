@@ -7,14 +7,13 @@ import { CheckCircle2, Loader2, LogIn, Mail, TimerReset } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
-import { auth, facebookProvider, firebaseConfigured, googleProvider, missingFirebaseConfigMessage } from "@/lib/firebase";
+import { auth, firebaseConfigured, googleProvider, missingFirebaseConfigMessage } from "@/lib/firebase";
 import { signInWithCustomToken, signInWithPopup } from "firebase/auth";
 import { authApi } from "@/services/api";
 import { useAuth } from '@/lib/AuthContext';
 
 const providerOptions = [
   { id: "google", label: "Continue with Google", icon: GoogleIcon },
-  { id: "facebook", label: "Continue with Facebook", icon: ({ className }) => <span className={`${className} font-semibold`}>f</span> },
 ];
 
 export default function Login() {
@@ -148,12 +147,12 @@ export default function Login() {
     }
   };
 
-  const handleProviderAuth = async (provider) => {
+  const handleProviderAuth = async () => {
     setError("");
     setLoading(true);
     try {
       if (!firebaseConfigured || !auth) throw new Error(missingFirebaseConfigMessage);
-      await signInWithPopup(auth, provider === "google" ? googleProvider : facebookProvider);
+      await signInWithPopup(auth, googleProvider);
       navigate("/login-success");
     } catch (authError) {
       setError(authError.code === "auth/popup-closed-by-user" ? "Sign-in was cancelled." : authError.message || "Provider sign-in failed.");
@@ -168,7 +167,7 @@ export default function Login() {
         <>
           <div className="space-y-3 mb-6">
             {providerOptions.map(({ id, label, icon: Icon }) => (
-              <Button key={id} variant="outline" className="w-full h-12 text-sm font-medium justify-start" onClick={() => handleProviderAuth(id)} type="button" disabled={loading}>
+              <Button key={id} variant="outline" className="w-full h-12 text-sm font-medium justify-start" onClick={handleProviderAuth} type="button" disabled={loading}>
                 <Icon className="w-5 h-5 mr-2" />
                 {label}
               </Button>

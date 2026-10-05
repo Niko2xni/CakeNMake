@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Cake, Loader2, RefreshCw, Search, Send, User, X } from 'lucide-react';
+import ChatMessageContent from '@/components/shared/ChatMessageContent';
 import CustomScrollbar from '@/components/shared/CustomScrollbar';
 import { AdminRowsSkeleton } from '@/components/shared/PageLoadingSkeleton';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -152,7 +153,7 @@ export default function BakeryChat() {
               <div className="space-y-2">
                 {chat.messages.filter(Boolean).map((message) => {
                   const fromBakery = message.senderRole !== 'customer';
-                  return <div key={message.id} className={`flex ${fromBakery ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[85%] sm:max-w-[75%] px-4 py-2.5 rounded-2xl text-[15px] ${fromBakery ? 'bg-rose-600 text-white' : 'bg-white text-gray-900 shadow-sm border border-pink-100'} ${message.failed ? 'ring-2 ring-red-400' : ''}`}><p className="whitespace-pre-wrap break-words">{message.text}</p><p className={`text-xs mt-1 ${fromBakery ? 'text-white/85 text-right' : 'text-gray-600'}`}>{message.pending ? 'Sending…' : message.failed ? 'Failed' : formatTime(message.createdAt)}</p></div></div>;
+                  return <div key={message.id} className={`flex ${fromBakery ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[85%] sm:max-w-[75%] px-4 py-2.5 rounded-2xl text-[15px] ${fromBakery ? 'bg-rose-600 text-white' : 'bg-white text-gray-900 shadow-sm border border-pink-100'} ${message.failed ? 'ring-2 ring-red-400' : ''}`}><div className="whitespace-pre-wrap break-words"><ChatMessageContent text={message.text} messageId={message.id} conversationId={message.conversationId} /></div><p className={`text-xs mt-1 ${fromBakery ? 'text-white/85 text-right' : 'text-gray-600'}`}>{message.pending ? 'Sending…' : message.failed ? 'Failed' : formatTime(message.createdAt)}</p></div></div>;
                 })}
                 <div ref={bottomRef} />
               </div>

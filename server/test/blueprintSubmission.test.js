@@ -32,7 +32,7 @@ test('authenticated submission stores account ownership without returning privat
   const customer = { _id: 'c'.repeat(24), displayName: 'Ana Cruz' };
   await submitBlueprint({ body: body(), user: customer }, res);
   assert.equal(res.code, 201);
-  assert.deepEqual(res.body, { submissionId: body().submissionId, status: 'ready' });
+  assert.deepEqual(res.body, { submissionId: body().submissionId, status: 'ready', platformId: 'a'.repeat(24) });
   assert.equal(saved.customerName, 'Ana Cruz');
   assert.equal(saved.customer, customer._id);
   assert.equal(saved.status, 'ready');

@@ -14,10 +14,10 @@ test('canonical Firebase identity includes every linked provider and provider fa
     photoURL: null,
     providerData: [
       {
-        providerId: 'facebook.com',
-        email: 'User@Example.com',
-        displayName: 'Cake User',
-        photoURL: 'https://example.com/facebook-avatar.jpg',
+          providerId: 'password',
+          email: 'User@Example.com',
+          displayName: 'Cake User',
+          photoURL: 'https://example.com/linked-account-avatar.jpg',
       },
       {
         providerId: 'google.com',
@@ -31,7 +31,7 @@ test('canonical Firebase identity includes every linked provider and provider fa
 
   assert.equal(identity.email, 'user@example.com');
   assert.equal(identity.displayName, 'Cake User');
-  assert.equal(identity.photoURL, 'https://example.com/facebook-avatar.jpg');
-  assert.deepEqual(identity.providers, ['facebook.com', 'google.com']);
+  assert.equal(identity.photoURL, 'https://example.com/linked-account-avatar.jpg');
+  assert.deepEqual(identity.providers, ['password', 'google.com']);
   assert.equal(identity.canonical, true);
 });

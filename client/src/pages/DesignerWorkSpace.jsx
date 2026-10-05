@@ -9,7 +9,7 @@ import SendBakeryModal from '@/components/bakery/SendBakeryModal';
 import BakeryChatPanel from '@/components/bakery/BakeryChatPanel';
 import useDesignAiChat from '@/hooks/useDesignAiChat';
 import GuestAuthModal from '@/components/auth/GuestAuthModal';
-import { Cake, X, Send, Cloud, CloudOff, Loader2, RotateCcw, GripHorizontal, SlidersHorizontal } from 'lucide-react';
+import { Home, X, Send, Cloud, CloudOff, Loader2, RotateCcw, GripHorizontal, SlidersHorizontal, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { blueprintApi, designApi, pricingApi, templateApi } from '@/services/api';
@@ -193,6 +193,85 @@ function MobileDraggableToolPanel({
   );
 }
 
+function MobileDraggableBakeryChat({ panelOpen, mainAreaRef }) {
+  const dragControls = useDragControls();
+  const [panelPos, setPanelPos] = useState({ side: 'right', y: 8 });
+  const [containerDimensions, setContainerDimensions] = useState({ width: 360, height: 640 });
+
+  useEffect(() => {
+    const updateDimensions = () => {
+      const container = mainAreaRef?.current;
+      setContainerDimensions({
+        width: container?.clientWidth || window.innerWidth,
+        height: container?.clientHeight || window.innerHeight - 60,
+      });
+    };
+    updateDimensions();
+    const observer = typeof ResizeObserver !== 'undefined' && mainAreaRef?.current
+      ? new ResizeObserver(updateDimensions)
+      : null;
+    observer?.observe(mainAreaRef.current);
+    window.addEventListener('resize', updateDimensions);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', updateDimensions);
+    };
+  }, [mainAreaRef]);
+
+  const panelWidth = Math.max(0, Math.min(340, containerDimensions.width - 32));
+  const panelHeight = Math.max(0, Math.min(620, containerDimensions.height - 16));
+  const edgePadding = 8;
+  const leftDockX = edgePadding;
+  const rightDockX = Math.max(edgePadding, containerDimensions.width - panelWidth - edgePadding);
+  const maxY = Math.max(edgePadding, containerDimensions.height - panelHeight - edgePadding);
+  const safeY = Math.max(edgePadding, Math.min(maxY, panelPos.y));
+  const targetX = panelPos.side === 'left' ? leftDockX : rightDockX;
+  const slideStartX = panelPos.side === 'left' ? -panelWidth - 30 : containerDimensions.width + 30;
+
+  const handleDragEnd = (event, info) => {
+    const side = info.point.x < containerDimensions.width / 2 ? 'left' : 'right';
+    const y = Math.round(Math.max(edgePadding, Math.min(maxY, safeY + info.offset.y)));
+    setPanelPos({ side, y });
+  };
+
+  return (
+    <AnimatePresence>
+      {panelOpen && (
+        <motion.div
+          key="mobile-draggable-bakery-chat"
+          drag
+          dragControls={dragControls}
+          dragListener={false}
+          dragMomentum={false}
+          dragElastic={0.06}
+          dragConstraints={{ left: leftDockX, right: rightDockX, top: edgePadding, bottom: maxY }}
+          onDragEnd={handleDragEnd}
+          initial={{ x: slideStartX, y: safeY, opacity: 0 }}
+          animate={{ x: targetX, y: safeY, opacity: 1 }}
+          exit={{ x: slideStartX, y: safeY, opacity: 0 }}
+          transition={{ type: 'spring', damping: 26, stiffness: 320 }}
+          style={{ position: 'absolute', top: 0, left: 0, width: panelWidth, height: panelHeight, zIndex: 30 }}
+          className="flex flex-col md:hidden drop-shadow-2xl"
+        >
+          <div className="w-full min-h-12 flex items-center justify-center gap-2 px-3 bg-card/95 backdrop-blur-md rounded-t-2xl border-t border-x border-border/70 shadow-sm">
+            <div
+              onPointerDown={(event) => dragControls.start(event)}
+              className="flex min-w-0 flex-1 items-center justify-center gap-1.5 py-2 cursor-grab active:cursor-grabbing select-none touch-none"
+              aria-label="Drag Bakery Chat panel"
+            >
+              <GripHorizontal className="w-4 h-4 text-muted-foreground" />
+              <span className="text-xs font-semibold text-muted-foreground">Drag Bakery Chat</span>
+            </div>
+          </div>
+          <div className="flex-1 min-h-0 bg-card rounded-b-2xl border-b border-x border-border/70 overflow-hidden shadow-2xl">
+            <BakeryChatPanel />
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 export default function DesignerWorkSpace() {
   const { account } = useAuth();
   const [searchParams] = useSearchParams();
@@ -201,6 +280,7 @@ export default function DesignerWorkSpace() {
   const [config, setConfig] = useState(INITIAL_CONFIG);
   const { quote, quotedConfig, loading: quoteLoading, error: quoteError, versionChanged, dismissVersionChanged } = useCakeQuote(config);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [mobileBakeryChatOpen, setMobileBakeryChatOpen] = useState(false);
   const [isBreakdownOpen, setIsBreakdownOpen] = useState(false);
   const [activeTool, setActiveTool] = useState(null);
   const [selectedCenterItemId, setSelectedCenterItemId] = useState(null);
@@ -208,8 +288,6 @@ export default function DesignerWorkSpace() {
   const [activeCategory, setActiveCategory] = useState(null);
   const [bakeryOpen, setBakeryOpen] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false); // true after first payment
-  const [showBakeryChat, setShowBakeryChat] = useState(false); // which panel is visible
-  const [chatNotifications, setChatNotifications] = useState(0);
   const [overlapWarning, setOverlapWarning] = useState(false);
   const [overlapMessage, setOverlapMessage] = useState(null);
   const overlapTimerRef = useRef(null);
@@ -269,10 +347,10 @@ export default function DesignerWorkSpace() {
       setDesignId(design._id);
       if (design.sentToBakery) {
         setOrderComplete(true);
-        setShowBakeryChat(true);
+        setMobileBakeryChatOpen(true);
       } else {
         setOrderComplete(false);
-        setShowBakeryChat(false);
+        setMobileBakeryChatOpen(false);
       }
       setHasUnsavedChanges(false);
       setSaveStatus('saved');
@@ -296,7 +374,7 @@ export default function DesignerWorkSpace() {
       isLoadingRef.current = true;
       setDesignId(null);
       setOrderComplete(false);
-      setShowBakeryChat(false);
+      setMobileBakeryChatOpen(false);
       setSelectedCenterItemId(null);
       setActiveTool(null);
       placeUndoStackRef.current = [];
@@ -335,7 +413,7 @@ export default function DesignerWorkSpace() {
       setDesignId(null);
       setConfig(INITIAL_CONFIG);
       setOrderComplete(false);
-      setShowBakeryChat(false);
+      setMobileBakeryChatOpen(false);
       setSelectedCenterItemId(null);
       setActiveTool(null);
       setHasUnsavedChanges(false);
@@ -619,45 +697,44 @@ export default function DesignerWorkSpace() {
       paymentCompleted: true,
     });
     if (result.status !== 'ready') throw new Error('Your order is still being processed. Please retry shortly.');
-  }, [account, config, title, quote, quotedConfig]);
+    snapshot.platformId = result.platformId;
+
+    const savedId = await saveDesign({ sentToBakery: true });
+    if (savedId) await saveThumbnail(savedId);
+
+    const convos = await chatApi.listConversations();
+    let convoId = convos.conversations?.find(
+      (conversation) => conversation.platform?.id === snapshot.platformId,
+    )?.id || null;
+    if (!convoId) {
+      const created = await chatApi.createConversation(snapshot.platformId);
+      convoId = created?.conversation?.id;
+    }
+    if (!convoId) throw new Error('Your order was submitted, but the bakery chat could not be opened. Please try again.');
+
+    const totalPesos = snapshot.quote ? snapshot.quote.totalMinor / 100 : 0;
+    const downpayment = Math.ceil(totalPesos / 2);
+    const remaining = totalPesos - downpayment;
+    const formattedDate = selectedDate ? format(selectedDate, 'MMM d, yyyy') : 'Scheduled Date';
+    try {
+      await chatApi.sendMessage(convoId, {
+        clientMessageId: `order_${snapshot.submissionId}`,
+        text: `🎂 Cake Order Submitted!\n• Design: "${snapshot.designName}"\n• Delivery Date: ${formattedDate}\n• Required Down Payment: ₱${downpayment} (Awaiting staff verification)\n• Remaining Balance: ₱${remaining} (Due upon delivery/pickup)\n\nCheckout was simulated; no money was collected. Please contact the bakery to arrange payment.`,
+      });
+    } catch (err) {
+      console.warn('Failed to send automated initial chat message:', err);
+    }
+    await chatApi.sendOrderAcknowledgement(convoId, snapshot.submissionId);
+  }, [account, config, title, quote, quotedConfig, saveDesign, saveThumbnail]);
 
   const handleOrderComplete = useCallback(async (selectedDate) => {
     setOrderComplete(true);
+    setMobileBakeryChatOpen(true);
     setBakeryOpen(false);
 
     if (!account) return;
 
-    // Explicitly update and save the design configuration permanently with sentToBakery: true
-    const savedId = await saveDesign({ sentToBakery: true });
-    if (savedId) {
-      await saveThumbnail(savedId);
-    }
-
-    // Post automated order brief into the bakery conversation
-    try {
-      const convos = await chatApi.listConversations();
-      let convoId = convos.conversations?.[0]?.id || null;
-      if (!convoId) {
-        const created = await chatApi.createConversation();
-        convoId = created?.conversation?.id;
-      }
-      if (convoId) {
-        const totalPesos = quote ? quote.totalMinor / 100 : 0;
-        const downpayment = Math.ceil(totalPesos / 2);
-        const remaining = totalPesos - downpayment;
-        const formattedDate = selectedDate ? format(selectedDate, 'MMM d, yyyy') : 'Scheduled Date';
-        await chatApi.sendMessage(convoId, {
-          clientMessageId: `order_${submittedBlueprintRef.current?.submissionId || crypto.randomUUID()}`,
-          text: `🎂 Cake Order Submitted!\n• Design: "${title}"\n• Delivery Date: ${formattedDate}\n• Required Down Payment: ₱${downpayment} (Awaiting staff verification)\n• Remaining Balance: ₱${remaining} (Due upon delivery/pickup)\n\nCheckout was simulated; no money was collected. Please contact the bakery to arrange payment.`,
-        });
-      }
-    } catch (err) {
-      console.warn('Failed to send automated initial chat message:', err);
-    }
-
-    // Direct the user to the dedicated Client Chats page
-    navigate('/chats');
-  }, [account, saveDesign, saveThumbnail, quote, title, navigate]);
+  }, [account]);
 
   const handleSaveDesign = async () => {
     if (!account) {
@@ -926,7 +1003,7 @@ export default function DesignerWorkSpace() {
               : "shrink-0 rounded-xl px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/10 transition-colors"}
             title="Back to home"
           >
-            {account ? <Cake className="w-4.5 h-4.5 sm:w-5 sm:h-5 text-primary-foreground" /> : 'Back'}
+            {account ? <Home className="w-4 h-4 text-primary-foreground" /> : 'Back'}
           </Link>
           {account && (
             <Input
@@ -940,7 +1017,7 @@ export default function DesignerWorkSpace() {
                   e.target.blur();
                 }
               }}
-              className="font-display text-base sm:text-xl font-bold leading-tight tracking-tight border-none shadow-none bg-transparent p-0 h-auto w-[120px] sm:w-[180px] max-w-[180px] focus-visible:ring-0 focus-visible:ring-offset-0 hover:bg-muted/50 rounded-md px-1 -ml-1 truncate disabled:opacity-100"
+              className="font-display text-base sm:text-xl font-bold leading-tight tracking-tight border-none shadow-none bg-transparent p-0 h-auto w-[120px] sm:w-[180px] max-w-[180px] focus-visible:ring-0 focus-visible:ring-offset-0 hover:bg-muted/50 rounded-md px-1 -ml-1 truncate disabled:opacity-100 disabled:cursor-not-allowed disabled:hover:bg-transparent"
             />
           )}
 
@@ -1020,7 +1097,7 @@ export default function DesignerWorkSpace() {
             </Button>
           )}
 
-          {/* Mobile toolpanel toggle - only when not sent to bakery */}
+          {/* Mobile panel toggle */}
           {!orderComplete && (
             <div className="relative md:hidden">
               <Button
@@ -1045,6 +1122,20 @@ export default function DesignerWorkSpace() {
                 </span>
               )}
             </div>
+          )}
+          {orderComplete && (
+            <Button
+              type="button"
+              variant={mobileBakeryChatOpen ? 'default' : 'outline'}
+              size="icon"
+              onClick={() => setMobileBakeryChatOpen((open) => !open)}
+              aria-label={mobileBakeryChatOpen ? 'Close Bakery Chat' : 'Open Bakery Chat'}
+              aria-expanded={mobileBakeryChatOpen}
+              title={mobileBakeryChatOpen ? 'Close Bakery Chat' : 'Open Bakery Chat'}
+              className="md:hidden rounded-xl"
+            >
+              {mobileBakeryChatOpen ? <X className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
+            </Button>
           )}
         </div>
       </header>
@@ -1156,7 +1247,7 @@ export default function DesignerWorkSpace() {
         <div className={`hidden md:block w-[280px] lg:w-[320px] xl:w-[340px] max-w-[40vw] p-2 sm:p-3 shrink-0 ${isBreakdownOpen ? 'pointer-events-none opacity-50 select-none' : ''}`}>
           {orderComplete ? (
             <div className="h-full">
-              <BakeryChatPanel onNotificationChange={setChatNotifications} config={config} onChange={setConfig} quote={quote} aiChatSession={aiChatSession} />
+              <BakeryChatPanel />
             </div>
           ) : (
             <ToolPanel
@@ -1198,9 +1289,10 @@ export default function DesignerWorkSpace() {
 
         {/* Mobile Panel */}
         {orderComplete ? (
-          <div className="md:hidden fixed bottom-0 inset-x-0 h-[360px] max-h-[50vh] bg-card border-t border-border/40 z-30 shadow-2xl p-2">
-            <BakeryChatPanel onNotificationChange={setChatNotifications} config={config} onChange={setConfig} quote={quote} aiChatSession={aiChatSession} />
-          </div>
+          <MobileDraggableBakeryChat
+            panelOpen={mobileBakeryChatOpen}
+            mainAreaRef={mainAreaRef}
+          />
         ) : (
           <MobileDraggableToolPanel
             aiChatSession={aiChatSession}

@@ -4,7 +4,6 @@ import {
   Clock,
   LayoutTemplate,
   LogOut,
-  MessageSquare,
   Plus,
   Settings,
   Trash2,
@@ -79,8 +78,6 @@ export default function ClientNavbar() {
 
         <div className="cn-nav-spacer" />
 
-        <NavItem to="/chats" icon={MessageSquare} label="Chats" currentPath={location.pathname} />
-
         <div className="cn-user-menu" ref={menuRef}>
           <button
             type="button"
@@ -117,7 +114,6 @@ export default function ClientNavbar() {
               >
                 <Settings className="w-4 h-4" /> Settings
               </Link>
-              <Link to="/support" role="menuitem" onClick={() => setUserDropdownOpen(false)}><MessageSquare className="w-4 h-4" /> Orders & Support</Link>
               <button type="button" role="menuitem" onClick={() => { setUserDropdownOpen(false); requestLogout(); }} disabled={isLoggingOut}>
                 <LogOut className="w-4 h-4" /> Log out
               </button>
