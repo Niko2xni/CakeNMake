@@ -243,7 +243,6 @@ export const DEFAULT_RATES = {
       oreo: [{ maxQty: 4, price: 8 }, { maxQty: 8, price: 15 }],
       hersheysKisses: [{ maxQty: 4, price: 37 }, { maxQty: 9, price: 74 }],
       fondantBalls: [{ maxQty: 3, price: 50 }, { maxQty: 8, price: 100 }],
-      pipingText: [{ maxQty: Infinity, price: 50 }],
       buttercreamText: [
         { maxQty: 10, price: 50 },
         { maxQty: 20, price: 100 },
@@ -272,7 +271,6 @@ export const CENTER_PER_PIECE_META = {
 };
 
 export const TEXT_PRICING_META = {
-  pipingText: { label: 'Piping Text', unit: 'flat', description: 'Thin piped inscription (flat rate)' },
   buttercreamText: { label: '3D Fondant Text', unit: 'letters', description: '3D standing fondant letters' },
 };
 

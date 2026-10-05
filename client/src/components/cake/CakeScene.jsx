@@ -50,12 +50,11 @@ import {
   getEdgeFerreroObstacles,
   getFerreroAwareBoundaryRadius,
   pruneItemsCollidingWithEdgeFerrero,
-  isFootprintCollidingWithText,
   getCenterItemLimit,
   getCenterItemCount,
 } from '../../lib/cakeConfig';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
-import { getPacificoFont, getHandwrittenFont, areFontsReady, onFontsReady } from './cakeFonts';
+import { getPacificoFont, areFontsReady, onFontsReady } from './cakeFonts';
 import { makePRNG, hashStr } from './cakeMath';
 import {
   FROSTING_COLORS,
@@ -1396,7 +1395,6 @@ const CakeScene = React.forwardRef(function CakeScene({
       sideSunshinePlaySetId = 'rainbowArc',
       sideVictorianLambethSetId = 'classic',
       sideNoNameSetId = null,
-      centerText = '', centerTextTop = '', centerTextMiddle = '', centerTextBottom = '', centerTextSpacing = 0.28, centerTextFont = 'default',
       edgeMode = 'both', edgeTop = null, edgeBottom = null, edgeBoth = null,
       edgeMiddle = null,
       sideDecorationColor = '#F6DEAB', sideDecorationColorId = null,
@@ -3367,57 +3365,6 @@ const CakeScene = React.forwardRef(function CakeScene({
         centerItemRadii[`letterLower${ch}`] = getCenterItemRadius(`letterLower${ch}`, centerDecorScale);
       }
 
-      // ── Text-Aware Collision Bounds Calculation ─────────────────────────
-      const isHandwritten = centerTextFont === 'handwritten';
-      const activeFont = isHandwritten ? getHandwrittenFont() : getPacificoFont();
-
-      const topStr = (centerTextTop || '').trim();
-      const middleStr = (centerTextMiddle || '').trim();
-      const bottomStr = (centerTextBottom || '').trim();
-      const hasExplicitSlots = Boolean(
-        centerTextTop !== undefined || centerTextMiddle !== undefined || centerTextBottom !== undefined
-      );
-
-      let activeTextSlots = [];
-      const spacingRatio = typeof centerTextSpacing === 'number' ? centerTextSpacing : 0.28;
-
-      if (hasExplicitSlots) {
-        if (topStr) activeTextSlots.push({ line: topStr, zRatio: -spacingRatio });
-        if (middleStr) activeTextSlots.push({ line: middleStr, zRatio: 0.00 });
-        if (bottomStr) activeTextSlots.push({ line: bottomStr, zRatio: spacingRatio });
-      } else if (centerText && centerText.trim()) {
-        const lines = centerText.split('\n').map((l) => l.trim()).filter(Boolean);
-        if (lines.length === 1) {
-          activeTextSlots.push({ line: lines[0], zRatio: 0.00 });
-        } else if (lines.length === 2) {
-          activeTextSlots.push({ line: lines[0], zRatio: -spacingRatio * 0.65 });
-          activeTextSlots.push({ line: lines[1], zRatio: spacingRatio * 0.65 });
-        } else if (lines.length >= 3) {
-          activeTextSlots.push({ line: lines[0], zRatio: -spacingRatio });
-          activeTextSlots.push({ line: lines[1], zRatio: 0.00 });
-          activeTextSlots.push({ line: lines[2], zRatio: spacingRatio });
-        }
-      }
-
-      // Compute 2D collision bounding boxes for active text lines
-      const computeActiveTextBounds = (slots, isScriptOrHand, rTop, decorPadding) => {
-        const charW = isScriptOrHand ? 0.22 : 0.20;
-        const lineH = isScriptOrHand ? 0.45 : 0.40;
-        return slots.map((slot) => {
-          const w = Math.max(0.8, slot.line.length * charW);
-          const zAnchor = slot.zRatio * rTop;
-          return {
-            minX: -w / 2 - decorPadding,
-            maxX: +w / 2 + decorPadding,
-            minZ: zAnchor - lineH / 2 - decorPadding,
-            maxZ: zAnchor + lineH / 2 + decorPadding,
-          };
-        });
-      };
-
-      const isScriptOrHand = isHandwritten || centerTextFont === 'default';
-      const activeTextBounds = computeActiveTextBounds(activeTextSlots, isScriptOrHand, topRadius, 0.08);
-
       const edgeConfig = cakeConfig?.edge || { mode: edgeMode, top: edgeTop, bottom: edgeBottom, both: edgeBoth };
       const edgeObstacles = getEdgeDelicatesObstacles(edgeConfig, topRadius, exteriorFinishStyle);
       const delicatesBoundaryRadius = getDelicatesAwareBoundaryRadius(topRadius, edgeConfig, exteriorFinishStyle);
@@ -3430,7 +3377,6 @@ const CakeScene = React.forwardRef(function CakeScene({
         isFerreroRocherEdgeOnTop: isDelicatesEdgeOnTop,
         isDelicatesEdgeOnTop,
         edgeObstacles,
-        activeTextBounds,
         centerItemRadii,
         // Place-tab items (cherry, strawberry, etc.) share Center's boundary
         // (same top surface, same edge-treatment clearance) but use their
@@ -3444,60 +3390,6 @@ const CakeScene = React.forwardRef(function CakeScene({
       // than an algorithmic preset pattern -- computeVariantPositions and
       // the old centerDecorationSetId/Variation/Orientation-driven block
       // that used to render here have been removed.
-
-      const textSlots = activeTextSlots;
-      if (textSlots.length > 0 && activeFont) {
-        const textMat = getFrostingMaterial(centerTextColor, centerTextColorId);
-        const textGroup = new THREE.Group();
-
-        textSlots.forEach((slot) => {
-          const textGeo = new TextGeometry(slot.line, {
-            font: activeFont,
-            size: isHandwritten ? 0.40 : 0.35,
-            depth: 0.015,
-            curveSegments: 8,
-            bevelEnabled: true,
-            bevelThickness: isHandwritten ? 0.03 : 0.025,
-            bevelSize: isHandwritten ? 0.015 : 0.01,
-            bevelSegments: 4,
-          });
-          textGeo.computeBoundingBox();
-          const bbox = textGeo.boundingBox;
-          const xOffset = -0.5 * (bbox.max.x - bbox.min.x);
-          const yOffset = -slot.zRatio * topRadius;
-
-          // Conform the text to the cake's domed surface
-          const R = topRadius - 0.15; // Bevel size is 0.15
-          const pos = textGeo.attributes.position;
-          for (let v = 0; v < pos.count; v++) {
-            const vx = pos.getX(v);
-            const vy = pos.getY(v);
-            const vz = pos.getZ(v);
-
-            const worldX = vx + xOffset;
-            const worldZ = -(vy + yOffset);
-            const r = Math.sqrt(worldX * worldX + worldZ * worldZ);
-
-            let heightAtR = topLayerBaseY;
-            if (r < R) {
-              heightAtR += topLayerDomeHeight * (1 - (r / R) * (r / R));
-            }
-
-            pos.setZ(v, vz + heightAtR);
-          }
-          textGeo.computeVertexNormals();
-
-          const textMesh = new THREE.Mesh(textGeo, textMat);
-          textMesh.position.set(xOffset, yOffset, 0);
-          textMesh.castShadow = true;
-          textMesh.receiveShadow = true;
-          textGroup.add(textMesh);
-        });
-
-        textGroup.rotation.x = -Math.PI / 2;
-        textGroup.position.set(0, 0, 0);
-        group.add(textGroup);
-      }
 
       // Edge > Decorations > Beaded Trim + Edge > Piping — colored by
       // Sugar Color's frostColor now (the per-slot pickers were removed)
@@ -4050,7 +3942,7 @@ const CakeScene = React.forwardRef(function CakeScene({
         const candidateToolType = `center-${designId}-${orientation || 'default'}`;
         const candidateFp = getItemFootprint({ type: candidateToolType, x, z, rotation, tiltX, tiltZ }, centerDecorScale);
 
-        const { centerPlacementBoundaryRadius, radius, edgeObstacles = [], activeTextBounds = [] } = topMetricsRef.current || {};
+        const { centerPlacementBoundaryRadius, radius, edgeObstacles = [] } = topMetricsRef.current || {};
         const boundaryR = centerPlacementBoundaryRadius ?? ((radius || 4) * 0.88);
         if (!isFootprintInBoundary(candidateFp, boundaryR, radius)) {
           return { x, z, valid: false, reason: 'boundary' };
@@ -4060,10 +3952,6 @@ const CakeScene = React.forwardRef(function CakeScene({
           if (doFootprintsClash(candidateFp, obs, 0.02)) {
             return { x, z, valid: false, reason: 'edge-overlap' };
           }
-        }
-
-        if (isFootprintCollidingWithText(candidateFp, activeTextBounds)) {
-          return { x, z, valid: false, reason: 'text-overlap' };
         }
 
         for (const item of placedItems) {
@@ -4084,7 +3972,7 @@ const CakeScene = React.forwardRef(function CakeScene({
         const centerDecorScale = topMetricsRef.current?.centerDecorScale ?? 1;
         const candidateFp = getItemFootprint({ type: toolType, x, z }, centerDecorScale);
 
-        const { centerPlacementBoundaryRadius, radius, edgeObstacles = [], activeTextBounds = [] } = topMetricsRef.current || {};
+        const { centerPlacementBoundaryRadius, radius, edgeObstacles = [] } = topMetricsRef.current || {};
         const boundaryR = centerPlacementBoundaryRadius ?? ((radius || 4) * 0.88);
         if (!isFootprintInBoundary(candidateFp, boundaryR, radius)) {
           return { x, z, valid: false, reason: 'boundary' };
@@ -4094,10 +3982,6 @@ const CakeScene = React.forwardRef(function CakeScene({
           if (doFootprintsClash(candidateFp, obs, 0.02)) {
             return { x, z, valid: false, reason: 'edge-overlap' };
           }
-        }
-
-        if (isFootprintCollidingWithText(candidateFp, activeTextBounds)) {
-          return { x, z, valid: false, reason: 'text-overlap' };
         }
 
         const placedItems = cakeConfigRef.current?.placedItems || [];

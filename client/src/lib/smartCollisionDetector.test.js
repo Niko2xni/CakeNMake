@@ -13,7 +13,6 @@ import {
   pruneItemsCollidingWithEdgeDelicates,
   getEdgeFerreroObstacles,
   getFerreroAwareBoundaryRadius,
-  isFootprintCollidingWithText,
   pruneItemsCollidingWithEdgeFerrero,
   getTopTierRadiusFromConfig,
 } from './cakeConfig';
@@ -230,24 +229,6 @@ describe('Smart Collision Detector for Center Tab Designs', () => {
       z: firstObstacle.z,
     });
     expect(doFootprintsClash(letterColliding, firstObstacle, 0.02)).toBe(true);
-  });
-
-  it('detects collisions with Center Text bounding boxes', () => {
-    const textBounds = [
-      { minX: -1.5, maxX: 1.5, minZ: -0.4, maxZ: 0.4 },
-    ];
-
-    // Item placed in the middle of the text
-    const strawberryOnText = getItemFootprint({ designId: 'strawberry', x: 0, z: 0 });
-    expect(isFootprintCollidingWithText(strawberryOnText, textBounds)).toBe(true);
-
-    // Letter design placed over text
-    const letterOnText = getItemFootprint({ designId: 'letterUpperA', x: 0.5, z: 0.1 });
-    expect(isFootprintCollidingWithText(letterOnText, textBounds)).toBe(true);
-
-    // Item placed cleanly outside text
-    const strawberryAway = getItemFootprint({ designId: 'strawberry', x: 0, z: 1.2 });
-    expect(isFootprintCollidingWithText(strawberryAway, textBounds)).toBe(false);
   });
 
   it('prunes ONLY center items that collide with Edge Ferrero Rocher, preserving safe items', () => {

@@ -65,7 +65,6 @@ export function validateCakeAiTool(name, input) {
   if (Object.keys(properties).length && !Object.keys(input).length) return 'Supply at least one edit.';
   if (name === 'set_side_treatment' && input.setId && !sideSets[input.mode]?.some(set => set.id === input.setId)) return 'This side variant does not belong to the selected treatment.';
   if (name === 'set_edge_border' && input.designId === undefined && !input.colorId && !input.secondaryColorId) return 'Choose a border design or color to change.';
-  if (name === 'set_cake_text' && input.style === 'buttercream' && input.font) return 'Font selection applies only to piping text.';
   return null;
 }
 
@@ -122,9 +121,9 @@ export function applyCakeAiTool(name, input, ctx) {
       const isLetter = item => /^center-letter/.test(item.type || '') || /^letter/.test(item.type || '');
       const retained = (config.place?.items || []).filter(item => !isLetter(item));
       const text = input.text.trim();
-      if (text && !(input.style === 'buttercream' ? /^[A-Za-z \n]+$/ : /^[A-Za-z0-9 .,!?&'()\n-]+$/).test(text)) return { error: input.style === 'buttercream' ? 'Buttercream letters support A–Z, a–z and spaces only.' : 'Piping text supports Latin letters, numbers and basic punctuation.' };
+      if (text && !/^[A-Za-z \n]+$/.test(text)) return { error: 'Buttercream letters support A–Z, a–z and spaces only.' };
       const lines = [];
-      const maxLine = input.style === 'buttercream' ? 12 : 20;
+      const maxLine = 12;
       for (const paragraph of text.split('\n')) {
         let line = '';
         for (const word of paragraph.trim().split(/\s+/).filter(Boolean)) {
@@ -143,29 +142,21 @@ export function applyCakeAiTool(name, input, ctx) {
       const footprints = [];
       const colorId = input.colorId || config.center?.text?.colorId || config.sugarColorOverrides?.center?.colorId || 'vanilla';
       lines.forEach((line, lineIndex) => {
-        const z = input.style === 'piping' && lines.length === 2 ? (lineIndex === 0 ? -0.28 : 0.28) * radius : (lineIndex - (lines.length - 1) / 2) * radius * 0.28;
-        if (input.style === 'piping') footprints.push({ type: 'obb', x: 0, z, halfLength: Math.max(0.4, line.length * 0.17), halfWidth: 0.3, angle: 0 });
-        else {
-          const widths = [...line].map(char => (char === ' ' ? 0.28 : char === char.toUpperCase() ? 0.52 : 0.4) * scale);
-          let x = -widths.reduce((sum, width) => sum + width, 0) / 2;
-          [...line].forEach((char, index) => {
-            const width = widths[index];
-            if (char !== ' ') {
-              const letter = BUTTERCREAM_LETTERS.find(entry => entry.char === char);
-              const item = { id: crypto.randomUUID(), type: letter.toolId, x: x + width / 2, z, y: 0, rotation: 0, tiltX: 0, tiltZ: 0, colorId, sugarColor: { mode: 'colorOverride', colorId } };
-              added.push(item); footprints.push(getItemFootprint(item, scale));
-            }
-            x += width;
-          });
-        }
+        const z = (lineIndex - (lines.length - 1) / 2) * radius * 0.28;
+        const widths = [...line].map(char => (char === ' ' ? 0.28 : char === char.toUpperCase() ? 0.52 : 0.4) * scale);
+        let x = -widths.reduce((sum, width) => sum + width, 0) / 2;
+        [...line].forEach((char, index) => {
+          const width = widths[index];
+          if (char !== ' ') {
+            const letter = BUTTERCREAM_LETTERS.find(entry => entry.char === char);
+            const item = { id: crypto.randomUUID(), type: letter.toolId, x: x + width / 2, z, y: 0, rotation: 0, tiltX: 0, tiltZ: 0, colorId, sugarColor: { mode: 'colorOverride', colorId } };
+            added.push(item); footprints.push(getItemFootprint(item, scale));
+          }
+          x += width;
+        });
       });
       if (footprints.some(footprint => !isFootprintInBoundary(footprint, boundary, radius) || obstacles.some(obstacle => doFootprintsClash(footprint, obstacle, 0.04)))) return { error: 'The text would overlap a decoration or extend beyond the cake. Shorten it or move decorations first.' };
-      const centerText = { ...(config.center?.text || {}), top: '', middle: '', bottom: '', colorId, font: input.font || 'default', spacing: 0.28, colorMode: 'individual' };
-      if (input.style === 'piping' && lines.length) {
-        if (lines.length === 1) centerText.middle = lines[0];
-        else if (lines.length === 2) { centerText.top = lines[0]; centerText.bottom = lines[1]; }
-        else [centerText.top, centerText.middle, centerText.bottom] = lines;
-      }
+      const centerText = { ...(config.center?.text || {}), top: '', middle: '', bottom: '', colorId, colorMode: 'individual' };
       onChange({ ...config, center: { ...config.center, mode: 'text', textCategory: input.style, text: centerText },
         place: { ...config.place, items: [...retained, ...added] }, placedItems: (config.placedItems || []).filter(item => !isLetter(item)) });
       return { label: text ? `Added ${input.style} text: ${text}` : 'Removed cake text', result: { text, style: input.style, lines, letters: added.length } };

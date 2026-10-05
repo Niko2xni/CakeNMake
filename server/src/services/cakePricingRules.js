@@ -336,7 +336,6 @@ const DEFAULT_RATES = {
   //   perPiece[key] = price for EACH piece (not bracketed)
   // Keys: designIds from CENTER_PLACEABLE_DESIGNS, except basketball and
   // soccerball share one 'fondantBalls' count, plus
-  //   pipingText      (center.text lines, counted in characters)
   //   buttercreamText (placed letters, counted in letters)
   center: {
     brackets: {
@@ -346,7 +345,6 @@ const DEFAULT_RATES = {
       oreo: [{ maxQty: 4, price: 8 }, { maxQty: 8, price: 15 }],
       hersheysKisses: [{ maxQty: 4, price: 37 }, { maxQty: 9, price: 74 }],
       fondantBalls: [{ maxQty: 3, price: 50 }, { maxQty: 8, price: 100 }],
-      pipingText: [{ maxQty: Infinity, price: 50 }], // flat, any length
       buttercreamText: [
         { maxQty: 10, price: 50 },
         { maxQty: 20, price: 100 },
@@ -369,7 +367,6 @@ const DESIGN_LABELS = {
   oreo: 'Oreo',
   chocolateBear: 'Chocolate Bear',
   fondantBalls: 'Fondant Ball',
-  pipingText: 'Piping Text',
   buttercreamText: '3D Fondant Text',
 };
 
@@ -897,16 +894,12 @@ function filterPrunedPlacedItems(config) {
       : designId;
     counts[key] = (counts[key] || 0) + 1;
   }
-  const text = config.center?.text || {};
-  const typed = [text.top, text.middle, text.bottom].filter(Boolean).join('').replace(/\s/g, '').length;
-  if (config.center?.mode === 'text' && typed > 0) counts.pipingText = typed;
-
   // ── Center: Decorations & Text ─────────────────────────────────────────
   const decoEntries = [];
   let decoTotalPrice = 0;
 
   for (const [designId, quantity] of Object.entries(counts)) {
-    if (designId === 'buttercreamText' || designId === 'pipingText') continue;
+    if (designId === 'buttercreamText') continue;
     const label = DESIGN_LABELS[designId] || designId;
     const each = rates.center?.perPiece?.[designId] ?? DEFAULT_RATES.center?.perPiece?.[designId];
     if (each != null) {
@@ -980,31 +973,6 @@ function filterPrunedPlacedItems(config) {
       missing(`Center Text × ${quantity}`, reason);
     } else {
       add('center-buttercreamText', 'Center Text:', price, 1, [`Letters x ${quantity}`]);
-    }
-  }
-
-  // Piping Inscription
-  if (counts.pipingText) {
-    const quantity = counts.pipingText;
-    const defaultBrackets = DEFAULT_RATES.center?.brackets?.pipingText || [{ maxQty: Infinity, price: 50 }];
-    const customBrackets = rates.center?.brackets?.pipingText;
-    let effectiveBrackets = defaultBrackets;
-
-    if (Array.isArray(customBrackets) && customBrackets.length > 0) {
-      effectiveBrackets = defaultBrackets.map((defB, idx) => {
-        const customB = customBrackets[idx];
-        return {
-          maxQty: customB?.maxQty ?? defB.maxQty,
-          price: customB?.price ?? defB.price,
-        };
-      });
-    }
-
-    const { price, reason } = bracketPrice(effectiveBrackets, quantity);
-    if (price == null) {
-      missing('Center — Piping Inscription', reason);
-    } else {
-      add('center-pipingText', 'Piping Inscription', price);
     }
   }
 

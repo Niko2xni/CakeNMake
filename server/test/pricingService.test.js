@@ -429,3 +429,13 @@ test('two-tier quote prices and generates accurate specs for Uniform vs Individu
 });
 
 
+
+test('retired flat inscriptions are ignored while placed letters remain priced', () => {
+  const config = { structure: { size: 'big', layers: 1 }, center: { mode: 'text', text: { middle: 'Legacy inscription' } } };
+  const base = buildQuote({ structure: config.structure });
+  const legacy = buildQuote(config);
+  assert.equal(legacy.totalMinor, base.totalMinor);
+  assert.equal(legacy.lineItems.some(line => line.componentKey === 'center-pipingText'), false);
+  const letters = buildQuote({ ...config, place: { items: [{ type: 'center-letterUpperA-default', x: 0, z: 0 }] } });
+  assert.ok(letters.lineItems.some(line => line.componentKey === 'center-buttercreamText'));
+});

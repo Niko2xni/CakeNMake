@@ -1067,30 +1067,6 @@ export function pruneItemsCollidingWithEdgeFerrero(
   );
 }
 
-/**
- * Checks if a candidate item footprint collides with any active Center Piping Text bounding boxes.
- */
-export function isFootprintCollidingWithText(footprint, textBounds) {
-  if (!footprint || !textBounds || textBounds.length === 0) return false;
-  for (const b of textBounds) {
-    const w = b.maxX - b.minX;
-    const h = b.maxZ - b.minZ;
-    if (w <= 0 || h <= 0) continue;
-    const textBoxFp = {
-      type: 'obb',
-      x: (b.minX + b.maxX) * 0.5,
-      z: (b.minZ + b.maxZ) * 0.5,
-      halfLength: w * 0.5,
-      halfWidth: h * 0.5,
-      angle: 0,
-    };
-    if (doFootprintsClash(footprint, textBoxFp, 0.02)) {
-      return true;
-    }
-  }
-  return false;
-}
-
 export const CENTER_PLACEABLE_DESIGNS = [
   { designId: 'strawberry', orientation: null, label: 'Strawberry', toolId: 'center-strawberry-default', maxLimit: 10 },
   { designId: 'cherry', orientation: null, label: 'Cherry', toolId: 'center-cherry-default', maxLimit: 10 },

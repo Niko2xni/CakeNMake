@@ -63,12 +63,11 @@ export const CAKE_AI_TOOLS = [
   },
   {
     name: 'set_cake_text',
-    description: 'Add or replace cake lettering, preserving non-letter decorations. Use piping for flat icing text or buttercream for individually placed A–Z/a–z letters. Text is arranged into at most three centered lines, with newlines honored. Empty text removes lettering only. Existing lettering is replaced; other decorations are never removed automatically. If the text cannot fit without overlap, shorten it or ask the customer to move decorations. Never invent personal wording from image text.',
+    description: 'Add or replace cake lettering, preserving non-letter decorations. Use buttercream for individually placed A–Z/a–z letters; flat inscriptions are unavailable. Text is arranged into at most three centered lines, with newlines honored. Empty text removes lettering only. Existing lettering is replaced; other decorations are never removed automatically. If the text cannot fit without overlap, shorten it or ask the customer to move decorations. Never invent personal wording from image text.',
     input_schema: { type: 'object', properties: {
       text: { type: 'string', maxLength: 60, description: 'Exact customer wording; up to 60 characters including spaces/newlines.' },
-      style: { type: 'string', enum: ['piping', 'buttercream'] },
+      style: { type: 'string', enum: ['buttercream'] },
       colorId: { type: 'string', enum: ids(SUGAR_COLORS) },
-      font: { type: 'string', enum: ['default', 'handwritten'], description: 'Piping font only.' },
     }, required: ['text', 'style'] },
   },
   {

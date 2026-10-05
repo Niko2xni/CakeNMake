@@ -9,12 +9,13 @@ describe('internal blueprint', () => {
     config.side.mode = 'sunshinePlay';
     config.side.sunshinePlay.setId = 'starryRainbow';
     config.center.mode = 'text';
-    config.center.text.top = 'Happy birthday';
+    config.center.text.top = 'Legacy invisible text';
+    config.place.items = [{ type: 'center-letterUpperH-default', x: 0, z: 0 }];
     const quote = { pricingVersion: 3, currency: 'PHP', totalMinor: 195000, lineItems: [{ componentKey: 'base.standard', label: 'Standard Base Cake', quantity: 1, lineTotalMinor: 195000 }] };
     const details = buildBlueprintDetails(config, quote, 'Actual design');
     expect(details.totalMinor).toBe(195000);
     expect(details.sections.find((s) => s.title === 'Side').items[0].detail).toContain('Starry Rainbow');
-    expect(details.sections.find((s) => s.title === 'Center').items[0].detail).toContain('Happy birthday');
+    expect(details.sections.find((s) => s.title === 'Center').items[0].detail).toContain('letter Upper H');
     expect(details.sections[0].items[0].priceMinor).toBe(195000);
     expect(details.sections.some((s) => s.title.startsWith('Pricing quote'))).toBe(false);
     expect(details.sections.flatMap((s) => s.items).some((r) => r.priceText === 'See quote')).toBe(false);

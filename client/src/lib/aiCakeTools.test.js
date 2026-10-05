@@ -30,15 +30,14 @@ describe('Cake AI edits without a provider', () => {
     expect(all.edge.both.piping.tip).toBe('shell'); expect(all.edge.middle.piping.tip).toBe('shell');
     expect(execute('set_edge_border', { slot: 'middle', designId: 'shell' }).response.error).toBeTruthy();
   });
-  it('adds exact piping text and removes only lettering when cleared', () => {
+  it('rejects removed flat text without changing the design and clears only letter decorations', () => {
     const config = structuredClone(DEFAULT_CONFIG);
     config.place.items = [{ id: 'letter', type: 'center-letterUpperA-default', x: 0, z: 0 }, { id: 'decor', type: 'center-cherry-default', x: 0, z: -2.5 }];
-    const { next, response } = execute('set_cake_text', { text: 'Happy Birthday\nAna!', style: 'piping', colorId: 'pink' }, config);
-    expect(response.error).toBeUndefined();
-    expect(next.center.text).toMatchObject({ top: 'Happy Birthday', bottom: 'Ana!', colorId: 'pink' });
-    expect(next.place.items.map(item => item.id)).toEqual(['decor']);
-    const cleared = execute('set_cake_text', { text: '', style: 'piping' }, next).next;
-    expect(cleared.center.text.top).toBe(''); expect(cleared.place.items).toEqual(next.place.items);
+    const rejected = execute('set_cake_text', { text: 'Hi', style: 'piping' }, config);
+    expect(rejected.response.error).toMatch(/Unsupported/);
+    expect(rejected.onChange).not.toHaveBeenCalled();
+    const cleared = execute('set_cake_text', { text: '', style: 'buttercream' }, config).next;
+    expect(cleared.place.items.map(item => item.id)).toEqual(['decor']);
   });
   it('creates individually movable buttercream letters and rejects unsupported or overlapping text atomically', () => {
     const { next } = execute('set_cake_text', { text: 'Hi Ana', style: 'buttercream', colorId: 'pink' });
@@ -49,7 +48,7 @@ describe('Cake AI edits without a provider', () => {
     expect(execute('set_cake_text', { text: 'Hi 123', style: 'buttercream' }).response.error).toBeTruthy();
     expect(execute('set_cake_text', { text: 'x'.repeat(61), style: 'piping' }).response.error).toBeTruthy();
     const blocked = structuredClone(DEFAULT_CONFIG); blocked.place.items = [{ type: 'center-basketball-default', x: 0, z: 0 }];
-    const { response, onChange } = execute('set_cake_text', { text: 'Hello', style: 'piping' }, blocked);
+    const { response, onChange } = execute('set_cake_text', { text: 'Hello', style: 'buttercream' }, blocked);
     expect(response.error).toMatch(/overlap/); expect(onChange).not.toHaveBeenCalled();
   });
   it('passes border and text colors to the renderer without recoloring other center decorations', () => {
@@ -57,12 +56,13 @@ describe('Cake AI edits without a provider', () => {
     const config = structuredClone(DEFAULT_CONFIG);
     config.sugarColorOverrides.center = { mode: 'colorOverride', colorId: 'chocolate' };
     let next = execute('set_edge_border', { slot: 'top', designId: 'shellAlt', colorId: 'pink', secondaryColorId: 'red' }, config).next;
-    next = execute('set_cake_text', { text: 'Happy Birthday', style: 'piping', colorId: 'pink' }, next).next;
+    next = execute('set_cake_text', { text: 'Hi', style: 'buttercream', colorId: 'pink' }, next).next;
     const rendered = adaptConfigToLegacy(next);
     expect(rendered.edgeTop.pipingTip).toBe('shellAlt');
     expect(rendered.edgeTop.pipingColorId).toBe('pink');
     expect(rendered.edgeTop.pipingSecondaryColorId).toBe('red');
-    expect(rendered.centerTextMiddle).toBe('Happy Birthday');
+    expect(next.place.items).toHaveLength(2);
+    expect(next.place.items.every(item => item.colorId === 'pink')).toBe(true);
     expect(rendered.centerTextColorId).toBe('pink');
     expect(rendered.centerDecorationColorId).toBe('chocolate');
     log.mockRestore();

@@ -43,11 +43,6 @@ export function buildBlueprintDetails(config, quote, designName = '') {
   }
   addSection('Side', sideItems);
   const center = [];
-  if (config.center?.mode === 'text') {
-    ['top', 'middle', 'bottom'].forEach((slot) => {
-      if (config.center.text?.[slot]) center.push([`${name(slot)} Text`, `${config.center.text[slot]} · ${name(config.center.text.font)}`, ['center.customText']]);
-    });
-  }
   (config.place?.items || []).forEach((item) => center.push(['Placed Decoration', `${name(item.designId || item.type)} · position ${JSON.stringify(item.position || { x: item.x, y: item.y, z: item.z })}`, [`placed.${item.type || item.designId}`]]));
   addSection('Center', center);
   const edges = [];

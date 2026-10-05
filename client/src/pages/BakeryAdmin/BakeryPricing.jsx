@@ -434,7 +434,6 @@ export default function BakeryPricing() {
   const [simEdgeId, setSimEdgeId] = useState('none');
   const [simStrawberries, setSimStrawberries] = useState(4);
   const [simBear, setSimBear] = useState(0);
-  const [simPipingText, setSimPipingText] = useState(false);
   const [simButtercreamLetters, setSimButtercreamLetters] = useState(0);
 
   async function load() {
@@ -680,12 +679,6 @@ export default function BakeryPricing() {
     if (simBear > 0) {
       total += (currentRates.center?.perPiece?.chocolateBear || 0) * simBear;
     }
-    // Custom Inscription (Text Pricing)
-    if (simPipingText) {
-      const brackets = currentRates.center?.brackets?.pipingText || [];
-      const hit = brackets[0];
-      if (hit) total += hit.price;
-    }
     // 3D Buttercream Letters (Text Pricing)
     if (simButtercreamLetters > 0) {
       const brackets = currentRates.center?.brackets?.buttercreamText || [];
@@ -693,7 +686,7 @@ export default function BakeryPricing() {
       if (hit) total += hit.price;
     }
     return total;
-  }, [rates, simLayers, simSize, simFinish, simGlaze, simSideKey, simEdgeId, simStrawberries, simBear, simPipingText, simButtercreamLetters]);
+  }, [rates, simLayers, simSize, simFinish, simGlaze, simSideKey, simEdgeId, simStrawberries, simBear, simButtercreamLetters]);
 
   const selectedSideLabel = useMemo(() => {
     if (simSideKey === 'none') return 'None';
@@ -1655,19 +1648,6 @@ export default function BakeryPricing() {
                       <div className="pt-2 border-t border-pink-100/60 space-y-3">
                         <span className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">Text Pricings</span>
                         <div>
-                          <label className="text-xs font-semibold text-gray-600 block mb-1">Piped Inscription (Flat Rate)</label>
-                          <button
-                            type="button"
-                            onClick={() => setSimPipingText(!simPipingText)}
-                            className={`w-full py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                              simPipingText ? 'bg-primary text-white' : 'bg-white border border-pink-100 text-gray-700'
-                            }`}
-                          >
-                            {simPipingText ? 'Piping Inscription Included' : 'No Piping Inscription'}
-                          </button>
-                        </div>
-
-                        <div>
                           <label className="text-xs font-semibold text-gray-600 block mb-1">
                             3D Fondant Letters ({simButtercreamLetters} letters)
                           </label>
@@ -1751,15 +1731,6 @@ export default function BakeryPricing() {
                           <div className="flex justify-between py-1 text-gray-700">
                             <span>Chocolate Bear ({simBear} pcs @ {money(rates.center?.perPiece?.chocolateBear || 0)})</span>
                             <span className="font-bold">{money((rates.center?.perPiece?.chocolateBear || 0) * simBear)}</span>
-                          </div>
-                        )}
-
-                        {simPipingText && (
-                          <div className="flex justify-between py-1 text-gray-700">
-                            <span>Piping Inscription (Flat Rate)</span>
-                            <span className="font-bold">
-                              {money((rates.center?.brackets?.pipingText || [])[0]?.price ?? 50)}
-                            </span>
                           </div>
                         )}
 

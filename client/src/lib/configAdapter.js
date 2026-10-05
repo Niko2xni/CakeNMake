@@ -264,15 +264,6 @@ export function adaptConfigToLegacy(newConfig) {
   const centerSugarColorHex = centerSugarColorData?.hex || null;
   const centerSugarColorId = centerSugarColorData?.id || null;
   const centerDecorationColor = centerSugarColorHex || resolveColor(center.decorations?.colorId);
-  const rawTop = center.text?.top ?? '';
-  const rawMiddle = center.text?.middle ?? '';
-  const rawBottom = center.text?.bottom ?? '';
-  const centerTextTop = rawTop;
-  const centerTextMiddle = rawMiddle;
-  const centerTextBottom = rawBottom;
-  const centerTextSpacing = typeof center.text?.spacing === 'number' ? center.text.spacing : 0.28;
-  const centerText = [rawTop, rawMiddle, rawBottom].filter(Boolean).join('\n');
-  const centerTextFont = center.text?.font || 'script';
   const individualTextColor = center.text?.colorMode === 'individual' && center.text?.colorId;
   const centerTextColor = individualTextColor ? resolveColor(individualTextColor) : centerSugarColorHex || resolveColor(center.text?.colorId);
   const centerTextColorId = individualTextColor || centerSugarColorId || center.text?.colorId || null;
@@ -490,12 +481,6 @@ export function adaptConfigToLegacy(newConfig) {
     // Center
     centerDecorationColor,
     centerDecorationColorId: centerSugarColorId || center.decorations?.colorId || null,
-    centerText,
-    centerTextTop,
-    centerTextMiddle,
-    centerTextBottom,
-    centerTextSpacing,
-    centerTextFont,
     centerTextColor,
     centerTextColorId,
     centerTextColorMode,
