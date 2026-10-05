@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Send, Sparkles, Bot, Loader2, Plus, Mic, Square, X, RotateCcw } from 'lucide-react';
+import { Send, Sparkles, Loader2, Plus, Mic, Square, X, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { cakeAiApi } from '@/services/api';
@@ -229,16 +229,11 @@ export default function AIChatPanel({ config, onChange, quote, session, active =
       <div className="flex-1 overflow-y-auto space-y-2 md:space-y-3 pr-1 pb-2 md:pb-4 min-h-0">
         {display.map((msg, i) => (
           <div key={i} className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            {msg.role === 'assistant' && (
-              <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                <Bot className="w-3.5 h-3.5 text-primary" />
-              </div>
-            )}
-            <div className="max-w-[88%] min-w-0">
+            <div className={`min-w-0 ${msg.role === 'user' ? 'max-w-[88%]' : 'flex-1'}`}>
               <div
-                className={`rounded-2xl px-3 py-2.5 text-xs leading-relaxed break-words ${msg.role === 'user'
-                    ? 'bg-primary text-primary-foreground rounded-br-sm whitespace-pre-wrap'
-                    : 'bg-muted text-foreground rounded-bl-sm'
+                className={`text-xs leading-relaxed break-words ${msg.role === 'user'
+                    ? 'rounded-2xl px-3 py-2.5 bg-primary text-primary-foreground rounded-br-sm whitespace-pre-wrap'
+                    : 'py-1 text-foreground'
                   }`}
               >
                 {msg.role === 'assistant' ? (
@@ -282,14 +277,11 @@ export default function AIChatPanel({ config, onChange, quote, session, active =
         {thinking && (
           <div className="flex flex-col gap-1.5 justify-start">
             <div className="flex gap-2 justify-start items-center">
-              <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                <Bot className="w-3.5 h-3.5 text-primary" />
-              </div>
-              <div className="rounded-2xl rounded-bl-sm bg-muted px-3 py-2 text-xs text-muted-foreground flex items-center gap-1.5 shadow-xs">
+              <div className="py-1 text-xs text-muted-foreground flex items-center gap-1.5">
                 <Loader2 className="w-3 h-3 animate-spin text-primary" /> Updating cake design live...
               </div>
             </div>
-            <div className="ml-8 text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+            <div className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
               Editing in progress — tab switching is locked to prevent interruptions.
             </div>
           </div>
