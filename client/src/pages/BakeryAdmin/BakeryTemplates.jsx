@@ -24,9 +24,12 @@ import {
   Images,
   RefreshCw,
   X,
+  Wand2,
+  Palette,
 } from 'lucide-react';
 import { templateApi } from '@/services/api';
 import { Skeleton } from '@/components/ui/skeleton';
+import TemplateBackgroundStudioModal from '@/components/bakery/TemplateBackgroundStudioModal';
 
 const formatMoney = (minor = 0) =>
   new Intl.NumberFormat('en-PH', {
@@ -60,7 +63,26 @@ export default function BakeryTemplates() {
     priceMinor: 0,
   });
 
+  const [studioTargetTemplate, setStudioTargetTemplate] = useState(null);
   const [savingAction, setSavingAction] = useState(false);
+
+  const handleSaveStudioViews = async (updatedViews) => {
+    if (!studioTargetTemplate) return;
+    try {
+      const updatedThumbnail = updatedViews[0]?.url || studioTargetTemplate.thumbnail;
+      await templateApi.updateTemplate(studioTargetTemplate._id, {
+        views: updatedViews,
+        thumbnail: updatedThumbnail,
+      });
+      showNotification('Showcase pictures and background updated successfully!');
+      setViewTemplateModal(null);
+      setStudioTargetTemplate(null);
+      await fetchTemplatesData();
+    } catch (err) {
+      console.error('Failed to update template pictures:', err);
+      setError('Failed to save updated showcase pictures.');
+    }
+  };
 
   useEffect(() => {
     fetchTemplatesData();
@@ -471,6 +493,14 @@ export default function BakeryTemplates() {
                                 <div className="flex items-center gap-1">
                                   <button
                                     type="button"
+                                    onClick={() => setStudioTargetTemplate(tpl)}
+                                    title="Background Maker & Photo Studio"
+                                    className="p-1 rounded-md text-amber-500 hover:text-amber-700 hover:bg-amber-50 transition-colors"
+                                  >
+                                    <Wand2 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
                                     onClick={() =>
                                       setEditTemplateModal({
                                         open: true,
@@ -783,6 +813,17 @@ export default function BakeryTemplates() {
               </div>
 
               <div className="pt-6 border-t border-gray-100 flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const tpl = viewTemplateModal;
+                    setViewTemplateModal(null);
+                    setStudioTargetTemplate(tpl);
+                  }}
+                  className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white text-xs font-bold text-center transition-all shadow-sm flex items-center justify-center gap-1.5"
+                >
+                  <Wand2 className="w-4 h-4" /> Background Maker & Photo Studio
+                </button>
                 <Link
                   to={`/bakery/designer?templateId=${viewTemplateModal._id}`}
                   className="w-full py-2.5 px-4 rounded-xl bg-pink-500 hover:bg-pink-600 text-white text-xs font-bold text-center transition-colors shadow-sm flex items-center justify-center gap-1.5"
@@ -868,6 +909,16 @@ export default function BakeryTemplates() {
             </div>
           </div>
         </div>
+      )}
+      {/* BACKGROUND MAKER & PHOTO STUDIO MODAL */}
+      {studioTargetTemplate && (
+        <TemplateBackgroundStudioModal
+          isOpen={Boolean(studioTargetTemplate)}
+          onClose={() => setStudioTargetTemplate(null)}
+          views={studioTargetTemplate.views || []}
+          templateName={studioTargetTemplate.name || 'Cake Template'}
+          onSave={handleSaveStudioViews}
+        />
       )}
     </div>
   );

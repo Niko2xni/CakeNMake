@@ -24,6 +24,7 @@ import {
   Search,
   Heart,
   PartyPopper,
+  CornerDownLeft,
 } from 'lucide-react';
 import ClientNavbar from '@/components/client/ClientNavbar';
 import { designApi, pricingApi } from '@/services/api';
@@ -88,8 +89,17 @@ export default function ClientHome() {
   const [showTrashFullWarning, setShowTrashFullWarning] = useState(false);
   const [neverShowTrashWarning, setNeverShowTrashWarning] = useState(false);
   const trashNotificationTimerRef = useRef(null);
+  const detailsInputRef = useRef(null);
+  const isSavingRenameRef = useRef(false);
 
   useDragToScroll();
+
+  useEffect(() => {
+    if (isEditingDetailsName && detailsInputRef.current) {
+      detailsInputRef.current.focus();
+      detailsInputRef.current.select();
+    }
+  }, [isEditingDetailsName]);
 
   useEffect(() => {
     fetchRecentDesigns();
@@ -215,18 +225,45 @@ export default function ClientHome() {
   const handleRename = async (designId, newName) => {
     const trimmedName = newName.trim();
     if (!trimmedName) return;
+
+    // Optimistically update right away so the name immediately changes on screen without reverting or flashing
+    const prevDesigns = [...recentDesigns];
+    const prevSelected = selectedDesign;
+
+    setRecentDesigns((designs) =>
+      designs.map((d) => (d._id === designId ? { ...d, name: trimmedName } : d))
+    );
+    setSelectedDesign((prev) =>
+      prev && prev._id === designId ? { ...prev, name: trimmedName } : prev
+    );
+    setRenameModal({ open: false, designId: null, currentName: '' });
+
     try {
       await designApi.updateDesign(designId, { name: trimmedName });
-      setRecentDesigns((designs) => designs.map((d) => 
-        d._id === designId ? { ...d, name: trimmedName } : d
-      ));
-      if (selectedDesign && selectedDesign._id === designId) {
-        setSelectedDesign((prev) => prev ? { ...prev, name: trimmedName } : null);
-      }
-      setRenameModal({ open: false, designId: null, currentName: '' });
     } catch (error) {
       console.error('Failed to rename design:', error);
+      // Revert if API call failed
+      setRecentDesigns(prevDesigns);
+      setSelectedDesign(prevSelected);
     }
+  };
+
+  const handleCommitDetailsRename = () => {
+    if (isSavingRenameRef.current) return;
+    isSavingRenameRef.current = true;
+
+    const trimmed = detailsNameInput.trim();
+    setIsEditingDetailsName(false);
+
+    if (trimmed && selectedDesign && trimmed !== selectedDesign.name) {
+      handleRename(selectedDesign._id, trimmed);
+    } else {
+      setDetailsNameInput(selectedDesign?.name || '');
+    }
+
+    setTimeout(() => {
+      isSavingRenameRef.current = false;
+    }, 200);
   };
 
   const handleMoveToTrash = async (designId) => {
@@ -439,10 +476,11 @@ export default function ClientHome() {
             <div className="cn-design-grid">
                   {displayedDesigns.slice(0, 20).map((design, index) => {
                     const isSelected = selectedDesign?._id === design._id;
+                    const isMenuOpen = (typeof activeMenu === 'string' ? activeMenu === design._id : activeMenu?.id === design._id);
                     return (
                       <article
                         key={design._id}
-                        className={`cn-design-card ${isSelected ? 'is-selected' : ''}`}
+                        className={`cn-design-card ${isSelected ? 'is-selected' : ''} ${isMenuOpen ? 'is-menu-open' : ''}`}
                       >
                         <Link
                           to={`/designer?designId=${design._id}`}
@@ -601,31 +639,47 @@ export default function ClientHome() {
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
-                      if (detailsNameInput.trim()) {
-                        handleRename(selectedDesign._id, detailsNameInput.trim());
-                      }
-                      setIsEditingDetailsName(false);
+                      handleCommitDetailsRename();
                     }}
+                    className="relative flex items-center w-full"
                   >
                     <input
+                      ref={detailsInputRef}
                       type="text"
-                      autoFocus
+                      enterKeyHint="done"
+                      autoComplete="off"
                       value={detailsNameInput}
                       onChange={(e) => setDetailsNameInput(e.target.value)}
-                      onBlur={() => {
-                        if (detailsNameInput.trim() && detailsNameInput.trim() !== selectedDesign.name) {
-                          handleRename(selectedDesign._id, detailsNameInput.trim());
-                        }
-                        setIsEditingDetailsName(false);
-                      }}
                       onKeyDown={(e) => {
-                        if (e.key === 'Escape') {
+                        if (e.key === 'Enter' || e.keyCode === 13 || e.which === 13) {
+                          e.preventDefault();
+                          handleCommitDetailsRename();
+                        } else if (e.key === 'Escape') {
+                          e.preventDefault();
                           setIsEditingDetailsName(false);
-                          setDetailsNameInput(selectedDesign.name || '');
+                          setDetailsNameInput(selectedDesign?.name || '');
                         }
                       }}
-                      className="w-full font-heading text-lg font-bold text-[var(--cn-ink)] bg-white border border-[var(--cn-cherry)] rounded-lg px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-pink-300"
+                      onBlur={(e) => {
+                        // Don't cancel or double commit if the user clicked the Enter submit button inside the input
+                        if (e.relatedTarget && e.relatedTarget.closest('.details-rename-submit-btn')) {
+                          return;
+                        }
+                        handleCommitDetailsRename();
+                      }}
+                      placeholder="Enter design name..."
+                      maxLength={100}
+                      className="w-full font-heading text-lg font-bold text-[var(--cn-ink)] bg-white border-2 border-[var(--cn-cherry)] rounded-2xl pl-3.5 pr-22 py-2 focus:outline-none focus:ring-2 focus:ring-pink-300 shadow-xs transition-all"
                     />
+                    <button
+                      type="submit"
+                      title="Save design name (Enter)"
+                      aria-label="Confirm rename"
+                      className="details-rename-submit-btn absolute right-1.5 top-1/2 -translate-y-1/2 h-8 px-2.5 rounded-xl bg-[var(--cn-cherry,#ff4d8d)] hover:bg-[var(--cn-cherry-dark,#e03577)] active:scale-95 text-white flex items-center gap-1 shadow-xs transition-transform cursor-pointer"
+                    >
+                      <span className="text-xs font-bold">Enter</span>
+                      <CornerDownLeft className="w-3.5 h-3.5 stroke-[2.5]" />
+                    </button>
                   </form>
                 ) : (
                   <button

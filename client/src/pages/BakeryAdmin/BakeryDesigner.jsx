@@ -20,6 +20,9 @@ import {
   GripHorizontal,
   Cloud,
   AlertCircle,
+  Wand2,
+  Palette,
+  Pencil,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +31,7 @@ import { DEFAULT_CONFIG, getCenterItemLimit, getCenterItemCount } from '@/lib/ca
 import { adaptConfigToLegacy } from '@/lib/configAdapter';
 import useCakeQuote from '@/hooks/use-cake-quote';
 import PageLoadingSkeleton from '@/components/shared/PageLoadingSkeleton';
+import TemplateBackgroundStudioModal from '@/components/bakery/TemplateBackgroundStudioModal';
 
 const formatMoney = (minor = 0) =>
   new Intl.NumberFormat('en-PH', {
@@ -279,6 +283,7 @@ export default function BakeryDesigner() {
   const [publishModalOpen, setPublishModalOpen] = useState(false);
   const [capturedViews, setCapturedViews] = useState([]);
   const [activeViewIndex, setActiveViewIndex] = useState(0);
+  const [backgroundStudioOpen, setBackgroundStudioOpen] = useState(false);
 
   // Sections
   const [sections, setSections] = useState([]);
@@ -873,13 +878,22 @@ export default function BakeryDesigner() {
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setPublishModalOpen(false)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBackgroundStudioOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-pink-200 bg-pink-50 hover:bg-pink-100 text-pink-700 text-xs font-bold transition-all shadow-xs cursor-pointer"
+                >
+                  <Wand2 className="w-3.5 h-3.5" /> Studio Background Maker
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPublishModalOpen(false)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             {/* Modal Body: 2 Columns */}
@@ -887,9 +901,18 @@ export default function BakeryDesigner() {
               {/* Left Column: 8-angle Carousel Preview */}
               <div className="md:w-1/2 p-6 bg-muted/20 border-b md:border-b-0 md:border-r border-border flex flex-col items-center justify-between">
                 <div className="w-full">
-                  <span className="text-[10px] font-medium text-primary uppercase tracking-wider block mb-2">
-                    Angle Slideshow Preview ({activeViewIndex + 1} of 8)
-                  </span>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-[10px] font-bold text-primary uppercase tracking-wider">
+                      Angle Preview ({activeViewIndex + 1} of 8)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setBackgroundStudioOpen(true)}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-pink-500 hover:bg-pink-600 text-white text-[11px] font-bold shadow-xs transition-all cursor-pointer"
+                    >
+                      <Palette className="w-3.5 h-3.5" /> Backgrounds & Ribbon
+                    </button>
+                  </div>
 
                   {/* Main Large View */}
                   <div className="w-full aspect-square rounded-2xl overflow-hidden bg-background border border-border shadow-sm relative group">
@@ -918,6 +941,19 @@ export default function BakeryDesigner() {
                       className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-background/90 text-foreground hover:bg-background flex items-center justify-center shadow-md transition-all opacity-0 group-hover:opacity-100"
                     >
                       <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between mt-2.5 w-full px-1">
+                    <span className="text-[11px] text-muted-foreground">
+                      {capturedViews[activeViewIndex]?.label || `Angle ${activeViewIndex + 1}`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setBackgroundStudioOpen(true)}
+                      className="text-[11px] font-bold text-pink-600 hover:text-pink-700 hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <Pencil className="w-3 h-3" /> Edit Pictures & Background
                     </button>
                   </div>
                 </div>
@@ -1096,6 +1132,19 @@ export default function BakeryDesigner() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Background Maker & Photo Studio Modal */}
+      {backgroundStudioOpen && (
+        <TemplateBackgroundStudioModal
+          isOpen={backgroundStudioOpen}
+          onClose={() => setBackgroundStudioOpen(false)}
+          views={capturedViews}
+          templateName={templateName}
+          onSaveViews={(newViews) => {
+            setCapturedViews(newViews);
+          }}
+        />
       )}
     </div>
   );

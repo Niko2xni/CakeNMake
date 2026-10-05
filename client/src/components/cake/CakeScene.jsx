@@ -1194,11 +1194,12 @@ const CakeScene = React.forwardRef(function CakeScene({
 
           renderer.setSize(width, height, false);
           renderer.render(scene, camera);
-          const url = renderer.domElement.toDataURL('image/jpeg', quality);
+          const pngUrl = renderer.domElement.toDataURL('image/png');
           views.push({
             label: shot.label,
             angle: shot.angle,
-            url,
+            url: pngUrl,
+            rawUrl: pngUrl,
           });
         }
       } catch (err) {

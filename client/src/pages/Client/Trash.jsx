@@ -250,8 +250,10 @@ export default function Trash() {
           ) : (
             <div>
               <div className="cn-trash-grid">
-              {trashedDesigns.map((design) => (
-                <article key={design._id} className="cn-design-card cn-trash-card">
+              {trashedDesigns.map((design) => {
+                const isMenuOpen = (typeof activeMenu === 'string' ? activeMenu === design._id : activeMenu?.id === design._id);
+                return (
+                <article key={design._id} className={`cn-design-card cn-trash-card ${isMenuOpen ? 'is-menu-open' : ''}`}>
                   <div className="cn-design-thumbnail cn-trash-thumbnail">
                     {design.thumbnail ? (
                       <img 
@@ -347,7 +349,8 @@ export default function Trash() {
                     </div>
                   </div>
                 </article>
-              ))}
+              );
+            })}
               </div>
             </div>
           )}
