@@ -5,8 +5,6 @@ const Message = require('../models/Message');
 const Conversation = require('../models/Conversation');
 const Reservation = require('../models/Reservation');
 const Blueprint = require('../models/Blueprint');
-const { cloudinary } = require('../config/cloudinary');
-const { blueprintPublicId } = require('../services/blueprintStorageService');
 const SupportRequest = require('../models/SupportRequest');
 const authenticate = require('../middleware/authenticate');
 const { loadAppUser, requireRole, requirePlatformMembership } = require('../middleware/authorize');
@@ -93,6 +91,9 @@ router.post('/customers/:id/restriction', ...staff, handler(async (req, res) => 
   if ((req.body.expectedRestrictionId || null) !== currentId) throw httpError(409, 'RESTRICTION_CHANGED', 'Another staff member changed this account. Refresh before proceeding.');
   let evidence = null;
   if (action !== 'restore') {
+    // Any reservation history protects the customer, regardless of payment
+    // or fulfillment status. Check again at action time, not just in the UI.
+    if (await Reservation.exists({ user: target._id })) throw httpError(409, 'CUSTOMER_HAS_RESERVATION', 'Customers who have made a reservation cannot be suspended or banned.');
     if (req.body.acknowledged !== true) throw httpError(400, 'REVIEW_REQUIRED', 'Confirm you reviewed the evidence.');
     evidence = await Message.findOne({ _id: id(req.body.messageId), sender: target._id, senderRole: 'customer', moderation: 'rejected', reviewedAt: { $ne: null } });
     if (!evidence || !await Conversation.exists({ _id: evidence.conversation, platform: req.platformId })) throw httpError(400, 'REVIEW_REQUIRED', 'Review and confirm an abusive message before restricting its sender.');
@@ -121,23 +122,19 @@ router.get('/customers/:id/evidence', ...staff, handler(async (req, res) => {
   // Evidence must remain selectable even after newer messages displace it
   // from the recent-message list. Keep the same platform and sender scope.
   const confirmedEvidence = await Message.find({ conversation: { $in: conversations.map((row) => row._id) }, sender: target._id, senderRole: 'customer', moderation: 'rejected', reviewedAt: { $ne: null } }).sort({ reviewedAt: -1 }).limit(50);
-  res.json({ customer: customerView(target), messages, confirmedEvidence });
+  const hasReservation = Boolean(await Reservation.exists({ user: target._id }));
+  res.json({ customer: { ...customerView(target), hasReservation }, messages, confirmedEvidence });
 }));
 
 router.get('/mine', customer, handler(async (req, res) => {
   const requests = await SupportRequest.find({ customer: req.user._id }).sort({ updatedAt: -1 }).limit(100);
-  const orders = await Reservation.find({ user: req.user._id }).sort({ createdAt: -1 });
+  const orders = await Reservation.find({ user: req.user._id }).select('-blueprintUrl').sort({ createdAt: -1 });
   const blueprints = await Blueprint.find({ customer: req.user._id }).select('designName deliveryDate status quoteSnapshot paymentMode createdAt').sort({ createdAt: -1 });
   res.json({ restriction: effectiveRestriction(req.user), requests, orders, blueprints });
 }));
 
 router.get('/blueprints/:id/access', customer, handler(async (req, res) => {
-  const record = await Blueprint.findOne({ _id: id(req.params.id), customer: req.user._id });
-  if (!record || record.status !== 'ready' || !record.pdf) throw httpError(404, 'NOT_READY', 'Blueprint is not available.');
-  if (record.pdf.publicId !== blueprintPublicId(record.platform, record._id) || record.pdf.resourceType !== 'raw' || record.pdf.deliveryType !== 'private') throw httpError(409, 'INVALID_STORAGE', 'Blueprint storage reference is invalid.');
-  const expiresAt = Math.floor(Date.now() / 1000) + 300;
-  const url = cloudinary.utils.private_download_url(record.pdf.publicId, '', { resource_type: 'raw', type: 'private', expires_at: expiresAt, attachment: true });
-  res.set('Cache-Control', 'no-store').json({ url, expiresAt });
+  throw httpError(403, 'BLUEPRINT_STAFF_ONLY', 'Blueprint access is available only to bakery staff.');
 }));
 
 router.post('/requests', customer, handler(async (req, res) => {

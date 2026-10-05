@@ -15,6 +15,21 @@ beforeEach(() => {
   moderationApi.createRequest.mockResolvedValue({});
 });
 describe('Customer support during restrictions', () => {
+  it('shows reservation protection, hides blueprint access, and selects an order from its card', async () => {
+    moderationApi.mine.mockResolvedValue({ restriction: null, orders: [{ ...order, blueprint: 'blueprint-1', blueprintUrl: 'https://example.com/private.pdf' }], blueprints: [{ _id: 'blueprint-1', designName: 'Duplicated cake', status: 'ready' }], requests: [] });
+    render(<Support />);
+    await screen.findByText('Reservation account protection');
+    expect(screen.queryByText('Duplicated cake')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Download blueprint/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /blueprint/i })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Request type')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Get help with this order' }));
+    expect(screen.getByLabelText('Existing order')).toHaveValue(`reservation:${id}`);
+    fireEvent.change(screen.getByLabelText('Request message'), { target: { value: 'Please confirm pickup' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
+    await waitFor(() => expect(moderationApi.createRequest).toHaveBeenCalledWith(expect.objectContaining({ orderId: id, orderType: 'reservation', kind: 'order' })));
+    expect(await screen.findByText(/Request sent/)).toBeVisible();
+  });
   it('keeps existing order and payment information visible and allows an appeal', async () => {
     render(<Support />);
     await screen.findByText('Account banned');

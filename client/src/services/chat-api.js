@@ -56,5 +56,4 @@ export const moderationApi = {
   flag: (id, reason) => chatRequest(`/moderation/messages/${id}/flag`, { method: 'POST', body: JSON.stringify({ reason }) }),
   createRequest: (payload) => chatRequest('/moderation/requests', { method: 'POST', body: JSON.stringify(payload) }),
   reply: (id, text, resolve = false) => chatRequest(`/moderation/requests/${id}/reply`, { method: 'POST', body: JSON.stringify({ text, resolve }) }),
-  blueprintAccess: (id) => chatRequest(`/moderation/blueprints/${id}/access`),
 };

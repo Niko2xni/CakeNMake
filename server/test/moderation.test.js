@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { afterEach, mock, test } = require('node:test');
+const { afterEach, beforeEach, mock, test } = require('node:test');
 const mongoose = require('mongoose');
 const User = require('../src/models/User');
 const Message = require('../src/models/Message');
@@ -11,6 +11,7 @@ const router = require('../src/routes/moderationRoutes');
 const { createMessage } = require('../src/services/messageService');
 
 afterEach(() => mock.restoreAll());
+beforeEach(() => mock.method(Reservation, 'exists', async () => null));
 test('evidence includes older confirmed abuse independently of the recent message window', async () => {
   const conversationId = new mongoose.Types.ObjectId();
   const queries = [];
@@ -40,6 +41,35 @@ const staffId = new mongoose.Types.ObjectId();
 const messageId = new mongoose.Types.ObjectId();
 const restrictionId = new mongoose.Types.ObjectId();
 const staff = { _id: staffId, role: 'bakery_staff', platform: platformId };
+
+test('customer blueprint access is denied without generating a download URL', async () => {
+  const route = router.stack.find(layer => layer.route?.path === '/blueprints/:id/access').route;
+  const req = { user: { _id: customerId, role: 'customer' }, params: { id: String(platformId) } };
+  const res = { status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; } };
+  for (const layer of route.stack) {
+    let next = false;
+    await layer.handle(req, res, () => { next = true; });
+    if (!next) break;
+  }
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.body.code, 'BLUEPRINT_STAFF_ONLY');
+  assert.equal(res.body.url, undefined);
+});
+
+for (const action of ['ban', 'suspend']) {
+  test(`reservation history prevents ${action} even through a direct API request`, async () => {
+    mock.method(User, 'findOne', async () => ({ _id: customerId, role: 'customer' }));
+    mock.method(Reservation, 'exists', async filter => {
+      assert.deepEqual(filter, { user: customerId });
+      return { _id: platformId };
+    });
+    const update = mock.method(User, 'findOneAndUpdate', async () => assert.fail('must not restrict'));
+    const res = await request('/customers/:id/restriction', { action, reason: 'Reviewed spam' }, staff, { id: customerId.toString() });
+    assert.equal(res.statusCode, 409);
+    assert.equal(res.body.code, 'CUSTOMER_HAS_RESERVATION');
+    assert.equal(update.mock.callCount(), 0);
+  });
+}
 
 async function request(path, body, user = staff, params = {}) {
   const route = router.stack.find((layer) => layer.route?.path === path && layer.route.methods.post).route;

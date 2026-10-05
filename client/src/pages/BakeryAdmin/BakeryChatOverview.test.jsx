@@ -16,6 +16,19 @@ beforeEach(() => {
   moderationApi.restrict.mockResolvedValue({});
 });
 describe('Chats Overview', () => {
+  it('prevents suspension and bans for customers with reservation history', async () => {
+    moderationApi.evidence.mockResolvedValue({ customer: { ...customer, hasReservation: true }, messages: [{ ...flag, moderation: 'rejected', reviewedAt: '2026-10-04T00:00:00Z' }] });
+    render(<BakeryChatOverview />);
+    fireEvent.click(await screen.findByRole('button', { name: /Ana Cruz ana@example.com Unrestricted/ }));
+    await screen.findByLabelText('Confirmed abuse evidence');
+    fireEvent.change(screen.getByLabelText('Action / review reason'), { target: { value: 'Reviewed spam' } });
+    fireEvent.change(screen.getByLabelText('Confirmed abuse evidence'), { target: { value: 'message-1' } });
+    fireEvent.click(screen.getByRole('checkbox'));
+    expect(screen.getByRole('button', { name: 'Suspend' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Ban indefinitely' })).toBeDisabled();
+    expect(screen.getByText(/This customer has made a reservation/)).toBeInTheDocument();
+    expect(moderationApi.restrict).not.toHaveBeenCalled();
+  });
   it('reviews held messages directly inside account review', async () => {
     moderationApi.evidence.mockResolvedValue({ customer, messages: [{ ...flag, moderation: 'held' }] });
     moderationApi.overview.mockResolvedValue({ customers: [customer], flags: [], requests: [] });

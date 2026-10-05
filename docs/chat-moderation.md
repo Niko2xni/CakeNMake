@@ -11,16 +11,18 @@ Customers open **Account → Orders & Support**. A restricted customer also sees
 1. Read a held message and enter a review reason.
 2. Choose **Dismiss flag & release** for a false flag, or **Confirm abuse** for an abusive message.
 3. Open the customer account, inspect the evidence, choose the reviewed message, and acknowledge reviewing it.
-4. Enter an account-action reason and choose **Suspend** or **Ban indefinitely**.
+4. For customers without reservation history, enter an account-action reason and choose **Suspend** or **Ban indefinitely**. Customers with any reservation cannot receive either action.
 5. Use **Restore access** with a reason to remove a restriction.
 
 Staff can also flag a previously delivered customer message from the account review panel. Its message text remains preserved. Message review history records automatic flags, manual flags, releases, and confirmed abuse. Account history records staff actions, reasons, dates, evidence, and suspension expiry.
 
 Only customer accounts can be moderated. Staff must have a bakery assignment. A stale account-action form is rejected if another staff member has changed the restriction.
 
+Reservation protection checks all reservations belonging to the customer, regardless of bakery, payment, or fulfillment status. The account panel disables restriction actions and the backend checks reservation history again before applying them. Message review remains available. Existing restrictions are not automatically removed; staff can use **Restore access** with a reason.
+
 ## Suspension and ban
 
-Both block normal chat sending and new bakery submissions. Customers can still log in, read messages, view existing reservations and payment information, access available blueprints, and use the limited support forms. Neither action cancels existing orders.
+Both block normal chat sending and new bakery submissions. Customers can still log in, read messages, view existing reservations and payment information, and use the limited support forms. Neither action cancels existing orders. Customer blueprint downloads are disabled; the customer access endpoint returns 403 and order responses omit blueprint download URLs. Bakery staff retain their separate blueprint access.
 
 - **Suspension:** 1, 3, 7, or 30 days, or a custom future expiry. Expiry is entered/displayed in Philippine time. The server allows actions automatically once the expiry passes.
 - **Ban:** indefinite; staff must restore access.
