@@ -94,11 +94,11 @@ export function applyCakeAiTool(name, input, ctx) {
           overrides[`edgeBottom${suffix}`] = { ...overrides[`edgeBoth${suffix}`] };
         }
       }
-      const shared = input.slot === 'all' || (input.slot === 'both' && tiers === 1);
-      const slots = input.slot === 'all' ? ['both', 'middle'] : input.slot === 'both' && tiers > 1 ? ['top', 'bottom'] : [input.slot];
-      if (!shared && edge.mode === 'both' && input.slot === 'both') {
-        edge.top = structuredClone(edge.both); edge.bottom = structuredClone(edge.both);
-      }
+      const slots = input.slot === 'all'
+        ? ['top', 'bottom', 'middle', 'both']
+        : input.slot === 'both'
+          ? ['top', 'bottom', 'both']
+          : [input.slot];
       for (const slot of slots) {
         const current = edge[slot] || {};
         if (input.designId === undefined && !current.piping?.tip) return { error: 'Choose a border design before changing its colors.' };
@@ -112,8 +112,8 @@ export function applyCakeAiTool(name, input, ctx) {
         if (input.secondaryColorId) overrides[`${context}Secondary`] = { mode: 'colorOverride', colorId: input.secondaryColorId };
         if (['top', 'bottom'].includes(slot)) edge[`${slot}Enabled`] = Boolean(piping.tip || edge[slot].decorations?.setId);
       }
-      edge.mode = shared ? 'both' : 'topBottomSeparate'; edge.activeSlot = shared ? 'both' : input.slot === 'both' ? 'top' : input.slot;
-      if (shared) { edge.top = structuredClone(DEFAULT_CONFIG.edge.top); edge.bottom = structuredClone(DEFAULT_CONFIG.edge.bottom); edge.topEnabled = false; edge.bottomEnabled = false; }
+      edge.mode = 'topBottomSeparate';
+      edge.activeSlot = (input.slot === 'both' || input.slot === 'all') ? 'top' : input.slot;
       onChange({ ...config, edge, sugarColorOverrides: overrides });
       return { label: `${input.slot} border → ${input.designId || 'updated colors'}`, result: edge };
     }

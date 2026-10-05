@@ -42,21 +42,41 @@ export default function EdgeSection({
     : (edge.mode === 'both' ? 'both' : 'top');
   const mode = edge.mode; // 'topBottomSeparate' | 'both'
 
+  const effectiveActiveSlot = (activeSlot === 'both' || !activeSlot) ? 'top' : activeSlot;
+
+  const ensureSlotsMigrated = (baseEdge) => {
+    const nextEdge = { ...baseEdge };
+    if (baseEdge.mode === 'both' && baseEdge.both) {
+      if (!baseEdge.top?.piping?.tip && !baseEdge.top?.decorations?.setId) {
+        nextEdge.top = structuredClone(baseEdge.both);
+        nextEdge.topEnabled = Boolean(baseEdge.both.piping?.tip || baseEdge.both.decorations?.setId);
+      }
+      if (!baseEdge.bottom?.piping?.tip && !baseEdge.bottom?.decorations?.setId) {
+        nextEdge.bottom = structuredClone(baseEdge.both);
+        nextEdge.bottomEnabled = Boolean(baseEdge.both.piping?.tip || baseEdge.both.decorations?.setId);
+      }
+    }
+    return nextEdge;
+  };
+
   const switchToTop = () => {
     const nextSlot = activeSlot === 'top' ? null : 'top';
-    onChange({ ...edge, mode: 'topBottomSeparate', activeSlot: nextSlot });
+    const nextEdge = ensureSlotsMigrated({ ...edge, mode: 'topBottomSeparate', activeSlot: nextSlot });
+    onChange(nextEdge);
     if (nextSlot) onActiveSlotChange?.(nextSlot);
   };
 
   const switchToMiddle = () => {
     const nextSlot = activeSlot === 'middle' ? null : 'middle';
-    onChange({ ...edge, mode: 'topBottomSeparate', activeSlot: nextSlot });
+    const nextEdge = ensureSlotsMigrated({ ...edge, mode: 'topBottomSeparate', activeSlot: nextSlot });
+    onChange(nextEdge);
     if (nextSlot) onActiveSlotChange?.(nextSlot);
   };
 
   const switchToBottom = () => {
     const nextSlot = activeSlot === 'bottom' ? null : 'bottom';
-    onChange({ ...edge, mode: 'topBottomSeparate', activeSlot: nextSlot });
+    const nextEdge = ensureSlotsMigrated({ ...edge, mode: 'topBottomSeparate', activeSlot: nextSlot });
+    onChange(nextEdge);
     if (nextSlot) onActiveSlotChange?.(nextSlot);
   };
 
@@ -69,47 +89,72 @@ export default function EdgeSection({
   // is layered on separately below (updateBorderPipingSlot's mirroring,
   // and ToolPanel.jsx's onSugarColorChange mirroring the color), not by
   // inventing a second mode string.
-  const isMiddleActive = hasMiddle && activeSlot === 'middle';
+  const isMiddleActive = hasMiddle && effectiveActiveSlot === 'middle';
   const isAllActive = hasMiddle && mode === 'both';
-  const hasSelectedSlot = mode === 'topBottomSeparate'
-    && ['top', 'middle', 'bottom'].includes(activeSlot);
+  const hasSelectedSlot = ['top', 'middle', 'bottom'].includes(effectiveActiveSlot);
 
-  const currentSlotKey = mode === 'both' ? 'both' : (isMiddleActive ? 'middle' : activeSlot);
+  const currentSlotKey = mode === 'both' ? 'both' : (isMiddleActive ? 'middle' : effectiveActiveSlot);
   const currentSlot = isMiddleActive
     ? (edge.middle || EMPTY_MIDDLE_SLOT())
-    : (edge[currentSlotKey] || EMPTY_SLOT());
+    : (edge[currentSlotKey]?.piping?.tip || edge[currentSlotKey]?.decorations?.setId
+        ? edge[currentSlotKey]
+        : ((mode === 'both' || !edge[currentSlotKey]?.piping?.tip) && edge.both?.piping?.tip
+            ? edge.both
+            : (edge[currentSlotKey] || EMPTY_SLOT())));
 
   const updateSlot = (changes) => {
-    onChange({ ...edge, [currentSlotKey]: { ...currentSlot, ...changes } });
+    let nextEdge = ensureSlotsMigrated({ ...edge });
+    if (nextEdge.mode === 'both') {
+      nextEdge.mode = 'topBottomSeparate';
+      nextEdge.activeSlot = effectiveActiveSlot;
+    }
+    const targetKey = nextEdge.mode === 'both' ? 'both' : (isMiddleActive ? 'middle' : effectiveActiveSlot);
+    const targetSlot = nextEdge[targetKey] || currentSlot;
+    nextEdge[targetKey] = { ...targetSlot, ...changes };
+    onChange(nextEdge);
   };
 
   // While Both mode is active, Border Piping choices also mirror to the
   // Middle seam. Color is mirrored separately through Sugar Color's context.
   const updateBorderPipingSlot = (changes) => {
-    const nextSlot = { ...currentSlot, ...changes };
+    let nextEdge = ensureSlotsMigrated({ ...edge });
+    if (nextEdge.mode === 'both') {
+      nextEdge.mode = 'topBottomSeparate';
+      nextEdge.activeSlot = effectiveActiveSlot;
+    }
+    const targetKey = nextEdge.mode === 'both' ? 'both' : (isMiddleActive ? 'middle' : effectiveActiveSlot);
+    const targetSlot = nextEdge[targetKey] || currentSlot;
+    const nextSlot = { ...targetSlot, ...changes };
     if (isAllActive && changes.piping) {
       onChange({
-        ...edge,
-        [currentSlotKey]: nextSlot,
+        ...nextEdge,
+        [targetKey]: nextSlot,
         middle: {
-          ...(edge.middle || EMPTY_MIDDLE_SLOT()),
-          piping: { ...(edge.middle?.piping || EMPTY_MIDDLE_SLOT().piping), tip: nextSlot.piping.tip },
+          ...(nextEdge.middle || EMPTY_MIDDLE_SLOT()),
+          piping: { ...(nextEdge.middle?.piping || EMPTY_MIDDLE_SLOT().piping), tip: nextSlot.piping?.tip },
         },
       });
       return;
     }
-    onChange({ ...edge, [currentSlotKey]: nextSlot });
+    onChange({ ...nextEdge, [targetKey]: nextSlot });
   };
 
-  const updateSecondaryColor = (colorId, mode = 'colorOverride') => {
+  const updateSecondaryColor = (colorId, secondaryMode = 'colorOverride') => {
+    let nextEdge = ensureSlotsMigrated({ ...edge });
+    if (nextEdge.mode === 'both') {
+      nextEdge.mode = 'topBottomSeparate';
+      nextEdge.activeSlot = effectiveActiveSlot;
+    }
+    const targetKey = nextEdge.mode === 'both' ? 'both' : (isMiddleActive ? 'middle' : effectiveActiveSlot);
+    const targetSlot = nextEdge[targetKey] || currentSlot;
     onChange({
-      ...edge,
-      [currentSlotKey]: {
-        ...currentSlot,
+      ...nextEdge,
+      [targetKey]: {
+        ...targetSlot,
         piping: {
-          ...currentSlot.piping,
+          ...targetSlot.piping,
           secondaryColorId: colorId,
-          secondaryColorMode: mode,
+          secondaryColorMode: secondaryMode,
         },
       },
     });
@@ -123,7 +168,7 @@ export default function EdgeSection({
             type="button"
             onClick={switchToTop}
             className={`py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
-              mode === 'topBottomSeparate' && activeSlot === 'top'
+              (mode === 'topBottomSeparate' ? activeSlot === 'top' : effectiveActiveSlot === 'top')
                 ? 'bg-card shadow text-foreground'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
@@ -149,7 +194,7 @@ export default function EdgeSection({
             type="button"
             onClick={switchToBottom}
             className={`py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
-              mode === 'topBottomSeparate' && activeSlot === 'bottom'
+              (mode === 'topBottomSeparate' ? activeSlot === 'bottom' : effectiveActiveSlot === 'bottom')
                 ? 'bg-card shadow text-foreground'
                 : 'text-muted-foreground hover:text-foreground'
             }`}

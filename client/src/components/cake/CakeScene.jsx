@@ -762,6 +762,7 @@ const CakeScene = React.forwardRef(function CakeScene({
   const controlsRef = useRef(null);
   const thumbnailCameraRef = useRef(null);
   const cakeGroupRef = useRef(null);
+  const groundRef = useRef(null);
   const animFrameRef = useRef(null);
   const mouseRef = useRef({ isDown: false, prevX: 0, prevY: 0, moved: false });
   const autoRotateRef = useRef(false);
@@ -913,8 +914,17 @@ const CakeScene = React.forwardRef(function CakeScene({
       const cam = cameraRef.current;
       if (!renderer || !scene || !cam) return null;
 
+      const prevGroundVisible = groundRef.current ? groundRef.current.visible : true;
+      const prevShadowMap = renderer.shadowMap.enabled;
+      if (groundRef.current) groundRef.current.visible = false;
+      renderer.shadowMap.enabled = false;
+
       renderer.render(scene, cam);
-      return renderer.domElement.toDataURL('image/png');
+      const url = renderer.domElement.toDataURL('image/png');
+
+      if (groundRef.current) groundRef.current.visible = prevGroundVisible;
+      renderer.shadowMap.enabled = prevShadowMap;
+      return url;
     },
     captureThumbnail: () => {
       const renderer = rendererRef.current;
@@ -927,8 +937,12 @@ const CakeScene = React.forwardRef(function CakeScene({
 
       const prevSlotsVisible = slotsGroupRef.current ? slotsGroupRef.current.visible : true;
       const prevGhostVisible = ghostGroupRef.current ? ghostGroupRef.current.visible : true;
+      const prevGroundVisible = groundRef.current ? groundRef.current.visible : true;
+      const prevShadowMap = renderer.shadowMap.enabled;
       if (slotsGroupRef.current) slotsGroupRef.current.visible = false;
       if (ghostGroupRef.current) ghostGroupRef.current.visible = false;
+      if (groundRef.current) groundRef.current.visible = false;
+      renderer.shadowMap.enabled = false;
 
       const prevRotY = cakeGroupRef.current?.rotation?.y ?? 0;
       if (cakeGroupRef.current) cakeGroupRef.current.rotation.set(0, 0, 0);
@@ -946,13 +960,12 @@ const CakeScene = React.forwardRef(function CakeScene({
         context.drawImage(renderer.domElement, 0, 0, canvas.width, canvas.height);
         dataUrl = canvas.toDataURL('image/jpeg', 0.82);
       } finally {
-
-      if (cakeGroupRef.current) cakeGroupRef.current.rotation.y = prevRotY;
-
-      coveringMaterialsRef.current.forEach((mat, i) => { mat.clippingPlanes = prevClipStates[i]; });
-      if (slotsGroupRef.current) slotsGroupRef.current.visible = prevSlotsVisible;
-      if (ghostGroupRef.current) ghostGroupRef.current.visible = prevGhostVisible;
-
+        if (cakeGroupRef.current) cakeGroupRef.current.rotation.y = prevRotY;
+        coveringMaterialsRef.current.forEach((mat, i) => { mat.clippingPlanes = prevClipStates[i]; });
+        if (slotsGroupRef.current) slotsGroupRef.current.visible = prevSlotsVisible;
+        if (ghostGroupRef.current) ghostGroupRef.current.visible = prevGhostVisible;
+        if (groundRef.current) groundRef.current.visible = prevGroundVisible;
+        renderer.shadowMap.enabled = prevShadowMap;
       }
       return dataUrl;
     },
@@ -1125,6 +1138,9 @@ const CakeScene = React.forwardRef(function CakeScene({
 
       const prevSlotsVisible = slotsGroupRef.current ? slotsGroupRef.current.visible : true;
       const prevGhostVisible = ghostGroupRef.current ? ghostGroupRef.current.visible : true;
+      const prevGroundVisible = groundRef.current ? groundRef.current.visible : true;
+      const prevBackground = scene.background;
+      const prevShadowMap = renderer.shadowMap.enabled;
       const prevClipStates = coveringMaterialsRef.current.map((mat) => mat.clippingPlanes);
       const prevRotation = cakeGroup.rotation.clone();
       const prevSize = renderer.getSize(new THREE.Vector2());
@@ -1135,6 +1151,8 @@ const CakeScene = React.forwardRef(function CakeScene({
         coveringMaterialsRef.current.forEach((mat) => { mat.clippingPlanes = []; });
         if (slotsGroupRef.current) slotsGroupRef.current.visible = false;
         if (ghostGroupRef.current) ghostGroupRef.current.visible = false;
+        if (groundRef.current) groundRef.current.visible = false;
+        renderer.shadowMap.enabled = false;
         cakeGroup.rotation.set(0, 0, 0);
         cakeGroup.updateMatrixWorld(true);
 
@@ -1193,25 +1211,39 @@ const CakeScene = React.forwardRef(function CakeScene({
           place(hi);
 
           renderer.setSize(width, height, false);
+
+          // 1. Render clean display view (matching exact display shown in Image 3)
           renderer.render(scene, camera);
-          const pngUrl = renderer.domElement.toDataURL('image/png');
+          const displayUrl = renderer.domElement.toDataURL('image/png');
+
+          // 2. Render clean transparent cutout directly from WebGL (zero flood-fill)
+          scene.background = null;
+          renderer.render(scene, camera);
+          const transparentUrl = renderer.domElement.toDataURL('image/png');
+          scene.background = prevBackground;
+
           views.push({
             label: shot.label,
             angle: shot.angle,
-            url: pngUrl,
-            rawUrl: pngUrl,
+            url: displayUrl,
+            rawUrl: displayUrl,
+            transparentUrl: transparentUrl,
+            cutoutUrl: transparentUrl,
           });
         }
       } catch (err) {
         console.warn('Template 8-angle capture failed:', err);
         return [];
       } finally {
+        scene.background = prevBackground;
         renderer.setPixelRatio(prevPixelRatio);
         renderer.setSize(prevSize.x, prevSize.y, false);
         cakeGroup.rotation.copy(prevRotation);
         coveringMaterialsRef.current.forEach((mat, i) => { mat.clippingPlanes = prevClipStates[i]; });
         if (slotsGroupRef.current) slotsGroupRef.current.visible = prevSlotsVisible;
         if (ghostGroupRef.current) ghostGroupRef.current.visible = prevGhostVisible;
+        if (groundRef.current) groundRef.current.visible = prevGroundVisible;
+        renderer.shadowMap.enabled = prevShadowMap;
       }
 
       return views;
@@ -3826,6 +3858,7 @@ const CakeScene = React.forwardRef(function CakeScene({
       ground.position.y = -0.3;
       ground.receiveShadow = true;
       scene.add(ground);
+      groundRef.current = ground;
 
       const cakeGroup = new THREE.Group();
       scene.add(cakeGroup);

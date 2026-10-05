@@ -250,6 +250,13 @@ export default function DesignerWorkSpace() {
   const isInitialMountRef = useRef(true);
   const isLoadingRef = useRef(false);
 
+  const handleModeUiChange = useCallback((next) => {
+    if (aiChatSession?.thinking && next === 'design') {
+      return;
+    }
+    setToolPanelModeUi(next);
+  }, [aiChatSession?.thinking]);
+
   const loadDesign = useCallback(async (id) => {
     try {
       setIsDesignLoading(true);
@@ -976,10 +983,11 @@ export default function DesignerWorkSpace() {
           {!orderComplete && (
             <Button
               onClick={handleSaveDesign}
-              disabled={saveStatus === 'saving'}
+              disabled={saveStatus === 'saving' || aiChatSession?.thinking}
               className="flex items-center gap-2 rounded-xl font-semibold"
               size="sm"
               variant="outline"
+              title={aiChatSession?.thinking ? 'AI is currently editing the cake' : undefined}
             >
               {saveStatus === 'saving' ? (
                 <>
@@ -1001,8 +1009,10 @@ export default function DesignerWorkSpace() {
           {!orderComplete && (
             <Button
               onClick={handleSendToBakery}
+              disabled={aiChatSession?.thinking}
               className="flex items-center gap-2 rounded-xl font-semibold"
               size="sm"
+              title={aiChatSession?.thinking ? 'AI is currently editing the cake' : undefined}
             >
               <Send className="w-4 h-4" />
               <span className="inline sm:hidden">Send</span>
@@ -1051,8 +1061,8 @@ export default function DesignerWorkSpace() {
           <CakeScene
             ref={cakeSceneRef}
             cakeConfig={adaptConfigToLegacy(config)}
-            activeTool={orderComplete || isBreakdownOpen ? null : activeTool}
-            disabled={isBreakdownOpen}
+            activeTool={orderComplete || isBreakdownOpen || aiChatSession?.thinking ? null : activeTool}
+            disabled={isBreakdownOpen || aiChatSession?.thinking}
             readOnly={orderComplete}
             onPlace={handlePlace}
             onSelectTool={setActiveTool}
@@ -1179,7 +1189,7 @@ export default function DesignerWorkSpace() {
               activeEdgeSlot={activeEdgeSlot}
               onActiveEdgeSlotChange={setActiveEdgeSlot}
               modeUi={toolPanelModeUi}
-              onModeUiChange={setToolPanelModeUi}
+              onModeUiChange={handleModeUiChange}
               expandedSections={expandedSections}
               onExpandedSectionsChange={setExpandedSections}
             />
@@ -1225,7 +1235,7 @@ export default function DesignerWorkSpace() {
             activeEdgeSlot={activeEdgeSlot}
             onActiveEdgeSlotChange={setActiveEdgeSlot}
             modeUi={toolPanelModeUi}
-            onModeUiChange={setToolPanelModeUi}
+            onModeUiChange={handleModeUiChange}
             expandedSections={expandedSections}
             onExpandedSectionsChange={setExpandedSections}
           />

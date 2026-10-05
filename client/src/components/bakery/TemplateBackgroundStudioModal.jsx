@@ -19,10 +19,14 @@ import {
   Copy,
   Wand2,
   Image as ImageIcon,
+  Trash2,
+  Plus,
+  Loader2,
 } from 'lucide-react';
 import {
   STUDIO_PRESETS,
   compositeTemplateImage,
+  removeImageBackground,
 } from '@/utils/templateBackgroundCompositor';
 
 export default function TemplateBackgroundStudioModal({
@@ -31,26 +35,62 @@ export default function TemplateBackgroundStudioModal({
   views = [],
   templateName = 'Special Cake',
   onSaveViews,
+  onSave,
 }) {
   if (!isOpen) return null;
 
-  // Working copy of views
+  // Working copy of views with rawUrl, transparentUrl, cutoutUrl, and composite url
   const [workingViews, setWorkingViews] = useState(() => {
     return (views && views.length > 0 ? views : []).map((v) => ({
       ...v,
-      rawUrl: v.rawUrl || v.url, // preserve raw 3D or original image
+      rawUrl: v.rawUrl || v.url, // clean 3D capture from Image 3
+      cutoutUrl: v.cutoutUrl || v.transparentUrl || null,
+      url: v.url || v.rawUrl,
     }));
   });
 
+  // Sync workingViews whenever views prop is updated
+  useEffect(() => {
+    if (views && views.length > 0) {
+      setWorkingViews(
+        views.map((v) => ({
+          ...v,
+          rawUrl: v.rawUrl || v.url,
+          cutoutUrl: v.cutoutUrl || v.transparentUrl || null,
+          url: v.url || v.rawUrl,
+        }))
+      );
+    }
+  }, [views]);
+
   const [activeAngleIndex, setActiveAngleIndex] = useState(0);
   const [activeTab, setActiveTab] = useState('presets'); // 'presets' | 'banner' | 'adjust'
-  const [selectedPresetId, setSelectedPresetId] = useState('red-ribbon-showcase');
+  // Default to plain-background (clean studio neutral) or first preset
+  const defaultPreset = STUDIO_PRESETS[1] || STUDIO_PRESETS[0];
+  const [selectedPresetId, setSelectedPresetId] = useState(defaultPreset.id);
   const [showOriginal, setShowOriginal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isRemovingBg, setIsRemovingBg] = useState(false);
   const [notification, setNotification] = useState('');
 
+  // Custom Bakery Backgrounds (persisted in localStorage)
+  const [customBackgrounds, setCustomBackgrounds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cakenmake_custom_backgrounds');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [showAddBackgroundModal, setShowAddBackgroundModal] = useState(false);
+  const [newBgName, setNewBgName] = useState('');
+  const [newBgType, setNewBgType] = useState('gradient'); // 'gradient' | 'solid' | 'image'
+  const [newBgTopColor, setNewBgTopColor] = useState('#fff5eb');
+  const [newBgBottomColor, setNewBgBottomColor] = useState('#ffe4d6');
+  const [newBgImageUrl, setNewBgImageUrl] = useState('');
+  const customBgImageInputRef = useRef(null);
+
   // Active studio settings
-  const defaultPreset = STUDIO_PRESETS[0];
   const [studioSettings, setStudioSettings] = useState({
     background: { ...defaultPreset.background },
     ribbon: { ...defaultPreset.ribbon, titleText: templateName },
@@ -78,11 +118,47 @@ export default function TemplateBackgroundStudioModal({
     }
   }, [templateName]);
 
-  // Re-composite active view whenever settings or active view changes
+  // Re-composite active view whenever settings, preset, or active view changes
   useEffect(() => {
     if (!workingViews || workingViews.length === 0) return;
     const currentView = workingViews[activeAngleIndex];
     if (!currentView) return;
+
+    // Plain background with no overlays: keep the pristine original capture from Image 3
+    const isPlainPreset = selectedPresetId === 'plain-background';
+    const isTransparentPreset = selectedPresetId === 'no-background' || studioSettings.background?.type === 'transparent';
+    const hasDecorations = studioSettings.ribbon?.enabled || studioSettings.badge?.enabled || studioSettings.promo?.enabled;
+
+    if (isPlainPreset && !hasDecorations) {
+      const pristineUrl = currentView.rawUrl || currentView.url;
+      if (currentView.url !== pristineUrl) {
+        setWorkingViews((prev) =>
+          prev.map((v, idx) =>
+            idx === activeAngleIndex ? { ...v, url: pristineUrl } : v
+          )
+        );
+      }
+      return;
+    }
+
+    if (isTransparentPreset && !hasDecorations) {
+      const transparentImg = currentView.cutoutUrl || currentView.transparentUrl || currentView.rawUrl || currentView.url;
+      if (currentView.url !== transparentImg) {
+        setWorkingViews((prev) =>
+          prev.map((v, idx) =>
+            idx === activeAngleIndex ? { ...v, url: transparentImg } : v
+          )
+        );
+      }
+      return;
+    }
+
+    // For banner or custom background: use clean cutout if available, else raw image
+    const baseCakeImage = isTransparentPreset
+      ? (currentView.cutoutUrl || currentView.transparentUrl || currentView.rawUrl || currentView.url)
+      : (currentView.cutoutUrl || currentView.transparentUrl || currentView.rawUrl || currentView.url);
+
+    if (!baseCakeImage) return;
 
     if (renderTimeoutRef.current) clearTimeout(renderTimeoutRef.current);
 
@@ -90,7 +166,7 @@ export default function TemplateBackgroundStudioModal({
       setIsProcessing(true);
       try {
         const compositeUrl = await compositeTemplateImage({
-          cakeImageUrl: currentView.rawUrl || currentView.url,
+          cakeImageUrl: baseCakeImage,
           templateName: studioSettings.ribbon.titleText || templateName,
           settings: studioSettings,
         });
@@ -105,39 +181,174 @@ export default function TemplateBackgroundStudioModal({
       } finally {
         setIsProcessing(false);
       }
-    }, 120);
+    }, 60);
 
     return () => {
       if (renderTimeoutRef.current) clearTimeout(renderTimeoutRef.current);
     };
-  }, [studioSettings, activeAngleIndex]);
+  }, [studioSettings, activeAngleIndex, selectedPresetId]);
 
-  // Select a preset
+  // Select a preset or custom background
   const handleSelectPreset = (preset) => {
     setSelectedPresetId(preset.id);
     setStudioSettings((prev) => ({
       ...prev,
       background: { ...preset.background },
-      ribbon: { ...preset.ribbon, titleText: prev.ribbon.titleText || templateName },
+      ribbon: { ...preset.ribbon, titleText: prev.ribbon?.titleText || templateName },
       plate: { ...preset.plate },
       shadow: { ...preset.shadow },
       badge: { ...preset.badge },
       promo: { ...preset.promo },
     }));
-    triggerFeedback(`Applied preset: ${preset.name}`);
+    triggerFeedback(`Applied background: ${preset.name}`);
+  };
+
+  // Save new custom background
+  const handleSaveNewBackground = () => {
+    const trimmed = newBgName.trim();
+    if (!trimmed) {
+      alert('Please enter a name for your custom background.');
+      return;
+    }
+    if (newBgType === 'image' && !newBgImageUrl) {
+      alert('Please select or upload a wallpaper image.');
+      return;
+    }
+
+    const newBg = {
+      id: `custom-bg-${Date.now()}`,
+      name: trimmed,
+      subtitle: `Custom ${newBgType} bakery backdrop`,
+      isCustom: true,
+      background: {
+        type: newBgType,
+        topColor: newBgTopColor,
+        midColor: newBgTopColor,
+        bottomColor: newBgType === 'gradient' ? newBgBottomColor : newBgTopColor,
+        imageUrl: newBgType === 'image' ? newBgImageUrl : null,
+        lightingIntensity: 0.7,
+      },
+      ribbon: { enabled: false },
+      plate: { enabled: false },
+      shadow: { enabled: true, opacity: 0.35, blur: 20, yOffset: 12 },
+      badge: { enabled: false },
+      promo: { enabled: false },
+    };
+
+    const updated = [newBg, ...customBackgrounds];
+    setCustomBackgrounds(updated);
+    try {
+      localStorage.setItem('cakenmake_custom_backgrounds', JSON.stringify(updated));
+    } catch (e) {
+      console.warn('Failed to save custom backgrounds:', e);
+    }
+
+    setShowAddBackgroundModal(false);
+    setNewBgName('');
+    setNewBgImageUrl('');
+    handleSelectPreset(newBg);
+    triggerFeedback(`✓ Created & applied background "${trimmed}"!`);
+  };
+
+  // Delete custom background
+  const handleDeleteCustomBackground = (bgId, bgName) => {
+    const updated = customBackgrounds.filter((b) => b.id !== bgId);
+    setCustomBackgrounds(updated);
+    try {
+      localStorage.setItem('cakenmake_custom_backgrounds', JSON.stringify(updated));
+    } catch (e) {
+      console.warn('Failed to update localStorage:', e);
+    }
+
+    if (selectedPresetId === bgId) {
+      handleSelectPreset(STUDIO_PRESETS[1] || STUDIO_PRESETS[0]);
+    }
+    triggerFeedback(`Removed background "${bgName}"`);
+  };
+
+  // Manual trigger for background removal
+  const handleManualRemoveBackground = async () => {
+    if (!workingViews || workingViews.length === 0) return;
+    const currentView = workingViews[activeAngleIndex];
+    if (!currentView) return;
+
+    // If native transparent cutout from WebGL is available, use it directly!
+    if (currentView.transparentUrl) {
+      setWorkingViews((prev) =>
+        prev.map((v, idx) =>
+          idx === activeAngleIndex
+            ? { ...v, url: currentView.transparentUrl, cutoutUrl: currentView.transparentUrl }
+            : v
+        )
+      );
+      setSelectedPresetId('no-background');
+      triggerFeedback('✓ Clean transparent cutout applied!');
+      return;
+    }
+
+    setIsRemovingBg(true);
+    triggerFeedback('Removing background… Extracting cake & plate');
+
+    try {
+      const src = currentView.rawUrl || currentView.url;
+      const cutout = await removeImageBackground(src);
+
+      setWorkingViews((prev) =>
+        prev.map((v, idx) =>
+          idx === activeAngleIndex ? { ...v, cutoutUrl: cutout, url: cutout } : v
+        )
+      );
+      setSelectedPresetId('no-background');
+      triggerFeedback('✓ Background removed! Cake & plate isolated.');
+    } catch (err) {
+      console.error('Manual background removal failed:', err);
+      triggerFeedback('Background removal failed. Please try again.');
+    } finally {
+      setIsRemovingBg(false);
+    }
   };
 
   // Apply current background & styles to ALL 8 angles
   const handleApplyToAllAngles = async () => {
     if (!workingViews || workingViews.length === 0) return;
     setIsProcessing(true);
-    triggerFeedback('Applying background studio style to all pictures…');
+    triggerFeedback('Applying background style to all pictures…');
 
     try {
+      const isPlainPreset = selectedPresetId === 'plain-background';
+      const isTransparentPreset = selectedPresetId === 'no-background' || studioSettings.background?.type === 'transparent';
+      const hasDecorations = studioSettings.ribbon?.enabled || studioSettings.badge?.enabled || studioSettings.promo?.enabled;
+
+      if (isPlainPreset && !hasDecorations) {
+        setWorkingViews((prev) =>
+          prev.map((v) => ({
+            ...v,
+            url: v.rawUrl || v.url,
+          }))
+        );
+        triggerFeedback('✓ Applied clean original presentation to all 8 angles!');
+        return;
+      }
+
+      if (isTransparentPreset && !hasDecorations) {
+        setWorkingViews((prev) =>
+          prev.map((v) => ({
+            ...v,
+            url: v.cutoutUrl || v.transparentUrl || v.rawUrl || v.url,
+          }))
+        );
+        triggerFeedback('✓ Applied transparent cutout to all 8 angles!');
+        return;
+      }
+
       const updatedViews = await Promise.all(
         workingViews.map(async (view) => {
+          const baseImage = isTransparentPreset
+            ? (view.cutoutUrl || view.transparentUrl || view.rawUrl || view.url)
+            : (view.cutoutUrl || view.transparentUrl || view.rawUrl || view.url);
+
           const compositeUrl = await compositeTemplateImage({
-            cakeImageUrl: view.rawUrl || view.url,
+            cakeImageUrl: baseImage,
             templateName: studioSettings.ribbon.titleText || templateName,
             settings: studioSettings,
           });
@@ -148,7 +359,7 @@ export default function TemplateBackgroundStudioModal({
         })
       );
       setWorkingViews(updatedViews);
-      triggerFeedback('✓ Successfully applied to all picture angles!');
+      triggerFeedback('✓ Successfully applied to all 8 picture angles!');
     } catch (err) {
       console.error('Failed to batch apply studio style:', err);
       triggerFeedback('Failed to apply to some views. Please try again.');
@@ -167,35 +378,46 @@ export default function TemplateBackgroundStudioModal({
       const customUrl = ev.target?.result;
       if (!customUrl) return;
 
-      setWorkingViews((prev) =>
-        prev.map((v, idx) =>
-          idx === activeAngleIndex ? { ...v, rawUrl: customUrl, url: customUrl } : v
-        )
-      );
+      setIsRemovingBg(true);
+      triggerFeedback('Extracting cake & plate from uploaded photo…');
 
-      // Re-composite with studio
-      const compositeUrl = await compositeTemplateImage({
-        cakeImageUrl: customUrl,
-        templateName: studioSettings.ribbon.titleText || templateName,
-        settings: studioSettings,
-      });
+      try {
+        const [cutout] = await Promise.all([
+          removeImageBackground(customUrl),
+          new Promise((res) => setTimeout(res, 550)),
+        ]);
 
-      setWorkingViews((prev) =>
-        prev.map((v, idx) =>
-          idx === activeAngleIndex ? { ...v, url: compositeUrl } : v
-        )
-      );
+        const compositeUrl = await compositeTemplateImage({
+          cakeImageUrl: cutout,
+          templateName: studioSettings.ribbon.titleText || templateName,
+          settings: studioSettings,
+        });
 
-      triggerFeedback('Custom photo loaded for this angle!');
+        setWorkingViews((prev) =>
+          prev.map((v, idx) =>
+            idx === activeAngleIndex
+              ? { ...v, rawUrl: customUrl, cutoutUrl: cutout, url: compositeUrl }
+              : v
+          )
+        );
+        triggerFeedback('Photo background removed & updated!');
+      } catch (err) {
+        console.error('Failed to process uploaded photo:', err);
+      } finally {
+        setIsRemovingBg(false);
+      }
     };
     reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   // Reset active picture to raw
   const handleResetActivePicture = () => {
     setWorkingViews((prev) =>
       prev.map((v, idx) =>
-        idx === activeAngleIndex ? { ...v, url: v.rawUrl || v.url } : v
+        idx === activeAngleIndex
+          ? { ...v, url: v.rawUrl || v.url, cutoutUrl: null }
+          : v
       )
     );
     setStudioSettings((prev) => ({
@@ -214,6 +436,9 @@ export default function TemplateBackgroundStudioModal({
   const handleSaveAndClose = () => {
     if (onSaveViews) {
       onSaveViews(workingViews);
+    }
+    if (onSave) {
+      onSave(workingViews);
     }
     onClose();
   };
@@ -301,6 +526,16 @@ export default function TemplateBackgroundStudioModal({
 
                   <button
                     type="button"
+                    onClick={handleManualRemoveBackground}
+                    disabled={isRemovingBg}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-pink-200 bg-white hover:bg-pink-50 text-pink-600 text-[11px] font-semibold transition-colors shadow-xs disabled:opacity-50"
+                    title="Remove background to leave only plate and cake"
+                  >
+                    <Wand2 className="w-3.5 h-3.5" /> Remove Background
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => fileInputRef.current?.click()}
                     className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-pink-200 bg-white hover:bg-pink-50 text-pink-600 text-[11px] font-semibold transition-colors shadow-xs"
                     title="Upload external photo for this angle"
@@ -318,7 +553,30 @@ export default function TemplateBackgroundStudioModal({
               </div>
 
               {/* Large Main Showcase Canvas Preview */}
-              <div className="w-full max-w-[500px] aspect-square mx-auto rounded-2xl overflow-hidden bg-white border border-pink-200/80 shadow-lg relative group flex items-center justify-center">
+              <div
+                className={`w-full max-w-[500px] aspect-square mx-auto rounded-2xl overflow-hidden border border-pink-200/80 shadow-lg relative group flex items-center justify-center ${
+                  selectedPresetId === 'no-background'
+                    ? 'bg-[linear-gradient(45deg,#f4f4f4_25%,transparent_25%),linear-gradient(-45deg,#f4f4f4_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#f4f4f4_75%),linear-gradient(-45deg,transparent_75%,#f4f4f4_75%)] bg-[size:16px_16px] bg-[position:0_0,0_8px,8px_-8px,-8px_0] bg-white'
+                    : 'bg-[#fff5ee]'
+                }`}
+              >
+                {isRemovingBg && (
+                  <div className="absolute inset-0 bg-white/90 backdrop-blur-md z-30 flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-200">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-pink-500 to-rose-400 text-white flex items-center justify-center shadow-lg shadow-pink-500/25 mb-3.5 animate-pulse">
+                      <Wand2 className="w-7 h-7 animate-spin" />
+                    </div>
+                    <h4 className="text-sm font-bold text-gray-900 font-heading">
+                      Processing Background…
+                    </h4>
+                    <p className="text-[11px] text-gray-500 max-w-xs mt-1">
+                      Applying transparent cutout for active angle
+                    </p>
+                    <div className="w-40 h-1.5 bg-pink-100 rounded-full mt-3 overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-pink-500 to-rose-500 rounded-full animate-pulse w-3/4" />
+                    </div>
+                  </div>
+                )}
+
                 {showOriginal ? (
                   <img
                     src={activeView.rawUrl || activeView.url}
@@ -327,7 +585,7 @@ export default function TemplateBackgroundStudioModal({
                   />
                 ) : (
                   <img
-                    src={activeView.url}
+                    src={activeView.url || activeView.rawUrl}
                     alt={activeView.label || 'Studio view'}
                     className="w-full h-full object-cover"
                   />
@@ -393,7 +651,7 @@ export default function TemplateBackgroundStudioModal({
                         : 'border-gray-200 bg-white opacity-70 hover:opacity-100'
                     }`}
                   >
-                    <img src={v.url} alt={v.label} className="w-full h-full object-cover" />
+                    <img src={v.url || v.rawUrl} alt={v.label} className="w-full h-full object-cover" />
                     <span className="absolute bottom-1 left-1 right-1 text-[8px] font-bold text-white bg-black/60 rounded px-1 truncate">
                       {v.angle || `#${idx + 1}`}
                     </span>
@@ -444,71 +702,177 @@ export default function TemplateBackgroundStudioModal({
 
             {/* Tab Contents (Scrollable) */}
             <div className="flex-1 overflow-y-auto p-5 space-y-6 text-xs">
-              {/* TAB 1: STUDIO PRESETS */}
+              {/* TAB 1: BACKGROUND SELECTION */}
               {activeTab === 'presets' && (
-                <div className="space-y-4">
+                <div className="space-y-5">
                   <div>
                     <h3 className="font-bold text-gray-900 text-sm font-heading mb-1">
-                      1-Click Marketing Presets
+                      Background Selections
                     </h3>
                     <p className="text-gray-500 text-[11px]">
-                      Instantly transform raw cake screenshots into eye-catching bakery promotional posters.
+                      Choose from the 3 core bakery presets or create and manage custom backgrounds.
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-2.5">
-                    {STUDIO_PRESETS.map((p) => {
-                      const isSelected = selectedPresetId === p.id;
-                      return (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => handleSelectPreset(p)}
-                          className={`p-3 rounded-2xl border text-left flex items-start justify-between gap-3 transition-all ${
-                            isSelected
-                              ? 'border-pink-500 bg-pink-50/40 ring-2 ring-pink-500/15 shadow-xs'
-                              : 'border-gray-200 hover:border-pink-200 hover:bg-gray-50/50'
-                          }`}
-                        >
-                          <div className="flex items-start gap-3">
-                            {/* Color preview circle */}
-                            <div
-                              className="w-10 h-10 rounded-xl shrink-0 border border-black/10 shadow-xs flex items-center justify-center text-xs font-bold"
-                              style={{
-                                background:
-                                  p.background.type === 'transparent'
-                                    ? '#ffffff'
-                                    : `linear-gradient(135deg, ${p.background.topColor}, ${p.background.bottomColor})`,
-                              }}
-                            >
-                              {p.ribbon.enabled && (
-                                <div
-                                  className="w-5 h-2 rounded-full shadow-xs"
-                                  style={{ backgroundColor: p.ribbon.color }}
-                                />
-                              )}
-                            </div>
-                            <div>
-                              <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5">
-                                {p.name}
-                                {p.id === 'red-ribbon-showcase' && (
-                                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-rose-100 text-rose-700 font-bold">
-                                    Ad Banner Style
-                                  </span>
+                  {/* Core 3 Presets */}
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                      Core Presets ({STUDIO_PRESETS.length})
+                    </span>
+                    <div className="grid grid-cols-1 gap-2.5">
+                      {STUDIO_PRESETS.map((p) => {
+                        const isSelected = selectedPresetId === p.id;
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => handleSelectPreset(p)}
+                            className={`p-3 rounded-2xl border text-left flex items-start justify-between gap-3 transition-all ${
+                              isSelected
+                                ? 'border-pink-500 bg-pink-50/40 ring-2 ring-pink-500/15 shadow-xs'
+                                : 'border-gray-200 hover:border-pink-200 hover:bg-gray-50/50'
+                            }`}
+                          >
+                            <div className="flex items-start gap-3">
+                              {/* Color preview circle */}
+                              <div
+                                className="w-10 h-10 rounded-xl shrink-0 border border-black/10 shadow-xs flex items-center justify-center text-xs font-bold"
+                                style={{
+                                  background:
+                                    p.background.type === 'transparent'
+                                      ? '#ffffff'
+                                      : `linear-gradient(135deg, ${p.background.topColor}, ${p.background.bottomColor || p.background.topColor})`,
+                                }}
+                              >
+                                {p.ribbon.enabled && (
+                                  <div
+                                    className="w-5 h-2 rounded-full shadow-xs"
+                                    style={{ backgroundColor: p.ribbon.color }}
+                                  />
                                 )}
                               </div>
-                              <p className="text-[11px] text-gray-500 mt-0.5">{p.subtitle}</p>
+                              <div>
+                                <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5">
+                                  {p.name}
+                                  {p.id === 'banner-background' && (
+                                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-rose-100 text-rose-700 font-bold">
+                                      Red Ribbon Ad
+                                    </span>
+                                  )}
+                                  {p.id === 'no-background' && (
+                                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-gray-100 text-gray-700 font-bold">
+                                      Transparent
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-gray-500 mt-0.5">{p.subtitle}</p>
+                              </div>
                             </div>
-                          </div>
-                          {isSelected && <CheckCircle2 className="w-5 h-5 text-pink-600 shrink-0" />}
-                        </button>
-                      );
-                    })}
+                            {isSelected && <CheckCircle2 className="w-5 h-5 text-pink-600 shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
 
-                  {/* Custom Background Colors */}
+                  {/* Custom Backgrounds Management */}
                   <div className="pt-4 border-t border-gray-200 space-y-3">
-                    <h4 className="font-bold text-gray-800 text-xs">Custom Gradient Colors</h4>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-gray-700 uppercase tracking-wider">
+                          Custom Bakery Backgrounds
+                        </span>
+                        {customBackgrounds.length > 0 && (
+                          <span className="px-1.5 py-0.2 rounded-full bg-pink-100 text-pink-700 text-[10px] font-bold">
+                            {customBackgrounds.length}
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddBackgroundModal(true)}
+                        className="flex items-center gap-1 text-[11px] font-bold text-pink-600 hover:text-pink-700 hover:bg-pink-50 px-2.5 py-1 rounded-lg transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Add Background
+                      </button>
+                    </div>
+
+                    {customBackgrounds.length === 0 ? (
+                      <div className="p-4 rounded-2xl border border-dashed border-gray-200 text-center bg-gray-50/50">
+                        <p className="text-[11px] text-gray-500 mb-2">
+                          No custom backgrounds added yet.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setShowAddBackgroundModal(true)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pink-50 border border-pink-200 text-pink-600 text-[11px] font-bold hover:bg-pink-100 transition-colors"
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Add Custom Wallpaper / Color
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-2">
+                        {customBackgrounds.map((cb) => {
+                          const isSelected = selectedPresetId === cb.id;
+                          return (
+                            <div
+                              key={cb.id}
+                              onClick={() => handleSelectPreset(cb)}
+                              className={`p-2.5 rounded-2xl border text-left flex items-center justify-between gap-3 cursor-pointer transition-all ${
+                                isSelected
+                                  ? 'border-pink-500 bg-pink-50/40 ring-2 ring-pink-500/15 shadow-xs'
+                                  : 'border-gray-200 hover:border-pink-200 hover:bg-gray-50/50'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5 overflow-hidden">
+                                <div
+                                  className="w-10 h-10 rounded-xl shrink-0 border border-black/10 overflow-hidden flex items-center justify-center bg-cover bg-center shadow-xs"
+                                  style={{
+                                    background:
+                                      cb.background.type === 'image' && cb.background.imageUrl
+                                        ? `url(${cb.background.imageUrl}) center/cover no-repeat`
+                                        : cb.background.type === 'solid'
+                                        ? cb.background.topColor
+                                        : `linear-gradient(135deg, ${cb.background.topColor}, ${cb.background.bottomColor || cb.background.topColor})`,
+                                  }}
+                                />
+                                <div className="truncate">
+                                  <div className="font-bold text-gray-900 text-xs truncate flex items-center gap-1.5">
+                                    {cb.name}
+                                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 font-bold">
+                                      Custom
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-gray-500 capitalize">
+                                    {cb.background.type} background
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-1 shrink-0">
+                                {isSelected && <CheckCircle2 className="w-4 h-4 text-pink-600" />}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteCustomBackground(cb.id, cb.name);
+                                  }}
+                                  className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                  title="Remove this background"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Fine-Tune Gradient / Color */}
+                  <div className="pt-4 border-t border-gray-200 space-y-3">
+                    <h4 className="font-bold text-gray-800 text-xs">Fine-Tune Active Colors</h4>
                     <div className="grid grid-cols-3 gap-2">
                       <div>
                         <label className="text-[10px] text-gray-500 block mb-1">Top Tone</label>
@@ -519,7 +883,7 @@ export default function TemplateBackgroundStudioModal({
                             onChange={(e) =>
                               setStudioSettings((prev) => ({
                                 ...prev,
-                                background: { ...prev.background, type: 'gradient', topColor: e.target.value },
+                                background: { ...prev.background, type: prev.background.type === 'transparent' ? 'gradient' : prev.background.type, topColor: e.target.value },
                               }))
                             }
                             className="w-8 h-8 rounded-lg cursor-pointer border border-gray-300 p-0.5"
@@ -538,7 +902,7 @@ export default function TemplateBackgroundStudioModal({
                             onChange={(e) =>
                               setStudioSettings((prev) => ({
                                 ...prev,
-                                background: { ...prev.background, type: 'gradient', midColor: e.target.value },
+                                background: { ...prev.background, type: prev.background.type === 'transparent' ? 'gradient' : prev.background.type, midColor: e.target.value },
                               }))
                             }
                             className="w-8 h-8 rounded-lg cursor-pointer border border-gray-300 p-0.5"
@@ -557,7 +921,7 @@ export default function TemplateBackgroundStudioModal({
                             onChange={(e) =>
                               setStudioSettings((prev) => ({
                                 ...prev,
-                                background: { ...prev.background, type: 'gradient', bottomColor: e.target.value },
+                                background: { ...prev.background, type: prev.background.type === 'transparent' ? 'gradient' : prev.background.type, bottomColor: e.target.value },
                               }))
                             }
                             className="w-8 h-8 rounded-lg cursor-pointer border border-gray-300 p-0.5"
@@ -1033,6 +1397,197 @@ export default function TemplateBackgroundStudioModal({
           </div>
         </div>
       </div>
+
+      {/* ADD CUSTOM BACKGROUND MODAL */}
+      {showAddBackgroundModal && (
+        <div className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl w-full max-w-md p-5 shadow-2xl border border-pink-200 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-pink-100 text-pink-600 flex items-center justify-center">
+                  <Plus className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 text-sm font-heading">Add Background</h3>
+                  <p className="text-[11px] text-gray-500">Create a custom named background for your bakery</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddBackgroundModal(false)}
+                className="w-7 h-7 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3.5">
+              <div>
+                <label className="text-[11px] font-bold text-gray-700 block mb-1">
+                  Background Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newBgName}
+                  onChange={(e) => setNewBgName(e.target.value)}
+                  placeholder="e.g. Birthday Pastel, Modern Velvet"
+                  className="w-full px-3 py-2 rounded-xl border border-gray-300 text-xs font-semibold text-gray-900 focus:ring-2 focus:ring-pink-500 focus:outline-none"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-gray-700 block mb-1.5">
+                  Background Type
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: 'gradient', label: 'Gradient' },
+                    { id: 'solid', label: 'Solid Color' },
+                    { id: 'image', label: 'Wallpaper Image' },
+                  ].map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setNewBgType(t.id)}
+                      className={`py-2 px-2 rounded-xl border text-[11px] font-bold text-center transition-all ${
+                        newBgType === t.id
+                          ? 'border-pink-500 bg-pink-50 text-pink-700 ring-1 ring-pink-500'
+                          : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {newBgType === 'gradient' && (
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="text-[10px] text-gray-500 block mb-1">Top Color</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={newBgTopColor}
+                        onChange={(e) => setNewBgTopColor(e.target.value)}
+                        className="w-9 h-9 rounded-xl cursor-pointer border border-gray-300 p-0.5"
+                      />
+                      <span className="text-xs font-mono text-gray-600">{newBgTopColor}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-500 block mb-1">Bottom Color</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={newBgBottomColor}
+                        onChange={(e) => setNewBgBottomColor(e.target.value)}
+                        className="w-9 h-9 rounded-xl cursor-pointer border border-gray-300 p-0.5"
+                      />
+                      <span className="text-xs font-mono text-gray-600">{newBgBottomColor}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {newBgType === 'solid' && (
+                <div className="pt-1">
+                  <label className="text-[10px] text-gray-500 block mb-1">Color Tone</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={newBgTopColor}
+                      onChange={(e) => setNewBgTopColor(e.target.value)}
+                      className="w-9 h-9 rounded-xl cursor-pointer border border-gray-300 p-0.5"
+                    />
+                    <span className="text-xs font-mono text-gray-600">{newBgTopColor}</span>
+                  </div>
+                </div>
+              )}
+
+              {newBgType === 'image' && (
+                <div className="pt-1 space-y-2">
+                  <label className="text-[10px] text-gray-500 block">Upload Wallpaper File</label>
+                  <div
+                    onClick={() => customBgImageInputRef.current?.click()}
+                    className="border-2 border-dashed border-pink-200 hover:border-pink-400 bg-pink-50/30 rounded-2xl p-4 text-center cursor-pointer transition-colors"
+                  >
+                    {newBgImageUrl ? (
+                      <div className="flex items-center justify-center gap-3">
+                        <img
+                          src={newBgImageUrl}
+                          alt="Preview"
+                          className="w-16 h-16 rounded-xl object-cover border border-gray-300 shadow-xs"
+                        />
+                        <div className="text-left">
+                          <span className="text-xs font-bold text-gray-800 block">Image Loaded</span>
+                          <span className="text-[10px] text-pink-600 hover:underline">Click to change</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <Upload className="w-6 h-6 text-pink-500 mx-auto mb-1" />
+                        <span className="text-xs font-bold text-gray-700 block">Select Wallpaper Image</span>
+                        <span className="text-[10px] text-gray-400">PNG, JPG, or WEBP up to 5MB</span>
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    ref={customBgImageInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) {
+                        const r = new FileReader();
+                        r.onload = (ev) => setNewBgImageUrl(ev.target?.result);
+                        r.readAsDataURL(f);
+                      }
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Live Swatch Preview */}
+              <div>
+                <label className="text-[10px] text-gray-500 block mb-1">Preview</label>
+                <div
+                  className="w-full h-14 rounded-xl border border-gray-200 shadow-inner flex items-center justify-center text-xs font-bold text-gray-700"
+                  style={{
+                    background:
+                      newBgType === 'image' && newBgImageUrl
+                        ? `url(${newBgImageUrl}) center/cover no-repeat`
+                        : newBgType === 'solid'
+                        ? newBgTopColor
+                        : `linear-gradient(135deg, ${newBgTopColor}, ${newBgBottomColor})`,
+                  }}
+                >
+                  {newBgName || 'Background Preview'}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setShowAddBackgroundModal(false)}
+                className="px-4 py-2 rounded-xl text-gray-600 hover:bg-gray-100 text-xs font-semibold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveNewBackground}
+                className="px-5 py-2 rounded-xl bg-pink-500 hover:bg-pink-600 text-white text-xs font-bold shadow-md shadow-pink-500/20 transition-all active:scale-98"
+              >
+                Save Background
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -23,7 +23,7 @@ const GREETING = {
 
 const MAX_TOOL_TURNS = 6;
 
-export default function AIChatPanel({ config, onChange, quote, session, active = true }) {
+export default function AIChatPanel({ config, onChange, quote, session, active = true, onThinkingChange }) {
   // `history` is the raw Anthropic-format message array sent back to the
   // API each turn. `display` is the simplified { role, content, changes? }
   // shape the bubbles below render — a tool_use/tool_result turn is never
@@ -36,6 +36,11 @@ export default function AIChatPanel({ config, onChange, quote, session, active =
     history: localHistory, display: localDisplay, input: localInput, thinking: localThinking,
     setHistory: setLocalHistory, setDisplay: setLocalDisplay, setInput: setLocalInput, setThinking: setLocalThinking,
   };
+
+  useEffect(() => {
+    onThinkingChange?.(Boolean(thinking));
+  }, [thinking, onThinkingChange]);
+
   const unavailable = session && !session.ready;
   const [attachment, setAttachment] = useState(null);
   const [preparing, setPreparing] = useState(false);
@@ -188,10 +193,25 @@ export default function AIChatPanel({ config, onChange, quote, session, active =
           <p className="text-xs font-heading font-semibold text-foreground">AI Cake Designer</p>
           <p className="text-[10px] text-muted-foreground">Turn your ideas into a cake</p>
         </div>
-        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground shrink-0" aria-label="Clear chat" title="Clear chat" disabled={thinking || unavailable || dictation.listening || preparing} onClick={() => {
-          setHistory([]); setDisplay([GREETING]); setInput(''); setAttachment(null); setMediaError('');
-          mediaVersion.current++; dictation.stop();
-        }}><RotateCcw className="h-3.5 w-3.5" /></Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground shrink-0"
+          aria-label="Reset chat"
+          title="Reset chat"
+          disabled={thinking || unavailable || dictation.listening || preparing}
+          onClick={() => {
+            setHistory([]);
+            setDisplay([GREETING]);
+            setInput('');
+            setAttachment(null);
+            setMediaError('');
+            mediaVersion.current++;
+            dictation.stop();
+          }}
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+        </Button>
       </div>
       {session?.error && <p role="status" className="text-xs text-destructive pb-2">{session.error}</p>}
       {unavailable && !session.error && <p role="status" className="text-xs text-muted-foreground pb-2">Loading saved chat...</p>}
@@ -213,20 +233,38 @@ export default function AIChatPanel({ config, onChange, quote, session, active =
                 }`}
               >
                 {msg.role === 'assistant' ? (
-                  <ReactMarkdown skipHtml components={{
-                    p: ({ children }) => <p className="mb-2.5 last:mb-0">{children}</p>,
-                    ul: ({ children }) => <ul className="list-disc pl-4 mb-2.5 last:mb-0 space-y-1.5">{children}</ul>,
-                    ol: ({ children }) => <ol className="list-decimal pl-4 mb-2.5 last:mb-0 space-y-1.5">{children}</ol>,
-                    li: ({ children }) => <li className="pl-0.5 [&>p]:mb-1">{children}</li>,
-                    strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                    h1: ({ children }) => <p className="font-semibold mb-2">{children}</p>,
-                    h2: ({ children }) => <p className="font-semibold mb-2">{children}</p>,
-                    h3: ({ children }) => <p className="font-semibold mb-2">{children}</p>,
-                    blockquote: ({ children }) => <blockquote className="border-l-2 border-primary/30 pl-2 my-2 text-muted-foreground">{children}</blockquote>,
-                    pre: ({ children }) => <pre className="max-w-full overflow-x-auto rounded-lg bg-background/60 p-2 my-2">{children}</pre>,
-                    a: ({ children }) => <span>{children}</span>,
-                    img: () => null,
-                  }}>{msg.content}</ReactMarkdown>
+                  <>
+                    <ReactMarkdown skipHtml components={{
+                      p: ({ children }) => <p className="mb-2.5 last:mb-0">{children}</p>,
+                      ul: ({ children }) => <ul className="list-disc pl-4 mb-2.5 last:mb-0 space-y-1.5">{children}</ul>,
+                      ol: ({ children }) => <ol className="list-decimal pl-4 mb-2.5 last:mb-0 space-y-1.5">{children}</ol>,
+                      li: ({ children }) => <li className="pl-0.5 [&>p]:mb-1">{children}</li>,
+                      strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                      h1: ({ children }) => <p className="font-semibold mb-2">{children}</p>,
+                      h2: ({ children }) => <p className="font-semibold mb-2">{children}</p>,
+                      h3: ({ children }) => <p className="font-semibold mb-2">{children}</p>,
+                      blockquote: ({ children }) => <blockquote className="border-l-2 border-primary/30 pl-2 my-2 text-muted-foreground">{children}</blockquote>,
+                      pre: ({ children }) => <pre className="max-w-full overflow-x-auto rounded-lg bg-background/60 p-2 my-2">{children}</pre>,
+                      a: ({ children }) => <span>{children}</span>,
+                      img: () => null,
+                    }}>{msg.content}</ReactMarkdown>
+                    {i === 0 && display.length === 1 && (
+                      <div className="mt-3 pt-2.5 border-t border-border/40 flex flex-col gap-1.5">
+                        {SUGGESTIONS.map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            disabled={thinking || unavailable || preparing || dictation.listening}
+                            onClick={() => sendMessage(s)}
+                            className="w-full text-left text-xs leading-relaxed px-3 py-2 rounded-xl bg-background/80 hover:bg-background border border-border/60 hover:border-primary/40 text-foreground transition-all duration-150 cursor-pointer shadow-xs active:scale-[0.99] disabled:opacity-50 flex items-center justify-between gap-2 group"
+                          >
+                            <span>"{s}"</span>
+                            <span className="text-[10px] text-muted-foreground/60 group-hover:text-primary transition-colors shrink-0">↵</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 ) : msg.content}
               </div>
               {/* "✓ change" chips so the person can see what happened
@@ -244,34 +282,21 @@ export default function AIChatPanel({ config, onChange, quote, session, active =
           </div>
         ))}
         {thinking && (
-          <div className="flex gap-2 justify-start">
-            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-              <Bot className="w-3.5 h-3.5 text-primary" />
+          <div className="flex flex-col gap-1.5 justify-start">
+            <div className="flex gap-2 justify-start items-center">
+              <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                <Bot className="w-3.5 h-3.5 text-primary" />
+              </div>
+              <div className="rounded-2xl rounded-bl-sm bg-muted px-3 py-2 text-xs text-muted-foreground flex items-center gap-1.5 shadow-xs">
+                <Loader2 className="w-3 h-3 animate-spin text-primary" /> Updating cake design live...
+              </div>
             </div>
-            <div className="rounded-2xl rounded-bl-sm bg-muted px-3 py-2 text-xs text-muted-foreground flex items-center gap-1.5">
-              <Loader2 className="w-3 h-3 animate-spin" /> Designing...
+            <div className="ml-8 text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+              Editing in progress — tab switching is locked to prevent interruptions.
             </div>
           </div>
         )}
-      {/* Suggestions — only on the untouched greeting screen */}
-      {display.length === 1 && (
-        <div className="pl-0 md:pl-8 pt-1">
-          <p className="text-[10px] text-muted-foreground mb-2">Try an idea</p>
-          <div className="grid grid-cols-2 gap-1.5 md:gap-2">
-          {SUGGESTIONS.map((s, index) => (
-            <button
-              key={s}
-              title={s}
-              disabled={thinking || unavailable || preparing || dictation.listening}
-              onClick={() => sendMessage(s)}
-              className="text-[11px] min-h-11 border border-border/60 bg-background hover:bg-primary/5 hover:border-primary/30 rounded-xl px-2.5 md:px-3 py-2 md:py-2.5 text-foreground/80 transition-colors text-left disabled:opacity-50"
-            >
-              {['Birthday fun', 'Elegant wedding', 'Chocolate dream', 'Cute unicorn'][index]}
-            </button>
-          ))}
-          </div>
-        </div>
-      )}
+
         <div ref={bottomRef} />
       </div>
 
@@ -309,7 +334,9 @@ export default function AIChatPanel({ config, onChange, quote, session, active =
         </div>
         </div>
         <p className="text-[10px] leading-relaxed text-muted-foreground text-center px-1">AI may miss details or differ from your reference. Review your design before sending it to a bakery.</p>
-        <p className="text-[10px] leading-relaxed text-muted-foreground text-center px-1">{dictation.supported ? 'Browser dictation may process audio online.' : 'Voice input is unavailable in this browser. Use a browser with speech recognition or type your request.'}</p>
+        {!dictation.supported && (
+          <p className="text-[10px] leading-relaxed text-muted-foreground text-center px-1">Voice input is unavailable in this browser. Use a browser with speech recognition or type your request.</p>
+        )}
       </div>
     </div>
   );

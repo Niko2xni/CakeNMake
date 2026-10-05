@@ -59,10 +59,16 @@ export default function ToolPanel({
   onDragHandlePointerDown,
   hideScrollbar = false,
 }) {
+  const [internalAiThinking, setInternalAiThinking] = useState(false);
+  const isAiBusy = Boolean(aiChatSession?.thinking || internalAiThinking);
+
   const [internalModeUi, setInternalModeUi] = useState('design'); // 'design' | 'ai'
   const modeUi = controlledModeUi !== undefined ? controlledModeUi : internalModeUi;
   const setModeUi = (val) => {
     const next = typeof val === 'function' ? val(modeUi) : val;
+    if (isAiBusy && next === 'design') {
+      return;
+    }
     setInternalModeUi(next);
     onModeUiChange?.(next);
   };
@@ -383,11 +389,18 @@ export default function ToolPanel({
       {/* Mode switcher header */}
       <div className="px-3 pt-2 pb-2 md:px-4 md:pt-4 md:pb-3 flex items-center gap-2">
         <button
-          onClick={() => setModeUi('design')}
+          onClick={() => {
+            if (isAiBusy) return;
+            setModeUi('design');
+          }}
+          disabled={isAiBusy}
+          title={isAiBusy ? 'AI is editing the cake. Switching to manual design is locked until it finishes.' : undefined}
           className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
-            modeUi === 'design'
-              ? 'bg-primary text-primary-foreground shadow-md'
-              : 'bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted'
+            isAiBusy
+              ? 'opacity-40 cursor-not-allowed bg-muted/40 text-muted-foreground'
+              : modeUi === 'design'
+                ? 'bg-primary text-primary-foreground shadow-md'
+                : 'bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted'
           }`}
         >
           <Cake className="w-4 h-4" />
@@ -413,20 +426,33 @@ export default function ToolPanel({
         <Button
           variant="ghost"
           size="icon"
+          disabled={isAiBusy}
           className={`rounded-full shrink-0 h-9 w-9 ${
+            isAiBusy ? 'opacity-40 cursor-not-allowed' : ''
+          } ${
             config.interiorPreview ? 'text-amber-600' : 'text-muted-foreground hover:text-foreground'
           }`}
           onClick={toggleInteriorPreview}
-          title={config.interiorPreview ? 'Turn off Interior Preview' : 'Turn on Interior Preview'}
+          title={
+            isAiBusy
+              ? 'AI is editing the cake.'
+              : config.interiorPreview ? 'Turn off Interior Preview' : 'Turn on Interior Preview'
+          }
         >
           {config.interiorPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
         </Button>
         <Button
           variant="ghost"
           size="icon"
-          className="rounded-full text-muted-foreground hover:text-foreground shrink-0 h-9 w-9"
-          onClick={() => setShowResetConfirm(true)}
-          title="Reset Cake Design"
+          disabled={isAiBusy}
+          className={`rounded-full text-muted-foreground hover:text-foreground shrink-0 h-9 w-9 ${
+            isAiBusy ? 'opacity-40 cursor-not-allowed' : ''
+          }`}
+          onClick={() => {
+            if (isAiBusy) return;
+            setShowResetConfirm(true);
+          }}
+          title={isAiBusy ? 'AI is editing the cake.' : 'Reset Cake Design'}
           aria-label="Reset Cake Design"
         >
           <RotateCcw className="w-4 h-4" />
@@ -452,7 +478,14 @@ export default function ToolPanel({
         >
           {/* Keep the conversation mounted when switching to manual design. */}
             <div className={`flex-1 p-3 md:p-4 min-h-0 flex-col ${modeUi === 'ai' ? 'flex' : 'hidden'}`} aria-hidden={modeUi !== 'ai'}>
-              <AIChatPanel config={config} onChange={onChange} quote={quote} session={aiChatSession} active={modeUi === 'ai'} />
+              <AIChatPanel
+                config={config}
+                onChange={onChange}
+                quote={quote}
+                session={aiChatSession}
+                active={modeUi === 'ai'}
+                onThinkingChange={setInternalAiThinking}
+              />
             </div>
           {modeUi !== 'ai' && (
             <>
@@ -803,21 +836,14 @@ export default function ToolPanel({
                       });
                     }}
                     onActiveSlotChange={setActiveEdgeSlot}
-                    sugarColor={config.sugarColorOverrides?.[edgeContext] || DEFAULT_CONFIG.sugarColor}
+                    sugarColor={config.sugarColorOverrides?.[edgeContext] || (currentSlot !== 'both' ? config.sugarColorOverrides?.edgeBoth : null) || DEFAULT_CONFIG.sugarColor}
                     onSugarColorChange={(newSugarColor) => {
                       const nextOverrides = { ...(config.sugarColorOverrides || {}), [edgeContext]: newSugarColor };
-                      // "All" (2-tier cakes) reuses this same edgeBoth
-                      // context for Top+Bottom's color, exactly as Both
-                      // always has — but All also fills the Middle seam
-                      // (see EdgeSection.jsx), so mirror the same color
-                      // choice into edgeMiddle too, keeping it visually in
-                      // sync without the person having to set it twice.
-                      // Harmless no-op on a 1-tier cake, or whenever Top or
-                      // Bottom (not Both) is the one being edited — Middle
-                      // only ever renders once edge.middle.piping.tip is
-                      // set, which only Middle's own tab or All's tip
-                      // mirroring ever does.
-                      if (edgeContext === 'edgeBoth') nextOverrides.edgeMiddle = newSugarColor;
+                      if (edgeContext === 'edgeBoth') {
+                        nextOverrides.edgeTop = newSugarColor;
+                        nextOverrides.edgeBottom = newSugarColor;
+                        nextOverrides.edgeMiddle = newSugarColor;
+                      }
                       onChange({ ...config, sugarColorOverrides: nextOverrides });
                     }}
                   />

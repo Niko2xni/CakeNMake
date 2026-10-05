@@ -226,6 +226,12 @@ export default function ClientHome() {
     const trimmedName = newName.trim();
     if (!trimmedName) return;
 
+    const targetDesign = recentDesigns.find((d) => d._id === designId) || selectedDesign;
+    if (targetDesign?.sentToBakery) {
+      setRenameModal({ open: false, designId: null, currentName: '' });
+      return;
+    }
+
     // Optimistically update right away so the name immediately changes on screen without reverting or flashing
     const prevDesigns = [...recentDesigns];
     const prevSelected = selectedDesign;
@@ -550,16 +556,18 @@ export default function ClientHome() {
                                 className={`dropdown-menu cn-design-menu ${activeMenu?.placement === 'up' ? 'is-up' : ''}`}
                                 role="menu"
                               >
-                                <button
-                                  type="button"
-                                  role="menuitem"
-                                  onClick={() => {
-                                    setActiveMenu(null);
-                                    setRenameModal({ open: true, designId: design._id, currentName: design.name });
-                                  }}
-                                >
-                                  <Pencil aria-hidden="true" /> Rename
-                                </button>
+                                {!design.sentToBakery && (
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    onClick={() => {
+                                      setActiveMenu(null);
+                                      setRenameModal({ open: true, designId: design._id, currentName: design.name });
+                                    }}
+                                  >
+                                    <Pencil aria-hidden="true" /> Rename
+                                  </button>
+                                )}
                                 <button
                                   type="button"
                                   role="menuitem"
@@ -681,6 +689,15 @@ export default function ClientHome() {
                       <CornerDownLeft className="w-3.5 h-3.5 stroke-[2.5]" />
                     </button>
                   </form>
+                ) : selectedDesign?.sentToBakery ? (
+                  <div className="w-full text-left p-1 -m-1">
+                    <h3
+                      className="font-heading text-lg font-bold text-[var(--cn-ink)] truncate"
+                      title={selectedDesign.name}
+                    >
+                      {selectedDesign.name || 'Untitled design'}
+                    </h3>
+                  </div>
                 ) : (
                   <button
                     type="button"
@@ -914,13 +931,18 @@ export default function ClientHome() {
             <input
               type="text"
               aria-label="Design name"
+              enterKeyHint="done"
+              autoComplete="off"
               value={renameModal.currentName}
               onChange={(event) => setRenameModal((current) => ({ ...current, currentName: event.target.value }))}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400"
               autoFocus
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleRename(renameModal.designId, e.target.value);
+                if (e.key === 'Enter' || e.keyCode === 13 || e.which === 13) {
+                  e.preventDefault();
+                  if (renameModal.currentName.trim()) {
+                    handleRename(renameModal.designId, renameModal.currentName);
+                  }
                 }
               }}
             />

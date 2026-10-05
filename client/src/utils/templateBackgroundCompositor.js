@@ -4,9 +4,48 @@
 
 export const STUDIO_PRESETS = [
   {
-    id: 'red-ribbon-showcase',
-    name: 'Red Ribbon Ad Style',
-    subtitle: 'Classic bakery ad with arched title ribbon & promo badges',
+    id: 'no-background',
+    name: 'No Background',
+    subtitle: 'Transparent cutout with only the plate and cake',
+    background: {
+      type: 'transparent',
+      topColor: 'transparent',
+      midColor: 'transparent',
+      bottomColor: 'transparent',
+      lightingIntensity: 0,
+    },
+    ribbon: { enabled: false },
+    plate: { enabled: false },
+    shadow: { enabled: false },
+    badge: { enabled: false },
+    promo: { enabled: false },
+  },
+  {
+    id: 'plain-background',
+    name: 'Plain Background',
+    subtitle: 'Clean studio backdrop with original cake & plate presentation',
+    background: {
+      type: 'plain',
+      topColor: '#fff5ee',
+      midColor: '#fff0e6',
+      bottomColor: '#ffe4d6',
+      lightingIntensity: 0.65,
+    },
+    ribbon: { enabled: false },
+    plate: { enabled: false },
+    shadow: {
+      enabled: false,
+      opacity: 0,
+      blur: 0,
+      yOffset: 0,
+    },
+    badge: { enabled: false },
+    promo: { enabled: false },
+  },
+  {
+    id: 'banner-background',
+    name: 'Banner Background',
+    subtitle: 'Foodpanda / Red Ribbon style with red arched banner & rating badge',
     background: {
       type: 'gradient',
       topColor: '#f9a875',
@@ -23,9 +62,7 @@ export const STUDIO_PRESETS = [
       fontSize: 24,
     },
     plate: {
-      enabled: true,
-      style: 'gold-red',
-      opacity: 0.95,
+      enabled: false,
     },
     shadow: {
       enabled: true,
@@ -46,239 +83,197 @@ export const STUDIO_PRESETS = [
       color: '#e91e63',
     },
   },
-  {
-    id: 'pastel-rose',
-    name: 'Pastel Rose Studio',
-    subtitle: 'Soft blush studio gradient with delicate rose ribbon',
-    background: {
-      type: 'gradient',
-      topColor: '#f7c5d2',
-      midColor: '#fdf0f4',
-      bottomColor: '#fef7f9',
-      lightingIntensity: 0.75,
-    },
-    ribbon: {
-      enabled: true,
-      style: 'arched-ribbon',
-      color: '#d64571',
-      goldTrim: true,
-      textColor: '#ffffff',
-      fontSize: 22,
-    },
-    plate: {
-      enabled: true,
-      style: 'rose-gold',
-      opacity: 0.85,
-    },
-    shadow: {
-      enabled: true,
-      opacity: 0.35,
-      blur: 20,
-      yOffset: 10,
-    },
-    badge: {
-      enabled: true,
-      text: 'BESTSELLER ★ 4.9',
-      subtitle: 'Artisan Buttercream Collection',
-      bgColor: '#d64571',
-    },
-    promo: {
-      enabled: false,
-      mainText: 'Handcrafted Daily',
-      subText: 'Fresh premium ingredients',
-      color: '#d64571',
-    },
-  },
-  {
-    id: 'caramel-warm',
-    name: 'Warm Caramel & Honey',
-    subtitle: 'Cozy amber bakery studio with golden ribbon banner',
-    background: {
-      type: 'gradient',
-      topColor: '#ebb577',
-      midColor: '#fbf0e1',
-      bottomColor: '#fcf7ef',
-      lightingIntensity: 0.8,
-    },
-    ribbon: {
-      enabled: true,
-      style: 'arched-ribbon',
-      color: '#b06f28',
-      goldTrim: true,
-      textColor: '#ffffff',
-      fontSize: 22,
-    },
-    plate: {
-      enabled: true,
-      style: 'gold-rim',
-      opacity: 0.9,
-    },
-    shadow: {
-      enabled: true,
-      opacity: 0.4,
-      blur: 22,
-      yOffset: 12,
-    },
-    badge: {
-      enabled: true,
-      text: 'CHEF RECOMMENDED ★ 5.0',
-      subtitle: 'Signature Oven Fresh',
-      bgColor: '#b06f28',
-    },
-    promo: {
-      enabled: false,
-      mainText: 'Freshly Baked',
-      subText: 'Baked upon order',
-      color: '#b06f28',
-    },
-  },
-  {
-    id: 'luxury-noir',
-    name: 'Luxury Noir & Gold',
-    subtitle: 'Sophisticated dark studio vignette with metallic gold trim',
-    background: {
-      type: 'gradient',
-      topColor: '#1e1c24',
-      midColor: '#2d2936',
-      bottomColor: '#1a1820',
-      lightingIntensity: 0.5,
-    },
-    ribbon: {
-      enabled: true,
-      style: 'arched-ribbon',
-      color: '#c99a3e',
-      goldTrim: false,
-      textColor: '#1a1820',
-      fontSize: 22,
-    },
-    plate: {
-      enabled: true,
-      style: 'gold-rim',
-      opacity: 0.95,
-    },
-    shadow: {
-      enabled: true,
-      opacity: 0.65,
-      blur: 28,
-      yOffset: 14,
-    },
-    badge: {
-      enabled: true,
-      text: 'PREMIUM TIER ★ 4.9',
-      subtitle: 'Haute Pâtisserie Selection',
-      bgColor: '#c99a3e',
-    },
-    promo: {
-      enabled: false,
-      mainText: 'Exclusive Edition',
-      subText: 'Pre-order available',
-      color: '#c99a3e',
-    },
-  },
-  {
-    id: 'mint-fresh',
-    name: 'Mint & Vanilla Fresh',
-    subtitle: 'Vibrant spring palette for celebration and birthday cakes',
-    background: {
-      type: 'gradient',
-      topColor: '#aee3d3',
-      midColor: '#eef8f5',
-      bottomColor: '#ffffff',
-      lightingIntensity: 0.7,
-    },
-    ribbon: {
-      enabled: true,
-      style: 'arched-ribbon',
-      color: '#2b8f72',
-      goldTrim: true,
-      textColor: '#ffffff',
-      fontSize: 22,
-    },
-    plate: {
-      enabled: true,
-      style: 'minimal',
-      opacity: 0.8,
-    },
-    shadow: {
-      enabled: true,
-      opacity: 0.35,
-      blur: 18,
-      yOffset: 10,
-    },
-    badge: {
-      enabled: true,
-      text: 'PARTY SPECIAL ★ 4.8',
-      subtitle: 'Sweet Celebrations',
-      bgColor: '#2b8f72',
-    },
-    promo: {
-      enabled: false,
-      mainText: 'Free Delivery',
-      subText: 'On selected locations',
-      color: '#2b8f72',
-    },
-  },
-  {
-    id: 'clean-white',
-    name: 'Clean Studio White',
-    subtitle: 'Minimal seamless white catalog look with soft shadow',
-    background: {
-      type: 'gradient',
-      topColor: '#f4f4f7',
-      midColor: '#ffffff',
-      bottomColor: '#ffffff',
-      lightingIntensity: 0.6,
-    },
-    ribbon: {
-      enabled: false,
-      style: 'modern-pill',
-      color: '#ee4f84',
-      goldTrim: false,
-      textColor: '#ffffff',
-      fontSize: 20,
-    },
-    plate: {
-      enabled: false,
-      style: 'minimal',
-      opacity: 0.5,
-    },
-    shadow: {
-      enabled: true,
-      opacity: 0.3,
-      blur: 24,
-      yOffset: 14,
-    },
-    badge: {
-      enabled: false,
-      text: '★ 4.8',
-      subtitle: '',
-      bgColor: '#ee4f84',
-    },
-    promo: {
-      enabled: false,
-      mainText: '',
-      subText: '',
-      color: '#ee4f84',
-    },
-  },
-  {
-    id: 'raw-transparent',
-    name: 'Pure 3D Raw',
-    subtitle: 'Original transparent cutout without background decorations',
-    background: {
-      type: 'transparent',
-      topColor: 'transparent',
-      midColor: 'transparent',
-      bottomColor: 'transparent',
-      lightingIntensity: 0,
-    },
-    ribbon: { enabled: false },
-    plate: { enabled: false },
-    shadow: { enabled: false },
-    badge: { enabled: false },
-    promo: { enabled: false },
-  },
 ];
+
+/**
+ * Automated Background Removal Engine
+ * Extracts the cake and plate by removing perimeter backgrounds.
+ * If the image is already a transparent cutout (from 3D scene captures),
+ * it preserves transparency cleanly.
+ * If the image has a solid, light, or studio background (e.g. uploaded photo or legacy capture),
+ * it detects perimeter background colors, traces inward, protects the cake & plate,
+ * and sets the background pixels to transparent with edge anti-aliasing/feathering.
+ */
+export async function removeImageBackground(imageSrc) {
+  if (!imageSrc) return imageSrc;
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const width = img.naturalWidth || img.width || 800;
+        const height = img.naturalHeight || img.height || 800;
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return resolve(imageSrc);
+
+        ctx.drawImage(img, 0, 0, width, height);
+        const imgData = ctx.getImageData(0, 0, width, height);
+        const data = imgData.data;
+
+        // 1. Quick check: Is the image already transparent around the perimeter?
+        let transparentPerimeterCount = 0;
+        const perimeterSamples = 120;
+        for (let i = 0; i < perimeterSamples; i++) {
+          const px = Math.floor((i / perimeterSamples) * width);
+          const topAlpha = data[(px) * 4 + 3];
+          const bottomAlpha = data[((height - 1) * width + px) * 4 + 3];
+          if (topAlpha < 25) transparentPerimeterCount++;
+          if (bottomAlpha < 25) transparentPerimeterCount++;
+        }
+
+        // If perimeter is already mostly transparent (> 75%), this image is already a clean cutout!
+        if (transparentPerimeterCount > perimeterSamples * 1.5) {
+          return resolve(imageSrc);
+        }
+
+        // 2. Sample background color palette from corners and borders
+        const sampleCoords = [
+          [2, 2], [Math.floor(width / 2), 2], [width - 3, 2],
+          [2, Math.floor(height / 4)], [width - 3, Math.floor(height / 4)],
+          [2, height - 3], [width - 3, height - 3]
+        ];
+
+        let bgR = 0, bgG = 0, bgB = 0;
+        sampleCoords.forEach(([sx, sy]) => {
+          const idx = (sy * width + sx) * 4;
+          bgR += data[idx];
+          bgG += data[idx + 1];
+          bgB += data[idx + 2];
+        });
+        bgR = Math.round(bgR / sampleCoords.length);
+        bgG = Math.round(bgG / sampleCoords.length);
+        bgB = Math.round(bgB / sampleCoords.length);
+
+        // Center protection box (where cake and plate live: center 60% horizontally, 65% vertically)
+        const centerX = width / 2;
+        const centerY = height / 2 + height * 0.05;
+        const protectRadiusX = width * 0.36;
+        const protectRadiusY = height * 0.38;
+
+        // BFS / Flood fill from the 4 borders inward to remove connected background pixels
+        const visited = new Uint8Array(width * height);
+        const queue = [];
+
+        // Push border pixels that match background color
+        const isBgColor = (r, g, b, tol = 58) => {
+          const dr = r - bgR;
+          const dg = g - bgG;
+          const db = b - bgB;
+          return Math.sqrt(dr * dr + dg * dg + db * db) <= tol;
+        };
+
+        // Seed with all border pixels
+        for (let x = 0; x < width; x++) {
+          const topIdx = x;
+          const tIdx4 = topIdx * 4;
+          if (isBgColor(data[tIdx4], data[tIdx4 + 1], data[tIdx4 + 2], 65)) {
+            visited[topIdx] = 1;
+            queue.push(topIdx);
+          }
+          const btmIdx = (height - 1) * width + x;
+          const bIdx4 = btmIdx * 4;
+          if (isBgColor(data[bIdx4], data[bIdx4 + 1], data[bIdx4 + 2], 65)) {
+            visited[btmIdx] = 1;
+            queue.push(btmIdx);
+          }
+        }
+        for (let y = 0; y < height; y++) {
+          const leftIdx = y * width;
+          const lIdx4 = leftIdx * 4;
+          if (!visited[leftIdx] && isBgColor(data[lIdx4], data[lIdx4 + 1], data[lIdx4 + 2], 65)) {
+            visited[leftIdx] = 1;
+            queue.push(leftIdx);
+          }
+          const rightIdx = y * width + (width - 1);
+          const rIdx4 = rightIdx * 4;
+          if (!visited[rightIdx] && isBgColor(data[rIdx4], data[rIdx4 + 1], data[rIdx4 + 2], 65)) {
+            visited[rightIdx] = 1;
+            queue.push(rightIdx);
+          }
+        }
+
+        // Process queue
+        let head = 0;
+        while (head < queue.length) {
+          const curr = queue[head++];
+          const cx = curr % width;
+          const cy = Math.floor(curr / width);
+
+          // Clear this pixel (make transparent)
+          const p4 = curr * 4;
+          data[p4 + 3] = 0;
+
+          // Check 4 neighbors
+          const neighbors = [
+            cx > 0 ? curr - 1 : -1,
+            cx < width - 1 ? curr + 1 : -1,
+            cy > 0 ? curr - width : -1,
+            cy < height - 1 ? curr + width : -1,
+          ];
+
+          for (let n = 0; n < neighbors.length; n++) {
+            const next = neighbors[n];
+            if (next === -1 || visited[next]) continue;
+
+            const nx = next % width;
+            const ny = Math.floor(next / width);
+
+            // Elliptical center protection check: don't flood into the core cake body
+            const dx = (nx - centerX) / protectRadiusX;
+            const dy = (ny - centerY) / protectRadiusY;
+            const isInsideCore = (dx * dx + dy * dy) < 0.65;
+
+            const nIdx4 = next * 4;
+            const nr = data[nIdx4];
+            const ng = data[nIdx4 + 1];
+            const nb = data[nIdx4 + 2];
+
+            if (!isInsideCore && isBgColor(nr, ng, nb, 55)) {
+              visited[next] = 1;
+              queue.push(next);
+            }
+          }
+        }
+
+        // Soft edge feathering around boundary pixels
+        for (let y = 1; y < height - 1; y++) {
+          for (let x = 1; x < width - 1; x++) {
+            const idx = y * width + x;
+            const p4 = idx * 4;
+            if (data[p4 + 3] > 0) {
+              if (
+                data[(idx - 1) * 4 + 3] === 0 ||
+                data[(idx + 1) * 4 + 3] === 0 ||
+                data[(idx - width) * 4 + 3] === 0 ||
+                data[(idx + width) * 4 + 3] === 0
+              ) {
+                const dr = data[p4] - bgR;
+                const dg = data[p4 + 1] - bgG;
+                const db = data[p4 + 2] - bgB;
+                const dist = Math.sqrt(dr * dr + dg * dg + db * db);
+                if (dist < 75) {
+                  data[p4 + 3] = Math.max(0, Math.min(255, Math.round((dist / 75) * 220)));
+                }
+              }
+            }
+          }
+        }
+
+        ctx.putImageData(imgData, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      } catch (err) {
+        console.warn('Background removal error, falling back to original:', err);
+        resolve(imageSrc);
+      }
+    };
+    img.onerror = () => resolve(imageSrc);
+    img.src = imageSrc;
+  });
+}
 
 /**
  * Loads an image from a URL into an HTMLImageElement
@@ -614,11 +609,46 @@ export async function compositeTemplateImage({
     color: '#e91e63',
   };
 
+  // If plain background without overlays/adjustments, return the pristine original capture directly
+  if (
+    bg.type === 'plain' &&
+    !ribbon.enabled &&
+    !plate.enabled &&
+    !shadow.enabled &&
+    !badge.enabled &&
+    !promo.enabled &&
+    scale === 1.0 &&
+    (cakeTransform.offsetX || 0) === 0 &&
+    (cakeTransform.offsetY || 0) === 0 &&
+    !filters.brightness &&
+    !filters.contrast &&
+    !filters.saturate
+  ) {
+    return cakeImageUrl;
+  }
+
   // 1. Draw Background
   if (bg.type === 'transparent') {
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+  } else if (bg.type === 'plain') {
+    ctx.fillStyle = '#fff5ee';
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+  } else if (bg.type === 'image' && bg.imageUrl) {
+    try {
+      const bgImg = await loadImage(bg.imageUrl);
+      const scale = Math.max(canvasWidth / bgImg.width, canvasHeight / bgImg.height);
+      const w = bgImg.width * scale;
+      const h = bgImg.height * scale;
+      const x = (canvasWidth - w) / 2;
+      const y = (canvasHeight - h) / 2;
+      ctx.drawImage(bgImg, x, y, w, h);
+    } catch (e) {
+      console.warn('Failed to load custom background image, falling back:', e);
+      ctx.fillStyle = '#fff5ee';
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    }
   } else if (bg.type === 'solid') {
-    ctx.fillStyle = bg.topColor || '#fbe2d2';
+    ctx.fillStyle = bg.topColor || '#fff5ee';
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
   } else {
     // Studio gradient
@@ -647,12 +677,12 @@ export async function compositeTemplateImage({
   const centerY = canvasHeight / 2 + (cakeTransform.offsetY || 0);
   const scale = cakeTransform.scale || 1.0;
 
-  // Cake dimensions
-  const cakeW = canvasWidth * 0.78 * scale;
-  const cakeH = canvasHeight * 0.78 * scale;
+  // Cake dimensions (full 1:1 scale by default to match 3D camera framing)
+  const cakeW = canvasWidth * scale;
+  const cakeH = canvasHeight * scale;
   const cakeX = centerX - cakeW / 2;
-  const cakeY = centerY - cakeH / 2 + 10;
-  const cakeBottomY = centerY + cakeH * 0.28;
+  const cakeY = centerY - cakeH / 2;
+  const cakeBottomY = centerY + cakeH * 0.38;
 
   // 2. Draw Serving Plate (Red Ribbon reference look)
   if (plate.enabled && bg.type !== 'transparent') {
@@ -809,5 +839,5 @@ export async function compositeTemplateImage({
     ctx.restore();
   }
 
-  return canvas.toDataURL('image/jpeg', 0.94);
+  return canvas.toDataURL('image/png');
 }
