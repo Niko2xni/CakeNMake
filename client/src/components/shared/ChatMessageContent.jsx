@@ -16,7 +16,18 @@ function safeMessageUrl(value) {
 function isChatImageUrl(value, conversationId) {
   try {
     const url = new URL(value);
-    if (url.protocol !== 'https:' || url.hostname !== 'firebasestorage.googleapis.com' || url.username || url.password) return false;
+    if (url.protocol !== 'https:' || url.username || url.password) return false;
+    if (url.hostname === 'res.cloudinary.com') {
+      const parts = decodeURIComponent(url.pathname).split('/');
+      const index = parts.indexOf('cakenmake');
+      return parts[2] === 'image' && parts[3] === 'upload'
+        && index >= 4 && parts[index + 1] === 'chat-attachments'
+        && Boolean(conversationId) && parts[index + 2] === conversationId
+        && /^[a-f0-9]{24}$/i.test(parts[index + 3] || '')
+        && /^[a-f0-9-]+\.(jpg|jpeg|png|webp)$/i.test(parts[index + 4] || '')
+        && parts.length === index + 5;
+    }
+    if (url.hostname !== 'firebasestorage.googleapis.com') return false;
     const path = decodeURIComponent(url.pathname).split('/');
     const attachmentIndex = path.indexOf('chat-attachments');
     return path[0] === '' && path[1] === 'v0' && path[2] === 'b'

@@ -106,6 +106,26 @@ const requestAuthenticatedJson = async (url, options = {}) => {
   return parseJsonResponse(response);
 };
 
+export const mediaApi = {
+  uploadImage: async (file, kind, conversationId) => {
+    const owner = auth?.currentUser?.uid;
+    if (!owner) throw new Error('You must be signed in.');
+    const image = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('Image could not be read.'));
+      reader.readAsDataURL(file);
+    });
+    if (auth?.currentUser?.uid !== owner) throw new Error('Your account changed. Please try again.');
+    const result = await requestAuthenticatedJson(`${API_BASE_URL}/media/images`, {
+      method: 'POST', body: JSON.stringify({ kind, conversationId, image }),
+      signal: AbortSignal.timeout(70000),
+    });
+    if (auth?.currentUser?.uid !== owner) throw new Error('Your account changed. Please try again.');
+    return result.secureUrl;
+  },
+};
+
 export const authApi = {
   requestEmailOtp: (email) => requestJson(`${API_BASE_URL}/auth/email/request-otp`, {
     method: 'POST',

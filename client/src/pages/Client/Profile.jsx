@@ -2,11 +2,10 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ClientNavbar from '@/components/client/ClientNavbar';
 import { useAuth } from '@/lib/AuthContext';
 import { useDragToScroll } from '@/hooks/useDragToScroll';
-import { auth, googleProvider, storage } from '@/lib/firebase';
-import { accountApi } from '@/services/api';
+import { auth, googleProvider } from '@/lib/firebase';
+import { accountApi, mediaApi } from '@/services/api';
 import { User, Globe, Mail, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { linkWithPopup, reload, unlink, updateProfile } from 'firebase/auth';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { safeMediaUrl } from '@/lib/safe-url';
 import { validateUploadedFile } from '@/lib/file-validation';
 
@@ -117,7 +116,7 @@ export default function Profile() {
 
   const handlePhotoUpload = async (event) => {
     const selectedFile = event.target.files?.[0];
-    if (!selectedFile || !user || !auth || !storage) {
+    if (!selectedFile || !user || !auth) {
       return;
     }
 
@@ -139,11 +138,7 @@ export default function Profile() {
       setPhotoError('');
       setIsUploadingPhoto(true);
 
-      const extension = selectedFile.name.split('.').pop().toLowerCase();
-      const avatarRef = ref(storage, `avatars/${user.uid}/${Date.now()}.${extension}`);
-      await uploadBytes(avatarRef, selectedFile, { contentType: selectedFile.type });
-
-      const photoURL = await getDownloadURL(avatarRef);
+      const photoURL = await mediaApi.uploadImage(selectedFile, 'avatar');
       await updateProfile(user, { photoURL });
       await refreshAccount();
       setPhotoOverride(photoURL);

@@ -16,6 +16,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 app.use(cors(corsOptions));
+app.use('/api/media', require('./routes/mediaRoutes'));
 app.use('/api/blueprint-submissions', require('./routes/blueprintSubmissionRoutes'));
 app.use('/api/cake-ai', express.json({ limit: '650kb' }));
 app.use(express.json({ limit: '10mb' }));

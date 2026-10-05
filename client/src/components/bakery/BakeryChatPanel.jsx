@@ -6,8 +6,8 @@ import { Separator } from '@/components/ui/separator';
 import { useChat } from '@/hooks/useChat';
 import { useAuth } from '@/lib/AuthContext';
 import { getChatSocket } from '@/lib/chat-socket';
-import { auth, storage } from '@/lib/firebase';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { auth } from '@/lib/firebase';
+import { mediaApi } from '@/services/api';
 import { validateUploadedFile } from '@/lib/file-validation';
 import ChatMessageContent from '@/components/shared/ChatMessageContent';
 import BakeryChat from './BakeryChat';
@@ -137,7 +137,7 @@ function AuthenticatedBakeryChatPanel() {
       setSendError(validationError);
       return;
     }
-    if (!user?.uid || !auth?.currentUser || auth.currentUser.uid !== user.uid || !storage || !chat.activeConversationId) {
+    if (!user?.uid || !auth?.currentUser || auth.currentUser.uid !== user.uid || !chat.activeConversationId) {
       setSendError('Sign in again before sharing an image.');
       return;
     }
@@ -147,14 +147,8 @@ function AuthenticatedBakeryChatPanel() {
     try {
       const bytes = new Uint8Array(await file.slice(0, 12).arrayBuffer());
       if (!hasValidImageSignature(file, bytes)) throw new Error('Choose a valid JPEG, PNG, or WebP image.');
-      const extension = file.name.split('.').pop().toLowerCase();
-      const imageRef = ref(
-        storage,
-        `chat-attachments/${user.uid}/${chat.activeConversationId}/${crypto.randomUUID()}.${extension}`,
-      );
-      await uploadBytes(imageRef, file, { contentType: file.type });
+      const imageUrl = await mediaApi.uploadImage(file, 'chat', chat.activeConversationId);
       if (auth.currentUser?.uid !== user.uid) throw new Error('Your account changed. Please try again.');
-      const imageUrl = await getDownloadURL(imageRef);
       await chat.sendMessage(`Image: ${imageUrl}`);
     } catch (error) {
       setSendError(error.message || 'Image could not be shared.');

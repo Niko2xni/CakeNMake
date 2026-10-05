@@ -3,8 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Profile from './Profile';
 
 const mockUpdateProfile = vi.fn();
-const mockUploadBytes = vi.fn();
-const mockGetDownloadURL = vi.fn();
+const mockUploadImage = vi.fn();
 const mockLinkWithPopup = vi.fn();
 const mockUnlink = vi.fn();
 const mockReload = vi.fn();
@@ -15,10 +14,9 @@ vi.mock('@/components/client/ClientNavbar', () => ({
   default: () => <div data-testid="client-navbar" />,
 }));
 
-vi.mock('firebase/storage', () => ({
-  getDownloadURL: (...args) => mockGetDownloadURL(...args),
-  ref: vi.fn(() => ({ fullPath: 'avatars/test-user/avatar.png' })),
-  uploadBytes: (...args) => mockUploadBytes(...args),
+vi.mock('@/services/api', () => ({
+  mediaApi: { uploadImage: (...args) => mockUploadImage(...args) },
+  accountApi: { requestEmailLinkOtp: vi.fn(), verifyEmailLinkOtp: vi.fn() },
 }));
 
 vi.mock('firebase/auth', async () => {
@@ -138,10 +136,9 @@ describe('Profile', () => {
     expect(await screen.findAllByRole('button', { name: /^disconnect$/i })).toHaveLength(1);
   });
 
-  it('uploads a selected photo to Firebase Storage and updates the profile', async () => {
+  it('uploads a selected photo through Cloudinary and updates the Firebase profile', async () => {
     mockUpdateProfile.mockResolvedValue(undefined);
-    mockUploadBytes.mockResolvedValue(undefined);
-    mockGetDownloadURL.mockResolvedValue('https://cdn.example.com/avatar.png');
+    mockUploadImage.mockResolvedValue('https://cdn.example.com/avatar.png');
 
     render(<Profile />);
 
@@ -151,8 +148,7 @@ describe('Profile', () => {
     fireEvent.change(input, { target: { files: [file] } });
 
     await waitFor(() => {
-      expect(mockUploadBytes).toHaveBeenCalledTimes(1);
-      expect(mockGetDownloadURL).toHaveBeenCalledTimes(1);
+      expect(mockUploadImage).toHaveBeenCalledWith(file, 'avatar');
       expect(mockUpdateProfile).toHaveBeenCalledWith(expect.objectContaining({ uid: 'test-user' }), expect.objectContaining({ photoURL: 'https://cdn.example.com/avatar.png' }));
     });
   });
