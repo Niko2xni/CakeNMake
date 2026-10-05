@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { format } from 'date-fns';
 import { ChevronLeft, ShieldCheck, Smartphone, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -83,9 +84,9 @@ export default function GCashPayment({ total, selectedDate, onPaid, onBack, onPa
           <span className="font-medium text-muted-foreground">₱{total - downpayment}</span>
         </div>
         <Separator className="opacity-40" />
-        <div className="flex justify-between text-sm font-bold">
+        <div className="flex justify-between gap-3 text-sm font-bold">
           <span>Required down payment (50%)</span>
-          <span className="text-primary">₱{downpayment}</span>
+          <span className="shrink-0 text-primary">₱{downpayment}</span>
         </div>
       </div>
 
@@ -103,11 +104,11 @@ export default function GCashPayment({ total, selectedDate, onPaid, onBack, onPa
             <div className="w-10 h-10 rounded-xl bg-[#007DFF] flex items-center justify-center shrink-0">
               <Smartphone className="w-5 h-5 text-white" />
             </div>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <p className="font-bold text-sm text-[#007DFF]">GCash</p>
               <p className="text-[10px] text-muted-foreground">Demo only · No GCash redirect or charge</p>
             </div>
-            <div className="w-4 h-4 rounded-full border-2 border-[#007DFF] flex items-center justify-center">
+            <div className="w-4 h-4 shrink-0 rounded-full border-2 border-[#007DFF] flex items-center justify-center">
               <div className="w-2 h-2 rounded-full bg-[#007DFF]" />
             </div>
           </div>
@@ -115,7 +116,7 @@ export default function GCashPayment({ total, selectedDate, onPaid, onBack, onPa
           {/* Reference code */}
           <div className="bg-muted/50 rounded-lg px-3 py-2 mb-3">
             <p className="text-[10px] text-muted-foreground mb-0.5">Demo reference · Not a payment receipt</p>
-            <p className="font-mono text-xs font-bold tracking-widest text-foreground">{ref}</p>
+            <p className="font-mono text-xs font-bold tracking-widest text-foreground break-all">{ref}</p>
           </div>
 
           <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mb-3">
@@ -151,9 +152,9 @@ export default function GCashPayment({ total, selectedDate, onPaid, onBack, onPa
       )}
 
       {/* Elaborate Final Confirmation & Rules Modal */}
-      {showConfirmModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-card border border-border/60 rounded-2xl shadow-2xl w-full max-w-[380px] p-5 text-left space-y-4">
+      {showConfirmModal && createPortal(
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in duration-200" onClick={event => event.stopPropagation()}>
+          <div role="dialog" aria-modal="true" aria-label="Confirm demo order" className="bg-card border border-border/60 rounded-2xl shadow-2xl w-full max-w-[380px] max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain p-4 sm:p-5 text-left space-y-4">
             <div className="flex items-center gap-2.5 text-primary">
               <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                 <ShieldCheck className="w-5 h-5 text-primary" />
@@ -214,7 +215,8 @@ export default function GCashPayment({ total, selectedDate, onPaid, onBack, onPa
               </Button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

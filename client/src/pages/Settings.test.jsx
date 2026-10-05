@@ -37,6 +37,9 @@ describe('Settings', () => {
     expect(screen.getByLabelText(/email address/i)).toHaveValue('jane@example.com');
     expect(screen.getByLabelText(/email address/i)).toHaveAttribute('readonly');
     expect(screen.getByText(/google sign-in/i)).toBeInTheDocument();
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+    expect(screen.queryByText('Notifications')).not.toBeInTheDocument();
+    expect(screen.queryByText('Appearance')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /save changes/i })).toBeDisabled();
     expect(screen.getByRole('button', { name: /cancel changes/i })).toBeDisabled();
   });
@@ -45,21 +48,18 @@ describe('Settings', () => {
     render(<Settings />);
 
     fireEvent.change(screen.getByLabelText(/display name/i), { target: { value: 'Jane Cake' } });
-    fireEvent.click(screen.getByRole('switch', { name: /promotional emails/i }));
     expect(screen.getByText(/unsaved changes/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /cancel changes/i }));
     expect(screen.getByLabelText(/display name/i)).toHaveValue('Jane Baker');
-    expect(screen.getByRole('switch', { name: /promotional emails/i })).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByRole('button', { name: /save changes/i })).toBeDisabled();
   });
 
-  it('updates the profile, persists preferences, and reports success', async () => {
+  it('updates the profile and reports success', async () => {
     mockUpdateProfile.mockResolvedValue(undefined);
     render(<Settings />);
 
     fireEvent.change(screen.getByLabelText(/display name/i), { target: { value: 'Jane Cake' } });
-    fireEvent.click(screen.getByRole('switch', { name: /promotional emails/i }));
     fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
 
     await waitFor(() => expect(mockUpdateProfile).toHaveBeenCalledWith(
@@ -67,9 +67,6 @@ describe('Settings', () => {
       { displayName: 'Jane Cake' },
     ));
     expect(await screen.findByRole('status')).toHaveTextContent(/settings were saved/i);
-    expect(JSON.parse(localStorage.getItem('cakenmake-settings-settings-user'))).toEqual({
-      notifications: { email: true, push: true, orderUpdates: true, promotions: true },
-    });
     expect(screen.getByRole('button', { name: /save changes/i })).toBeDisabled();
   });
 

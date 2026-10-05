@@ -82,26 +82,13 @@ describe('Profile', () => {
     expect(emailRow).not.toHaveTextContent('Edit');
     expect(screen.getByText('Google')).toBeInTheDocument();
     expect(screen.queryByText(/using canva/i)).not.toBeInTheDocument();
-    expect(screen.getByLabelText(/what are you designing for/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/what are you designing for/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^language$/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/preferences save automatically/i)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^disconnect$/i })).toBeEnabled();
     expect(screen.getByRole('button', { name: /remove photo/i })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Jane Doe' })).toHaveAttribute('src', 'https://example.com/google-avatar.jpg');
     expect(screen.getByRole('img', { name: 'Jane Doe' })).toHaveAttribute('referrerpolicy', 'no-referrer');
-  });
-
-  it('persists profile preferences locally and confirms that they are device-only', async () => {
-    render(<Profile />);
-
-    fireEvent.change(screen.getByLabelText(/what are you designing for/i), { target: { value: 'events' } });
-    fireEvent.change(screen.getByLabelText(/language/i), { target: { value: 'fil-PH' } });
-
-    expect(screen.getByRole('status')).toHaveTextContent(/saved on this device/i);
-    await waitFor(() => {
-      expect(JSON.parse(localStorage.getItem('cakenmake-profile-preferences-test-user'))).toEqual({
-        occasion: 'events',
-        language: 'fil-PH',
-      });
-    });
   });
 
   it('edits the display name with the Firebase profile API', async () => {

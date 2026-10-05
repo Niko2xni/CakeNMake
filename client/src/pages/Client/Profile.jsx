@@ -50,17 +50,6 @@ export default function Profile() {
   const [emailLinkCode, setEmailLinkCode] = useState('');
   const [emailLinkExpiresAt, setEmailLinkExpiresAt] = useState(null);
   const [isLinkingEmail, setIsLinkingEmail] = useState(false);
-  const [preferenceStatus, setPreferenceStatus] = useState('Preferences save automatically on this device.');
-
-  const preferenceKey = `cakenmake-profile-preferences-${user?.uid || user?.email || 'guest'}`;
-  const [preferences, setPreferences] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem(preferenceKey) || '{}');
-    } catch {
-      return {};
-    }
-  });
-
   const providerProfile = (providerData || []).find((profile) => profile.email || profile.photoURL)
     || null;
   const synchronizedPhotoURL = user?.photoURL || providerProfile?.photoURL || account?.photoURL || null;
@@ -96,11 +85,7 @@ export default function Profile() {
     setPhotoLoadFailed(false);
   }, [displayPhotoURL]);
 
-  useEffect(() => {
-    localStorage.setItem(preferenceKey, JSON.stringify(preferences));
-  }, [preferenceKey, preferences]);
-
-  useEffect(() => {
+useEffect(() => {
     if (!disconnectTarget) return undefined;
     const handleEscape = (event) => event.key === 'Escape' && setDisconnectTarget(null);
     document.addEventListener('keydown', handleEscape);
@@ -108,11 +93,6 @@ export default function Profile() {
   }, [disconnectTarget]);
 
   const showFeedback = (type, message) => setFeedback({ type, message });
-
-  const handlePreferenceChange = (key, value) => {
-    setPreferences((current) => ({ ...current, [key]: value }));
-    setPreferenceStatus('Saved on this device.');
-  };
 
   const handlePhotoUpload = async (event) => {
     const selectedFile = event.target.files?.[0];
@@ -319,7 +299,7 @@ export default function Profile() {
           <header className="cn-profile-header">
             <p className="cn-profile-eyebrow">Made personal</p>
             <h1 className="cn-profile-title text-5xl font-bold text-gray-800">Your profile</h1>
-            <p className="cn-profile-intro">Keep your account details, preferences, and sign-in methods in one place.</p>
+            <p className="cn-profile-intro">Keep your account details and sign-in methods in one place.</p>
           </header>
 
           <div className="cn-profile-feedback-region" aria-live="polite">
@@ -338,7 +318,6 @@ export default function Profile() {
                 <h2>Account details</h2>
                 <p>Manage the information that shapes your CakeNMake experience.</p>
               </div>
-              <span className="cn-profile-save-status" role="status" aria-live="polite">{preferenceStatus}</span>
             </div>
 
             <div className="cn-profile-card bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -436,39 +415,7 @@ export default function Profile() {
                   </div>
                 </div>
 
-                <div className="cn-profile-field-row flex flex-col gap-3 px-6 py-4 text-left md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <label className="cn-profile-field-label" htmlFor="profile-occasion">What are you designing for?</label>
-                    <p className="cn-profile-helper">Choose the occasion that best matches your usual designs.</p>
-                  </div>
-                  <select
-                    id="profile-occasion"
-                    value={preferences.occasion || ''}
-                    onChange={(event) => handlePreferenceChange('occasion', event.target.value)}
-                    className="cn-profile-select"
-                  >
-                    <option value="">Choose an occasion</option>
-                    <option value="personal">Personal celebrations</option>
-                    <option value="gifts">Gifts for friends and family</option>
-                    <option value="events">Events and gatherings</option>
-                    <option value="business">Bakery or business projects</option>
-                  </select>
-                </div>
-
-                <div className="cn-profile-field-row flex flex-col gap-3 px-6 py-4 text-left md:flex-row md:items-center md:justify-between">
-                  <label className="cn-profile-field-label" htmlFor="profile-language">Language</label>
-                  <select
-                    id="profile-language"
-                    value={preferences.language || 'en-US'}
-                    onChange={(event) => handlePreferenceChange('language', event.target.value)}
-                    className="cn-profile-select"
-                  >
-                    <option value="en-US">English (US)</option>
-                    <option value="en-PH">English (Philippines)</option>
-                    <option value="fil-PH">Filipino</option>
-                  </select>
-                </div>
-              </div>
+</div>
             </div>
           </section>
 

@@ -3,37 +3,17 @@ import ClientNavbar from '@/components/client/ClientNavbar';
 import { useAuth } from '@/lib/AuthContext';
 import { useDragToScroll } from '@/hooks/useDragToScroll';
 import { updateProfile } from 'firebase/auth';
-import { AlertCircle, Bell, CheckCircle2, Loader2, LockKeyhole, Palette, Save, Shield, User } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Loader2, LockKeyhole, Save, Shield, User } from 'lucide-react';
 
-const DEFAULT_NOTIFICATIONS = { email: true, push: true, orderUpdates: true, promotions: false };
-const NOTIFICATION_OPTIONS = [
-  ['email', 'Email notifications', 'Design activity and account updates.'],
-  ['push', 'Push notifications', 'Timely alerts while you are signed in.'],
-  ['orderUpdates', 'Order updates', 'Production, pickup, and delivery progress.'],
-  ['promotions', 'Promotional emails', 'Occasional CakeNMake news and offers.'],
-];
-
-const getPreferenceKey = (user) => `cakenmake-settings-${user?.uid || user?.email || 'guest'}`;
-
-function readPreferences(user) {
-  try {
-    const stored = JSON.parse(localStorage.getItem(getPreferenceKey(user)) || '{}');
-    return { notifications: { ...DEFAULT_NOTIFICATIONS, ...stored.notifications } };
-  } catch {
-    return { notifications: DEFAULT_NOTIFICATIONS };
-  }
-}
-
-function createFormState(user, preferences) {
+function createFormState(user) {
   return {
     username: user?.displayName || user?.email?.split('@')[0]?.replace(/[._-]/g, ' ') || 'Cake Lover',
-    notifications: { ...preferences.notifications },
   };
 }
 
 export default function Settings() {
   const { user } = useAuth();
-  const [savedSettings, setSavedSettings] = useState(() => createFormState(user, readPreferences(user)));
+  const [savedSettings, setSavedSettings] = useState(() => createFormState(user));
   const [settings, setSettings] = useState(savedSettings);
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState(null);
@@ -57,7 +37,7 @@ export default function Settings() {
         : 'Authentication provider';
 
   useEffect(() => {
-    const next = createFormState(user, readPreferences(user));
+    const next = createFormState(user);
     setSavedSettings(next);
     setSettings(next);
     setFeedback(null);
@@ -67,14 +47,6 @@ export default function Settings() {
 
   const isDirty = JSON.stringify(settings) !== JSON.stringify(savedSettings);
   const usernameIsValid = settings.username.trim().length > 0;
-
-  const updateNotification = (key) => {
-    setFeedback(null);
-    setSettings((current) => ({
-      ...current,
-      notifications: { ...current.notifications, [key]: !current.notifications[key] },
-    }));
-  };
 
   const handleReset = () => {
     setSettings(savedSettings);
@@ -90,7 +62,6 @@ export default function Settings() {
       if (user && nextSettings.username !== savedSettings.username) {
         await updateProfile(user, { displayName: nextSettings.username });
       }
-      localStorage.setItem(getPreferenceKey(user), JSON.stringify({ notifications: nextSettings.notifications }));
       setSettings(nextSettings);
       setSavedSettings(nextSettings);
       setFeedback({ type: 'success', message: 'Your settings were saved.' });
@@ -109,7 +80,7 @@ export default function Settings() {
         <header className="cn-settings-header">
           <p>MAKE IT WORK FOR YOU</p>
           <h1 className="cn-settings-title">Settings</h1>
-          <span>Manage your account and the updates you want to receive.</span>
+          <span>Manage your account details and view your sign-in method.</span>
         </header>
 
         {feedback && (
@@ -152,41 +123,11 @@ export default function Settings() {
                 </div>
               </section>
 
-              <section className="cn-settings-card" aria-labelledby="appearance-settings-title">
-                <div className="cn-settings-card-heading">
-                  <span className="cn-settings-icon is-gold"><Palette aria-hidden="true" /></span>
-                  <div><h2 id="appearance-settings-title">Appearance</h2><p>The current CakeNMake experience.</p></div>
-                </div>
-                <div className="cn-settings-static-row">
-                  <div><strong>Theme</strong><span>Warm light</span></div>
-                  <span className="cn-settings-status">Current</span>
-                </div>
-              </section>
+
             </div>
 
             <div className="cn-settings-column">
-              <section className="cn-settings-card" aria-labelledby="notification-settings-title">
-                <div className="cn-settings-card-heading">
-                  <span className="cn-settings-icon"><Bell aria-hidden="true" /></span>
-                  <div><h2 id="notification-settings-title">Notifications</h2><p>Choose which CakeNMake updates reach you.</p></div>
-                </div>
-                <div className="cn-settings-toggle-list">
-                  {NOTIFICATION_OPTIONS.map(([key, label, description]) => (
-                    <div className="cn-settings-toggle-row" key={key}>
-                      <label htmlFor={`notification-${key}`}><strong>{label}</strong><span>{description}</span></label>
-                      <button
-                        id={`notification-${key}`}
-                        type="button"
-                        role="switch"
-                        aria-checked={settings.notifications[key]}
-                        aria-label={label}
-                        className="cn-settings-switch"
-                        onClick={() => updateNotification(key)}
-                      ><span /></button>
-                    </div>
-                  ))}
-                </div>
-              </section>
+
 
               <section className="cn-settings-card" aria-labelledby="security-settings-title">
                 <div className="cn-settings-card-heading">
