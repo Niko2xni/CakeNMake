@@ -1,5 +1,6 @@
 import React from 'react';
 import { SURFACE_TREATMENT_MODES, GLAZE_PATTERNS } from '@/lib/cakeConfig';
+import { flatTreatment } from '@/lib/treatmentConfig';
 
 // Surface Treatment — Glaze. An overlay layer, independent of both Sugar
 // Color (a color choice) and Exterior Finish's `style` (the base coat
@@ -23,9 +24,9 @@ import { SURFACE_TREATMENT_MODES, GLAZE_PATTERNS } from '@/lib/cakeConfig';
 // for Ridged Comb/Ribbon Wrap.
 export default function SurfaceTreatmentSection({ surfaceTreatment, onChange, isIndividual = false, activeLayer = 0 }) {
   const sectionLabel = isIndividual ? `Tier ${activeLayer + 1} Drip` : 'Surface Treatment';
-  const activeTreatment = isIndividual
+  const activeTreatment = flatTreatment(isIndividual
     ? (surfaceTreatment.layerTreatments?.[activeLayer] || surfaceTreatment)
-    : surfaceTreatment;
+    : surfaceTreatment);
   const mode = activeTreatment.mode || null;
   const glaze = SURFACE_TREATMENT_MODES.find((m) => m.id === 'glaze');
   const active = mode === 'glaze';
@@ -37,7 +38,7 @@ export default function SurfaceTreatmentSection({ surfaceTreatment, onChange, is
           ...surfaceTreatment,
           layerTreatments: Object.assign(
             Array.from({ length: Math.max(2, surfaceTreatment.layerTreatments?.length || 0) }, (_, index) => (
-              surfaceTreatment.layerTreatments?.[index] || { mode: null, pattern: 'longGaps' }
+              flatTreatment(surfaceTreatment.layerTreatments?.[index] || { mode: null, pattern: 'longGaps' })
             )),
             { [activeLayer]: nextTreatment },
           ),
@@ -55,7 +56,7 @@ export default function SurfaceTreatmentSection({ surfaceTreatment, onChange, is
           ...surfaceTreatment,
           layerTreatments: Object.assign(
             Array.from({ length: Math.max(2, surfaceTreatment.layerTreatments?.length || 0) }, (_, index) => (
-              surfaceTreatment.layerTreatments?.[index] || { mode: null, pattern: 'longGaps' }
+              flatTreatment(surfaceTreatment.layerTreatments?.[index] || { mode: null, pattern: 'longGaps' })
             )),
             { [activeLayer]: nextTreatment },
           ),

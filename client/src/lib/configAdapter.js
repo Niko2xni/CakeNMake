@@ -14,6 +14,7 @@
 // split (see cakeConfig.js) — one merged, fully-priced list, one resolver.
 
 import { SUGAR_COLORS } from './cakeConfig';
+import { normalizeTreatmentConfig } from './treatmentConfig';
 
 function resolveColor(colorId) {
   const entry = SUGAR_COLORS.find((c) => c.id === colorId);
@@ -541,12 +542,12 @@ export function adaptConfigFromLegacy(legacyConfig) {
 
   // If the config is already in new format, return it as-is
   if (legacyConfig.structure !== undefined || legacyConfig.sponge !== undefined) {
-    return legacyConfig;
+    return normalizeTreatmentConfig(legacyConfig);
   }
 
   // If legacy config embedded the original modern config
   if (legacyConfig._newConfig) {
-    return legacyConfig._newConfig;
+    return normalizeTreatmentConfig(legacyConfig._newConfig);
   }
 
   // Convert legacy config to new bakery-style format

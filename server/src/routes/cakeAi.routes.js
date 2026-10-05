@@ -8,8 +8,29 @@ const { SUGAR_COLORS, CENTER_PLACEABLE_DESIGNS } = require('../../lib/cakeConfig
 const { validateCakeAiPrompt } = require('../services/cakeAiPromptValidation');
 const { getLocalCakeAiReply } = require('../services/cakeAiScope');
 const { validReferenceImage, describeCakeReference } = require('../services/cakeAiReference');
+const { limits } = require('../services/cakeAiLimits');
+const authenticate = require('../middleware/authenticate');
+const { loadAppUser } = require('../middleware/authorize');
+const { effectiveRestriction } = require('../services/moderationService');
 
 const router = Router();
+router.use((req, res, next) => req.get('authorization') ? authenticate(req, res, () => loadAppUser(req, res, () => {
+  if (effectiveRestriction(req.user)) return res.status(403).json({ code: 'CUSTOMER_RESTRICTED', error: 'AI is unavailable while your account is restricted. Manual cake editing remains available.' });
+  return next();
+})) : next());
+function limitError(res, error) {
+  res.set('Retry-After', String(error.retryAfter || 60));
+  return res.status(error.status || 503).json({ code: error.code, error: error.message, retryAfter: error.retryAfter || 60 });
+}
+router.post('/turn', async (req, res) => {
+  if (!req.user && !/^[0-9a-f-]{36}$/i.test(req.get('x-ai-guest-session') || '')) return res.status(400).json({ code: 'AI_GUEST_SESSION_REQUIRED', error: 'Refresh the page to start a guest AI session.' });
+  try { return res.json({ turnId: await limits.begin(req) }); }
+  catch (error) { return limitError(res, error); }
+});
+router.delete('/turn/:id', async (req, res) => {
+  try { await limits.finish(req, req.params.id, true); return res.sendStatus(204); }
+  catch (error) { return limitError(res, error); }
+});
 const AI_PROVIDER = (process.env.AI_PROVIDER || 'gemini').toLowerCase();
 
 const gemini = AI_PROVIDER === 'gemini' && process.env.GEMINI_API_KEY
@@ -76,12 +97,21 @@ router.post('/reference', async (req, res) => {
   if (validation) return res.status(validation.status).json({ error: validation.message });
   if (!validReferenceImage(image)) return res.status(400).json({ error: 'Please attach a compressed JPEG cake image smaller than 350 KB.' });
   if (!['vercel', 'openrouter'].includes(AI_PROVIDER)) return res.status(503).json({ error: 'Reference images currently require Vercel or OpenRouter with an image-capable model.' });
+  let claimed = false;
   try {
+    await limits.call(req, req.body.turnId, true);
+    claimed = true;
+    await limits.reserve(req, 4096);
     const description = await describeCakeReference(image, { provider: AI_PROVIDER });
+    await limits.finish(req, req.body.turnId); claimed = false;
     if (description.includes('NO_CAKE_REFERENCE')) return res.status(422).json({ error: 'Please choose a reference showing a cake or cake decorations.' });
     return res.json({ description });
-  } catch {
+  } catch (error) {
+    if (claimed) { await limits.finish(req, req.body.turnId).catch(() => {}); claimed = false; }
+    if (error.code?.startsWith('AI_')) return limitError(res, error);
     return res.status(502).json({ error: 'Could not read this image. Check that your configured vision model supports images, then try again.' });
+  } finally {
+    if (claimed) await limits.finish(req, req.body.turnId).catch(() => {});
   }
 });
 
@@ -112,7 +142,13 @@ router.post('/message', async (req, res) => {
     return res.status(502).json({ error: 'Cake AI is temporarily unavailable.' });
   }
 
+  let claimed = false;
   try {
+    await limits.call(req, req.body.turnId);
+    claimed = true;
+    // Reserve conservatively for text, tool schemas, and maximum output.
+    // Each provider call is charged separately; failed calls stay reserved.
+    await limits.reserve(req, JSON.stringify({ messages, system: buildSystemPrompt(config), tools: CAKE_AI_TOOLS }).length + 1024);
     const response = AI_PROVIDER === 'vercel'
       ? await callVercel(messages, buildSystemPrompt(config))
       : AI_PROVIDER === 'openrouter'
@@ -121,10 +157,15 @@ router.post('/message', async (req, res) => {
       ? await callGemini(messages, config)
       : await callAnthropic(messages, config);
 
+    await limits.finish(req, req.body.turnId); claimed = false;
     return res.json(response);
   } catch (err) {
+    if (claimed) { await limits.finish(req, req.body.turnId).catch(() => {}); claimed = false; }
+    if (err.code?.startsWith('AI_')) return limitError(res, err);
     console.error('[cake-ai] request failed:', err.message);
     return res.status(502).json({ error: 'Cake AI is temporarily unavailable.' });
+  } finally {
+    if (claimed) await limits.finish(req, req.body.turnId).catch(() => {});
   }
 });
 

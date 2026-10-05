@@ -5,7 +5,7 @@ import AIChatPanel from './AIChatPanel';
 import { DEFAULT_CONFIG } from '@/lib/cakeConfig';
 import { cakeAiApi } from '@/services/api';
 
-vi.mock('@/services/api', () => ({ cakeAiApi: { sendMessage: vi.fn() } }));
+vi.mock('@/services/api', () => ({ cakeAiApi: { beginTurn: vi.fn().mockResolvedValue({ turnId: 'test-turn' }), endTurn: vi.fn().mockResolvedValue({}), sendMessage: vi.fn() } }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe('imported Cake AI tool conversation', () => {
@@ -28,6 +28,7 @@ describe('imported Cake AI tool conversation', () => {
     const input = screen.getByPlaceholderText('Describe your cake...');
     fireEvent.change(input, { target: { value: 'Make it chocolate' } });
     fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => expect(cakeAiApi.sendMessage).toHaveBeenCalled());
     panel.unmount();
     finish({ stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'edit', name: 'set_sponge_flavor', input: { flavor: 'chocolate' } }] });
     await waitFor(() => expect(cakeAiApi.sendMessage).toHaveBeenCalledTimes(1));

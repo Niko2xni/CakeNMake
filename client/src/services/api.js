@@ -3,25 +3,54 @@ import { createThumbnailQueue } from '@/lib/thumbnailQueue';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
+let aiGuestSession;
+function aiRetryText(status, seconds) {
+  if (status !== 429 || !seconds) return '';
+  if (seconds >= 3600) {
+    const time = new Date(Date.now() + seconds * 1000).toLocaleString('en-PH', { timeZone: 'Asia/Manila', dateStyle: 'medium', timeStyle: 'short' });
+    return ` Available again ${time} (Philippine time).`;
+  }
+  return ` Retry in ${Math.ceil(seconds / 60)} minute(s).`;
+}
+async function cakeAiHeaders() {
+  const headers = { 'Content-Type': 'application/json' };
+  if (auth?.currentUser) headers.Authorization = `Bearer ${await auth.currentUser.getIdToken()}`;
+  else {
+    if (!aiGuestSession) {
+      try { aiGuestSession = localStorage.getItem('cakenmake_ai_guest_session'); } catch {}
+      if (!/^[0-9a-f-]{36}$/i.test(aiGuestSession || '')) aiGuestSession = crypto.randomUUID();
+      try { localStorage.setItem('cakenmake_ai_guest_session', aiGuestSession); } catch {}
+    }
+    headers['X-AI-Guest-Session'] = aiGuestSession;
+  }
+  return headers;
+}
+async function cakeAiLimitResponse(response) {
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw Object.assign(new Error('AI request failed'), { validationMessage: `${body.error || body.message || 'AI is temporarily unavailable.'}${aiRetryText(response.status, body.retryAfter)}`, retryAfter: body.retryAfter });
+  return body;
+}
 export const cakeAiApi = {
-  describeReference: (image, prompt, signal) => fetch(`${API_BASE_URL}/cake-ai/reference`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ image, prompt }), signal,
+  beginTurn: async () => cakeAiLimitResponse(await fetch(`${API_BASE_URL}/cake-ai/turn`, { method: 'POST', headers: await cakeAiHeaders() })),
+  endTurn: async turnId => fetch(`${API_BASE_URL}/cake-ai/turn/${encodeURIComponent(turnId)}`, { method: 'DELETE', headers: await cakeAiHeaders(), keepalive: true, signal: AbortSignal.timeout(5000) }),
+  describeReference: async (image, prompt, signal, turnId) => fetch(`${API_BASE_URL}/cake-ai/reference`, {
+    method: 'POST', headers: await cakeAiHeaders(),
+    body: JSON.stringify({ image, prompt, turnId }), signal,
   }).then(async response => {
     const data = await response.json();
-    if (!response.ok) throw Object.assign(new Error('Reference image failed'), { validationMessage: data.error });
+    if (!response.ok) throw Object.assign(new Error('Reference image failed'), { validationMessage: `${data.error || data.message || 'Reference image failed.'}${aiRetryText(response.status, data.retryAfter)}` });
     return data.description;
   }),
-  sendMessage: (messages, config) =>
+  sendMessage: async (messages, config, turnId) =>
     fetch(`${API_BASE_URL}/cake-ai/message`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages, config }),
+      headers: await cakeAiHeaders(),
+      body: JSON.stringify({ messages, config, turnId }),
     }).then(async (response) => {
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
         const error = new Error(`Cake AI request failed (${response.status})`);
-        if (['PROMPT_REJECTED', 'INVALID_AI_REQUEST'].includes(body.code)) error.validationMessage = body.error;
+        if (['PROMPT_REJECTED', 'INVALID_AI_REQUEST'].includes(body.code) || body.code?.startsWith('AI_') || response.status === 401 || response.status === 403) error.validationMessage = `${body.error || body.message}${aiRetryText(response.status, body.retryAfter)}`;
         throw error;
       }
       return response.json();

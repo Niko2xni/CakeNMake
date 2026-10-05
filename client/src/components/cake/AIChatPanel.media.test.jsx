@@ -5,7 +5,7 @@ import AIChatPanel from './AIChatPanel';
 import { DEFAULT_CONFIG } from '@/lib/cakeConfig';
 import { cakeAiApi } from '@/services/api';
 import { prepareCakeReference } from '@/lib/cakeReferenceImage';
-vi.mock('@/services/api', () => ({ cakeAiApi: { sendMessage: vi.fn(), describeReference: vi.fn() } }));
+vi.mock('@/services/api', () => ({ cakeAiApi: { beginTurn: vi.fn().mockResolvedValue({ turnId: 'test-turn' }), endTurn: vi.fn().mockResolvedValue({}), sendMessage: vi.fn(), describeReference: vi.fn() } }));
 vi.mock('@/lib/cakeReferenceImage', () => ({ prepareCakeReference: vi.fn() }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals(); });
 
@@ -50,7 +50,7 @@ it('clears the composer immediately while keeping the submitted image available 
   await screen.findByAltText('Cake reference preview');
   fireEvent.click(screen.getByRole('button', { name: 'Send cake request' }));
   expect(screen.queryByAltText('Cake reference preview')).not.toBeInTheDocument();
-  expect(cakeAiApi.describeReference).toHaveBeenCalledWith('image-bytes', expect.any(String), expect.any(AbortSignal));
+  await waitFor(() => expect(cakeAiApi.describeReference).toHaveBeenCalledWith('image-bytes', expect.any(String), expect.any(AbortSignal), 'test-turn'));
   await act(async () => finishAnalysis('Pink cake.'));
   await screen.findByText('Reference applied.');
   fireEvent.change(screen.getByPlaceholderText('Describe your cake...'), { target: { value: 'Make it blue' } });

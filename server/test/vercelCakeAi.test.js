@@ -92,9 +92,12 @@ test('cake route selects Vercel, validates first, and reports missing configurat
     app.use('/ai', require(routePath));
     server = app.listen(0, '127.0.0.1');
     await new Promise(resolve => server.listening ? resolve() : server.once('listening', resolve));
+    const guestSession = '12345678-1234-1234-1234-123456789abc';
+    const turn = await originalFetch(`http://127.0.0.1:${server.address().port}/ai/turn`, { method: 'POST', headers: { 'X-AI-Guest-Session': guestSession } });
+    const { turnId } = await turn.json();
     const send = content => originalFetch(`http://127.0.0.1:${server.address().port}/ai/message`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: [{ role: 'user', content }], config: {} }),
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-AI-Guest-Session': guestSession },
+      body: JSON.stringify({ messages: [{ role: 'user', content }], config: {}, turnId }),
     });
     const success = await send('Make it pink');
     assert.equal(success.status, 200);

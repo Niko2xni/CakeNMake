@@ -5,7 +5,7 @@ import ToolPanel from './ToolPanel';
 import { DEFAULT_CONFIG } from '@/lib/cakeConfig';
 import { cakeAiApi } from '@/services/api';
 
-vi.mock('@/services/api', () => ({ cakeAiApi: { sendMessage: vi.fn() } }));
+vi.mock('@/services/api', () => ({ cakeAiApi: { beginTurn: vi.fn().mockResolvedValue({ turnId: 'test-turn' }), endTurn: vi.fn().mockResolvedValue({}), sendMessage: vi.fn() } }));
 // Decorative previews load Three.js fonts; this regression exercises the
 // real tab switcher and chat, not those unrelated manual controls.
 vi.mock('./sections/CenterSection', () => ({ default: () => null }));

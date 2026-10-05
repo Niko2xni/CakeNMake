@@ -99,13 +99,16 @@ export default function AIChatPanel({ config, onChange, quote, session, active =
     const changesThisTurn = [];
     const requestSession = session?.key;
 
+    let turnId;
     try {
+      ({ turnId } = await cakeAiApi.beginTurn());
+      if (activeSession.current !== requestSession) return;
       if (sentAttachment) {
         let description = sentAttachment.description;
         if (!description) {
           const controller = new AbortController(); referenceRequest.current = controller;
           const timeout = setTimeout(() => controller.abort(), 50000);
-          try { description = await cakeAiApi.describeReference(sentAttachment.data, msg, controller.signal); }
+          try { description = await cakeAiApi.describeReference(sentAttachment.data, msg, controller.signal, turnId); }
           finally { clearTimeout(timeout); referenceRequest.current = null; }
           if (activeSession.current !== requestSession) return;
         }
@@ -115,7 +118,7 @@ export default function AIChatPanel({ config, onChange, quote, session, active =
         ] };
       }
       for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
-        const response = await cakeAiApi.sendMessage(nextHistory, liveConfig);
+        const response = await cakeAiApi.sendMessage(nextHistory, liveConfig, turnId);
         if (activeSession.current !== requestSession) return;
 
         if (response.stop_reason !== 'tool_use') {
@@ -171,6 +174,7 @@ export default function AIChatPanel({ config, onChange, quote, session, active =
         { role: 'assistant', content: err.validationMessage || "Sorry, I couldn't reach the design assistant just now. Please try again in a moment." },
       ]);
     } finally {
+      if (turnId) await cakeAiApi.endTurn(turnId).catch(() => {});
       setThinking(false);
     }
   };

@@ -11,6 +11,7 @@ import {
   VICTORIAN_LAMBETH_SETS,
 } from '@/lib/cakeConfig';
 import SugarColorSection from './SugarColorSection';
+import { flatTreatment } from '@/lib/treatmentConfig';
 
 export default function SideSection({ side, structure, activeLayer = 0, onChange, sugarColor, onSugarColorChange }) {
   const [activeChevronColorSlot, setActiveChevronColorSlot] = useState('primary');
@@ -19,6 +20,7 @@ export default function SideSection({ side, structure, activeLayer = 0, onChange
   const activeSide = isIndividual ? (side.layerTreatments?.[activeLayer] || side) : side;
 
   const updateSide = (nextSide) => {
+    nextSide = flatTreatment(nextSide);
     if (!isIndividual) {
       const layersCount = Math.max(structure?.layers || 2, 2);
       const layerTreatments = Array.from(
@@ -31,7 +33,7 @@ export default function SideSection({ side, structure, activeLayer = 0, onChange
 
     const layerTreatments = Array.from(
       { length: Math.max(structure.layers, side.layerTreatments?.length || 0) },
-      (_, index) => side.layerTreatments?.[index] || side,
+      (_, index) => flatTreatment(side.layerTreatments?.[index] || side),
     );
     layerTreatments[activeLayer] = nextSide;
     onChange({ ...side, layerTreatments });
