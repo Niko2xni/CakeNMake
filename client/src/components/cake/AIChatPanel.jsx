@@ -27,7 +27,7 @@ export default function AIChatPanel({ config, onChange, quote, session, active =
   // `history` is the raw Anthropic-format message array sent back to the
   // API each turn. `display` is the simplified { role, content, changes? }
   // shape the bubbles below render — a tool_use/tool_result turn is never
-  // shown to the person literally, only its resulting "changes" chips.
+  // shown to the person literally; only the assistant's reply is rendered.
   const [localHistory, setLocalHistory] = useState([]);
   const [localDisplay, setLocalDisplay] = useState([GREETING]);
   const [localInput, setLocalInput] = useState('');
@@ -276,17 +276,6 @@ export default function AIChatPanel({ config, onChange, quote, session, active =
                   </>
                 ) : msg.content}
               </div>
-              {/* "✓ change" chips so the person can see what happened
-                  without hunting through the 3D view for it. */}
-              {msg.changes?.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-1.5">
-                  {msg.changes.map((c, ci) => (
-                    <span key={ci} className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
-                      ✓ {c}
-                    </span>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         ))}

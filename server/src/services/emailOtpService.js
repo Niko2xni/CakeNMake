@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
-const nodemailer = require('nodemailer');
+const { createAuthEmailDelivery } = require('./authEmailDelivery');
 const { OtpStore } = require('./otpStore');
 
 const OTP_TTL_MS = 3 * 60 * 1000;
@@ -14,25 +14,8 @@ const RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
 
 const otpStore = new OtpStore();
 
-const mailConfigured = Boolean(
-  process.env.SMTP_HOST
-  && process.env.SMTP_PORT
-  && process.env.SMTP_USER
-  && process.env.SMTP_PASSWORD
-  && process.env.AUTH_EMAIL_FROM
-);
-
-const mailTransport = mailConfigured
-  ? nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT),
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASSWORD,
-      },
-    })
-  : null;
+const mailDelivery = createAuthEmailDelivery();
+const mailConfigured = mailDelivery.configured;
 
 function serviceError(message, code, status) {
   const error = new Error(message);
@@ -51,7 +34,7 @@ function normalizeEmail(email) {
 
 async function requestOtp({ email, purpose = 'login', ip = 'unknown', metadata = {} }) {
   const normalizedEmail = normalizeEmail(email);
-  if (!mailTransport) {
+  if (!mailConfigured) {
     throw serviceError('Email OTP authentication is not configured on the server.', 'EMAIL_OTP_NOT_CONFIGURED', 503);
   }
 
@@ -83,8 +66,7 @@ async function requestOtp({ email, purpose = 'login', ip = 'unknown', metadata =
 
   const action = purpose === 'link-email' ? 'verify your email address' : 'sign in';
   try {
-    await mailTransport.sendMail({
-      from: process.env.AUTH_EMAIL_FROM,
+    await mailDelivery.send({
       to: normalizedEmail,
       subject: 'Your CakeNMake verification code',
       text: `Use ${code} to ${action} to CakeNMake. It expires in 3 minutes.`,
