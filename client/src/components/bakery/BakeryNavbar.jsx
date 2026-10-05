@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import useLogout from '@/hooks/useLogout';
+import LogoutConfirmation from '@/components/shared/LogoutConfirmation';
 import {
   Cake,
   ClipboardList,
@@ -26,7 +27,7 @@ const NAV_ITEMS = [
 ];
 
 export default function BakeryNavbar() {
-  const { handleLogout, isLoggingOut } = useLogout();
+  const { handleLogout, requestLogout, isLoggingOut, logoutConfirmationOpen, changeLogoutConfirmation } = useLogout();
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreButtonRef = useRef(null);
@@ -93,7 +94,7 @@ export default function BakeryNavbar() {
         type="button"
         title="Log out"
         aria-label="Log out"
-        onClick={handleLogout}
+        onClick={requestLogout}
         disabled={isLoggingOut}
         className="w-12 h-12 flex-shrink-0 flex items-center justify-center rounded-xl text-gray-400 hover:bg-pink-50 hover:text-pink-500 transition-colors mt-2"
       >
@@ -152,10 +153,11 @@ export default function BakeryNavbar() {
               );
             })}
           </div>
-          <button type="button" className="cn-bakery-mobile-logout" onClick={handleLogout} disabled={isLoggingOut}><LogOut /> Log out</button>
+          <button type="button" className="cn-bakery-mobile-logout" onClick={() => { setMoreOpen(false); requestLogout(); }} disabled={isLoggingOut}><LogOut /> Log out</button>
         </section>
       </div>
     )}
+    <LogoutConfirmation open={logoutConfirmationOpen} onOpenChange={changeLogoutConfirmation} onConfirm={handleLogout} pending={isLoggingOut} />
     </>
   );
 }

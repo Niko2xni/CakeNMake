@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import useLogout from '@/hooks/useLogout';
+import LogoutConfirmation from '@/components/shared/LogoutConfirmation';
 
 const primaryItems = [
   { to: '/client', icon: Clock, label: 'Recents' },
@@ -37,7 +38,7 @@ function NavItem({ to, icon: Icon, label, currentPath }) {
 export default function ClientNavbar() {
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const menuRef = useRef(null);
-  const { handleLogout, isLoggingOut } = useLogout();
+  const { handleLogout, requestLogout, isLoggingOut, logoutConfirmationOpen, changeLogoutConfirmation } = useLogout();
   const location = useLocation();
   const { user } = useAuth();
 
@@ -117,13 +118,14 @@ export default function ClientNavbar() {
                 <Settings className="w-4 h-4" /> Settings
               </Link>
               <Link to="/support" role="menuitem" onClick={() => setUserDropdownOpen(false)}><MessageSquare className="w-4 h-4" /> Orders & Support</Link>
-              <button type="button" role="menuitem" onClick={handleLogout} disabled={isLoggingOut}>
+              <button type="button" role="menuitem" onClick={() => { setUserDropdownOpen(false); requestLogout(); }} disabled={isLoggingOut}>
                 <LogOut className="w-4 h-4" /> Log out
               </button>
             </div>
           )}
         </div>
       </div>
+      <LogoutConfirmation open={logoutConfirmationOpen} onOpenChange={changeLogoutConfirmation} onConfirm={handleLogout} pending={isLoggingOut} />
     </nav>
   );
 }

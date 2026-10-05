@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ClientNavbar from './ClientNavbar';
@@ -23,7 +23,10 @@ describe('navigation logout', () => {
     mount(ClientNavbar);
     fireEvent.click(screen.getByRole('button', { name: 'Account' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Log out' }));
+    expect(mocks.logout).not.toHaveBeenCalled();
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Log out' }));
     expect(mocks.logout).toHaveBeenCalledWith(false);
+    expect(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Logging out…' })).toBeDisabled();
     expect(screen.queryByText('Login destination')).not.toBeInTheDocument();
     finish();
     expect(await screen.findByText('Login destination')).toBeInTheDocument();
@@ -31,6 +34,8 @@ describe('navigation logout', () => {
   it('signs out from the bakery desktop navigation', async () => {
     mount(BakeryNavbar);
     fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
+    expect(mocks.logout).not.toHaveBeenCalled();
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Log out' }));
     expect(await screen.findByText('Login destination')).toBeInTheDocument();
     expect(mocks.logout).toHaveBeenCalledWith(false);
   });
@@ -38,6 +43,8 @@ describe('navigation logout', () => {
     mount(BakeryNavbar);
     fireEvent.click(screen.getByRole('button', { name: 'More' }));
     fireEvent.click(screen.getAllByRole('button', { name: 'Log out' })[1]);
+    expect(mocks.logout).not.toHaveBeenCalled();
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Log out' }));
     expect(await screen.findByText('Login destination')).toBeInTheDocument();
     expect(mocks.logout).toHaveBeenCalledWith(false);
   });
@@ -45,8 +52,22 @@ describe('navigation logout', () => {
     mocks.logout.mockRejectedValueOnce(new Error('sign-out failed'));
     mount(BakeryNavbar);
     fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Log out' }));
     await waitFor(() => expect(mocks.error).toHaveBeenCalled());
     expect(screen.queryByText('Login destination')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Log out' })).toBeEnabled();
   });
+  for (const Component of [ClientNavbar, BakeryNavbar]) {
+    it(`cancels logout in ${Component.name}`, () => {
+      mount(Component);
+      if (Component === ClientNavbar) {
+        fireEvent.click(screen.getByRole('button', { name: 'Account' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Log out' }));
+      } else fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
+      fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }));
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      expect(mocks.logout).not.toHaveBeenCalled();
+      expect(screen.queryByText('Login destination')).not.toBeInTheDocument();
+    });
+  }
 });

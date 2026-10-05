@@ -9,7 +9,7 @@ import {
   Rotate3D,
   X,
 } from 'lucide-react';
-import cakePreview from '@/assets/cake-preview.png';
+import cakePreview from '@/assets/cake-preview-new.png';
 import cakeChoiceOne from '@/assets/cake1-choice.png';
 import cakeChoiceTwo from '@/assets/cake2-choice.png';
 import cakeChoiceThree from '@/assets/cake3-choice.png';
@@ -137,8 +137,8 @@ export default function Landing() {
     activeSection === 'design-brief'
       ? 'how-it-works'
       : activeSection === 'questions'
-      ? 'about'
-      : activeSection;
+        ? 'about'
+        : activeSection;
 
   const updateIndicator = () => {
     if (!navContainerRef.current) return;
@@ -373,19 +373,19 @@ export default function Landing() {
               <div className="brief-preview">
                 <img
                   src={cakePreview}
-                  alt="Cake shown inside the CakeNMake design preview with gold buttercream, whipped cream, cherries, and the message Twenty and Thriving"
+                  alt="One-tier cake with ridged white-to-pink buttercream, cherry-topped star dollops, Happy Birthday lettering, and a ₱1,965 cake estimate"
                 />
                 <span className="preview-mode"><Rotate3D size={14} aria-hidden="true" /> 3D design preview</span>
                 <div className="preview-annotations" aria-hidden="true">
-                  <span className="annotation-one">Gold buttercream</span>
-                  <span className="annotation-two">Whipped cream &amp; cherries</span>
+                  <span className="annotation-one">Pink ombré buttercream</span>
+                  <span className="annotation-two">Star dollops &amp; cherries</span>
                 </div>
               </div>
               <div className="brief-selections">
-                <div><span>Finish</span><strong>Gold buttercream</strong></div>
-                <div><span>Palette</span><span className="color-swatches"><i /><i /><i /></span></div>
-                <div><span>Message</span><strong>Twenty & thriving</strong></div>
-                <div><span>Estimate</span><strong>₱64 preview total</strong></div>
+                <div><span>Finish</span><strong>Ridged pink ombré buttercream</strong></div>
+                <div><span>Palette</span><span className="color-swatches" role="img" aria-label="White, blush pink, and deep rose"><i /><i /><i /></span></div>
+                <div><span>Message</span><strong>Happy Birthday</strong></div>
+                <div><span>Estimate</span><strong>₱1,965 cake total</strong></div>
               </div>
             </div>
 
