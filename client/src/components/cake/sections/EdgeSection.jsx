@@ -60,22 +60,22 @@ export default function EdgeSection({
   };
 
   const switchToTop = () => {
-    const nextSlot = activeSlot === 'top' ? null : 'top';
-    const nextEdge = ensureSlotsMigrated({ ...edge, mode: 'topBottomSeparate', activeSlot: nextSlot });
+    const nextSlot = 'top';
+    const nextEdge = { ...ensureSlotsMigrated(edge), mode: 'topBottomSeparate', activeSlot: nextSlot };
     onChange(nextEdge);
     if (nextSlot) onActiveSlotChange?.(nextSlot);
   };
 
   const switchToMiddle = () => {
-    const nextSlot = activeSlot === 'middle' ? null : 'middle';
-    const nextEdge = ensureSlotsMigrated({ ...edge, mode: 'topBottomSeparate', activeSlot: nextSlot });
+    const nextSlot = 'middle';
+    const nextEdge = { ...ensureSlotsMigrated(edge), mode: 'topBottomSeparate', activeSlot: nextSlot };
     onChange(nextEdge);
     if (nextSlot) onActiveSlotChange?.(nextSlot);
   };
 
   const switchToBottom = () => {
-    const nextSlot = activeSlot === 'bottom' ? null : 'bottom';
-    const nextEdge = ensureSlotsMigrated({ ...edge, mode: 'topBottomSeparate', activeSlot: nextSlot });
+    const nextSlot = 'bottom';
+    const nextEdge = { ...ensureSlotsMigrated(edge), mode: 'topBottomSeparate', activeSlot: nextSlot };
     onChange(nextEdge);
     if (nextSlot) onActiveSlotChange?.(nextSlot);
   };

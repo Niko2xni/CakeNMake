@@ -9,6 +9,27 @@ vi.mock('@/services/api', () => ({ cakeAiApi: { beginTurn: vi.fn().mockResolvedV
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe('imported Cake AI tool conversation', () => {
+  it('disables AI editing for a submitted design without making a provider request', () => {
+    render(<AIChatPanel config={DEFAULT_CONFIG} onChange={vi.fn()} readOnly />);
+    expect(screen.getByPlaceholderText('Describe your cake...')).toBeDisabled();
+    expect(screen.getByText(/This design has been sent to the bakery/)).toBeVisible();
+    fireEvent.keyDown(screen.getByPlaceholderText('Describe your cake...'), { key: 'Enter' });
+    expect(cakeAiApi.beginTurn).not.toHaveBeenCalled();
+  });
+  it('ignores an in-flight AI edit if submission locks the design', async () => {
+    let finish;
+    cakeAiApi.sendMessage.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const onChange = vi.fn();
+    const view = render(<AIChatPanel config={DEFAULT_CONFIG} onChange={onChange} />);
+    const input = screen.getByPlaceholderText('Describe your cake...');
+    fireEvent.change(input, { target: { value: 'Make it chocolate' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => expect(cakeAiApi.sendMessage).toHaveBeenCalled());
+    view.rerender(<AIChatPanel config={DEFAULT_CONFIG} onChange={onChange} readOnly />);
+    finish({ stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'edit', name: 'set_exterior_finish', input: { style: 'fullyFrosted', flavor: 'chocolate' } }] });
+    await waitFor(() => expect(cakeAiApi.endTurn).toHaveBeenCalled());
+    expect(onChange).not.toHaveBeenCalled();
+  });
   it('renders assistant Markdown as paragraphs, emphasis and lists without embedding HTML or remote images', () => {
     const content = '**Exterior:** ivory frosting.\n\n- **Border:** chocolate piping\n- **Center:** truffles\n\nReview your cake.\n\n<img src="https://example.com/unsafe.png">\n\n![remote](https://example.com/image.png)';
     const session = { ready: true, history: [], display: [{ role: 'assistant', content }], input: '', thinking: false,

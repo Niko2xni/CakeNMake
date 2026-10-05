@@ -74,6 +74,7 @@ export function validateCakeAiTool(name, input) {
 // fed back to the model as the tool_result, and a human-readable label
 // used to render an "AI changed: ..." chip in the chat transcript.
 export function applyCakeAiTool(name, input, ctx) {
+  if ((ctx.readOnly || ctx.config?.sentToBakery) && name !== 'get_current_quote') return { error: 'This submitted design is locked and cannot be edited.' };
   const error = validateCakeAiTool(name, input);
   if (error) return { error };
   const { config, onChange, quote } = ctx;
