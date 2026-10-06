@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, LogIn, Sparkles, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import CakeScene from '@/components/cake/CakeScene';
 import ToolPanel from '@/components/cake/ToolPanel';
 import PricingPanel from '@/components/cake/PricingPanel';
@@ -75,51 +75,14 @@ export default function Designer() {
   const legacyConfig = adaptConfigToLegacy(cakeConfig);
 
   return (
-    <div className="h-[100dvh] w-full max-w-full flex flex-col overflow-hidden bg-background">
-      {/* Top Header Navigation for Guest Designer */}
-      <header className="flex items-center justify-between gap-2 px-3 sm:px-6 py-2.5 sm:py-3 border-b border-border/40 bg-card/90 backdrop-blur-md z-20 shrink-0">
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <Link
-            to="/"
-            className="shrink-0 rounded-xl px-2.5 py-1.5 text-xs sm:text-sm font-semibold text-primary hover:bg-primary/10 transition-colors flex items-center gap-1.5"
-            title="Back to home"
-          >
-            <Home className="w-4 h-4" />
-            <span className="hidden sm:inline">Home</span>
-          </Link>
-          <div className="h-4 w-px bg-border/60 mx-1 hidden sm:block" />
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="font-display text-sm sm:text-base font-bold text-foreground truncate">
-              Guest Designer
-            </span>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-medium bg-amber-100/80 text-amber-900 border border-amber-200/60 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/40 shrink-0">
-              <Sparkles className="w-3 h-3 text-amber-600 dark:text-amber-400" />
-              <span>Guest Preview</span>
-            </span>
-          </div>
-        </div>
+    <div className="h-[100dvh] w-full max-w-full flex flex-col lg:flex-row overflow-hidden bg-gradient-to-br from-pink-50 to-orange-50">
+      {/* Left: Pricing Panel */}
+      <div className="w-full lg:w-64 p-3 lg:p-4 flex flex-col shrink-0">
+        <PricingPanel config={cakeConfig} />
+      </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <Link
-            to="/login"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs sm:text-sm font-semibold shadow-sm hover:bg-primary/90 transition-colors"
-            title="Sign in to save and order your cake"
-          >
-            <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span>Sign in to save</span>
-          </Link>
-        </div>
-      </header>
-
-      {/* Main Designer Workspace */}
-      <div className="flex-1 min-h-0 w-full max-w-full flex flex-col lg:flex-row overflow-hidden bg-gradient-to-br from-pink-50 to-orange-50">
-        {/* Left: Pricing Panel */}
-        <div className="w-full lg:w-64 p-3 lg:p-4 flex flex-col shrink-0">
-          <PricingPanel config={cakeConfig} />
-        </div>
-
-        {/* Center: 3D Cake Scene */}
-        <div className="flex-1 min-w-0 min-h-0 p-3 lg:p-6 relative">
+      {/* Center: 3D Cake Scene */}
+      <div className="flex-1 min-w-0 min-h-0 p-3 lg:p-6 relative">
         <div className="h-full rounded-2xl shadow-2xl overflow-hidden bg-white/80 backdrop-blur-sm border border-white/50 relative">
           <CakeScene 
             cakeConfig={legacyConfig}
@@ -182,6 +145,5 @@ export default function Designer() {
         />
       </div>
     </div>
-  </div>
-);
+  );
 }
