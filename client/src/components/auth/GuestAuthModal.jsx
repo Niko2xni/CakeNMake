@@ -296,21 +296,22 @@ export default function GuestAuthModal({
                   </div>
                 )}
               </div>
-              <div className="flex justify-center py-2">
+              <div className="w-full flex justify-center py-2">
                 <InputOTP
-                aria-label="Verification code"
+                  aria-label="Verification code"
+                  containerClassName="w-full justify-center"
                   maxLength={6}
                   value={otp}
                   onChange={handleOtpChange}
                   autoFocus
                   autoComplete="one-time-code"
                 >
-                  <InputOTPGroup className="gap-2">
+                  <InputOTPGroup className="cn-auth-otp-group w-full gap-2">
                     {[0, 1, 2, 3, 4, 5].map((index) => (
                       <InputOTPSlot
                         key={index}
                         index={index}
-                        className="h-11 w-10 rounded-xl border text-base font-semibold shadow-sm"
+                        className="cn-auth-otp-slot h-12 rounded-xl text-base font-semibold shadow-sm"
                       />
                     ))}
                   </InputOTPGroup>

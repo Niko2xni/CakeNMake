@@ -255,9 +255,10 @@ export default function Login() {
                 </div>
               )}
             </div>
-            <div className="flex justify-center">
+            <div className="w-full flex justify-center">
               <InputOTP
                 aria-label="Verification code"
+                containerClassName="w-full justify-center"
                 maxLength={6}
                 value={otp}
                 onChange={handleOtpChange}
@@ -271,12 +272,12 @@ export default function Login() {
                 autoFocus
                 autoComplete="one-time-code"
               >
-                <InputOTPGroup className="cn-auth-otp-group gap-2">
+                <InputOTPGroup className="cn-auth-otp-group w-full gap-2">
                   {[0, 1, 2, 3, 4, 5].map((index) => (
                     <InputOTPSlot
                       key={index}
                       index={index}
-                      className="cn-auth-otp-slot h-12 w-11 rounded-xl border text-base font-semibold shadow-sm"
+                      className="cn-auth-otp-slot h-12 rounded-xl text-base font-semibold shadow-sm"
                     />
                   ))}
                 </InputOTPGroup>

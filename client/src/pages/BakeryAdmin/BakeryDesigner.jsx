@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { motion, AnimatePresence, useDragControls } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import CakeScene from '@/components/cake/CakeScene.jsx';
 import ToolPanel from '@/components/cake/ToolPanel';
@@ -17,7 +17,6 @@ import {
   SlidersHorizontal,
   ChevronLeft,
   ChevronRight,
-  GripHorizontal,
   Cloud,
   AlertCircle,
   Wand2,
@@ -820,43 +819,65 @@ export default function BakeryDesigner() {
           />
         </div>
 
-        {/* Mobile Panel */}
-        <MobileDraggableToolPanel
-          panelOpen={panelOpen && !isBreakdownOpen}
-          onClose={() => setPanelOpen(false)}
-          mainAreaRef={mainAreaRef}
-          config={cakeConfig}
-          onChange={handleConfigChange}
-          onReset={() => {
-            setCakeConfig(DEFAULT_CONFIG);
-            setActiveTool(null);
-            placeUndoStackRef.current = [];
-            placeRedoStackRef.current = [];
-            setPlaceHistoryVersion((v) => v + 1);
-          }}
-          activeTool={activeTool}
-          onSelectTool={setActiveTool}
-          onPlaceChange={setPlaceItems}
-          onPlaceUndo={handlePlaceUndo}
-          onPlaceRedo={handlePlaceRedo}
-          canPlaceUndo={placeUndoStackRef.current.length > 0}
-          canPlaceRedo={placeRedoStackRef.current.length > 0}
-          selectedCenterItemId={selectedCenterItemId}
-          onCenterItemSelect={setSelectedCenterItemId}
-          onDeleteSelectedCenterItem={handleDeleteSelectedCenterItem}
-          onCenterTextColorModeChange={handleCenterTextColorModeChange}
-          tab={activeTab}
-          onTabChange={setActiveTab}
-          activeLayer={activeLayer}
-          onActiveLayerChange={setActiveLayer}
-          activeEdgeSlot={activeEdgeSlot}
-          onActiveEdgeSlotChange={setActiveEdgeSlot}
-          modeUi={toolPanelModeUi}
-          onModeUiChange={setToolPanelModeUi}
-          expandedSections={expandedSections}
-          onExpandedSectionsChange={setExpandedSections}
-          quote={quote}
-        />
+        {/* Mobile Panel Overlay */}
+        <AnimatePresence>
+          {panelOpen && !isBreakdownOpen && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/40 backdrop-blur-sm z-30 md:hidden"
+                onClick={() => setPanelOpen(false)}
+              />
+              <motion.div
+                key="mobile-toolpanel"
+                initial={{ x: '100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '100%' }}
+                transition={{ type: 'spring', damping: 26, stiffness: 300 }}
+                className="fixed inset-y-0 right-0 w-[340px] max-w-[88vw] z-40 p-2 sm:p-3 md:hidden flex flex-col"
+              >
+                <div className="flex-1 min-h-0 bg-card rounded-2xl border border-border/70 overflow-hidden shadow-2xl">
+                  <ToolPanel
+                    config={cakeConfig}
+                    onChange={handleConfigChange}
+                    onReset={() => {
+                      setCakeConfig(DEFAULT_CONFIG);
+                      setActiveTool(null);
+                      placeUndoStackRef.current = [];
+                      placeRedoStackRef.current = [];
+                      setPlaceHistoryVersion((v) => v + 1);
+                    }}
+                    activeTool={activeTool}
+                    onSelectTool={setActiveTool}
+                    onPlaceChange={setPlaceItems}
+                    onPlaceUndo={handlePlaceUndo}
+                    onPlaceRedo={handlePlaceRedo}
+                    canPlaceUndo={placeUndoStackRef.current.length > 0}
+                    canPlaceRedo={placeRedoStackRef.current.length > 0}
+                    selectedCenterItemId={selectedCenterItemId}
+                    onCenterItemSelect={setSelectedCenterItemId}
+                    onDeleteSelectedCenterItem={handleDeleteSelectedCenterItem}
+                    onCenterTextColorModeChange={handleCenterTextColorModeChange}
+                    tab={activeTab}
+                    onTabChange={setActiveTab}
+                    activeLayer={activeLayer}
+                    onActiveLayerChange={setActiveLayer}
+                    activeEdgeSlot={activeEdgeSlot}
+                    onActiveEdgeSlotChange={setActiveEdgeSlot}
+                    modeUi={toolPanelModeUi}
+                    onModeUiChange={setToolPanelModeUi}
+                    expandedSections={expandedSections}
+                    onExpandedSectionsChange={setExpandedSections}
+                    quote={quote}
+                    onClose={() => setPanelOpen(false)}
+                  />
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* 8-ANGLE CAPTURE & PUBLISH TEMPLATE MODAL */}

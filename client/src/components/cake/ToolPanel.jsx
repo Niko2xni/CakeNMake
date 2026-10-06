@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Cake, Palette, Sparkles, RotateCcw, Layers, Building2, ChevronDown, ChevronUp, Eye, EyeOff, Bot, Check } from 'lucide-react';
+import { Cake, Palette, Sparkles, RotateCcw, Layers, Building2, ChevronDown, ChevronUp, Eye, EyeOff, Bot, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -56,8 +56,7 @@ export default function ToolPanel({
   onModeUiChange,
   expandedSections: controlledExpandedSections,
   onExpandedSectionsChange,
-  onDragHandlePointerDown,
-  hideScrollbar = false,
+  onClose,
 }) {
   const [internalAiThinking, setInternalAiThinking] = useState(false);
   const isAiBusy = Boolean(aiChatSession?.thinking || internalAiThinking);
@@ -457,6 +456,18 @@ export default function ToolPanel({
         >
           <RotateCcw className="w-4 h-4" />
         </Button>
+        {onClose && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-full text-muted-foreground hover:text-foreground shrink-0 h-9 w-9 md:hidden"
+            onClick={onClose}
+            title="Close Tools"
+            aria-label="Close Tools"
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        )}
       </div>
 
       <Separator />
@@ -514,7 +525,6 @@ export default function ToolPanel({
               {/* Scrollable content with drag-to-scroll */}
               <ScrollArea
                 className="flex-1"
-                hideScrollbar={hideScrollbar}
                 onPointerDown={handlePointerDownScroll}
                 onClickCapture={handleClickCapture}
               >
@@ -866,13 +876,8 @@ export default function ToolPanel({
             </motion.div>
           </ScrollArea>
 
-          {/* Footer hint & bottom drag handle */}
-          <div
-            onPointerDown={onDragHandlePointerDown}
-            className={`px-5 py-3 border-t border-border/50 bg-muted/30 select-none ${
-              onDragHandlePointerDown ? 'cursor-grab active:cursor-grabbing touch-none' : ''
-            }`}
-          >
+          {/* Footer hint */}
+          <div className="px-5 py-3 border-t border-border/50 bg-muted/30 select-none">
             <p className="text-[11px] text-muted-foreground text-center flex items-center justify-center gap-1.5">
               Drag to rotate • Scroll to zoom
             </p>

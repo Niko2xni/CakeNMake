@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react';
-import { motion, AnimatePresence, useDragControls } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useSearchParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import CakeScene from '@/components/cake/CakeScene.jsx';
 import PageLoadingSkeleton from '@/components/shared/PageLoadingSkeleton';
@@ -9,7 +9,7 @@ import SendBakeryModal from '@/components/bakery/SendBakeryModal';
 import BakeryChatPanel from '@/components/bakery/BakeryChatPanel';
 import useDesignAiChat from '@/hooks/useDesignAiChat';
 import GuestAuthModal from '@/components/auth/GuestAuthModal';
-import { Home, X, Send, Cloud, CloudOff, Loader2, RotateCcw, GripHorizontal, SlidersHorizontal, MessageSquare } from 'lucide-react';
+import { Home, X, Send, Cloud, CloudOff, Loader2, RotateCcw, SlidersHorizontal, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { blueprintApi, designApi, pricingApi, templateApi } from '@/services/api';
@@ -38,238 +38,6 @@ function getActiveToolLabel(tool) {
   if (typeof tool === 'object' && tool.label) return tool.label;
   const cleaned = rawType.replace(/^center-/, '').replace(/-default$/, '').replace(/-/g, ' ');
   return cleaned ? cleaned.charAt(0).toUpperCase() + cleaned.slice(1) : 'Decoration';
-}
-
-function MobileDraggableToolPanel({
-  panelOpen,
-  onClose,
-  mainAreaRef,
-  activeTool,
-  ...toolPanelProps
-}) {
-  const dragControls = useDragControls();
-  const [panelPos, setPanelPos] = useState(() => {
-    try {
-      const saved = localStorage.getItem('cakenmake_toolpanel_pos');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && (parsed.side === 'left' || parsed.side === 'right') && typeof parsed.y === 'number') {
-          return {
-            side: parsed.side,
-            y: Math.max(8, Math.min(300, parsed.y)),
-          };
-        }
-      }
-    } catch (e) {}
-    return { side: 'right', y: 16 };
-  });
-
-  const [containerDimensions, setContainerDimensions] = useState({ width: 360, height: 640 });
-
-  useEffect(() => {
-    const updateDimensions = () => {
-      if (mainAreaRef?.current) {
-        setContainerDimensions({
-          width: mainAreaRef.current.clientWidth || window.innerWidth,
-          height: mainAreaRef.current.clientHeight || (window.innerHeight - 60),
-        });
-      } else if (typeof window !== 'undefined') {
-        setContainerDimensions({
-          width: window.innerWidth,
-          height: window.innerHeight - 60,
-        });
-      }
-    };
-    updateDimensions();
-
-    let resizeObserver = null;
-    if (typeof ResizeObserver !== 'undefined' && mainAreaRef?.current) {
-      resizeObserver = new ResizeObserver(updateDimensions);
-      resizeObserver.observe(mainAreaRef.current);
-    }
-
-    window.addEventListener('resize', updateDimensions);
-    return () => {
-      window.removeEventListener('resize', updateDimensions);
-      if (resizeObserver) {
-        resizeObserver.disconnect();
-      }
-    };
-  }, [mainAreaRef]);
-
-  const panelWidth = Math.min(320, containerDimensions.width - 16);
-  const panelHeight = Math.min(560, Math.max(0, containerDimensions.height - 16));
-  const EDGE_PADDING = 8;
-  const leftDockX = EDGE_PADDING;
-  const rightDockX = Math.max(EDGE_PADDING, containerDimensions.width - panelWidth - EDGE_PADDING);
-  const maxY = Math.max(EDGE_PADDING, containerDimensions.height - panelHeight - EDGE_PADDING);
-  const safeY = Math.max(EDGE_PADDING, Math.min(maxY, panelPos.y));
-
-  const targetX = panelPos.side === 'left' ? leftDockX : rightDockX;
-  const slideStartX = panelPos.side === 'left' ? -panelWidth - 30 : containerDimensions.width + 30;
-
-  const handleDragEnd = (event, info) => {
-    const dropX = info.point.x;
-    const isLeft = dropX < (containerDimensions.width / 2);
-    const newSide = isLeft ? 'left' : 'right';
-
-    // Calculate next Y: current base Y + gesture delta, clamped to safe boundaries
-    const nextY = safeY + info.offset.y;
-    const nextClampedY = Math.max(EDGE_PADDING, Math.min(maxY, nextY));
-
-    const nextPos = { side: newSide, y: Math.round(nextClampedY) };
-    setPanelPos(nextPos);
-    try {
-      localStorage.setItem('cakenmake_toolpanel_pos', JSON.stringify(nextPos));
-    } catch (err) {}
-  };
-
-  return (
-    <AnimatePresence>
-      {panelOpen && (
-        <motion.div
-          key="mobile-draggable-toolpanel"
-          drag
-          dragControls={dragControls}
-          dragListener={false}
-          dragMomentum={false}
-          dragElastic={0.06}
-          dragConstraints={{
-            left: leftDockX,
-            right: rightDockX,
-            top: EDGE_PADDING,
-            bottom: maxY,
-          }}
-          onDragEnd={handleDragEnd}
-          initial={{ x: slideStartX, y: safeY, opacity: 0 }}
-          animate={{ x: targetX, y: safeY, opacity: 1 }}
-          exit={{ x: slideStartX, y: safeY, opacity: 0 }}
-          transition={{ type: 'spring', damping: 26, stiffness: 320 }}
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: `${panelWidth}px`,
-            height: `${panelHeight}px`,
-            zIndex: 30,
-          }}
-          className="flex flex-col md:hidden drop-shadow-2xl"
-        >
-          {/* Draggable header bar */}
-          <div
-            onPointerDown={(e) => dragControls.start(e)}
-            className="w-full min-h-11 flex flex-col items-center justify-center px-3 py-1.5 bg-card/95 backdrop-blur-md rounded-t-2xl border-t border-x border-border/70 cursor-grab active:cursor-grabbing select-none touch-none shadow-sm gap-1"
-          >
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted/80 hover:bg-muted transition-colors">
-              <GripHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className="text-[10px] font-semibold text-muted-foreground">Drag to Move</span>
-            </div>
-
-            {activeTool && (
-              <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-                </span>
-                <span className="text-[10px] font-bold truncate max-w-[120px]">
-                  Placing: {getActiveToolLabel(activeTool)}
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Panel content with internal drag-to-scroll & draggable footer */}
-          <div className="flex-1 min-h-0 bg-card rounded-b-2xl border-b border-x border-border/70 overflow-hidden shadow-2xl select-none">
-            <ToolPanel
-              {...toolPanelProps}
-              activeTool={activeTool}
-              hideScrollbar={true}
-              onDragHandlePointerDown={(e) => dragControls.start(e)}
-            />
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-}
-
-function MobileDraggableBakeryChat({ panelOpen, mainAreaRef }) {
-  const dragControls = useDragControls();
-  const [panelPos, setPanelPos] = useState({ side: 'right', y: 8 });
-  const [containerDimensions, setContainerDimensions] = useState({ width: 360, height: 640 });
-
-  useEffect(() => {
-    const updateDimensions = () => {
-      const container = mainAreaRef?.current;
-      setContainerDimensions({
-        width: container?.clientWidth || window.innerWidth,
-        height: container?.clientHeight || window.innerHeight - 60,
-      });
-    };
-    updateDimensions();
-    const observer = typeof ResizeObserver !== 'undefined' && mainAreaRef?.current
-      ? new ResizeObserver(updateDimensions)
-      : null;
-    observer?.observe(mainAreaRef.current);
-    window.addEventListener('resize', updateDimensions);
-    return () => {
-      observer?.disconnect();
-      window.removeEventListener('resize', updateDimensions);
-    };
-  }, [mainAreaRef]);
-
-  const panelWidth = Math.max(0, Math.min(340, containerDimensions.width - 32));
-  const panelHeight = Math.max(0, Math.min(620, containerDimensions.height - 16));
-  const edgePadding = 8;
-  const leftDockX = edgePadding;
-  const rightDockX = Math.max(edgePadding, containerDimensions.width - panelWidth - edgePadding);
-  const maxY = Math.max(edgePadding, containerDimensions.height - panelHeight - edgePadding);
-  const safeY = Math.max(edgePadding, Math.min(maxY, panelPos.y));
-  const targetX = panelPos.side === 'left' ? leftDockX : rightDockX;
-  const slideStartX = panelPos.side === 'left' ? -panelWidth - 30 : containerDimensions.width + 30;
-
-  const handleDragEnd = (event, info) => {
-    const side = info.point.x < containerDimensions.width / 2 ? 'left' : 'right';
-    const y = Math.round(Math.max(edgePadding, Math.min(maxY, safeY + info.offset.y)));
-    setPanelPos({ side, y });
-  };
-
-  return (
-    <AnimatePresence>
-      {panelOpen && (
-        <motion.div
-          key="mobile-draggable-bakery-chat"
-          drag
-          dragControls={dragControls}
-          dragListener={false}
-          dragMomentum={false}
-          dragElastic={0.06}
-          dragConstraints={{ left: leftDockX, right: rightDockX, top: edgePadding, bottom: maxY }}
-          onDragEnd={handleDragEnd}
-          initial={{ x: slideStartX, y: safeY, opacity: 0 }}
-          animate={{ x: targetX, y: safeY, opacity: 1 }}
-          exit={{ x: slideStartX, y: safeY, opacity: 0 }}
-          transition={{ type: 'spring', damping: 26, stiffness: 320 }}
-          style={{ position: 'absolute', top: 0, left: 0, width: panelWidth, height: panelHeight, zIndex: 30 }}
-          className="flex flex-col md:hidden drop-shadow-2xl"
-        >
-          <div className="w-full min-h-12 flex items-center justify-center gap-2 px-3 bg-card/95 backdrop-blur-md rounded-t-2xl border-t border-x border-border/70 shadow-sm">
-            <div
-              onPointerDown={(event) => dragControls.start(event)}
-              className="flex min-w-0 flex-1 items-center justify-center gap-1.5 py-2 cursor-grab active:cursor-grabbing select-none touch-none"
-              aria-label="Drag Bakery Chat panel"
-            >
-              <GripHorizontal className="w-4 h-4 text-muted-foreground" />
-              <span className="text-xs font-semibold text-muted-foreground">Drag Bakery Chat</span>
-            </div>
-          </div>
-          <div className="flex-1 min-h-0 bg-card rounded-b-2xl border-b border-x border-border/70 overflow-hidden shadow-2xl">
-            <BakeryChatPanel />
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
 }
 
 export default function DesignerWorkSpace() {
@@ -1287,50 +1055,107 @@ export default function DesignerWorkSpace() {
           )}
         </div>
 
-        {/* Mobile Panel */}
+        {/* Mobile Panel Overlay */}
         {orderComplete ? (
-          <MobileDraggableBakeryChat
-            panelOpen={mobileBakeryChatOpen}
-            mainAreaRef={mainAreaRef}
-          />
+          <AnimatePresence>
+            {mobileBakeryChatOpen && (
+              <>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 bg-black/40 backdrop-blur-sm z-30 md:hidden"
+                  onClick={() => setMobileBakeryChatOpen(false)}
+                />
+                <motion.div
+                  key="mobile-bakery-chat-panel"
+                  initial={{ x: '100%' }}
+                  animate={{ x: 0 }}
+                  exit={{ x: '100%' }}
+                  transition={{ type: 'spring', damping: 26, stiffness: 300 }}
+                  className="fixed inset-y-0 right-0 w-[340px] max-w-[88vw] z-40 p-2 sm:p-3 md:hidden flex flex-col"
+                >
+                  <div className="flex-1 min-h-0 bg-card rounded-2xl border border-border/70 overflow-hidden shadow-2xl flex flex-col">
+                    <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/60 bg-muted/40">
+                      <span className="text-sm font-semibold text-foreground">Bakery Chat</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-full"
+                        onClick={() => setMobileBakeryChatOpen(false)}
+                        aria-label="Close Bakery Chat"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="flex-1 min-h-0">
+                      <BakeryChatPanel />
+                    </div>
+                  </div>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
         ) : (
-          <MobileDraggableToolPanel
-            aiChatSession={aiChatSession}
-            panelOpen={panelOpen && !isBreakdownOpen}
-            quote={quote}
-            onClose={() => setPanelOpen(false)}
-            mainAreaRef={mainAreaRef}
-            config={config}
-            onChange={setConfig}
-            onReset={() => {
-              setConfig(INITIAL_CONFIG);
-              setActiveTool(null);
-              placeUndoStackRef.current = [];
-              placeRedoStackRef.current = [];
-              setPlaceHistoryVersion(v => v + 1);
-            }}
-            activeTool={activeTool}
-            onSelectTool={setActiveTool}
-            onPlaceChange={setPlaceItems}
-            onPlaceUndo={handlePlaceUndo}
-            onPlaceRedo={handlePlaceRedo}
-            canPlaceUndo={placeUndoStackRef.current.length > 0}
-            canPlaceRedo={placeRedoStackRef.current.length > 0}
-            selectedCenterItemId={selectedCenterItemId}
-            onCenterItemSelect={setSelectedCenterItemId}
-            onDeleteSelectedCenterItem={handleDeleteSelectedCenterItem}
-            onCenterTextColorModeChange={handleCenterTextColorModeChange}
-            tab={activeTab}
-            onTabChange={setActiveTab}
-            activeLayer={activeLayer}
-            onActiveLayerChange={setActiveLayer}
-            activeEdgeSlot={activeEdgeSlot}
-            onActiveEdgeSlotChange={setActiveEdgeSlot}
-            modeUi={toolPanelModeUi}
-            onModeUiChange={handleModeUiChange}
-            expandedSections={expandedSections}
-            onExpandedSectionsChange={setExpandedSections}
-          />
+          <AnimatePresence>
+            {panelOpen && !isBreakdownOpen && (
+              <>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 bg-black/40 backdrop-blur-sm z-30 md:hidden"
+                  onClick={() => setPanelOpen(false)}
+                />
+                <motion.div
+                  key="mobile-toolpanel"
+                  initial={{ x: '100%' }}
+                  animate={{ x: 0 }}
+                  exit={{ x: '100%' }}
+                  transition={{ type: 'spring', damping: 26, stiffness: 300 }}
+                  className="fixed inset-y-0 right-0 w-[340px] max-w-[88vw] z-40 p-2 sm:p-3 md:hidden flex flex-col"
+                >
+                  <div className="flex-1 min-h-0 bg-card rounded-2xl border border-border/70 overflow-hidden shadow-2xl">
+                    <ToolPanel
+                      aiChatSession={aiChatSession}
+                      config={config}
+                      quote={quote}
+                      onChange={setConfig}
+                      onReset={() => {
+                        setConfig(INITIAL_CONFIG);
+                        setActiveTool(null);
+                        placeUndoStackRef.current = [];
+                        placeRedoStackRef.current = [];
+                        setPlaceHistoryVersion(v => v + 1);
+                      }}
+                      activeTool={activeTool}
+                      onSelectTool={setActiveTool}
+                      onPlaceChange={setPlaceItems}
+                      onPlaceUndo={handlePlaceUndo}
+                      onPlaceRedo={handlePlaceRedo}
+                      canPlaceUndo={placeUndoStackRef.current.length > 0}
+                      canPlaceRedo={placeRedoStackRef.current.length > 0}
+                      selectedCenterItemId={selectedCenterItemId}
+                      onCenterItemSelect={setSelectedCenterItemId}
+                      onDeleteSelectedCenterItem={handleDeleteSelectedCenterItem}
+                      onCenterTextColorModeChange={handleCenterTextColorModeChange}
+                      tab={activeTab}
+                      onTabChange={setActiveTab}
+                      activeLayer={activeLayer}
+                      onActiveLayerChange={setActiveLayer}
+                      activeEdgeSlot={activeEdgeSlot}
+                      onActiveEdgeSlotChange={setActiveEdgeSlot}
+                      modeUi={toolPanelModeUi}
+                      onModeUiChange={handleModeUiChange}
+                      expandedSections={expandedSections}
+                      onExpandedSectionsChange={setExpandedSections}
+                      onClose={() => setPanelOpen(false)}
+                    />
+                  </div>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
         )}
       </div>
 

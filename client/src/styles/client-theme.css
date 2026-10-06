@@ -458,11 +458,20 @@
 .cn-auth-form button[class*='bg-primary']:hover { background: var(--cn-cherry-dark) !important; color: var(--cn-cream) !important; transform: translateY(-1px); }
 
 .cn-auth-otp-group {
-  width: 100%;
-  justify-content: space-between;
+  width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
   gap: 8px !important;
 }
 
+[data-input-otp-container] {
+  width: 100% !important;
+  display: flex !important;
+  justify-content: center !important;
+}
+
+input[data-input-otp],
 .cn-auth-page input[data-input-otp] {
   background: transparent !important;
   border-color: transparent !important;
@@ -472,6 +481,7 @@
   -webkit-text-fill-color: transparent !important;
 }
 
+input[data-input-otp]:focus,
 .cn-auth-page input[data-input-otp]:focus {
   border-color: transparent !important;
   box-shadow: none !important;
@@ -479,10 +489,13 @@
 }
 
 .cn-auth-otp-slot {
-  flex: 1 1 0;
-  min-width: 0;
-  max-width: 52px;
+  flex: 1 1 0 !important;
+  width: 100% !important;
+  min-width: 40px !important;
+  max-width: 54px !important;
+  height: 50px !important;
   border: 1.5px solid rgba(44, 23, 19, 0.34) !important;
+  border-radius: 12px !important;
   background: #fffdf8 !important;
   color: var(--cn-ink) !important;
   font-family: 'DM Sans', sans-serif;
@@ -491,6 +504,7 @@
   line-height: 1;
   opacity: 1 !important;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65), 0 2px 8px rgba(67, 36, 28, 0.06) !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .cn-auth-otp-slot[data-active='true'] {
@@ -2484,8 +2498,14 @@
   .cn-auth-form { padding: 24px !important; }
   .cn-auth-panel > div:first-child { margin-bottom: 24px; }
   .cn-auth-panel h1 { font-size: clamp(2rem, 11vw, 2.5rem) !important; }
-  .cn-auth-otp-group { gap: 5px !important; }
-  .cn-auth-otp-slot { width: auto !important; height: 44px !important; max-width: 46px; }
+  .cn-auth-otp-group { width: 100% !important; gap: 6px !important; }
+  .cn-auth-otp-slot {
+    flex: 1 1 0 !important;
+    min-width: 38px !important;
+    height: 48px !important;
+    max-width: 48px !important;
+    border-radius: 10px !important;
+  }
   .cn-nav-item span { display: none !important; }
   .cn-nav-item { min-width: 42px; }
 }
@@ -2493,7 +2513,14 @@
 @media (max-width: 360px) {
   .cn-auth-page { padding-right: 12px; padding-left: 12px; }
   .cn-auth-form { padding: 20px 16px !important; }
-  .cn-auth-otp-slot { height: 42px !important; max-width: 42px; }
+  .cn-auth-otp-group { gap: 4px !important; }
+  .cn-auth-otp-slot {
+    min-width: 34px !important;
+    height: 44px !important;
+    max-width: 42px !important;
+    border-radius: 8px !important;
+    font-size: 18px !important;
+  }
   .cn-sidebar { padding-right: 4px; padding-left: 4px; }
   .cn-nav-item { min-width: 38px; }
 }
