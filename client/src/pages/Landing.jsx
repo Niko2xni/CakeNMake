@@ -401,7 +401,7 @@ export default function Landing() {
                 <li><Check size={17} aria-hidden="true" /> Keep the design and estimate together</li>
                 <li><Check size={17} aria-hidden="true" /> Give your baker a clearer starting point</li>
               </ul>
-              <Link to="/designer" className="inline-link">Try the designer <ArrowRight size={17} /></Link>
+              <Link to="/guest-designer" className="inline-link">Try the designer <ArrowRight size={17} /></Link>
               <aside className="brief-note">
                 <span>Why it matters</span>
                 <p>“Something like this” becomes one cake both you and your baker can see.</p>

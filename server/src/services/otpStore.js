@@ -18,7 +18,8 @@ function createUnavailableError(cause) {
 
 class OtpStore {
   constructor({ redisUrl = process.env.REDIS_URL, nodeEnv = process.env.NODE_ENV } = {}) {
-    this.useMemory = !redisUrl && nodeEnv !== 'production';
+    this.nodeEnv = nodeEnv || process.env.NODE_ENV;
+    this.useMemory = !redisUrl && this.nodeEnv !== 'production';
     this.redis = redisUrl
       ? new Redis(redisUrl, {
           lazyConnect: true,
@@ -50,6 +51,13 @@ class OtpStore {
       if (this.redis.status === 'wait') await this.redis.connect();
       return await operation(this.redis);
     } catch (error) {
+      if (this.nodeEnv !== 'production') {
+        console.warn('Redis OTP store failed, falling back to memory in development:', error.message);
+        try { this.redis.disconnect(); } catch (_) {}
+        this.redis = null;
+        this.useMemory = true;
+        return operation(null);
+      }
       throw createUnavailableError(error);
     }
   }

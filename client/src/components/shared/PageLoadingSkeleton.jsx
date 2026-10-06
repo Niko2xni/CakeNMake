@@ -257,7 +257,7 @@ function PageSkeletonContent({ path }) {
   if (path === '/cake-ai') {
     return <ClientPage wide><div className="flex h-[70dvh] min-h-[500px] overflow-hidden rounded-2xl border border-pink-100 bg-white"><section className="hidden w-72 shrink-0 space-y-4 border-r border-pink-100 p-4 md:block"><Skeleton className="h-8 w-full rounded-full" /><AdminRowsSkeleton count={6} /></section><section className="flex min-w-0 flex-1 flex-col p-5"><Skeleton className="h-8 w-52" /><div className="flex-1 space-y-6 py-12"><Skeleton className="h-14 w-3/5 rounded-2xl" /><Skeleton className="ml-auto h-20 w-3/4 rounded-2xl" /></div><Skeleton className="h-16 w-full rounded-2xl" /></section></div></ClientPage>;
   }
-  if (path === '/designer') return <DesignerSkeleton />;
+  if (path === '/designer' || path === '/guest-designer') return <DesignerSkeleton />;
   if (path === '/bakery/designer') return <DesignerSkeleton />;
   if (path === '/bakery/chats') return <TableSkeleton summary />;
   if (path === '/support') return <ClientPage><Skeleton className="h-8 w-60" /><AdminRowsSkeleton count={5} /></ClientPage>;

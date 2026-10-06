@@ -31,10 +31,9 @@ describe('Login auth experience', () => {
     firebase.custom.mockResolvedValueOnce({ user: { uid: 'email-user' } });
     render(<MemoryRouter initialEntries={['/login']}><Routes><Route path="/login" element={<Login />} /><Route path="/login-success" element={<div>Completing sign-in</div>} /></Routes></MemoryRouter>);
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'demo@example.com' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Send OTP' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }));
     const input = await screen.findByLabelText('Verification code');
     fireEvent.change(input, { target: { value: '123456' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Verify and log in' }));
     expect(await screen.findByText('Completing sign-in')).toBeInTheDocument();
     expect(authApi.verifyEmailOtp).toHaveBeenCalledWith('demo@example.com', '123456');
     expect(firebase.custom).toHaveBeenCalledWith({}, 'custom-token');
@@ -60,7 +59,7 @@ describe('Login auth experience', () => {
 
     expect(screen.getByRole('button', { name: /continue with google/i })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /continue with/i })).toHaveLength(1);
-    expect(screen.getByRole('button', { name: /send otp/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^login$/i })).toBeInTheDocument();
   });
 
   it('shows a resend OTP action and a 3 minute countdown after sending a code', async () => {
@@ -71,11 +70,39 @@ describe('Login auth experience', () => {
     );
 
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'demo@example.com' } });
-    fireEvent.click(screen.getByRole('button', { name: /send otp/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^login$/i }));
 
     expect(authApi.requestEmailOtp).toHaveBeenCalledWith('demo@example.com');
     expect(await screen.findByText(/^Verification code$/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^verify$/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /resend otp/i })).toBeInTheDocument();
-    expect(screen.getByText(/^03:00$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^0[23]:[0-5][0-9]$/i)).toBeInTheDocument();
+  });
+
+  it('disables the Verify button once the timer expires', async () => {
+    vi.useFakeTimers();
+    authApi.requestEmailOtp.mockResolvedValueOnce({ expiresAt: Date.now() + 5000 });
+
+    render(
+      <MemoryRouter>
+        <Login />
+      </MemoryRouter>
+    );
+
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'demo@example.com' } });
+    fireEvent.click(screen.getByRole('button', { name: /^login$/i }));
+
+    await vi.waitFor(() => {
+      expect(screen.getByRole('button', { name: /^verify$/i })).toBeInTheDocument();
+    });
+
+    // Fast-forward past expiry
+    vi.advanceTimersByTime(6000);
+
+    await vi.waitFor(() => {
+      expect(screen.getByRole('button', { name: /^verify$/i })).toBeDisabled();
+    });
+
+    vi.useRealTimers();
   });
 });

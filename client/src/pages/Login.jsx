@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CheckCircle2, Loader2, LogIn, Mail, TimerReset } from "lucide-react";
+import { CheckCircle2, Loader2, Mail, TimerReset } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
@@ -79,8 +79,43 @@ export default function Login() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isOtpActive]);
 
+  const verifyCode = async (codeToVerify) => {
+    const targetCode = String(codeToVerify || otp || "").trim();
+    if (loading) return;
+    setError("");
+    setStatusMessage("");
+    setOtpExpiredMessage("");
+    setLoading(true);
+
+    try {
+      if (!otpExpiresAt || Date.now() >= otpExpiresAt || otpTimeLeft <= 0) {
+        setOtp("");
+        setOtpExpiresAt(null);
+        setOtpTimeLeft(0);
+        setOtpExpiredMessage("OTP expired");
+        setStatusMessage("Please request a new code to continue.");
+        setError("Your verification code expired. Please request a new code.");
+        return;
+      }
+
+      if (!/^\d{6}$/.test(targetCode)) throw new Error("Enter the 6-digit verification code.");
+      const { token } = await authApi.verifyEmailOtp(email.trim().toLowerCase(), targetCode);
+      if (!firebaseConfigured || !auth) throw new Error(missingFirebaseConfigMessage);
+      await signInWithCustomToken(auth, token);
+      navigate("/login-success");
+    } catch (authError) {
+      setError(authError.message || "Authentication failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleOtpChange = (value) => {
-    setOtp(value.replace(/\D/g, "").slice(0, 6));
+    const cleaned = value.replace(/\D/g, "").slice(0, 6);
+    setOtp(cleaned);
+    if (cleaned.length === 6 && !loading && otpSent && otpTimeLeft > 0) {
+      verifyCode(cleaned);
+    }
   };
 
   const requestNewOtp = async () => {
@@ -93,7 +128,7 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const response = await authApi.requestEmailOtp(email);
+      const response = await authApi.requestEmailOtp(email.trim().toLowerCase());
       const expiresAt = response?.expiresAt || Date.now() + 3 * 60 * 1000;
       setOtpSent(true);
       setOtpExpiresAt(expiresAt);
@@ -107,44 +142,31 @@ export default function Login() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setError("");
-    setStatusMessage("");
-    setOtpExpiredMessage("");
-    setLoading(true);
+    if (loading) return;
 
-    try {
-      if (!email) throw new Error("Enter your email address.");
+    if (!otpSent) {
+      setError("");
+      setStatusMessage("");
+      setOtpExpiredMessage("");
+      setLoading(true);
 
-      if (!otpSent) {
-        const response = await authApi.requestEmailOtp(email);
+      try {
+        if (!email) throw new Error("Enter your email address.");
+        const response = await authApi.requestEmailOtp(email.trim().toLowerCase());
         const expiresAt = response?.expiresAt || Date.now() + 3 * 60 * 1000;
         setOtpSent(true);
         setOtpExpiresAt(expiresAt);
         setStatusMessage("A 6-digit verification code was sent to your email.");
         setError("");
-        return;
+      } catch (authError) {
+        setError(authError.message || "Authentication failed.");
+      } finally {
+        setLoading(false);
       }
-
-      if (!otpExpiresAt || Date.now() >= otpExpiresAt) {
-        setOtp("");
-        setOtpExpiresAt(null);
-        setOtpTimeLeft(0);
-        setOtpExpiredMessage("OTP expired");
-        setStatusMessage("Please request a new code to continue.");
-        setError("Your verification code expired. Please request a new code.");
-        return;
-      }
-
-      if (!/^\d{6}$/.test(otp)) throw new Error("Enter the 6-digit verification code.");
-      const { token } = await authApi.verifyEmailOtp(email, otp);
-      if (!firebaseConfigured || !auth) throw new Error(missingFirebaseConfigMessage);
-      await signInWithCustomToken(auth, token);
-      navigate("/login-success");
-    } catch (authError) {
-      setError(authError.message || "Authentication failed.");
-    } finally {
-      setLoading(false);
+      return;
     }
+
+    await verifyCode(otp);
   };
 
   const handleProviderAuth = async () => {
@@ -162,7 +184,7 @@ export default function Login() {
   };
 
   return (
-    <AuthLayout icon={LogIn} title="Welcome back" subtitle="Choose how you'd like to sign in">
+    <AuthLayout icon={null} title="Welcome back" subtitle="Choose how you'd like to sign in">
       {!otpSent && (
         <>
           <div className="space-y-3 mb-6">
@@ -239,6 +261,13 @@ export default function Login() {
                 maxLength={6}
                 value={otp}
                 onChange={handleOtpChange}
+                onComplete={(val) => {
+                  const cleaned = String(val || "").replace(/\D/g, "").slice(0, 6);
+                  if (cleaned.length === 6 && !loading && otpSent && otpTimeLeft > 0) {
+                    verifyCode(cleaned);
+                  }
+                }}
+                disabled={loading || otpTimeLeft <= 0}
                 autoFocus
                 autoComplete="one-time-code"
               >
@@ -265,8 +294,21 @@ export default function Login() {
           </div>
         )}
 
-        <Button type="submit" className="cn-auth-submit w-full h-12 font-medium" disabled={loading || (otpSent && otp.length !== 6)}>
-          {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{otpSent ? "Verifying..." : "Sending code..."}</> : otpSent ? "Verify and log in" : "Send OTP"}
+        <Button
+          type="submit"
+          className="cn-auth-submit w-full h-12 font-medium"
+          disabled={loading || (otpSent && (otp.length !== 6 || otpTimeLeft <= 0))}
+        >
+          {loading ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              {otpSent ? "Verifying..." : "Logging in..."}
+            </>
+          ) : otpSent ? (
+            "Verify"
+          ) : (
+            "Login"
+          )}
         </Button>
       </form>
     </AuthLayout>

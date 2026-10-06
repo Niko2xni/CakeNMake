@@ -65,6 +65,9 @@ async function requestOtp({ email, purpose = 'login', ip = 'unknown', metadata =
   }, OTP_TTL_MS);
 
   const action = purpose === 'link-email' ? 'verify your email address' : 'sign in';
+  if (process.env.NODE_ENV !== 'production') {
+    console.info(`[DEV] Generated OTP code for ${normalizedEmail}: ${code}`);
+  }
   try {
     await mailDelivery.send({
       to: normalizedEmail,
@@ -73,6 +76,10 @@ async function requestOtp({ email, purpose = 'login', ip = 'unknown', metadata =
       html: `<p>Use this code to ${action} to CakeNMake:</p><h2>${code}</h2><p>This code expires in 3 minutes.</p>`,
     });
   } catch (error) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn(`[DEV] Email delivery failed (${error.message}). Development OTP for ${normalizedEmail} is: ${code}`);
+      return { email: normalizedEmail, expiresAt };
+    }
     await otpStore.delete(purpose, normalizedEmail);
     const deliveryError = serviceError('We could not send the verification code.', 'OTP_DELIVERY_FAILED', 502);
     deliveryError.cause = error;

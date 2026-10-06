@@ -58,24 +58,36 @@ const AuthenticatedApp = () => {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
-      <Route path="/designer" element={<DesignerWorkSpace />} />
+      <Route path="/guest-designer" element={<Designer />} />
 
       <Route path="/login" element={<Login />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/login-success" element={<LoginSuccess />} />
 
-      <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
-        <Route path="/client" element={<ClientHome />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/templates" element={<Templates />} />
-        <Route path="/cake-ai" element={<CakeAI />} />
-        <Route path="/trash" element={<Trash />} />
-        <Route path="/chats" element={<Chats />} />
-        <Route path="/support" element={<CustomerSupport />} />
+      {/* Original designer workspace: only logged in client accounts can access */}
+      <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/guest-designer" replace />} />}>
+        <Route element={<RoleRoute allowedRoles={['customer']} fallbackPath="/bakery/orders" />}>
+          <Route path="/designer" element={<DesignerWorkSpace />} />
+        </Route>
+      </Route>
 
-        <Route element={<RoleRoute allowedRoles={['bakery_staff', 'bakery_admin', 'platform_admin']} />}>
+      {/* Protected client and bakery routes */}
+      <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
+        {/* Only client accounts can access customer routes */}
+        <Route element={<RoleRoute allowedRoles={['customer']} fallbackPath="/bakery/orders" />}>
+          <Route path="/client" element={<ClientHome />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/templates" element={<Templates />} />
+          <Route path="/cake-ai" element={<CakeAI />} />
+          <Route path="/trash" element={<Trash />} />
+          <Route path="/chats" element={<Chats />} />
+          <Route path="/support" element={<CustomerSupport />} />
+        </Route>
+
+        {/* Only bakery admin / staff accounts can access bakery admin routes */}
+        <Route element={<RoleRoute allowedRoles={['bakery_staff', 'bakery_admin', 'platform_admin']} fallbackPath="/client" />}>
           <Route path="/bakery/designer" element={<BakeryDesigner />} />
           <Route path="/bakery" element={<BakeryAdminLayout />}>
             <Route index element={<Navigate to="orders" replace />} />

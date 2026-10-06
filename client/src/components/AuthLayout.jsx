@@ -17,9 +17,13 @@ export default function AuthLayout({ icon: Icon, title, subtitle, footer, childr
 
       <main className="cn-auth-panel w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="cn-auth-icon inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary mb-4">
-            <Icon className="w-7 h-7 text-primary-foreground" aria-hidden="true" />
-          </div>
+          {Icon ? (
+            <div className="cn-auth-icon inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary mb-4">
+              <Icon className="w-7 h-7 text-primary-foreground" aria-hidden="true" />
+            </div>
+          ) : (
+            <div className="w-14 h-14 mb-4 mx-auto" aria-hidden="true" />
+          )}
           <h1 className="text-4xl font-medium tracking-tight text-foreground">{title}</h1>
           {subtitle && <p className="text-muted-foreground mt-2">{subtitle}</p>}
         </div>
