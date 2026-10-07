@@ -517,11 +517,13 @@ export default function ClientHome() {
                               <h3>{design.name || 'Untitled design'}</h3>
                             </Link>
                             <p>{design.isDuplicated ? 'Duplicated' : `Edited ${formatDate(design.lastEdited)}`}</p>
-                            {index === 0 && (
-                              <Link to={`/designer?designId=${design._id}`} className="cn-continue-label">
-                                {design.sentToBakery ? 'View design →' : 'Continue designing →'}
-                              </Link>
-                            )}
+                            <Link to={`/designer?designId=${design._id}`} className="cn-continue-label">
+                              {design.sentToBakery
+                                ? 'View design →'
+                                : index === 0
+                                  ? 'Continue designing →'
+                                  : 'Edit design →'}
+                            </Link>
                           </div>
 
                           <div className="cn-design-menu-wrap">

@@ -54,6 +54,7 @@ describe('ClientHome presentation', () => {
     expect(screen.getByText('Latest')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /open cherry cake/i })).toHaveAttribute('href', '/designer?designId=latest');
     expect(screen.getByRole('link', { name: /view design/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /edit design/i })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /continue designing/i })).not.toBeInTheDocument();
     expect(screen.queryByText('Premium Quality')).not.toBeInTheDocument();
     expect(screen.queryByText('Easy Ordering')).not.toBeInTheDocument();
