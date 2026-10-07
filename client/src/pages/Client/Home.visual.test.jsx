@@ -50,8 +50,11 @@ describe('ClientHome presentation', () => {
     expect(title).not.toHaveClass('bg-gradient-to-r', 'bg-clip-text', 'text-transparent');
 
     expect(await screen.findByText('Cherry cake')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /your designs/i })).toBeInTheDocument();
     expect(screen.getByText('Latest')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /open cherry cake/i })).toHaveAttribute('href', '/designer?designId=latest');
+    expect(screen.getByRole('link', { name: /view design/i })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /continue designing/i })).not.toBeInTheDocument();
     expect(screen.queryByText('Premium Quality')).not.toBeInTheDocument();
     expect(screen.queryByText('Easy Ordering')).not.toBeInTheDocument();
   });

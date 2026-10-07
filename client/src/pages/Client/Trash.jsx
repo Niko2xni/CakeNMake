@@ -103,7 +103,7 @@ export default function Trash() {
       await designApi.restoreFromTrash(id);
       setTrashedDesigns(designs => designs.filter(d => d._id !== id));
       setActiveMenu(null);
-      setOperationFeedback(`“${restoredDesign?.name || 'Design'}” was restored to your recent designs.`);
+      setOperationFeedback(`“${restoredDesign?.name || 'Design'}” was restored to your designs.`);
     } catch (error) {
       console.error('Failed to restore design:', error);
       setOperationError('That design could not be restored. Please try again.');

@@ -13,17 +13,10 @@ import {
   X,
   Cake,
   ReceiptText,
-  Calendar,
   Layers,
-  Palette,
-  CheckCircle2,
   ArrowRight,
   Loader2,
-  Home as HomeIcon,
-  LayoutTemplate,
   Search,
-  Heart,
-  PartyPopper,
   CornerDownLeft,
 } from 'lucide-react';
 import ClientNavbar from '@/components/client/ClientNavbar';
@@ -178,8 +171,8 @@ export default function ClientHome() {
         setSelectedDesign(refreshed || null);
       }
     } catch (error) {
-      console.error('Failed to fetch recent designs:', error);
-      setLoadError('We could not load your recent designs.');
+      console.error('Failed to fetch designs:', error);
+      setLoadError('We could not load your designs.');
     } finally {
       setLoading(false);
     }
@@ -402,7 +395,7 @@ export default function ClientHome() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search recent designs"
+              placeholder="Search your designs"
               className="w-full pl-11 pr-10 py-3 rounded-full border border-pink-100 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-pink-300 text-sm text-gray-700"
             />
             {searchQuery && (
@@ -418,11 +411,11 @@ export default function ClientHome() {
           </div>
         </header>
 
-        <section className="cn-recent-section" aria-labelledby="recent-designs-title" aria-busy={loading}>
+        <section className="cn-recent-section" aria-labelledby="your-designs-title" aria-busy={loading}>
           <div className="cn-recent-heading">
             <div>
               <p>YOUR CAKE TABLE</p>
-              <h2 id="recent-designs-title">Recent designs</h2>
+              <h2 id="your-designs-title">Your designs</h2>
             </div>
             {!loading && recentDesigns.length > 0 && (
               <span>
@@ -433,7 +426,7 @@ export default function ClientHome() {
           </div>
 
           {loading ? (
-            <div className="cn-design-grid" role="status" aria-label="Loading recent designs">
+            <div className="cn-design-grid" role="status" aria-label="Loading your designs">
               {[0, 1, 2, 3].map((item) => (
                 <div className="cn-design-skeleton" key={item}>
                   <span /><span /><span />
@@ -444,7 +437,7 @@ export default function ClientHome() {
             <div className="cn-home-state is-error" role="alert">
               <AlertCircle aria-hidden="true" />
               <div>
-                <h3>Recent designs are unavailable</h3>
+                <h3>Your designs are unavailable</h3>
                 <p>{loadError}</p>
               </div>
               <div>
@@ -471,7 +464,7 @@ export default function ClientHome() {
               <Search aria-hidden="true" />
               <div>
                 <h3>No designs found</h3>
-                <p>No recent designs match &ldquo;{searchQuery}&rdquo;.</p>
+                <p>No designs match &ldquo;{searchQuery}&rdquo;.</p>
               </div>
               <div>
                 <button type="button" onClick={() => setSearchQuery('')}>Clear search</button>
@@ -526,7 +519,7 @@ export default function ClientHome() {
                             <p>{design.isDuplicated ? 'Duplicated' : `Edited ${formatDate(design.lastEdited)}`}</p>
                             {index === 0 && (
                               <Link to={`/designer?designId=${design._id}`} className="cn-continue-label">
-                                Continue designing →
+                                {design.sentToBakery ? 'View design →' : 'Continue designing →'}
                               </Link>
                             )}
                           </div>
@@ -743,7 +736,7 @@ export default function ClientHome() {
                 to={`/designer?designId=${selectedDesign._id}`}
                 className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1.5"
               >
-                Open in Designer <ArrowRight className="w-4 h-4" />
+                {selectedDesign?.sentToBakery ? 'View in Designer' : 'Open in Designer'} <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
 
@@ -751,7 +744,7 @@ export default function ClientHome() {
               to={`/designer?designId=${selectedDesign._id}`}
               className="w-full mb-5 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-[var(--cn-cherry)] hover:bg-[var(--cn-cherry-dark)] text-white text-xs font-bold shadow-md shadow-[rgba(var(--cn-brand-rgb),0.2)] transition-colors"
             >
-              Open in Designer <ArrowRight className="w-4 h-4" />
+              {selectedDesign?.sentToBakery ? 'View in Designer' : 'Open in Designer'} <ArrowRight className="w-4 h-4" />
             </Link>
 
             {/* Design Specifications */}
