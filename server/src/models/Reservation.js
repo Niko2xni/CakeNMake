@@ -15,6 +15,19 @@ const pricingSnapshotSchema = new mongoose.Schema({
   calculatedAt: { type: Date, required: true },
 }, { _id: false });
 
+// Delivery is persisted with the reservation so a process restart or a mail
+// provider outage does not turn a successfully-created reservation into a
+// permanently lost confirmation.
+const confirmationEmailSchema = new mongoose.Schema({
+  status: { type: String, enum: ['pending', 'sending', 'sent', 'failed'], default: 'pending', required: true },
+  attempts: { type: Number, default: 0, min: 0, required: true },
+  nextAttemptAt: { type: Date, default: Date.now, required: true },
+  lockToken: { type: String, default: null },
+  lockExpiresAt: { type: Date, default: null },
+  sentAt: { type: Date, default: null },
+  lastError: { type: String, default: null, maxlength: 500 },
+}, { _id: false });
+
 const reservationSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -43,6 +56,8 @@ const reservationSchema = new mongoose.Schema(
     // Set once the BullMQ/Puppeteer/jsPDF background pipeline finishes.
     // Bakery Admin never triggers this — it's populated automatically.
     blueprintUrl: { type: String, default: null },
+
+    confirmationEmail: { type: confirmationEmailSchema, default: () => ({}) },
 
     status: {
       type: String,

@@ -16,7 +16,7 @@ const order = () => ({ _id: orderId, user: customer, platform, status: 'pending_
 test('checkout creates one unpaid reservation from the trusted stored price snapshot', async () => {
   mock.method(Reservation, 'findOne', async () => null);
   const upsert = mock.method(Reservation, 'findOneAndUpdate', async () => ({}));
-  await ensureCheckoutReservation({ _id: orderId, customer, platform, status: 'ready', designName: 'Cake', deliveryDate: '2026-10-10', orderPricingSnapshot: { totalMinor: 195000, pricingVersion: 1, calculatedAt: new Date(), lineItems: [] } });
+  await ensureCheckoutReservation({ _id: orderId, customer, platform, status: 'ready', designName: 'Cake', deliveryDate: '2026-10-10', orderPricingSnapshot: { totalMinor: 195000, pricingVersion: 1, calculatedAt: new Date(), lineItems: [] } }, { emailSender: null });
   const [key, update] = upsert.mock.calls[0].arguments;
   assert.deepEqual(key, { blueprint: orderId });
   assert.equal(update.$setOnInsert.totalPrice, 1950);
@@ -27,7 +27,7 @@ test('checkout retry preserves an existing reservation and payment', async () =>
   const existing = { ...order(), downPayment: { isPaid: true } };
   mock.method(Reservation, 'findOne', async () => existing);
   const upsert = mock.method(Reservation, 'findOneAndUpdate', async () => assert.fail('must not reset payment'));
-  assert.equal(await ensureCheckoutReservation({ _id: orderId, customer, status: 'ready' }), existing);
+  assert.equal(await ensureCheckoutReservation({ _id: orderId, customer, status: 'ready' }, { emailSender: null }), existing);
   assert.equal(upsert.mock.callCount(), 0);
 });
 test('checkout reservations validate without a saved Design and preserve price line items', async () => {
@@ -38,7 +38,7 @@ test('checkout reservations validate without a saved Design and preserve price l
     assert.equal(document.pricingSnapshot.lineItems[0].unit, 'item');
     return document;
   });
-  await ensureCheckoutReservation({ _id: orderId, customer, platform, status: 'ready', designName: 'Cake', deliveryDate: '2026-10-10', orderPricingSnapshot: { totalMinor: 195000, pricingVersion: 1, calculatedAt: new Date(), lineItems: [{ componentKey: 'cake', label: 'Cake', quantity: 1, unitPriceMinor: 195000, lineTotalMinor: 195000 }] } });
+  await ensureCheckoutReservation({ _id: orderId, customer, platform, status: 'ready', designName: 'Cake', deliveryDate: '2026-10-10', orderPricingSnapshot: { totalMinor: 195000, pricingVersion: 1, calculatedAt: new Date(), lineItems: [{ componentKey: 'cake', label: 'Cake', quantity: 1, unitPriceMinor: 195000, lineTotalMinor: 195000 }] } }, { emailSender: null });
 });
 test('failed uploads and unowned guest blueprints do not create orders', async () => {
   const lookup = mock.method(Reservation, 'findOne', async () => assert.fail('must not create order'));

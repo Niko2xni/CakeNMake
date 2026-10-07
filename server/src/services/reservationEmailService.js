@@ -1,0 +1,213 @@
+const { randomUUID } = require('node:crypto');
+const { createAuthEmailDelivery } = require('./authEmailDelivery');
+const User = require('../models/User');
+const Platform = require('../models/Platform');
+const Reservation = require('../models/Reservation');
+
+const DELIVERY_LEASE_MS = 2 * 60 * 1000;
+const RETRY_BASE_MS = 60 * 1000;
+const RETRY_MAX_MS = 6 * 60 * 60 * 1000;
+
+function formatPesos(amount) {
+  const num = Number(amount || 0);
+  return Number.isFinite(num)
+    ? num.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : '0.00';
+}
+
+function formatDate(date) {
+  if (!date) return 'Scheduled Date';
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return String(date);
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'Asia/Manila' });
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[character]));
+}
+
+function safeHeader(value) {
+  return String(value ?? '').replace(/[\r\n]+/g, ' ').trim();
+}
+
+function buildEmailContent({ customerName, designName, bakeryName, deliveryDate, totalPrice, downPayment, remainingBalance }) {
+  const subject = `Reservation Confirmation: ${safeHeader(designName)} - CakeNMake`;
+  const text = `Hello ${customerName},
+
+Thank you for sending your cake design to ${bakeryName}! We have received your reservation request.
+
+Reservation Details:
+• Design: "${designName}"
+• Bakery: ${bakeryName}
+• Delivery/Pickup Date: ${deliveryDate}
+• Total Estimated Price: ₱${totalPrice}
+• Required Down Payment: ₱${downPayment} (Awaiting staff verification)
+• Remaining Balance: ₱${remainingBalance} (Due upon delivery/pickup)
+• Status: Pending Down Payment
+
+Your reservation has been created in CakeNMake. You can chat directly with the bakery staff in your dashboard to arrange payment, discuss details, and coordinate delivery.
+
+Thank you,
+The CakeNMake Team`;
+  const values = Object.fromEntries(Object.entries({
+    subject, customerName, designName, bakeryName, deliveryDate, totalPrice, downPayment, remainingBalance,
+  }).map(([key, value]) => [key, escapeHtml(value)]));
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>${values.subject}</title></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #fdf8f9; color: #1f2937; margin: 0; padding: 24px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #fee2e2;">
+    <tr><td style="background: linear-gradient(135deg, #ec4899, #f43f5e, #fb923c); padding: 28px 32px; text-align: center;"><h1 style="color: #ffffff; margin: 0; font-size: 24px;">🎂 CakeNMake</h1><p style="color: #ffffff; margin: 6px 0 0; font-size: 14px;">Reservation Confirmation</p></td></tr>
+    <tr><td style="padding: 32px;">
+      <p style="font-size: 16px; margin: 0 0 16px; color: #374151;">Hello <strong>${values.customerName}</strong>,</p>
+      <p style="font-size: 14px; line-height: 1.6; margin: 0 0 24px; color: #4b5563;">Thank you for sending your cake design to <strong>${values.bakeryName}</strong>! We have received your reservation request and recorded your order specifications.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #fff1f2; border: 1px solid #ffe4e6; border-radius: 12px; margin-bottom: 24px;"><tr><td style="padding: 20px;">
+        <h2 style="font-size: 15px; margin: 0 0 14px; color: #9f1239;">Reservation Summary</h2>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size: 14px; line-height: 1.8;">
+          <tr><td style="color: #6b7280; width: 45%;">Cake Design:</td><td style="color: #111827; font-weight: 600;">${values.designName}</td></tr>
+          <tr><td style="color: #6b7280;">Bakery:</td><td style="color: #111827; font-weight: 600;">${values.bakeryName}</td></tr>
+          <tr><td style="color: #6b7280;">Delivery / Pickup:</td><td style="color: #111827; font-weight: 600;">${values.deliveryDate}</td></tr>
+          <tr><td style="color: #6b7280;">Total Estimated Price:</td><td style="color: #111827; font-weight: 600;">₱${values.totalPrice}</td></tr>
+          <tr><td style="color: #6b7280;">Required Down Payment:</td><td style="color: #e11d48; font-weight: 700;">₱${values.downPayment} <span style="font-size: 11px; font-weight: normal; color: #6b7280;">(Pending verification)</span></td></tr>
+          <tr><td style="color: #6b7280;">Remaining Balance:</td><td style="color: #111827; font-weight: 600;">₱${values.remainingBalance} <span style="font-size: 11px; font-weight: normal; color: #6b7280;">(Due upon pickup/delivery)</span></td></tr>
+          <tr><td style="color: #6b7280;">Status:</td><td style="color: #ea580c; font-weight: 600;">Pending Down Payment</td></tr>
+        </table>
+      </td></tr></table>
+      <div style="background-color: #f9fafb; border-radius: 12px; padding: 18px 20px; margin-bottom: 24px; border: 1px solid #f3f4f6;"><h3 style="font-size: 13px; color: #374151; margin: 0 0 8px;">Next Steps</h3><p style="font-size: 13px; color: #6b7280; line-height: 1.5; margin: 0;">The bakery staff will review your 3D cake design specifications. You can message the bakery directly through your <strong>CakeNMake Chats</strong> to coordinate down payment options and finalize delivery arrangements.</p></div>
+      <p style="font-size: 13px; color: #9ca3af; line-height: 1.5; margin: 0;">If you have any questions, please reach out directly through the CakeNMake chat.</p>
+    </td></tr>
+    <tr><td style="background-color: #f9fafb; padding: 20px 32px; text-align: center; border-top: 1px solid #f3f4f6; font-size: 12px; color: #9ca3af;"><p style="margin: 0;">CakeNMake &bull; Your 3D Custom Cake Design Platform</p></td></tr>
+  </table>
+</body>
+</html>`.trim();
+  return { subject, text, html };
+}
+
+function retryDelay(attempts) {
+  return Math.min(RETRY_BASE_MS * (2 ** Math.max(0, attempts - 1)), RETRY_MAX_MS);
+}
+
+function createReservationEmailService({
+  mailDelivery = createAuthEmailDelivery(),
+  userModel = User,
+  platformModel = Platform,
+  reservationModel = Reservation,
+  clock = () => new Date(),
+  createToken = randomUUID,
+} = {}) {
+  async function sendReservationConfirmationEmail(reservation) {
+    if (!reservation) return { sent: false, reason: 'NO_RESERVATION' };
+    let user = reservation.user;
+    try {
+      if (!user || typeof user !== 'object' || !user.email) user = user ? await userModel.findById(user._id || user).lean() : null;
+    } catch {
+      return { sent: false, error: 'Customer account lookup failed.' };
+    }
+    if (!user?.email) return { sent: false, reason: 'NO_EMAIL', error: 'Customer account has no email address.' };
+
+    let platform = reservation.platform;
+    try {
+      if (!platform || typeof platform !== 'object' || !platform.name) platform = platform ? await platformModel.findById(platform._id || platform).lean() : null;
+    } catch {
+      return { sent: false, error: 'Bakery lookup failed.' };
+    }
+    if (!platform?.name) return { sent: false, error: 'Bakery details are unavailable.' };
+
+    const totalNum = Number(reservation.totalPrice || 0);
+    const downNum = Number(reservation.downPayment?.amount || Math.ceil(totalNum / 2));
+    const message = buildEmailContent({
+      customerName: user.displayName || user.email.split('@')[0] || 'Valued Customer',
+      designName: reservation.designName || 'Custom Cake',
+      bakeryName: platform.name,
+      deliveryDate: formatDate(reservation.pickupDate),
+      totalPrice: formatPesos(totalNum),
+      downPayment: formatPesos(downNum),
+      remainingBalance: formatPesos(Math.max(0, totalNum - downNum)),
+    });
+    if (!mailDelivery.configured) return { sent: false, reason: 'NOT_CONFIGURED', error: 'Email delivery is not configured.' };
+    try {
+      return { sent: true, result: await mailDelivery.send({ to: user.email, ...message }) };
+    } catch (error) {
+      return { sent: false, error: error.message || 'Email provider rejected delivery.' };
+    }
+  }
+
+  async function processReservationConfirmationEmail(reservation) {
+    if (!reservation?._id) return { sent: false, reason: 'NO_RESERVATION_ID' };
+    const now = clock();
+    const token = createToken();
+    const lockExpiresAt = new Date(now.getTime() + DELIVERY_LEASE_MS);
+    let claimed;
+    try {
+      claimed = await reservationModel.findOneAndUpdate({
+        _id: reservation._id,
+        $or: [
+          { 'confirmationEmail.status': 'pending', 'confirmationEmail.nextAttemptAt': { $lte: now } },
+          { 'confirmationEmail.status': 'failed', 'confirmationEmail.nextAttemptAt': { $lte: now } },
+          { 'confirmationEmail.status': 'sending', 'confirmationEmail.lockExpiresAt': { $lte: now } },
+        ],
+      }, {
+        $set: {
+          'confirmationEmail.status': 'sending',
+          'confirmationEmail.lockToken': token,
+          'confirmationEmail.lockExpiresAt': lockExpiresAt,
+          'confirmationEmail.lastError': null,
+        },
+        $inc: { 'confirmationEmail.attempts': 1 },
+      }, { new: true });
+    } catch (error) {
+      console.error('[ReservationEmail] Could not claim confirmation delivery:', error.message);
+      return { sent: false, error: 'Could not claim confirmation delivery.' };
+    }
+    if (!claimed) return { sent: false, reason: 'NOT_DUE_OR_ALREADY_SENT' };
+
+    const delivery = await sendReservationConfirmationEmail(claimed);
+    const filter = { _id: claimed._id, 'confirmationEmail.status': 'sending', 'confirmationEmail.lockToken': token };
+    if (delivery.sent) {
+      await reservationModel.updateOne(filter, { $set: {
+        'confirmationEmail.status': 'sent', 'confirmationEmail.sentAt': clock(),
+        'confirmationEmail.lockToken': null, 'confirmationEmail.lockExpiresAt': null, 'confirmationEmail.lastError': null,
+      } }).catch((error) => console.error('[ReservationEmail] Could not record delivered confirmation:', error.message));
+      return delivery;
+    }
+
+    const attempts = Number(claimed.confirmationEmail?.attempts || 1);
+    const errorMessage = String(delivery.error || delivery.reason || 'Email delivery failed.').slice(0, 500);
+    await reservationModel.updateOne(filter, { $set: {
+      'confirmationEmail.status': 'failed',
+      'confirmationEmail.nextAttemptAt': new Date(clock().getTime() + retryDelay(attempts)),
+      'confirmationEmail.lockToken': null, 'confirmationEmail.lockExpiresAt': null, 'confirmationEmail.lastError': errorMessage,
+    } }).catch((error) => console.error('[ReservationEmail] Could not record deferred confirmation:', error.message));
+    console.error(`[ReservationEmail] Confirmation delivery deferred for reservation ${claimed._id}: ${errorMessage}`);
+    return delivery;
+  }
+
+  async function processPendingReservationConfirmations({ limit = 25 } = {}) {
+    const now = clock();
+    const pending = await reservationModel.find({ $or: [
+      { 'confirmationEmail.status': 'pending', 'confirmationEmail.nextAttemptAt': { $lte: now } },
+      { 'confirmationEmail.status': 'failed', 'confirmationEmail.nextAttemptAt': { $lte: now } },
+      { 'confirmationEmail.status': 'sending', 'confirmationEmail.lockExpiresAt': { $lte: now } },
+    ] }).select('_id').sort({ 'confirmationEmail.nextAttemptAt': 1 }).limit(limit).lean();
+    return Promise.allSettled(pending.map((entry) => processReservationConfirmationEmail(entry)));
+  }
+
+  return { sendReservationConfirmationEmail, processReservationConfirmationEmail, processPendingReservationConfirmations };
+}
+
+const defaultReservationEmailService = createReservationEmailService();
+
+module.exports = {
+  createReservationEmailService,
+  sendReservationConfirmationEmail: (reservation) => defaultReservationEmailService.sendReservationConfirmationEmail(reservation),
+  processReservationConfirmationEmail: (reservation) => defaultReservationEmailService.processReservationConfirmationEmail(reservation),
+  processPendingReservationConfirmations: (options) => defaultReservationEmailService.processPendingReservationConfirmations(options),
+  buildEmailContent,
+  formatPesos,
+  formatDate,
+  escapeHtml,
+};
