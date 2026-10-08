@@ -21,6 +21,8 @@ describe('Smart Collision Detector for Center Tab Designs', () => {
   it('defines accurate physical radii for all Center items matching their 3D meshes', () => {
     expect(CENTER_ITEM_RADII.strawberry).toBe(0.30);
     expect(CENTER_ITEM_RADII.cherry).toBe(0.34);
+    expect(CENTER_ITEM_RADII.blueberry).toBe(0.25);
+    expect(CENTER_ITEM_RADII.mangoCube).toBe(0.24);
     expect(CENTER_ITEM_RADII.ferreroRocher).toBe(0.62);
     expect(CENTER_ITEM_RADII.oreo).toBe(0.875);
     expect(CENTER_ITEM_RADII.hersheysKisses).toBe(0.40);
@@ -30,11 +32,13 @@ describe('Smart Collision Detector for Center Tab Designs', () => {
   });
 
   it('keeps delicate edible items at fixed 1:1 real-life size while scaling scalable items', () => {
-    // Ferrero Rocher, Strawberry, Cherry, Hershey Kisses, Basketball, Soccer Ball are delicate fixed-scale
+    // Ferrero Rocher, Strawberry, Cherry, Blueberry, Mango Cube, Hershey Kisses, Basketball, Soccer Ball are delicate fixed-scale
     expect(getCenterItemRadius('ferreroRocher', 1.5)).toBe(0.62);
     expect(getCenterItemRadius('ferreroRocher', 0.5)).toBe(0.62);
     expect(getCenterItemRadius('strawberry', 1.5)).toBe(0.30);
     expect(getCenterItemRadius('cherry', 1.5)).toBe(0.34);
+    expect(getCenterItemRadius('blueberry', 1.5)).toBe(0.25);
+    expect(getCenterItemRadius('mangoCube', 1.5)).toBe(0.24);
     expect(getCenterItemRadius('hersheysKisses', 1.5)).toBe(0.40);
     expect(getCenterItemRadius('basketball', 1.5)).toBe(0.54);
     expect(getCenterItemRadius('soccerball', 1.5)).toBe(0.54);

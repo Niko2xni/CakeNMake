@@ -12,6 +12,9 @@ describe('Center tab item placement limits', () => {
     expect(CENTER_ITEM_LIMITS).toEqual({
       strawberry: 10,
       cherry: 10,
+      blueberry: 10,
+      mangoCube: 12,
+      mango: 12,
       ferreroRocher: 8,
       oreo: 8,
       hersheysKisses: 9,
@@ -31,6 +34,8 @@ describe('Center tab item placement limits', () => {
     expect(limitsByDesignId).toEqual({
       strawberry: 10,
       cherry: 10,
+      blueberry: 10,
+      mangoCube: 12,
       ferreroRocher: 8,
       hersheysKisses: 9,
       oreo: 8,
@@ -43,6 +48,9 @@ describe('Center tab item placement limits', () => {
   it('retrieves limits accurately via getCenterItemLimit', () => {
     expect(getCenterItemLimit('strawberry')).toBe(10);
     expect(getCenterItemLimit('cherry')).toBe(10);
+    expect(getCenterItemLimit('blueberry')).toBe(10);
+    expect(getCenterItemLimit('mangoCube')).toBe(12);
+    expect(getCenterItemLimit('mango')).toBe(12);
     expect(getCenterItemLimit('ferreroRocher')).toBe(8);
     expect(getCenterItemLimit('oreo')).toBe(8);
     expect(getCenterItemLimit('hersheysKisses')).toBe(9);
@@ -81,7 +89,7 @@ describe('Center tab item placement limits', () => {
     expect(isCenterItemAtLimit(items, 'strawberry')).toBe(false);
   });
 
-  it('enforces 10 max for Strawberry and Cherry', () => {
+  it('enforces 10 max for Strawberry, Cherry, and Blueberry', () => {
     const strawberries = Array.from({ length: 10 }, (_, i) => ({
       id: `straw-${i}`,
       type: 'center-strawberry-default',
@@ -95,6 +103,22 @@ describe('Center tab item placement limits', () => {
     }));
     expect(isCenterItemAtLimit(cherries, 'cherry')).toBe(true);
     expect(isCenterItemAtLimit(cherries.slice(0, 9), 'cherry')).toBe(false);
+
+    const blueberries = Array.from({ length: 10 }, (_, i) => ({
+      id: `blue-${i}`,
+      type: 'center-blueberry-default',
+    }));
+    expect(isCenterItemAtLimit(blueberries, 'blueberry')).toBe(true);
+    expect(isCenterItemAtLimit(blueberries.slice(0, 9), 'blueberry')).toBe(false);
+  });
+
+  it('enforces 12 max for Mango Cube', () => {
+    const mangoes = Array.from({ length: 12 }, (_, i) => ({
+      id: `mango-${i}`,
+      type: 'center-mangoCube-default',
+    }));
+    expect(isCenterItemAtLimit(mangoes, 'mangoCube')).toBe(true);
+    expect(isCenterItemAtLimit(mangoes.slice(0, 11), 'mangoCube')).toBe(false);
   });
 
   it('enforces 8 max for Ferrero Rocher, Oreo, Fondant Basketball, and Fondant Soccer Ball', () => {

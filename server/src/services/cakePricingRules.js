@@ -341,6 +341,8 @@ const DEFAULT_RATES = {
     brackets: {
       strawberry: [{ maxQty: 4, price: 150 }, { maxQty: 10, price: 200 }],
       cherry: [{ maxQty: 4, price: 175 }, { maxQty: 10, price: 250 }],
+      blueberry: [{ maxQty: 4, price: 150 }, { maxQty: 10, price: 200 }],
+      mangoCube: [{ maxQty: 4, price: 150 }, { maxQty: 12, price: 200 }],
       ferreroRocher: [{ maxQty: 3, price: 60 }, { maxQty: 8, price: 120 }],
       oreo: [{ maxQty: 4, price: 8 }, { maxQty: 8, price: 15 }],
       hersheysKisses: [{ maxQty: 4, price: 37 }, { maxQty: 9, price: 74 }],
@@ -362,6 +364,9 @@ const DEFAULT_RATES = {
 const DESIGN_LABELS = {
   strawberry: 'Strawberry',
   cherry: 'Cherry',
+  blueberry: 'Blueberry',
+  mangoCube: 'Mango Cube',
+  mango: 'Mango Cube',
   ferreroRocher: 'Ferrero Rocher',
   hersheysKisses: "Hershey's Kiss",
   oreo: 'Oreo',
@@ -713,6 +718,9 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
 const CENTER_RADII = {
   strawberry: 0.30,
   cherry: 0.34,
+  blueberry: 0.25,
+  mangoCube: 0.24,
+  mango: 0.24,
   ferreroRocher: 0.62,
   oreo: 0.875,
   hersheysKisses: 0.40,
@@ -758,7 +766,7 @@ function getFootprint(item, scale = 1) {
   }
 
   const baseRadius = CENTER_RADII[designId] || 0.45;
-  const isDelicate = ['strawberry', 'cherry', 'ferreroRocher', 'hersheysKisses', 'basketball', 'soccerball'].includes(designId);
+  const isDelicate = ['strawberry', 'cherry', 'blueberry', 'mangoCube', 'mango', 'ferreroRocher', 'hersheysKisses', 'basketball', 'soccerball'].includes(designId);
   const radius = isDelicate ? baseRadius : baseRadius * scale;
   return { type: 'circle', x, z, radius };
 }

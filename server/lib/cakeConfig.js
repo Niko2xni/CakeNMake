@@ -523,6 +523,9 @@ const TRIANGLE_PATTERN_SETS = [
 const CENTER_ITEM_LIMITS = {
   strawberry: 10,
   cherry: 10,
+  blueberry: 10,
+  mangoCube: 12,
+  mango: 12,
   ferreroRocher: 8,
   oreo: 8,
   hersheysKisses: 9,
@@ -580,6 +583,9 @@ function isCenterItemAtLimit(placedItems = [], designId) {
 const CENTER_ITEM_RADII = {
   strawberry: 0.30,       // mesh diameter ~0.60
   cherry: 0.34,           // mesh diameter ~0.68
+  blueberry: 0.25,        // mesh diameter ~0.50
+  mangoCube: 0.24,        // mesh diameter ~0.48 bounding circle
+  mango: 0.24,
   ferreroRocher: 0.62,    // mesh diameter ~1.24 across textured hazelnut sphere
   oreo: 0.875,            // mesh diameter 1.75in (radius 0.875, half-thickness 0.23)
   hersheysKisses: 0.40,   // mesh diameter ~0.80 base
@@ -599,6 +605,9 @@ function getCenterItemRadius(designId, centerDecorScale = 1) {
   const isFixedScale = [
     'strawberry',
     'cherry',
+    'blueberry',
+    'mangoCube',
+    'mango',
     'ferreroRocher',
     'hersheysKisses',
     'basketball',
@@ -1094,6 +1103,8 @@ function isFootprintCollidingWithText(footprint, textBounds) {
 const CENTER_PLACEABLE_DESIGNS = [
   { designId: 'strawberry', orientation: null, label: 'Strawberry', toolId: 'center-strawberry-default', maxLimit: 10 },
   { designId: 'cherry', orientation: null, label: 'Cherry', toolId: 'center-cherry-default', maxLimit: 10 },
+  { designId: 'blueberry', orientation: null, label: 'Blueberry', toolId: 'center-blueberry-default', maxLimit: 10 },
+  { designId: 'mangoCube', orientation: null, label: 'Mango Cube', toolId: 'center-mangoCube-default', maxLimit: 12 },
   { designId: 'ferreroRocher', orientation: null, label: 'Ferrero Rocher', toolId: 'center-ferreroRocher-default', maxLimit: 8 },
   { designId: 'hersheysKisses', orientation: null, label: 'Hershey Kisses', toolId: 'center-hersheysKisses-default', maxLimit: 9 },
   { designId: 'oreo', orientation: 'standing', label: 'Oreo', toolId: 'center-oreo-standing', maxLimit: 8 },
@@ -1429,6 +1440,9 @@ const PLACEABLE_DECORATIONS = [
 const PLACE_ITEM_RADII = {
   cherry: 0.50,
   strawberry: 0.62,
+  blueberry: 0.45,
+  mangoCube: 0.45,
+  mango: 0.45,
   candle: 0.38,
   chocolateChip: 0.30,
   rosette: 0.75,

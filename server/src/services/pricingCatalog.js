@@ -1,6 +1,6 @@
 const flavors = ['vanilla', 'chocolate', 'strawberry', 'cheese', 'ube', 'mocha'];
 const colors = ['red', 'black', 'pink', 'white', 'ivory', 'blush', 'sage', 'navy', 'terracotta', 'lavenderGrey', 'charcoal', 'gold', 'marble', 'ombre', 'rainbowSwirl', 'goldShimmer', 'watercolorPastel', 'redWhiteGradient'];
-const placed = ['cherry', 'strawberry', 'mango', 'candyFlowers', 'ferreroRocher', 'hersheysKisses', 'oreo', 'chocolateBear', 'basketball', 'soccerball', 'candle', 'chocolateChip', 'rosette'];
+const placed = ['cherry', 'strawberry', 'blueberry', 'mango', 'mangoCube', 'candyFlowers', 'ferreroRocher', 'hersheysKisses', 'oreo', 'chocolateBear', 'basketball', 'soccerball', 'candle', 'chocolateChip', 'rosette'];
 const sideModes = ['checkeredPattern', 'trianglePattern', 'chevronPattern', 'scatterPearls', 'whippedSkirt', 'drip', 'pipingScrolls', 'sunshinePlay', 'victorianLambeth'];
 
 function title(value) {
