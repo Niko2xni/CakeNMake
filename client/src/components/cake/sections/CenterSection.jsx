@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import {
   CENTER_PLACEABLE_DESIGNS,
+  CENTER_VARIATIONS,
+  getCenterVariations,
   BUTTERCREAM_LETTERS,
   BUTTERCREAM_LETTERS_UPPER,
   BUTTERCREAM_LETTERS_LOWER,
@@ -334,6 +336,7 @@ function LetterGroup({
 // implies per-tier awareness eventually; not wired into this pass.
 export default function CenterSection({
   center,
+  structure,
   onChange,
   activeTool,
   onSelectTool,
@@ -373,17 +376,23 @@ export default function CenterSection({
     onChange({ ...center, mode: 'text', textCategory: 'buttercream' });
   };
 
+  const switchToVariations = () => {
+    onItemSelect?.(null);
+    onSelectTool?.(null);
+    onChange({ ...center, mode: 'variations' });
+  };
+
   // Auto-disarm if the currently armed design has reached its maximum limit
   React.useEffect(() => {
-    if (armedDesign?.designId && isCenterItemAtLimit(placedItems, armedDesign.designId)) {
+    if (armedDesign?.designId && isCenterItemAtLimit(placedItems, armedDesign.designId, structure)) {
       onSelectTool?.(null);
     }
-  }, [placedItems, armedDesign?.designId, onSelectTool]);
+  }, [placedItems, armedDesign?.designId, onSelectTool, structure]);
 
   const armDecorationTool = (toolId) => {
     onItemSelect?.(null);
     const design = CENTER_PLACEABLE_DESIGNS.find((d) => d.toolId === toolId);
-    if (design && isCenterItemAtLimit(placedItems, design.designId)) {
+    if (design && isCenterItemAtLimit(placedItems, design.designId, structure)) {
       return;
     }
     const isSameArmed = armedCenterType === toolId;
@@ -413,15 +422,18 @@ export default function CenterSection({
     onSelectTool?.(null);
   };
 
-  // Decorations and Buttercream Text share one placedItems bucket (both
-  // are 'center-' tagged, both go through the same collision system in
+  // Decorations, Buttercream Text, and Variations share one placedItems bucket (all
+  // are 'center-' tagged, all go through the same collision system in
   // CakeScene.jsx) but get their own separate "N placed / Clear All" here
   // -- clearing a typed word on the Buttercream Text tab shouldn't also
-  // wipe out a chocolate bear placed on the Decorations tab, and vice
+  // wipe out a chocolate bear placed on the Decorations tab, or vice
   // versa, even though under the hood they're neighbors in the same array
   // and DO collide with each other on the cake.
-  const placedDecorationItems = placedItems.filter((item) => item.type && item.type.startsWith('center-') && !isLetterToolType(item.type));
+  const placedDecorationItems = placedItems.filter(
+    (item) => item.type && item.type.startsWith('center-') && !isLetterToolType(item.type) && item.source !== 'variation'
+  );
   const placedLetterItems = placedItems.filter((item) => isLetterToolType(item.type));
+  const placedVariationItems = placedItems.filter((item) => item.source === 'variation');
 
   const selectedCenterItem = placedItems.find((item) => item.id === selectedItemId) || null;
   const isSelectedDecoration = Boolean(selectedCenterItem && !isLetterToolType(selectedCenterItem.type));
@@ -447,11 +459,87 @@ export default function CenterSection({
     if (selectedCenterItem) {
       if (isLetterToolType(selectedCenterItem.type) && mode !== 'text') {
         onChange({ ...center, mode: 'text', textCategory: 'buttercream' });
-      } else if (!isLetterToolType(selectedCenterItem.type) && mode !== 'decorations') {
+      } else if (
+        !isLetterToolType(selectedCenterItem.type) &&
+        !selectedCenterItem.source?.startsWith('variation') &&
+        mode !== 'decorations' &&
+        mode !== 'variations'
+      ) {
         onChange({ ...center, mode: 'decorations' });
       }
     }
   }, [selectedCenterItem, mode]);
+
+  const clearVariationItems = () => {
+    onItemSelect?.(null);
+    onPlacedItemsChange?.((currentItems) =>
+      currentItems.filter((item) => item.source !== 'variation')
+    );
+    onChange({
+      ...center,
+      variations: {},
+    });
+  };
+
+  const handleSelectVariation = (decoration, variantId) => {
+    onItemSelect?.(null);
+    onSelectTool?.(null);
+
+    const hasItems = placedItems.some(
+      (item) => item.source === 'variation' && item.variationType === decoration.id
+    );
+    const currentSetId = hasItems
+      ? (center.variations?.[decoration.id]?.setId || center.variations?.[decoration.id] || null)
+      : null;
+
+    if (currentSetId === variantId) {
+      // Toggle off / deselect
+      const nextVariations = { ...(center.variations || {}) };
+      delete nextVariations[decoration.id];
+      onChange({
+        ...center,
+        variations: nextVariations,
+      });
+      onPlacedItemsChange?.((currentItems) =>
+        currentItems.filter(
+          (item) => !(item.source === 'variation' && item.variationType === decoration.id)
+        )
+      );
+      return;
+    }
+
+    const variant = decoration.sets.find((s) => s.id === variantId);
+    if (!variant) return;
+
+    const newItems = variant.placements.map((p, idx) => ({
+      id: `center-var-${decoration.id}-${Date.now()}-${idx}`,
+      type: decoration.toolId,
+      x: p.x,
+      z: p.z,
+      rotation: p.rotation || 0,
+      tiltX: p.tiltX || 0,
+      tiltZ: p.tiltZ || 0,
+      source: 'variation',
+      variationType: decoration.id,
+      variationId: variant.id,
+    }));
+
+    onChange({
+      ...center,
+      mode: 'variations',
+      variations: {
+        ...(center.variations || {}),
+        [decoration.id]: variantId,
+      },
+    });
+
+    onPlacedItemsChange?.((currentItems) => {
+      const withoutExisting = currentItems.filter(
+        (item) => !(item.source === 'variation' && item.variationType === decoration.id)
+      );
+      return [...withoutExisting, ...newItems];
+    });
+  };
 
   const updateSelectedItemPose = (changes) => {
     if (!selectedCenterItem) return;
@@ -623,6 +711,7 @@ export default function CenterSection({
       <div>
         <div className="flex gap-1 bg-muted/40 rounded-xl p-1">
           <button
+            type="button"
             onClick={switchToDecorations}
             className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
               mode === 'decorations' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
@@ -631,12 +720,22 @@ export default function CenterSection({
             Decorations
           </button>
           <button
+            type="button"
             onClick={switchToText}
             className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
               mode === 'text' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             Text
+          </button>
+          <button
+            type="button"
+            onClick={switchToVariations}
+            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
+              mode === 'variations' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Variations
           </button>
         </div>
       </div>
@@ -683,7 +782,7 @@ export default function CenterSection({
           <div className="grid grid-cols-2 gap-2">
             {CENTER_PLACEABLE_DESIGNS.map((design) => {
               const isArmed = armedCenterType === design.toolId;
-              const limit = getCenterItemLimit(design.designId);
+              const limit = getCenterItemLimit(design.designId, structure);
               const count = getCenterItemCount(placedItems, design.designId);
               const isMaxReached = limit !== null && count >= limit;
 
@@ -807,6 +906,81 @@ export default function CenterSection({
         </div>
       )}
 
+      {mode === 'variations' && (
+        <div className="space-y-4">
+          {placedVariationItems.length > 0 && (
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-xs text-muted-foreground">
+                {placedVariationItems.length} placed
+              </span>
+              <button
+                type="button"
+                onClick={clearVariationItems}
+                className="text-xs font-semibold text-destructive hover:underline"
+              >
+                Clear All
+              </button>
+            </div>
+          )}
+
+          <div className="space-y-4">
+            {getCenterVariations(structure).map((decoration) => {
+              const currentSetId = (
+                placedItems.some(
+                  (item) => item.source === 'variation' && item.variationType === decoration.id
+                )
+                  ? (center.variations?.[decoration.id]?.setId || center.variations?.[decoration.id] || null)
+                  : null
+              );
+
+              return (
+                <OptionRow key={decoration.id} label={decoration.label}>
+                  {decoration.sets.map((variant, i) => {
+                    const isActive = currentSetId === variant.id;
+                    return (
+                      <Circle
+                        key={variant.id}
+                        active={isActive}
+                        onClick={() => handleSelectVariation(decoration, variant.id)}
+                        title={isActive ? `Remove ${variant.label}` : variant.label}
+                      >
+                        {i + 1}
+                      </Circle>
+                    );
+                  })}
+                </OptionRow>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
     </div>
+  );
+}
+
+function OptionRow({ label, children }) {
+  return (
+    <div>
+      <span className="text-xs font-semibold text-foreground/80 mb-1.5 block">{label}</span>
+      <div className="flex flex-wrap gap-2">{children}</div>
+    </div>
+  );
+}
+
+function Circle({ active, onClick, title, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
+        active
+          ? 'bg-primary text-primary-foreground border-primary shadow-md'
+          : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
+      }`}
+    >
+      {children}
+    </button>
   );
 }

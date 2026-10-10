@@ -154,13 +154,13 @@ const DEFAULT_CONFIG = {
     ],
   },
 
-  // 5. Center — top surface. Decorations and Text are mutually EXCLUSIVE
-  // (genuine delete, not disable-preserve — see spec §4b): picking one
-  // clears the other's stored value. `mode` tracks which is active.
+  // 5. Center — top surface. Decorations, Text, and Variations are
+  // separate tabs. `mode` tracks which tab is currently active.
   center: {
-    mode: 'decorations', // 'decorations' | 'text' | null -- starts on Decorations, but with nothing armed (that's activeTool, separate state, starts null regardless)
+    mode: 'decorations', // 'decorations' | 'text' | 'variations' | null -- starts on Decorations
     decorations: { colorId: 'vanilla' },
     text: { top: '', middle: '', bottom: '', font: 'script' },
+    variations: {},
   },
 
   // 6. Edge — top edge / bottom edge trim. Top+Bottom-separate and Both are
@@ -628,9 +628,15 @@ function isLetterDesignId(designId) {
     || designId === 'fondantText';
 }
 
-function getCenterItemLimit(designId) {
+function getCenterItemLimit(designId, structureOrFormat) {
   if (!designId) return null;
   if (isLetterDesignId(designId)) return 50;
+  const isBento = typeof structureOrFormat === 'string'
+    ? structureOrFormat === 'bento'
+    : isBentoStructure(structureOrFormat || {});
+  if (designId === 'strawberry' && isBento) {
+    return 4;
+  }
   return CENTER_ITEM_LIMITS[designId] ?? null;
 }
 
@@ -652,8 +658,8 @@ function getCenterItemCount(placedItems = [], designId) {
   }).length;
 }
 
-function isCenterItemAtLimit(placedItems = [], designId) {
-  const limit = getCenterItemLimit(designId);
+function isCenterItemAtLimit(placedItems = [], designId, structureOrFormat) {
+  const limit = getCenterItemLimit(designId, structureOrFormat);
   if (limit === null) return false;
   return getCenterItemCount(placedItems, designId) >= limit;
 }
@@ -1176,6 +1182,149 @@ const CENTER_PLACEABLE_DESIGNS = [
   { designId: 'soccerball', orientation: null, label: 'Fondant Soccer Ball', toolId: 'center-soccerball-default', maxLimit: 8 },
 ];
 
+// ─── Center Variations ──────────────────────────────────────────────────────
+// Preset multi-item arrangements for center decorations. Numbered choices
+// give distinct placements across the cake top surface, mirroring the Side
+// tab's numbered variation architecture.
+const STRAWBERRY_VARIATION_SETS = [
+  {
+    id: 'singleCenter',
+    label: 'Single Center',
+    placements: [
+      { x: 0, z: 0, rotation: 0 },
+    ],
+  },
+  {
+    id: 'trioCluster',
+    label: 'Center Trio',
+    placements: [
+      { x: 0, z: -0.42, rotation: 0 },
+      { x: 0.364, z: 0.21, rotation: 2.094 },
+      { x: -0.364, z: 0.21, rotation: 4.189 },
+    ],
+  },
+  {
+    id: 'centerDiamond',
+    label: 'Center Diamond',
+    placements: [
+      { x: 0, z: -0.52, rotation: 0 },
+      { x: 0.52, z: 0, rotation: 1.571 },
+      { x: 0, z: 0.52, rotation: 3.142 },
+      { x: -0.52, z: 0, rotation: 4.712 },
+    ],
+  },
+  {
+    id: 'crescentArc',
+    label: 'Crescent Arc',
+    placements: [
+      { x: -1.6, z: -0.92, rotation: -1.05 },
+      { x: -0.92, z: -1.6, rotation: -0.52 },
+      { x: 0, z: -1.85, rotation: 0 },
+      { x: 0.92, z: -1.6, rotation: 0.52 },
+      { x: 1.6, z: -0.92, rotation: 1.05 },
+    ],
+  },
+  {
+    id: 'blossomRadial',
+    label: 'Blossom Radial',
+    placements: [
+      { x: 0, z: 0, rotation: 0 },
+      { x: 0, z: -1.4, rotation: 0 },
+      { x: 1.21, z: -0.7, rotation: 1.047 },
+      { x: 1.21, z: 0.7, rotation: 2.094 },
+      { x: 0, z: 1.4, rotation: 3.142 },
+      { x: -1.21, z: 0.7, rotation: 4.189 },
+      { x: -1.21, z: -0.7, rotation: 5.236 },
+    ],
+  },
+  {
+    id: 'circleRing',
+    label: 'Outer Ring',
+    placements: [
+      { x: 0, z: -1.95, rotation: 0 },
+      { x: 1.38, z: -1.38, rotation: 0.785 },
+      { x: 1.95, z: 0, rotation: 1.571 },
+      { x: 1.38, z: 1.38, rotation: 2.356 },
+      { x: 0, z: 1.95, rotation: 3.142 },
+      { x: -1.38, z: 1.38, rotation: 3.927 },
+      { x: -1.95, z: 0, rotation: 4.712 },
+      { x: -1.38, z: -1.38, rotation: 5.498 },
+    ],
+  },
+];
+
+// Bento Cake variations (strict limit of 4 strawberries max, 6 variations)
+const BENTO_STRAWBERRY_VARIATION_SETS = [
+  {
+    id: 'singleCenter',
+    label: 'Single Center',
+    placements: [
+      { x: 0, z: 0, rotation: 0 },
+    ],
+  },
+  {
+    id: 'duoCenter',
+    label: 'Center Duo',
+    placements: [
+      { x: -0.35, z: 0, rotation: -0.2 },
+      { x: 0.35, z: 0, rotation: 0.2 },
+    ],
+  },
+  {
+    id: 'trioCluster',
+    label: 'Center Trio',
+    placements: [
+      { x: 0, z: -0.38, rotation: 0 },
+      { x: 0.33, z: 0.19, rotation: 2.094 },
+      { x: -0.33, z: 0.19, rotation: 4.189 },
+    ],
+  },
+  {
+    id: 'crescentArc',
+    label: 'Crescent Arc',
+    placements: [
+      { x: -0.75, z: -0.35, rotation: -0.5 },
+      { x: -0.45, z: -0.75, rotation: 0 },
+      { x: 0.1, z: -0.85, rotation: 0.5 },
+    ],
+  },
+  {
+    id: 'centerDiamond',
+    label: 'Center Diamond',
+    placements: [
+      { x: 0, z: -0.45, rotation: 0 },
+      { x: 0.45, z: 0, rotation: 1.571 },
+      { x: 0, z: 0.45, rotation: 3.142 },
+      { x: -0.45, z: 0, rotation: 4.712 },
+    ],
+  },
+  {
+    id: 'fourCorners',
+    label: '4 Corners Ring',
+    placements: [
+      { x: 0, z: -0.85, rotation: 0 },
+      { x: 0.85, z: 0, rotation: 1.571 },
+      { x: 0, z: 0.85, rotation: 3.142 },
+      { x: -0.85, z: 0, rotation: 4.712 },
+    ],
+  },
+];
+
+function getCenterVariations(structure = {}) {
+  const isBento = isBentoStructure(structure);
+  return [
+    {
+      id: 'strawberry',
+      designId: 'strawberry',
+      label: 'Strawberry',
+      toolId: 'center-strawberry-default',
+      sets: isBento ? BENTO_STRAWBERRY_VARIATION_SETS : STRAWBERRY_VARIATION_SETS,
+    },
+  ];
+}
+
+const CENTER_VARIATIONS = getCenterVariations();
+
 // Buttercream Text: individual hardened-buttercream letters, placed one at
 // a time exactly like any other Center design above (same 'center-{id}-
 // default' toolId format, same click-to-arm flow, same freeform placement
@@ -1522,4 +1671,4 @@ function computeSlotPosition(slot, topRadius) {
   };
 }
 
-module.exports = { DEFAULT_CONFIG, FINISH_STYLES, BUTTERCREAM_TEXTURES, STANDARD_SIZE_OPTIONS, BENTO_SIZE_OPTIONS, PETITS_FOUR_SIZE_OPTIONS, SIZE_OPTIONS, CAKE_FORMAT_OPTIONS, CAKE_TYPE_OPTIONS, LAYER_OPTIONS, SHAPE_OPTIONS, getCakeFormat, isPetitsFourStructure, isBentoStructure, resolveStructureShape, FILLING_LAYER_OPTIONS, PIPING_TIPS, FILLING_PIPING_DESIGNS, SIZE_OPTIONS_CUSTOM, SUGAR_COLORS, SUGAR_COLOR_MODES, SURFACE_TREATMENT_MODES, GLAZE_PATTERNS, PETIT_FOURS_GLAZE_PATTERNS, CHECKERED_PATTERN_SETS, TRIANGLE_PATTERN_SETS, CENTER_ITEM_LIMITS, isLetterDesignId, getCenterItemLimit, getCenterItemCount, isCenterItemAtLimit, CENTER_ITEM_RADII, getCenterItemRadius, getItemFootprint, doFootprintsClash, isFootprintInBoundary, doItemsClash, CENTER_BOUNDARY_RATIO, CENTER_BOUNDARY_RESERVE, getCenterPlacementBoundaryRadius, EDIBLE_DELICATES_RIM_SPECS, getActiveEdgeDelicateTip, getEdgeDelicatesObstacles, getEdgeFerreroObstacles, getDelicatesAwareBoundaryRadius, getFerreroAwareBoundaryRadius, getTopTierRadiusFromConfig, pruneItemsCollidingWithEdgeDelicates, pruneItemsCollidingWithEdgeFerrero, CENTER_PLACEABLE_DESIGNS, BUTTERCREAM_LETTERS_UPPER, BUTTERCREAM_LETTERS_LOWER, BUTTERCREAM_LETTERS, BRACELET_BEADS_VARIATIONS, SCALLOPS_VARIATIONS, EDGE_DECORATION_SETS, PIPING_TIPS_DELUXE, BEADED_TRIM_VARIATIONS_DELUXE, BORDER_PIPING_SOLID_VARIATIONS, BORDER_PIPING_ALTERNATING_VARIATIONS, BORDER_PIPING_VARIATIONS_DELUXE, DOLLOPS_SOLID_VARIATIONS_DELUXE, DOLLOPS_SOLID_CHERRY_VARIATIONS_DELUXE, DOLLOPS_ALTERNATING_VARIATIONS_DELUXE, DOLLOPS_ALTERNATING_CHERRY_VARIATIONS_DELUXE, DOLLOPS_VARIATIONS_DELUXE, WHIPPED_CREAM_SOLID_VARIATIONS, WHIPPED_CREAM_ALTERNATING_VARIATIONS, WHIPPED_CREAM_CHERRY_VARIATIONS, WHIPPED_CREAM_VARIATIONS, FRUIT_CONFECTION_RIM_OPTIONS, WHIPPED_CREAM_AND_RIM_VARIATIONS_DELUXE, EDGE_PIPING_OPTIONS, CHEVRON_PATTERN_SETS, SCATTER_PEARLS_SETS, PIPING_SCROLLS_SETS, SUNSHINE_PLAY_SETS, VICTORIAN_LAMBETH_SETS, SIDE_TREATMENTS, SLOT_RINGS, TOP_SURFACE_SLOTS, PLACEABLE_DECORATIONS, PLACE_ITEM_RADII, getSlotById, computeSlotPosition };
+module.exports = { DEFAULT_CONFIG, FINISH_STYLES, BUTTERCREAM_TEXTURES, STANDARD_SIZE_OPTIONS, BENTO_SIZE_OPTIONS, PETITS_FOUR_SIZE_OPTIONS, SIZE_OPTIONS, CAKE_FORMAT_OPTIONS, CAKE_TYPE_OPTIONS, LAYER_OPTIONS, SHAPE_OPTIONS, getCakeFormat, isPetitsFourStructure, isBentoStructure, resolveStructureShape, FILLING_LAYER_OPTIONS, PIPING_TIPS, FILLING_PIPING_DESIGNS, SIZE_OPTIONS_CUSTOM, SUGAR_COLORS, SUGAR_COLOR_MODES, SURFACE_TREATMENT_MODES, GLAZE_PATTERNS, PETIT_FOURS_GLAZE_PATTERNS, CHECKERED_PATTERN_SETS, TRIANGLE_PATTERN_SETS, CENTER_ITEM_LIMITS, isLetterDesignId, getCenterItemLimit, getCenterItemCount, isCenterItemAtLimit, CENTER_ITEM_RADII, getCenterItemRadius, getItemFootprint, doFootprintsClash, isFootprintInBoundary, doItemsClash, CENTER_BOUNDARY_RATIO, CENTER_BOUNDARY_RESERVE, getCenterPlacementBoundaryRadius, EDIBLE_DELICATES_RIM_SPECS, getActiveEdgeDelicateTip, getEdgeDelicatesObstacles, getEdgeFerreroObstacles, getDelicatesAwareBoundaryRadius, getFerreroAwareBoundaryRadius, getTopTierRadiusFromConfig, pruneItemsCollidingWithEdgeDelicates, pruneItemsCollidingWithEdgeFerrero, CENTER_PLACEABLE_DESIGNS, STRAWBERRY_VARIATION_SETS, BENTO_STRAWBERRY_VARIATION_SETS, getCenterVariations, CENTER_VARIATIONS, BUTTERCREAM_LETTERS_UPPER, BUTTERCREAM_LETTERS_LOWER, BUTTERCREAM_LETTERS, BRACELET_BEADS_VARIATIONS, SCALLOPS_VARIATIONS, EDGE_DECORATION_SETS, PIPING_TIPS_DELUXE, BEADED_TRIM_VARIATIONS_DELUXE, BORDER_PIPING_SOLID_VARIATIONS, BORDER_PIPING_ALTERNATING_VARIATIONS, BORDER_PIPING_VARIATIONS_DELUXE, DOLLOPS_SOLID_VARIATIONS_DELUXE, DOLLOPS_SOLID_CHERRY_VARIATIONS_DELUXE, DOLLOPS_ALTERNATING_VARIATIONS_DELUXE, DOLLOPS_ALTERNATING_CHERRY_VARIATIONS_DELUXE, DOLLOPS_VARIATIONS_DELUXE, WHIPPED_CREAM_SOLID_VARIATIONS, WHIPPED_CREAM_ALTERNATING_VARIATIONS, WHIPPED_CREAM_CHERRY_VARIATIONS, WHIPPED_CREAM_VARIATIONS, FRUIT_CONFECTION_RIM_OPTIONS, WHIPPED_CREAM_AND_RIM_VARIATIONS_DELUXE, EDGE_PIPING_OPTIONS, CHEVRON_PATTERN_SETS, SCATTER_PEARLS_SETS, PIPING_SCROLLS_SETS, SUNSHINE_PLAY_SETS, VICTORIAN_LAMBETH_SETS, SIDE_TREATMENTS, SLOT_RINGS, TOP_SURFACE_SLOTS, PLACEABLE_DECORATIONS, PLACE_ITEM_RADII, getSlotById, computeSlotPosition };

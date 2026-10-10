@@ -663,7 +663,7 @@ export default function DesignerWorkSpace() {
     setPlaceItems(prevItems => {
       if (item?.type && typeof item.type === 'string' && item.type.startsWith('center-')) {
         const designId = item.type.split('-')[1];
-        const limit = getCenterItemLimit(designId);
+        const limit = getCenterItemLimit(designId, config?.structure);
         if (limit !== null) {
           const currentCount = getCenterItemCount(prevItems, designId);
           if (currentCount >= limit) {
@@ -689,7 +689,7 @@ export default function DesignerWorkSpace() {
       const id = `${item.type || 'item'}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       return [...prevItems, { ...item, id }];
     });
-  }, [setPlaceItems, setActiveTool]);
+  }, [setPlaceItems, setActiveTool, config?.structure]);
 
   const handleDeleteSelectedCenterItem = useCallback(() => {
     if (!selectedCenterItemId) return;

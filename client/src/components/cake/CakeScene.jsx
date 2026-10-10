@@ -4251,7 +4251,7 @@ const CakeScene = React.forwardRef(function CakeScene({
       // space without penetrating or clashing with neighboring items.
       const resolveCenterDrop = (designId, orientation, x, z, rotation = 0, tiltX = 0, tiltZ = 0) => {
         const placedItems = cakeConfigRef.current?.placedItems || [];
-        const limit = getCenterItemLimit(designId);
+        const limit = getCenterItemLimit(designId, cakeConfigRef.current?.structure);
         if (limit !== null && getCenterItemCount(placedItems, designId) >= limit) {
           return { x, z, valid: false, reason: 'limit' };
         }
@@ -4373,7 +4373,7 @@ const CakeScene = React.forwardRef(function CakeScene({
           }
           const placedItems = cakeConfigRef.current?.placedItems || [];
           const currentCount = getCenterItemCount(placedItems, designId);
-          const limit = getCenterItemLimit(designId);
+          const limit = getCenterItemLimit(designId, cakeConfigRef.current?.structure);
           const isLetter = isButtercreamLetterDesign(designId);
           const letterColorId = cakeConfigRef.current?.centerTextColorId || 'vanilla';
           const isFlavor = ['vanilla', 'chocolate', 'strawberry', 'cheese', 'ube', 'mocha'].includes(letterColorId);

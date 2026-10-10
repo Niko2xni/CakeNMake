@@ -842,6 +842,7 @@ export default function ToolPanel({
                 <>
                   <CenterSection
                     center={config.center || DEFAULT_CONFIG.center}
+                    structure={config.structure || DEFAULT_CONFIG.structure}
                     onChange={(newCenter) => onChange({ ...config, center: newCenter })}
                     activeTool={activeTool}
                     onSelectTool={onSelectTool}
