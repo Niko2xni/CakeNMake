@@ -1,6 +1,8 @@
 export { addPremadeDoodle } from './doodle';
-export { addCherry, addStrawberry, addCandle, addChocolateChip, addRosette } from './basicToppings';
+export { addCherry, addStrawberry, addBlueberry, addMango, addMangoCube, addCandle, addChocolateChip, addRosette } from './basicToppings';
 export { buildCherryMesh, getSharedCherryBodyGeometry, getSharedCherryBodyMaterial } from './cherry';
+export { buildBlueberryMesh, addBlueberry as addBlueberryDirect, getSharedBlueberryBodyGeometry, getSharedBlueberryBodyMaterial, getSharedBlueberryPitGeometry, getSharedBlueberryPitMaterial } from './blueberry';
+export { buildMangoCubeMesh, addMangoCube as addMangoCubeDirect, addMango as addMangoDirect, getSharedMangoCubeGeometry, getSharedMangoCubeMaterial } from './mango';
 export { buildStrawberryMesh, buildSlicedStrawberryMesh, getSharedStrawberryBodyGeometry, getSharedStrawberryBodyMaterial, getSharedStrawberryTextures } from './strawberry';
 export { buildFloralRosetteMesh, getSharedFloralRosetteGeometry, getSharedFloralRosetteMaterial } from './floralRosette';
 export { buildFerreroRocherMesh, getSharedFerreroGeometry, getSharedFerreroMaterial, getSharedFerreroNormalTexture } from './ferreroRocher';

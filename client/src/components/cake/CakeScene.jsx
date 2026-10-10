@@ -100,6 +100,8 @@ import {
   addPremadeDoodle,
   addCherry,
   addStrawberry,
+  addBlueberry,
+  addMangoCube,
   addCandle,
   addChocolateChip,
   addRosette,
@@ -248,6 +250,9 @@ export function buildAndAddDecoration(targetGroup, setId, x, y, z, scaleFactor, 
   const edibleDelicateScale = [
     'strawberry',
     'cherry',
+    'blueberry',
+    'mangoCube',
+    'mango',
     'ferreroRocher',
     'hersheysKisses',
     'basketball',
@@ -270,6 +275,18 @@ export function buildAndAddDecoration(targetGroup, setId, x, y, z, scaleFactor, 
     const unitGroup = new THREE.Group();
     addCherry(unitGroup, 0, 0, 0, prng);
     unitGroup.scale.setScalar(0.85 * edibleDelicateScale);
+    unitGroup.position.set(x, y, z);
+    targetGroup.add(unitGroup);
+  } else if (setId === 'blueberry') {
+    const unitGroup = new THREE.Group();
+    addBlueberry(unitGroup, 0, 0, 0, prng);
+    unitGroup.scale.setScalar(0.85 * edibleDelicateScale);
+    unitGroup.position.set(x, y, z);
+    targetGroup.add(unitGroup);
+  } else if (setId === 'mangoCube' || setId === 'mango') {
+    const unitGroup = new THREE.Group();
+    addMangoCube(unitGroup, 0, 0, 0, prng);
+    unitGroup.scale.setScalar(0.95 * edibleDelicateScale);
     unitGroup.position.set(x, y, z);
     targetGroup.add(unitGroup);
   } else if (setId === 'fruitRing') {
@@ -679,6 +696,10 @@ export function getDecorationLandingY(anchor, px, pz, topMetrics) {
       const upsideDownFactor = Math.abs(upY);
       nestle += upsideDownFactor * 0.07;
     }
+  } else if (designId === 'blueberry') {
+    nestle += 0.015;
+  } else if (designId === 'mangoCube' || designId === 'mango') {
+    nestle += 0.015;
   } else if (designId === 'oreo' || designId === 'chocolateBear') {
     const upY = anchor.userData.localUpY ?? 1.0;
     // For every angle tilt (0 -> 90 deg), bury progressively into frosting:
@@ -3903,6 +3924,12 @@ const CakeScene = React.forwardRef(function CakeScene({
         } else if (item.type === 'cherry') {
           py = getCakeTopSurfacePoint(px, pz, topMetricsRef.current).y - 0.045;
           addCherry(itemGroup, px, py, pz, rand);
+        } else if (item.type === 'blueberry') {
+          py = getCakeTopSurfacePoint(px, pz, topMetricsRef.current).y - 0.035;
+          addBlueberry(itemGroup, px, py, pz, rand);
+        } else if (item.type === 'mango' || item.type === 'mangoCube') {
+          py = getCakeTopSurfacePoint(px, pz, topMetricsRef.current).y - 0.03;
+          addMangoCube(itemGroup, px, py, pz, rand);
         } else if (item.type === 'strawberry') {
           py = getCakeTopSurfacePoint(px, pz, topMetricsRef.current).y - 0.045;
           addStrawberry(itemGroup, px, py, pz);
@@ -4546,6 +4573,10 @@ const CakeScene = React.forwardRef(function CakeScene({
         const ghostRand = makePRNG(12345);
         if (toolType === 'cherry') {
           addCherry(ghostContainer, resolved.x, surfaceY, resolved.z, ghostRand);
+        } else if (toolType === 'blueberry') {
+          addBlueberry(ghostContainer, resolved.x, surfaceY, resolved.z, ghostRand);
+        } else if (toolType === 'mango' || toolType === 'mangoCube') {
+          addMangoCube(ghostContainer, resolved.x, surfaceY, resolved.z, ghostRand);
         } else if (toolType === 'strawberry') {
           addStrawberry(ghostContainer, resolved.x, surfaceY, resolved.z);
         } else if (toolType === 'candle') {

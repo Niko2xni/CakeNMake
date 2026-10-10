@@ -243,6 +243,8 @@ export const DEFAULT_RATES = {
     brackets: {
       strawberry: [{ maxQty: 4, price: 150 }, { maxQty: 10, price: 200 }],
       cherry: [{ maxQty: 4, price: 175 }, { maxQty: 10, price: 250 }],
+      blueberry: [{ maxQty: 4, price: 150 }, { maxQty: 10, price: 200 }],
+      mangoCube: [{ maxQty: 4, price: 150 }, { maxQty: 12, price: 200 }],
       ferreroRocher: [{ maxQty: 3, price: 60 }, { maxQty: 8, price: 120 }],
       oreo: [{ maxQty: 4, price: 8 }, { maxQty: 8, price: 15 }],
       hersheysKisses: [{ maxQty: 4, price: 37 }, { maxQty: 9, price: 74 }],
@@ -264,6 +266,8 @@ export const DEFAULT_RATES = {
 export const CENTER_DECORATION_META = {
   strawberry: { label: 'Strawberry', unit: 'pcs', description: 'Fresh strawberries placed in center' },
   cherry: { label: 'Cherry', unit: 'pcs', description: 'Maraschino cherries' },
+  blueberry: { label: 'Blueberry', unit: 'pcs', description: 'Fresh blueberries placed in center' },
+  mangoCube: { label: 'Mango Cube', unit: 'pcs', description: 'Fresh diced mango cubes placed in center' },
   ferreroRocher: { label: 'Ferrero Rocher', unit: 'pcs', description: 'Hazelnut chocolates' },
   oreo: { label: 'Oreo', unit: 'pcs', description: 'Standing / flat cookies' },
   hersheysKisses: { label: "Hershey's Kisses", unit: 'pcs', description: 'Chocolate kisses' },

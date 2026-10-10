@@ -5,6 +5,14 @@ import {
   addCherry,
   getSharedCherryBodyGeometry,
   getSharedCherryBodyMaterial,
+  buildBlueberryMesh,
+  addBlueberry,
+  getSharedBlueberryBodyGeometry,
+  getSharedBlueberryBodyMaterial,
+  buildMangoCubeMesh,
+  addMangoCube,
+  getSharedMangoCubeGeometry,
+  getSharedMangoCubeMaterial,
   buildStrawberryMesh,
   buildSlicedStrawberryMesh,
   addStrawberry,
@@ -180,6 +188,85 @@ describe('High-Fidelity Toppings Upgrade', () => {
     it('addRosette adds rosette to target group backwards-compatibly with color', () => {
       const group = new THREE.Group();
       const res = addRosette(group, 0, 0, 0, '#4CAF50');
+      expect(group.children.length).toBe(1);
+      expect(group.children[0]).toBe(res);
+    });
+  });
+
+  describe('Blueberry Module', () => {
+    it('creates a Blueberry mesh group with body and recessed calyx pit', () => {
+      const blueberry = buildBlueberryMesh(1, 2, 3, 0.85);
+      expect(blueberry).toBeInstanceOf(THREE.Group);
+      expect(blueberry.position.x).toBe(1);
+      expect(blueberry.position.y).toBe(2);
+      expect(blueberry.position.z).toBe(3);
+      expect(blueberry.scale.x).toBeCloseTo(0.85);
+
+      const meshes = blueberry.children.filter((c) => c.isMesh);
+      expect(meshes.length).toBeGreaterThanOrEqual(2);
+      meshes.forEach((mesh) => {
+        expect(mesh.castShadow).toBe(true);
+      });
+      expect(blueberry.userData.designId).toBe('blueberry');
+    });
+
+    it('caches Blueberry geometry and materials properly', () => {
+      const geo1 = getSharedBlueberryBodyGeometry();
+      const geo2 = getSharedBlueberryBodyGeometry();
+      expect(geo1).toBe(geo2);
+      expect(geo1.userData.sharedCache).toBe(true);
+
+      const mat1 = getSharedBlueberryBodyMaterial();
+      const mat2 = getSharedBlueberryBodyMaterial();
+      expect(mat1).toBe(mat2);
+      expect(mat1.userData.sharedCache).toBe(true);
+      // Velvety epicuticular bloom properties
+      expect(mat1.sheen).toBeGreaterThan(0.5);
+      expect(mat1.clearcoat).toBeGreaterThan(0.2);
+    });
+
+    it('addBlueberry adds blueberry to target group backwards-compatibly', () => {
+      const group = new THREE.Group();
+      const res = addBlueberry(group, 0, 0, 0);
+      expect(group.children.length).toBe(1);
+      expect(group.children[0]).toBe(res);
+    });
+  });
+
+  describe('Mango Cube Module', () => {
+    it('creates a Mango Cube mesh group with juicy cut-fruit mesh and shadow flags', () => {
+      const mango = buildMangoCubeMesh(1, 2, 3, 0.95);
+      expect(mango).toBeInstanceOf(THREE.Group);
+      expect(mango.position.x).toBe(1);
+      expect(mango.position.y).toBe(2);
+      expect(mango.position.z).toBe(3);
+      expect(mango.scale.x).toBeCloseTo(0.95);
+
+      const meshes = mango.children.filter((c) => c.isMesh);
+      expect(meshes.length).toBe(1);
+      expect(meshes[0].castShadow).toBe(true);
+      expect(meshes[0].receiveShadow).toBe(true);
+      expect(mango.userData.designId).toBe('mangoCube');
+    });
+
+    it('caches Mango Cube geometry and juicy glazed material properly', () => {
+      const geo1 = getSharedMangoCubeGeometry();
+      const geo2 = getSharedMangoCubeGeometry();
+      expect(geo1).toBe(geo2);
+      expect(geo1.userData.sharedCache).toBe(true);
+
+      const mat1 = getSharedMangoCubeMaterial();
+      const mat2 = getSharedMangoCubeMaterial();
+      expect(mat1).toBe(mat2);
+      expect(mat1.userData.sharedCache).toBe(true);
+      // Juicy fruit nectar glaze properties
+      expect(mat1.clearcoat).toBeGreaterThan(0.5);
+      expect(mat1.roughness).toBeLessThan(0.35);
+    });
+
+    it('addMangoCube adds mango cube to target group backwards-compatibly', () => {
+      const group = new THREE.Group();
+      const res = addMangoCube(group, 0, 0, 0);
       expect(group.children.length).toBe(1);
       expect(group.children[0]).toBe(res);
     });

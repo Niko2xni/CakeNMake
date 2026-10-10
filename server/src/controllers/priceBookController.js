@@ -9,6 +9,9 @@ const LEGACY_ESTIMATES = {
   'tier.additional': 100000,
   'placed.strawberry': 15000,
   'placed.cherry': 10000,
+  'placed.blueberry': 10000,
+  'placed.mango': 10000,
+  'placed.mangoCube': 10000,
 };
 
 function initialItems() {
@@ -37,6 +40,7 @@ async function ensureInitialBook(platformId, userId = null) {
     if (preset.category === 'base') componentKey = 'base.standard';
     if (preset.category === 'tier') componentKey = 'tier.additional';
     if (normalizedName.includes('strawberr')) componentKey = 'placed.strawberry';
+    if (normalizedName.includes('blueberr')) componentKey = 'placed.blueberry';
     if (normalizedName.includes('mango')) componentKey = 'placed.mango';
     if (normalizedName.includes('candy flower')) componentKey = 'placed.candyFlowers';
     if (componentKey && itemIndex.has(componentKey)) itemIndex.get(componentKey).costBasisMinor = Math.round(preset.price * 100);

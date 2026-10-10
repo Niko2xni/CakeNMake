@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 export { addCherry } from './cherry';
 export { addStrawberry } from './strawberry';
+export { addBlueberry } from './blueberry';
+export { addMango, addMangoCube } from './mango';
 export { addRosette } from './floralRosette';
 
 export function addCandle(group, x, y, z, rand) {
