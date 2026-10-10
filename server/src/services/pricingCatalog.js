@@ -13,8 +13,12 @@ const item = (componentKey, displayName, category, billingUnit = 'per_cake', isR
 
 const CATALOG_DEFINITIONS = [
   item('base.standard', 'Standard Base Cake', 'base', 'per_cake', true),
-  item('size.small', 'Small Cake (6×4)', 'structure', 'per_cake'),
-  item('size.big', 'Large Cake (8×5)', 'structure', 'per_cake'),
+  item('size.6x6', '6×6 Cake', 'structure', 'per_cake'),
+  item('size.8x8', '8×8 Cake', 'structure', 'per_cake'),
+  item('size.10x10', '10×10 Cake', 'structure', 'per_cake'),
+  item('size.12x12', '12×12 Cake', 'structure', 'per_cake'),
+  item('size.small', 'Small Cake (6×6)', 'structure', 'per_cake'),
+  item('size.big', 'Large Cake (8×8)', 'structure', 'per_cake'),
   item('tier.additional', 'Additional Tier', 'structure', 'per_tier'),
   item('filling.layer', 'Filling Layer', 'filling', 'per_layer'),
   item('finish.naked', 'Naked Finish', 'finish'),

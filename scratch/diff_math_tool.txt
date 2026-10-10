@@ -1,0 +1,257 @@
+diff --git a/client/src/components/cake/LayerSlider.jsx b/client/src/components/cake/LayerSlider.jsx
+index 284f40b..703917d 100644
+--- a/client/src/components/cake/LayerSlider.jsx
++++ b/client/src/components/cake/LayerSlider.jsx
+@@ -4,25 +4,44 @@ import { Button } from '@/components/ui/button';
+ 
+ // Tier dimensions per size and layer count — shown as a hint below the controls
+ const TIER_DIMS = {
+-  big:   { 1: '8"×5"', 2: '8"×5" + 6"×4"' },
+-  small: { 1: '6"×4"', 2: '6"×4" + 4"×3"' },
++  '6x6':           { 1: '6"×4"' },
++  '8x8':           { 1: '8"×6"', 2: '8"×6" + 6"×4"' },
++  '10x10':         { 1: '10"×8"', 2: '10"×8" + 8"×6"' },
++  '12x12':         { 1: '12"×10"', 2: '12"×10" + 10"×8"' },
++  miniBento:     { 1: '3.5"×2"' },
++  standardBento: { 1: '4"×2"' },
++  largeBento:    { 1: '5"×3"' },
++  // Legacy aliases
++  big:             { 1: '8"×6"', 2: '8"×6" + 6"×4"' },
++  small:           { 1: '6"×4"' },
+ };
+ 
+-export default function LayerSlider({ layers, onChange, cakeSize = 'big', onSizeChange }) {
++export default function LayerSlider({ layers, onChange, cakeSize = '8x8', onSizeChange }) {
++  const isSingleTierOnly = cakeSize === '6x6' || cakeSize === 'small' || cakeSize === 'miniBento' || cakeSize === 'standardBento' || cakeSize === 'largeBento';
++  const handleSizeChange = (key) => {
++    onSizeChange?.(key);
++    const isTargetSingleTier = key === '6x6' || key === 'small' || key === 'miniBento' || key === 'standardBento' || key === 'largeBento';
++    if (isTargetSingleTier && layers === 2) {
++      onChange(1);
++    }
++  };
++
+   return (
+     <div className="space-y-4">
+       {/* Size picker */}
+       <div>
+         <p className="text-sm font-heading font-semibold text-foreground/70 mb-2">Cake Size</p>
+-        <div className="flex gap-2">
++        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+           {[
+-            { key: 'big',   label: '8×5', dims: '8"×5"' },
+-            { key: 'small', label: '6×4', dims: '6"×4"' },
++            { key: '6x6',   label: '6×6', dims: '6"×4"' },
++            { key: '8x8',   label: '8×8', dims: '8"×6"' },
++            { key: '10x10', label: '10×10', dims: '10"×8"' },
++            { key: '12x12', label: '12×12', dims: '12"×10"' },
+           ].map(({ key, label, dims }) => (
+             <button
+               key={key}
+-              onClick={() => onSizeChange?.(key)}
+-              className={`flex-1 flex flex-col items-center py-2.5 px-3 rounded-xl border-2 text-xs font-semibold transition-all duration-200 ${
++              onClick={() => handleSizeChange(key)}
++              className={`flex-1 flex flex-col items-center py-2 px-2 rounded-xl border-2 text-xs font-semibold transition-all duration-200 ${
+                 cakeSize === key
+                   ? 'border-primary bg-primary/10 text-primary'
+                   : 'border-border bg-muted/40 text-muted-foreground hover:border-primary/40 hover:text-foreground'
+@@ -49,28 +68,34 @@ export default function LayerSlider({ layers, onChange, cakeSize = 'big', onSize
+             <Minus className="w-4 h-4" />
+           </Button>
+           <div className="flex-1 flex items-center justify-center gap-1.5">
+-            {[1, 2].map((n) => (
+-              <button
+-                key={n}
+-                onClick={() => onChange(n)}
+-                className={`
+-                  h-8 rounded-lg transition-all duration-300 font-heading font-bold text-sm
+-                  ${n <= layers
+-                    ? 'bg-primary text-primary-foreground shadow-sm'
+-                    : 'bg-muted text-muted-foreground'}
+-                `}
+-                style={{ width: `${18 + (6 - n) * 4}px` }}
+-              >
+-                {n}
+-              </button>
+-            ))}
++            {[1, 2].map((n) => {
++              const disabledTier = n === 2 && isSingleTierOnly;
++              return (
++                <button
++                  key={n}
++                  onClick={() => !disabledTier && onChange(n)}
++                  disabled={disabledTier}
++                  className={`
++                    h-8 rounded-lg transition-all duration-300 font-heading font-bold text-sm
++                    ${disabledTier ? 'opacity-30 cursor-not-allowed bg-muted text-muted-foreground' : (
++                      n <= layers
++                        ? 'bg-primary text-primary-foreground shadow-sm'
++                        : 'bg-muted text-muted-foreground'
++                    )}
++                  `}
++                  style={{ width: `${18 + (6 - n) * 4}px` }}
++                >
++                  {n}
++                </button>
++              );
++            })}
+           </div>
+           <Button
+             variant="outline"
+             size="icon"
+             className="rounded-full h-10 w-10 shrink-0"
+             onClick={() => onChange(Math.min(2, layers + 1))}
+-            disabled={layers >= 2}
++            disabled={layers >= 2 || isSingleTierOnly}
+           >
+             <Plus className="w-4 h-4" />
+           </Button>
+diff --git a/client/src/components/cake/ToolPanel.jsx b/client/src/components/cake/ToolPanel.jsx
+index 02de197..65208c2 100644
+--- a/client/src/components/cake/ToolPanel.jsx
++++ b/client/src/components/cake/ToolPanel.jsx
+@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
+ import { ScrollArea } from '@/components/ui/scroll-area';
+ import { Separator } from '@/components/ui/separator';
+ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+-import { DEFAULT_CONFIG, pruneItemsCollidingWithEdgeDelicates, getTopTierRadiusFromConfig } from '@/lib/cakeConfig';
++import { DEFAULT_CONFIG, pruneItemsCollidingWithEdgeDelicates, getTopTierRadiusFromConfig, isPetitsFourStructure } from '@/lib/cakeConfig';
+ import CakeStructureSection from './sections/CakeStructureSection';
+ import SpongeFlavorSection from './sections/SpongeFlavorSection';
+ import FillingSection from './sections/FillingSection';
+@@ -112,7 +112,8 @@ export default function ToolPanel({
+ 
+   const [showResetConfirm, setShowResetConfirm] = useState(false);
+ 
+-  const isIndividual = config.structure?.layerDesign === 'individual' && config.structure?.layers > 1;
++  const isPetitsFour = isPetitsFourStructure(config.structure);
++  const isIndividual = config.structure?.layerDesign === 'individual' && (config.structure?.layers > 1 || isPetitsFour);
+ 
+   // Fully Frosted and Textured Buttercream both physically cover the
+   // sponge and filling — a change made to either while one of these
+@@ -142,11 +143,11 @@ export default function ToolPanel({
+   useEffect(() => () => clearTimeout(frostedNoticeTimeoutRef.current), []);
+ 
+   useEffect(() => {
+-    const maxLayer = (config.structure?.layers || 1) - 1;
++    const maxLayer = (isPetitsFour ? 4 : (config.structure?.layers || 1)) - 1;
+     if (activeLayer > maxLayer) {
+       setActiveLayer(0);
+     }
+-  }, [config.structure?.layers, activeLayer]);
++  }, [config.structure?.layers, isPetitsFour, activeLayer]);
+ 
+   // Refs to each collapsible section's own wrapper, keyed by section id —
+   // used to scroll a section into view right after IT opens, so expanding
+@@ -534,7 +535,7 @@ export default function ToolPanel({
+               animate={{ opacity: 1 }}
+               transition={{ duration: 0.2 }}
+             >
+-              {config.structure?.layers > 1 && tab !== 'center' && tab !== 'edge' && (
++              {(config.structure?.layers > 1 || isPetitsFour) && tab !== 'center' && tab !== 'edge' && (
+                 <>
+                   <TierDesignControl
+                     structure={config.structure}
+@@ -549,7 +550,8 @@ export default function ToolPanel({
+                   />
+                   {showLayerStrip && (
+                     <LayerTabStrip
+-                      layers={config.structure.layers}
++                      layers={isPetitsFour ? 4 : config.structure.layers}
++                      shape={config.structure.shape}
+                       activeLayer={activeLayer}
+                       onLayerChange={setActiveLayer}
+                     />
+@@ -778,6 +780,7 @@ export default function ToolPanel({
+                           surfaceTreatment={config.surfaceTreatment || DEFAULT_CONFIG.surfaceTreatment}
+                           isIndividual={isIndividual}
+                           activeLayer={activeLayer}
++                          structure={config.structure}
+                           onChange={(newSurfaceTreatment) => {
+                             onChange({
+                               ...config,
+diff --git a/client/src/components/cake/cakeMath.js b/client/src/components/cake/cakeMath.js
+index 3097020..f152861 100644
+--- a/client/src/components/cake/cakeMath.js
++++ b/client/src/components/cake/cakeMath.js
+@@ -123,3 +123,42 @@ export function blendHex(hexA, hexB, t) {
+   const bl = Math.round(a[2] + (b[2] - a[2]) * t);
+   return `#${[r, g, bl].map(v => v.toString(16).padStart(2, '0')).join('')}`;
+ }
++
++/**
++ * Calculates radial distance at angle theta to the perimeter of a rounded box
++ * with half-width W, half-depth D, and corner radius rc.
++ */
++export function getBoxyRadius(theta, W, D, rc = 0.35) {
++  let angle = theta % (Math.PI * 2);
++  if (angle < 0) angle += Math.PI * 2;
++
++  const cosT = Math.cos(angle);
++  const sinT = Math.sin(angle);
++  const ux = Math.abs(cosT);
++  const uz = Math.abs(sinT);
++
++  if (ux < 1e-6) return D;
++  if (uz < 1e-6) return W;
++
++  const safeRc = Math.min(rc, Math.min(W, D) * 0.45);
++  const xc = Math.max(0, W - safeRc);
++  const zc = Math.max(0, D - safeRc);
++
++  const thetaEdgeX = Math.atan2(zc, W);
++  const thetaEdgeZ = Math.atan2(D, xc);
++  const thetaQuad = Math.atan2(uz, ux);
++
++  if (thetaQuad <= thetaEdgeX) {
++    return W / ux;
++  } else if (thetaQuad >= thetaEdgeZ) {
++    return D / uz;
++  } else {
++    const B = ux * xc + uz * zc;
++    const C = xc * xc + zc * zc - safeRc * safeRc;
++    const disc = B * B - C;
++    if (disc >= 0) {
++      return B + Math.sqrt(disc);
++    }
++    return Math.max(W, D);
++  }
++}
+diff --git a/client/src/components/cake/frostingGeometry.js b/client/src/components/cake/frostingGeometry.js
+index a406fe9..7bf105a 100644
+--- a/client/src/components/cake/frostingGeometry.js
++++ b/client/src/components/cake/frostingGeometry.js
+@@ -37,8 +37,8 @@ export function buildOrganicFrostingGeometry(radius, height, topDomeHeight = 0)
+     path.lineTo(0, height);
+   }
+ 
+-  // Generate LatheGeometry (48 radial segments)
+-  const geo = new THREE.LatheGeometry(path.getPoints(8), 48);
++  // Generate LatheGeometry (128 radial segments for smooth corner coverage)
++  const geo = new THREE.LatheGeometry(path.getPoints(12), 128);
+ 
+   // Fix UV coordinates for proper vertical gradient mapping
+   const uvAttribute = geo.attributes.uv;
+@@ -59,7 +59,7 @@ export function buildOrganicFrostingGeometry(radius, height, topDomeHeight = 0)
+     uvAttribute.setY(i, normalizedY);
+   }
+ 
+-  // Apply subtle organic wobble to the outer vertices
++  // Apply subtle organic wobble to the outer vertices (always positive so frosting never dips below base radius)
+   const vertex = new THREE.Vector3();
+ 
+   for (let i = 0; i < posAttribute.count; i++) {
+@@ -70,10 +70,10 @@ export function buildOrganicFrostingGeometry(radius, height, topDomeHeight = 0)
+     if (distSq > (radius * 0.5) * (radius * 0.5)) {
+       const angle = Math.atan2(vertex.z, vertex.x);
+ 
+-      // Low-frequency sine/cosine wobble
++      // Low-frequency positive organic wobble
+       const wobble =
+-        Math.sin(angle * 3 + vertex.y * 2) * 0.02 +
+-        Math.cos(angle * 5 - vertex.y * 1.5) * 0.015;
++        (Math.sin(angle * 3 + vertex.y * 2) * 0.5 + 0.5) * 0.01 +
++        (Math.cos(angle * 5 - vertex.y * 1.5) * 0.5 + 0.5) * 0.008;
+ 
+       const dist = Math.sqrt(distSq);
+       const newDist = dist + wobble;

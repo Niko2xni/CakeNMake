@@ -1,0 +1,287 @@
+diff --git a/client/src/components/cake/CakeScene.jsx b/client/src/components/cake/CakeScene.jsx
+index d5e7842..93b61d2 100644
+--- a/client/src/components/cake/CakeScene.jsx
++++ b/client/src/components/cake/CakeScene.jsx
+@@ -55,7 +55,7 @@ import {
+ } from '../../lib/cakeConfig';
+ import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+ import { getPacificoFont, areFontsReady, onFontsReady } from './cakeFonts';
+-import { makePRNG, hashStr } from './cakeMath';
++import { makePRNG, hashStr, getBoxyRadius } from './cakeMath';
+ import {
+   FROSTING_COLORS,
+   PIPING_FLAVOR_COLORS,
+@@ -740,6 +740,65 @@ function isPlaceItemTool(toolType) {
+   return typeof toolType === 'string' && Object.prototype.hasOwnProperty.call(PLACE_ITEM_RADII, toolType);
+ }
+ 
++function morphGroupToBoxyRectangle(cakeGroup, baseRadius, customW = null, customD = null) {
++  if (!cakeGroup) return;
++  const W = customW !== null ? customW : baseRadius * 1.25;
++  const D = customD !== null ? customD : baseRadius * 0.85;
++  const rc = 0.35;
++
++  const transformedGeometries = new Set();
++
++  cakeGroup.traverse((child) => {
++    if (child.isMesh && child.geometry && !transformedGeometries.has(child.geometry)) {
++      const isCentered = Math.abs(child.position.x) < 0.001 && Math.abs(child.position.z) < 0.001;
++      const isPlacedItem = child.userData?.isPlacedItem || child.name?.startsWith('placed-');
++
++      if (isCentered && !isPlacedItem) {
++        transformedGeometries.add(child.geometry);
++        child.geometry = child.geometry.clone();
++        const pos = child.geometry.attributes.position;
++        if (pos) {
++          for (let i = 0; i < pos.count; i++) {
++            const vx = pos.getX(i);
++            const vz = pos.getZ(i);
++            const r = Math.sqrt(vx * vx + vz * vz);
++            if (r > 0.001) {
++              const theta = Math.atan2(vz, vx);
++              const targetR = getBoxyRadius(theta, W, D, rc);
++              const scale = targetR / baseRadius;
++              pos.setX(i, vx * scale);
++              pos.setZ(i, vz * scale);
++            }
++          }
++          pos.needsUpdate = true;
++          child.geometry.computeVertexNormals();
++        }
++      } else {
++        const r = Math.sqrt(child.position.x * child.position.x + child.position.z * child.position.z);
++        if (r > 0.001) {
++          const theta = Math.atan2(child.position.z, child.position.x);
++          const targetR = getBoxyRadius(theta, W, D, rc);
++          const scale = targetR / baseRadius;
++          child.position.x *= scale;
++          child.position.z *= scale;
++        }
++      }
++    } else if (child.isGroup && child !== cakeGroup) {
++      const isCentered = Math.abs(child.position.x) < 0.001 && Math.abs(child.position.z) < 0.001;
++      if (!isCentered) {
++        const r = Math.sqrt(child.position.x * child.position.x + child.position.z * child.position.z);
++        if (r > 0.001) {
++          const theta = Math.atan2(child.position.z, child.position.x);
++          const targetR = getBoxyRadius(theta, W, D, rc);
++          const scale = targetR / baseRadius;
++          child.position.x *= scale;
++          child.position.z *= scale;
++        }
++      }
++    }
++  });
++}
++
+ const CakeScene = React.forwardRef(function CakeScene({
+   cakeConfig,
+   activeTool,
+@@ -1360,6 +1419,7 @@ const CakeScene = React.forwardRef(function CakeScene({
+     const {
+       layers, frostingColor, toppings = [], cakeColor, plateVisible, placedItems = [],
+       designMode, layerColors, layerFrostings, fillingColor, layerFillings, cakeSize = 'big',
++      shape = 'round',
+       fillingEnabled = false, fillingLayers = 1, interiorPreview = false, exteriorFinishStyle = 'fullyFrosted',
+       // Only meaningful when exteriorFinishStyle === 'texturedButtercream'
+       // — picks which of the three ripple geometries below gets built.
+@@ -1433,8 +1493,11 @@ const CakeScene = React.forwardRef(function CakeScene({
+     // Seed the PRNG from stable config properties so the random visual details
+     // (candle colors, drip heights, sprinkle positions) are consistent across
+     // re-renders triggered by unrelated changes like frosting color or tool selection.
++    const cakeShape = shape || cakeConfig?.structure?.shape || 'round';
++    group.scale.set(1, 1, 1);
++
+     const seed = hashStr(
+-      [layers, cakeSize, cakeColor, frostingColor, ...(toppings || [])].join('|')
++      [layers, cakeSize, cakeShape, cakeColor, frostingColor, ...(toppings || [])].join('|')
+     );
+     const rand = makePRNG(seed);
+ 
+@@ -1476,6 +1539,152 @@ const CakeScene = React.forwardRef(function CakeScene({
+     // fraction of it — pass the calling mesh's own base radius (before
+     // any bulge) so the peaks/valleys scale correctly against IT specifically,
+     // not always the frosting shell's.
++    if (cakeShape === 'petitsFour') {
++      const isClassic = cakeSize === 'classicCube';
++      const pieceSize = isClassic ? 1.0 : 1.8;
++      const pieceRadius = pieceSize / 2;
++      const pieceHeight = isClassic ? 1.0 : 1.8;
++      const gridOffset = isClassic ? 0.75 : 1.35;
++      const plateRadius = isClassic ? 2.2 : 3.4;
++      const plateRim = isClassic ? 2.4 : 3.6;
++
++      if (plateVisible !== false) {
++        const plate = new THREE.Mesh(
++          new THREE.CylinderGeometry(plateRadius, plateRim, 0.15, 64),
++          new THREE.MeshPhysicalMaterial({ color: '#FFFFFF', roughness: 0.1, metalness: 0.05, clearcoat: 0.8 })
++        );
++        plate.position.y = -0.15;
++        plate.castShadow = true;
++        plate.receiveShadow = true;
++        group.add(plate);
++      }
++
++      const gridPositions = [
++        { x: -gridOffset, z: -gridOffset }, // Variation 1 (top-left)
++        { x: gridOffset, z: -gridOffset },  // Variation 2 (top-right)
++        { x: -gridOffset, z: gridOffset },  // Variation 3 (bottom-left)
++        { x: gridOffset, z: gridOffset },   // Variation 4 (bottom-right)
++      ];
++
++      for (let p = 0; p < 4; p++) {
++        const pieceGroup = new THREE.Group();
++        const pos = gridPositions[p];
++
++        const cakeKey = isIndividual ? (layerColors?.[p] || cakeColor) : cakeColor;
++        const frostKey = isIndividual ? (layerFrostings?.[p] || frostingColor) : frostingColor;
++        const fillingKey = isIndividual ? (layerFillings?.[p] || fillingColor) : fillingColor;
++        const currentStyle = isIndividual ? (layerStyles?.[p] || exteriorFinishStyle) : exteriorFinishStyle;
++        const currentTexture = isIndividual ? (layerButtercreamTextures?.[p] || buttercreamTexture) : buttercreamTexture;
++        const frostColorBase = frostKey ? FROSTING_COLORS[frostKey] : null;
++        const frostColor = (isIndividual ? layerSurfaceFrostingColors?.[p] : surfaceFrostingColorHex) || surfaceFrostingColorHex || frostColorBase;
++        const frostColorId = (isIndividual ? layerSurfaceFrostingColorIds?.[p] : surfaceFrostingColorId) || surfaceFrostingColorId || null;
++        const fillColor = fillingKey ? FILLING_COLORS[fillingKey] : null;
++
++        const pieceHasFrost = Boolean(frostColor && currentStyle !== 'naked');
++        const pieceHasGlaze = isIndividual
++          ? (layerSurfaceTreatmentModes?.[p] === 'glaze')
++          : (surfaceTreatmentMode === 'glaze');
++        const glazeColor = isIndividual
++          ? (layerSurfaceTreatmentColors?.[p] || surfaceTreatmentColorHex || '#FFF8E7')
++          : (surfaceTreatmentColorHex || '#FFF8E7');
++        const glazePattern = isIndividual
++          ? (layerSurfaceTreatmentPatterns?.[p] || surfaceTreatmentPattern || 'longGaps')
++          : (surfaceTreatmentPattern || 'longGaps');
++
++        const totalFillingHeight = fillingEnabled ? (pieceHeight * 0.12 * fillingLayers) : 0;
++        const spongeHeight = pieceHeight - totalFillingHeight;
++        const spongeMat = cakeKey ? getSpongeMaterial(cakeKey) : null;
++        const domeAmount = pieceHeight * 0.05;
++
++        // Sponge
++        let spongeCurrentY = 0;
++        const spongeSectionHeight = spongeHeight / (fillingEnabled ? fillingLayers + 1 : 1);
++        for (let s = 0; s < (fillingEnabled ? fillingLayers + 1 : 1); s++) {
++          const isTopSection = s === (fillingEnabled ? fillingLayers : 0);
++          const currentSectionH = isTopSection ? spongeSectionHeight + domeAmount : spongeSectionHeight;
++          const spongeGeom = buildSpongeProfileGeometry(pieceRadius, currentSectionH, {
++            topBumpHeight: isTopSection ? domeAmount : 0,
++            bevelSize: 0.1,
++            bevelTop: !(fillingEnabled && s < fillingLayers),
++            bevelBottom: !(fillingEnabled && s > 0),
++          });
++          const spongeMesh = new THREE.Mesh(spongeGeom, spongeMat || new THREE.MeshStandardMaterial({ color: '#F6DEAB' }));
++          spongeMesh.position.y = spongeCurrentY + currentSectionH / 2;
++          spongeMesh.castShadow = true;
++          spongeMesh.receiveShadow = true;
++          pieceGroup.add(spongeMesh);
++          spongeCurrentY += currentSectionH;
++
++          if (fillingEnabled && s < fillingLayers) {
++            const fillingH = pieceHeight * 0.12;
++            const fillMat = getFrostingMaterial(fillColor || '#FFF4DC', null);
++            const fillGeom = new THREE.CylinderGeometry(pieceRadius * 0.98, pieceRadius * 0.98, fillingH, 48);
++            const fillMesh = new THREE.Mesh(fillGeom, fillMat);
++            fillMesh.position.y = spongeCurrentY + fillingH / 2;
++            pieceGroup.add(fillMesh);
++            spongeCurrentY += fillingH;
++          }
++        }
++
++        // Frosting
++        if (pieceHasFrost) {
++          const frostMat = getFrostingMaterial(frostColor, frostColorId);
++          coveringMaterialsRef.current.push(frostMat);
++          let frostGeom;
++          if (currentStyle === 'texturedButtercream') {
++            if (currentTexture === 'ribbonWrap') {
++              frostGeom = buildRibbonWrapButtercreamGeometry(pieceRadius + 0.04, pieceHeight, domeAmount, rand);
++            } else if (currentTexture === 'verticalPiping') {
++              frostGeom = buildVerticalPipingButtercreamGeometry(pieceRadius + 0.04, pieceHeight, domeAmount, rand);
++            } else {
++              frostGeom = buildTexturedButtercreamGeometry(pieceRadius + 0.04, pieceHeight, domeAmount, rand);
++            }
++          } else {
++            frostGeom = buildOrganicFrostingGeometry(pieceRadius + 0.04, pieceHeight, domeAmount, rand);
++          }
++          const frostMesh = new THREE.Mesh(frostGeom, frostMat);
++          frostMesh.position.y = 0;
++          frostMesh.castShadow = true;
++          frostMesh.receiveShadow = true;
++          pieceGroup.add(frostMesh);
++        }
++
++        // Glaze
++        if (pieceHasGlaze) {
++          const glazeMat = makeGlazeMaterial(glazeColor);
++          coveringMaterialsRef.current.push(glazeMat);
++          const carve = GLAZE_PATTERN_CARVES[glazePattern] || GLAZE_PATTERN_CARVES.longGaps;
++          const glazeGeom = buildGlazeGeometry(
++            pieceRadius + (pieceHasFrost ? 0.08 : 0.04),
++            pieceHeight,
++            domeAmount,
++            rand,
++            {
++              carve,
++              coatThickness: 0.1,
++            }
++          );
++          const glazeMesh = new THREE.Mesh(glazeGeom, glazeMat);
++          glazeMesh.position.y = 0;
++          pieceGroup.add(glazeMesh);
++        }
++
++        // Morph piece into a neat rounded cube
++        morphGroupToBoxyRectangle(pieceGroup, pieceRadius, pieceRadius, pieceRadius);
++        pieceGroup.position.set(pos.x, 0, pos.z);
++        group.add(pieceGroup);
++      }
++
++      const baselineY = 0;
++      if (baselineYRef.current === 0 || group.position.y !== baselineY) {
++        group.position.y = baselineY;
++        baselineYRef.current = baselineY;
++      }
++      updateSlotVisuals();
++      refreshSelectionOverlayRef.current?.();
++      return;
++    }
++
+     if (plateVisible !== false) {
+       const plate = new THREE.Mesh(
+         new THREE.CylinderGeometry(PLATE_RADIUS, PLATE_RIM, 0.15, 64),
+@@ -2391,16 +2600,17 @@ const CakeScene = React.forwardRef(function CakeScene({
+           : FROST_CAP_H + height + FROST_H + tierSeamOverlap;
+ 
+         const domeH = isOverallTopTier ? (domeAmount + 0.05) : 0;
++        const frostRadius = radius + 0.08;
+ 
+         const frostGeo = exteriorFinishStyle === 'texturedButtercream'
+           ? (
+             buttercreamTexture === 'ribbonWrap'
+-              ? buildRibbonWrapButtercreamGeometry(radius + 0.06, totalFrostHeight, domeH)
++              ? buildRibbonWrapButtercreamGeometry(frostRadius, totalFrostHeight, domeH)
+               : buttercreamTexture === 'verticalPiping'
+-                ? buildVerticalPipingButtercreamGeometry(radius + 0.06, totalFrostHeight, domeH)
+-                : buildTexturedButtercreamGeometry(radius + 0.06, totalFrostHeight, domeH) // 'ridged', also the default
++                ? buildVerticalPipingButtercreamGeometry(frostRadius, totalFrostHeight, domeH)
++                : buildTexturedButtercreamGeometry(frostRadius, totalFrostHeight, domeH) // 'ridged', also the default
+           )
+-          : buildOrganicFrostingGeometry(radius + 0.06, totalFrostHeight, domeH);
++          : buildOrganicFrostingGeometry(frostRadius, totalFrostHeight, domeH);
+         // Same fix as Mashed Circles/Mashed Swirls in the filling loop
+         // above (see applyVerticalGradientUV's doc comment in
+         // frostingMaterial.js): the three Textured Buttercream ridge/
+@@ -3651,6 +3861,11 @@ const CakeScene = React.forwardRef(function CakeScene({
+       }
+     }
+ 
++    // When shape is rectangle, morph all geometry and placements into a boxy rectangle
++    if (cakeShape === 'rectangle') {
++      morphGroupToBoxyRectangle(group, BASE_RADIUS);
++    }
++
+     // Fixed baseline — bottom of the cake sits at y=0, cake rises upward.
+     const baselineY = 0;
+     if (baselineYRef.current === 0 || group.position.y !== baselineY) {

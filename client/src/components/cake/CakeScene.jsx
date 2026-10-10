@@ -8,6 +8,7 @@ import { buildVictorianLambeth, getVictorianLambethCoverageFn } from './sets/vic
 import { buildPipingRing } from './pipingTipsDeluxe';
 import {
   buildDripRing,
+  buildPetitFoursDripRing,
   buildBeadedTrimRing,
   buildStrawberryRimRing,
   buildHersheysKissRimRing,
@@ -55,7 +56,7 @@ import {
 } from '../../lib/cakeConfig';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 import { getPacificoFont, areFontsReady, onFontsReady } from './cakeFonts';
-import { makePRNG, hashStr } from './cakeMath';
+import { makePRNG, hashStr, getBoxyRadius } from './cakeMath';
 import {
   FROSTING_COLORS,
   PIPING_FLAVOR_COLORS,
@@ -64,13 +65,17 @@ import {
   INTERIOR_PREVIEW_CLIP_PLANES_2WAY,
   INTERIOR_PREVIEW_FROSTING_3WAY_PLANES,
   INTERIOR_PREVIEW_DRIP_3WAY_PLANES,
+  GLAZE_DRIP_COUNT_RADIUS,
   GLAZE_PATTERN_CARVES,
+  getNaturalTearGlazeCarve,
+  getPetitFoursGlazeCarve,
   getRenderDimensions,
 } from './cakeConstants';
 import {
   disposeSceneObject,
   registerNewChildrenForClipping,
   getInteriorPreviewClippingConfig,
+  getPieceInteriorPreviewClippingConfig,
   isAngleUnclippedByPlanes,
 } from './sceneUtils';
 import {
@@ -134,6 +139,10 @@ export function getEdgeSlotsToRender({
 
 export function getMiddlePipingRadius(topTierRadius) {
   return Math.max(0.2, topTierRadius + 0.2);
+}
+
+export function getCakeGlazeCarve(pattern) {
+  return GLAZE_PATTERN_CARVES[pattern] || GLAZE_PATTERN_CARVES.longGaps;
 }
 
 export function makeFillingBandHugFn(bands, originY, meshBaseRadius, fillingHeight) {
@@ -218,6 +227,10 @@ export function getTierGlazeProfileOptions({
     );
     sideSamples = Math.max(140, Math.ceil((descriptor.totalHeight / fillingHeight) * 10));
     coatThickness = 0.08;
+  }
+
+  if (descriptor.coverageFn && !sideSamples) {
+    sideSamples = 160;
   }
 
   return { ridgeProfileFn, sideSamples, coatThickness, edgeFadeDist };
@@ -738,6 +751,65 @@ function isButtercreamLetterDesign(designId) {
 // they still use the old slot system for now.
 function isPlaceItemTool(toolType) {
   return typeof toolType === 'string' && Object.prototype.hasOwnProperty.call(PLACE_ITEM_RADII, toolType);
+}
+
+function morphGroupToBoxyRectangle(cakeGroup, baseRadius, customW = null, customD = null) {
+  if (!cakeGroup) return;
+  const W = customW !== null ? customW : baseRadius * 1.25;
+  const D = customD !== null ? customD : baseRadius * 0.85;
+  const rc = 0.35;
+
+  const transformedGeometries = new Set();
+
+  cakeGroup.traverse((child) => {
+    if (child.isMesh && child.geometry && !transformedGeometries.has(child.geometry)) {
+      const isCentered = Math.abs(child.position.x) < 0.001 && Math.abs(child.position.z) < 0.001;
+      const isPlacedItem = child.userData?.isPlacedItem || child.name?.startsWith('placed-');
+
+      if (isCentered && !isPlacedItem) {
+        transformedGeometries.add(child.geometry);
+        child.geometry = child.geometry.clone();
+        const pos = child.geometry.attributes.position;
+        if (pos) {
+          for (let i = 0; i < pos.count; i++) {
+            const vx = pos.getX(i);
+            const vz = pos.getZ(i);
+            const r = Math.sqrt(vx * vx + vz * vz);
+            if (r > 0.001) {
+              const theta = Math.atan2(vz, vx);
+              const targetR = getBoxyRadius(theta, W, D, rc);
+              const scale = targetR / baseRadius;
+              pos.setX(i, vx * scale);
+              pos.setZ(i, vz * scale);
+            }
+          }
+          pos.needsUpdate = true;
+          child.geometry.computeVertexNormals();
+        }
+      } else {
+        const r = Math.sqrt(child.position.x * child.position.x + child.position.z * child.position.z);
+        if (r > 0.001) {
+          const theta = Math.atan2(child.position.z, child.position.x);
+          const targetR = getBoxyRadius(theta, W, D, rc);
+          const scale = targetR / baseRadius;
+          child.position.x *= scale;
+          child.position.z *= scale;
+        }
+      }
+    } else if (child.isGroup && child !== cakeGroup) {
+      const isCentered = Math.abs(child.position.x) < 0.001 && Math.abs(child.position.z) < 0.001;
+      if (!isCentered) {
+        const r = Math.sqrt(child.position.x * child.position.x + child.position.z * child.position.z);
+        if (r > 0.001) {
+          const theta = Math.atan2(child.position.z, child.position.x);
+          const targetR = getBoxyRadius(theta, W, D, rc);
+          const scale = targetR / baseRadius;
+          child.position.x *= scale;
+          child.position.z *= scale;
+        }
+      }
+    }
+  });
 }
 
 const CakeScene = React.forwardRef(function CakeScene({
@@ -1360,6 +1432,10 @@ const CakeScene = React.forwardRef(function CakeScene({
     const {
       layers, frostingColor, toppings = [], cakeColor, plateVisible, placedItems = [],
       designMode, layerColors, layerFrostings, fillingColor, layerFillings, cakeSize = 'big',
+      shape = 'round', cakeFormat = 'standard',
+      // Per-piece style/texture arrays — configAdapter.js fills these for
+      // every piece (4 Variants for Petit Fours, one per tier otherwise).
+      layerStyles = [], layerButtercreamTextures = [],
       fillingEnabled = false, fillingLayers = 1, interiorPreview = false, exteriorFinishStyle = 'fullyFrosted',
       // Only meaningful when exteriorFinishStyle === 'texturedButtercream'
       // — picks which of the three ripple geometries below gets built.
@@ -1383,7 +1459,7 @@ const CakeScene = React.forwardRef(function CakeScene({
       // below, after topY/topRadius are known, via buildGlazeGeometry.
       surfaceTreatmentMode = null,
       surfaceTreatmentColorHex = '#F6DEAB',
-      surfaceTreatmentPattern = 'longGaps', // one of GLAZE_PATTERNS ids, see GLAZE_PATTERN_CARVES above
+      surfaceTreatmentPattern = 'naturalTear2', // one of GLAZE_PATTERNS ids, see GLAZE_PATTERN_CARVES above
       layerSurfaceTreatmentModes = [],
       layerSurfaceTreatmentColors = [],
       layerSurfaceTreatmentPatterns = [],
@@ -1406,7 +1482,13 @@ const CakeScene = React.forwardRef(function CakeScene({
       sideDecorationSetId = null, sideDecorationVariant = 0,
       layerSideTreatments = [],
     } = cakeConfig;
-    const isIndividual = designMode === 'individual' && layers > 1;
+    const cakeShape = shape || cakeConfig?.structure?.shape || 'round';
+    // Petit Fours renders as a 4-piece set (early branch below) — it is a
+    // FORMAT, not a shape, so the Cake Shape control still applies to the
+    // pieces the same way it does to Bento Cake. Legacy configs used the
+    // shape field itself as the format marker; keep accepting that.
+    const isPetitsFour = cakeFormat === 'petitsFour' || cakeShape === 'petitsFour';
+    const isIndividual = designMode === 'individual' && (layers > 1 || isPetitsFour);
     const sharedSideTreatment = {
       sideDecorationSetId,
       sideDecorationColor,
@@ -1433,8 +1515,10 @@ const CakeScene = React.forwardRef(function CakeScene({
     // Seed the PRNG from stable config properties so the random visual details
     // (candle colors, drip heights, sprinkle positions) are consistent across
     // re-renders triggered by unrelated changes like frosting color or tool selection.
+    group.scale.set(1, 1, 1);
+
     const seed = hashStr(
-      [layers, cakeSize, cakeColor, frostingColor, ...(toppings || [])].join('|')
+      [layers, cakeSize, cakeShape, cakeColor, frostingColor, ...(toppings || [])].join('|')
     );
     const rand = makePRNG(seed);
 
@@ -1476,6 +1560,202 @@ const CakeScene = React.forwardRef(function CakeScene({
     // fraction of it — pass the calling mesh's own base radius (before
     // any bulge) so the peaks/valleys scale correctly against IT specifically,
     // not always the frosting shell's.
+    if (isPetitsFour) {
+      const isClassic = cakeSize === 'classicCube';
+      const pieceSize = isClassic ? 1.0 : 1.8;
+      const pieceRadius = pieceSize / 2;
+      const pieceHeight = isClassic ? 1.0 : 1.8;
+      const gridOffset = isClassic ? 0.75 : 1.35;
+      const plateRadius = isClassic ? 2.2 : 3.4;
+      const plateRim = isClassic ? 2.4 : 3.6;
+
+      if (plateVisible !== false) {
+        const plate = new THREE.Mesh(
+          new THREE.CylinderGeometry(plateRadius, plateRim, 0.15, 64),
+          new THREE.MeshPhysicalMaterial({ color: '#FFFFFF', roughness: 0.1, metalness: 0.05, clearcoat: 0.8 })
+        );
+        plate.position.y = -0.15;
+        plate.castShadow = true;
+        plate.receiveShadow = true;
+        group.add(plate);
+      }
+
+      const gridPositions = [
+        { x: -gridOffset, z: -gridOffset }, // Variant 1 (top-left)
+        { x: gridOffset, z: -gridOffset },  // Variant 2 (top-right)
+        { x: -gridOffset, z: gridOffset },  // Variant 3 (bottom-left)
+        { x: gridOffset, z: gridOffset },   // Variant 4 (bottom-right)
+      ];
+
+      for (let p = 0; p < 4; p++) {
+        const pieceGroup = new THREE.Group();
+        const pos = gridPositions[p];
+
+        const cakeKey = isIndividual ? (layerColors?.[p] || cakeColor) : cakeColor;
+        const frostKey = isIndividual ? (layerFrostings?.[p] || frostingColor) : frostingColor;
+        const fillingKey = isIndividual ? (layerFillings?.[p] || fillingColor) : fillingColor;
+        const currentStyle = isIndividual ? (layerStyles?.[p] || exteriorFinishStyle) : exteriorFinishStyle;
+        const currentTexture = isIndividual ? (layerButtercreamTextures?.[p] || buttercreamTexture) : buttercreamTexture;
+        const frostColorBase = frostKey ? FROSTING_COLORS[frostKey] : null;
+        const frostColor = (isIndividual ? layerSurfaceFrostingColors?.[p] : surfaceFrostingColorHex) || surfaceFrostingColorHex || frostColorBase;
+        const frostColorId = (isIndividual ? layerSurfaceFrostingColorIds?.[p] : surfaceFrostingColorId) || surfaceFrostingColorId || null;
+        const fillColor = fillingKey ? FILLING_COLORS[fillingKey] : null;
+
+        const pieceHasFrost = Boolean(frostColor && currentStyle !== 'naked');
+        const pieceHasGlaze = isIndividual
+          ? (layerSurfaceTreatmentModes?.[p] === 'glaze')
+          : (surfaceTreatmentMode === 'glaze');
+        const glazeColor = isIndividual
+          ? (layerSurfaceTreatmentColors?.[p] || surfaceTreatmentColorHex || '#FFF8E7')
+          : (surfaceTreatmentColorHex || '#FFF8E7');
+        const glazePattern = isIndividual
+          ? (layerSurfaceTreatmentPatterns?.[p] || surfaceTreatmentPattern || 'naturalTear2')
+          : (surfaceTreatmentPattern || 'naturalTear2');
+        const pieceHasDrip = isIndividual
+          ? (layerSideTreatments?.[p]?.sideNoNameSetId === 'drip')
+          : (sideNoNameSetId === 'drip');
+        const pieceClipConfig = getPieceInteriorPreviewClippingConfig({
+          hasFrosting: pieceHasFrost,
+          hasDrip: pieceHasGlaze || pieceHasDrip,
+          hasSide: false,
+          interiorPreview,
+          position: pos,
+        });
+
+        const totalFillingHeight = fillingEnabled ? (pieceHeight * 0.12 * fillingLayers) : 0;
+        const spongeHeight = pieceHeight - totalFillingHeight;
+        const spongeMat = cakeKey ? getSpongeMaterial(cakeKey) : null;
+        const domeAmount = pieceHeight * 0.05;
+
+        // Sponge
+        let spongeCurrentY = 0;
+        const spongeSectionHeight = spongeHeight / (fillingEnabled ? fillingLayers + 1 : 1);
+        for (let s = 0; s < (fillingEnabled ? fillingLayers + 1 : 1); s++) {
+          const isTopSection = s === (fillingEnabled ? fillingLayers : 0);
+          const currentSectionH = spongeSectionHeight;
+          const spongeGeom = buildSpongeProfileGeometry(pieceRadius, currentSectionH, {
+            topBumpHeight: isTopSection ? domeAmount : 0,
+            bevelSize: 0.1,
+            bevelTop: !(fillingEnabled && s < fillingLayers),
+            bevelBottom: !(fillingEnabled && s > 0),
+          });
+          const spongeMesh = new THREE.Mesh(spongeGeom, spongeMat || new THREE.MeshStandardMaterial({ color: '#F6DEAB' }));
+          spongeMesh.position.y = spongeCurrentY + currentSectionH / 2;
+          spongeMesh.castShadow = true;
+          spongeMesh.receiveShadow = true;
+          pieceGroup.add(spongeMesh);
+          spongeCurrentY += currentSectionH;
+
+          if (fillingEnabled && s < fillingLayers) {
+            const fillingH = pieceHeight * 0.12;
+            const fillMat = getFrostingMaterial(fillColor || '#FFF4DC', null);
+            const fillGeom = new THREE.CylinderGeometry(pieceRadius * 0.98, pieceRadius * 0.98, fillingH, 48);
+            const fillMesh = new THREE.Mesh(fillGeom, fillMat);
+            fillMesh.position.y = spongeCurrentY + fillingH / 2;
+            pieceGroup.add(fillMesh);
+            spongeCurrentY += fillingH;
+          }
+        }
+
+        // Frosting
+        if (pieceHasFrost) {
+          const frostMat = getFrostingMaterial(frostColor, frostColorId);
+          frostMat.clippingPlanes = pieceClipConfig.frosting.planes;
+          frostMat.clipIntersection = pieceClipConfig.frosting.clipIntersection;
+          frostMat.clipShadows = true;
+          coveringMaterialsRef.current.push(frostMat);
+          let frostGeom;
+          if (currentStyle === 'texturedButtercream') {
+            if (currentTexture === 'ribbonWrap') {
+              frostGeom = buildRibbonWrapButtercreamGeometry(pieceRadius + 0.04, pieceHeight, domeAmount, rand);
+            } else if (currentTexture === 'verticalPiping') {
+              frostGeom = buildVerticalPipingButtercreamGeometry(pieceRadius + 0.04, pieceHeight, domeAmount, rand);
+            } else {
+              frostGeom = buildTexturedButtercreamGeometry(pieceRadius + 0.04, pieceHeight, domeAmount, rand);
+            }
+          } else {
+            frostGeom = buildOrganicFrostingGeometry(pieceRadius + 0.04, pieceHeight, domeAmount, rand);
+          }
+          const frostMesh = new THREE.Mesh(frostGeom, frostMat);
+          frostMesh.position.y = 0;
+          frostMesh.castShadow = true;
+          frostMesh.receiveShadow = true;
+          pieceGroup.add(frostMesh);
+        }
+
+        // Glaze
+        if (pieceHasGlaze) {
+          const glazeMat = makeGlazeMaterial(glazeColor);
+          glazeMat.clippingPlanes = pieceClipConfig.drip.planes;
+          glazeMat.clipIntersection = pieceClipConfig.drip.clipIntersection;
+          glazeMat.clipShadows = true;
+          coveringMaterialsRef.current.push(glazeMat);
+          const carve = getPetitFoursGlazeCarve(glazePattern, p, rand);
+          const underlyingRadius = pieceHasFrost ? pieceRadius + 0.04 : pieceRadius;
+          const pfCoat = Math.max(0.026, underlyingRadius * 0.055);
+          const pfBevel = Math.min(0.08, Math.max(0.04, underlyingRadius * 0.09));
+          const glazeGeom = buildGlazeGeometry(
+            underlyingRadius,
+            pieceHeight,
+            domeAmount,
+            rand,
+            {
+              carve,
+              coatThickness: pfCoat,
+              wallThickness: pfCoat,
+              capLift: pfCoat,
+              bevelSize: pfBevel,
+              edgeFadeDist: 0.025,
+              sideSamples: 64,
+            }
+          );
+          const glazeMesh = new THREE.Mesh(glazeGeom, glazeMat);
+          glazeMesh.position.y = 0;
+          pieceGroup.add(glazeMesh);
+        }
+
+        // Drip for Petit Fours - add drip to each piece when Side Drip is active
+        if (pieceHasDrip) {
+          const dripColor = isIndividual
+            ? (layerSideTreatments?.[p]?.sideNoNameColor || sideNoNameColor || '#FFF8E7')
+            : (sideNoNameColor || '#FFF8E7');
+          const dripPattern = isIndividual
+            ? (layerSurfaceTreatmentPatterns?.[p] || surfaceTreatmentPattern || 'tinyTip')
+            : (surfaceTreatmentPattern || 'tinyTip');
+          const pieceTopY = pieceHeight + (pieceHasFrost ? 0.08 : 0.04);
+          const dripRing = buildPetitFoursDripRing(pieceRadius, dripColor, rand, dripPattern);
+          dripRing.position.y = pieceTopY;
+          dripRing.material.clippingPlanes = pieceClipConfig.drip.planes;
+          dripRing.material.clipIntersection = pieceClipConfig.drip.clipIntersection;
+          dripRing.material.clipShadows = true;
+          coveringMaterialsRef.current.push(dripRing.material);
+          pieceGroup.add(dripRing);
+        }
+
+        // Rectangle: morph the piece into a neat rounded cube. Round keeps
+        // the plain cylindrical piece — mirroring the whole-cake Rectangle
+        // morph at the end of the standard path below, so Petit Fours honor
+        // Cake Shape the same way Bento Cake does.
+        if (cakeShape === 'rectangle' || cakeShape === 'petitsFour') {
+          morphGroupToBoxyRectangle(pieceGroup, pieceRadius, pieceRadius, pieceRadius);
+        }
+        if (cakeShape === 'square') {
+          morphGroupToBoxyRectangle(pieceGroup, pieceRadius, pieceRadius, pieceRadius);
+        }
+        pieceGroup.position.set(pos.x, 0, pos.z);
+        group.add(pieceGroup);
+      }
+
+      const baselineY = 0;
+      if (baselineYRef.current === 0 || group.position.y !== baselineY) {
+        group.position.y = baselineY;
+        baselineYRef.current = baselineY;
+      }
+      updateSlotVisuals();
+      refreshSelectionOverlayRef.current?.();
+      return;
+    }
+
     if (plateVisible !== false) {
       const plate = new THREE.Mesh(
         new THREE.CylinderGeometry(PLATE_RADIUS, PLATE_RIM, 0.15, 64),
@@ -1615,17 +1895,17 @@ const CakeScene = React.forwardRef(function CakeScene({
       const tierHasDrip = tierHasGlaze || tierHasSideDrip;
       const tierHasSideDecor = isIndividual
         ? Boolean(
-            (sideNoNameSetId && sideNoNameSetId !== 'drip') ||
-            sideCheckeredPatternSetId ||
-            sideTrianglePatternSetId ||
-            sideDecorationSetId
-          )
+          (sideNoNameSetId && sideNoNameSetId !== 'drip') ||
+          sideCheckeredPatternSetId ||
+          sideTrianglePatternSetId ||
+          sideDecorationSetId
+        )
         : Boolean(
-            (sharedSideTreatment.sideNoNameSetId && sharedSideTreatment.sideNoNameSetId !== 'drip') ||
-            sharedSideTreatment.sideCheckeredPatternSetId ||
-            sharedSideTreatment.sideTrianglePatternSetId ||
-            sharedSideTreatment.sideDecorationSetId
-          );
+          (sharedSideTreatment.sideNoNameSetId && sharedSideTreatment.sideNoNameSetId !== 'drip') ||
+          sharedSideTreatment.sideCheckeredPatternSetId ||
+          sharedSideTreatment.sideTrianglePatternSetId ||
+          sharedSideTreatment.sideDecorationSetId
+        );
 
       const tierClipConfig = getInteriorPreviewClippingConfig({
         hasFrosting: tierHasFrost,
@@ -1703,27 +1983,29 @@ const CakeScene = React.forwardRef(function CakeScene({
       // this whole per-tier loop, from that final iteration's "last*"
       // values) — so this only matters on `i === layerCount - 1`.
       //
-      // A flat conservative worst-case, same reasoning as every other
-      // Side-decoration protrusion estimate in this file (not exact
-      // hugging — Glaze's own radius varies by carve pattern/ridge-hug/
-      // filling-hug in ways not worth reproducing a third time here):
-      // 0.18 covers Textured Buttercream's own worst per-texture
-      // coatThickness (Vertical Piping's (0.095+0.02)*1.5 ≈ 0.17, the
-      // largest of the three — see the Surface Treatment > Glaze block's
-      // own coatThickness branches). `0.08 + radius*0.1` covers the
-      // Naked + active Mashed Swirls filling-hug case instead, whose
-      // bulge amplitude scales with the tier's own radius rather than
-      // being a fixed number — mirrors buildMashedSwirlFillingGeometry's
-      // own peakBulge formula (radius*0.95*0.1, rounded up here since
-      // this only needs to be a safe ceiling, not exact).
+      // Match the Side standoff to the glaze's actual outer coat thickness.
+      // This keeps Side elements in front of the new narrow drip walls and
+      // keeps the glaze coverage windows on the same radius as the elements.
       const tierSurfaceTreatmentMode = isIndividual
         ? (layerSurfaceTreatmentModes[i] || null)
         : surfaceTreatmentMode;
-      const glazeMaxProtrusion = (tierSurfaceTreatmentMode === 'glaze')
-        ? 0.04
-        : 0;
+      const glazeMaxProtrusion = (() => {
+        if (tierSurfaceTreatmentMode !== 'glaze') return 0;
+        if (exteriorFinishStyle !== 'texturedButtercream') return 0.16;
+        if (buttercreamTexture === 'verticalPiping') return 0.1725;
+        if (buttercreamTexture === 'ribbonWrap') return 0.12;
+        return 0.15; // Ridge Comb's 0.1 coat, with the 1.5x glaze boost
+      })();
       lastGlazeMaxProtrusion = glazeMaxProtrusion;
       lastCurrentY = currentY;
+
+      // How far Side designs stand off to clear Glaze. On all finishes (Naked,
+      // Fully Frosted, and Textured Buttercream), buildGlazeGeometry's coverageFn
+      // shaves/collapses the glaze to the cake wall wherever a Side design covers it,
+      // so the design sits directly on the cake (hugging it) with the drip showing
+      // in the gaps around it. Setting any standoff here pushes the Side design into
+      // empty air away from the cake wall.
+      const sideGlazeClearance = 0;
 
       // Hoisted up here (out of its original spot right before the
       // Checkered Pattern block) so Filling can shave its own Piping
@@ -1748,22 +2030,19 @@ const CakeScene = React.forwardRef(function CakeScene({
           }
           return 0.08; // smooth Fully Frosted shell, unchanged — its own base IS radius + 0.06, no ridge on top of it to clear
         })();
-        return base + glazeMaxProtrusion;
+        return base + sideGlazeClearance;
       })();
 
-      // Glaze windows (glaze* coverage functions + Chevron's) apply on a
-      // Naked cake AND a Fully Frosted one. Filling-only coverage (the
-      // checkerCoverageFn/triangleCoverageFn/... chain) stays Naked-only —
-      // Filling piping doesn't exist under frosting (see configAdapter's
-      // regionsHidden). Textured Buttercream is deliberately excluded: it
-      // has its own ridge geometry/clearances.
-      const glazeWindowStyleOk = exteriorFinishStyle === 'naked' || exteriorFinishStyle === 'fullyFrosted';
+      // Glaze windows (glaze* coverage functions + Chevron's) apply on Naked,
+      // Fully Frosted, and Textured Buttercream cakes so side designs hug the cake
+      // and drip instead of floating away.
+      const glazeWindowStyleOk = exteriorFinishStyle === 'naked' || exteriorFinishStyle === 'fullyFrosted' || exteriorFinishStyle === 'texturedButtercream';
       // The wall radius the Side decorations actually sit at: mirrors
-      // sideDecorationRadius (declared further down, so it can't be read
-      // from here) — frosted tiers add the 0.06 shell, naked ones recess
-      // 0.02, both plus Glaze's own clearance. Checkered/Triangle already
-      // use `radius + sideDecorStandoff`, which is frosting-aware itself.
-      const glazeDecoRadius = ((frostColor && exteriorFinishStyle !== 'naked') ? radius + 0.06 : radius - 0.02) + glazeMaxProtrusion;
+      // ridgedTextureRadius for Textured Buttercream and sideDecorationRadius
+      // for Naked / Fully Frosted.
+      const glazeDecoRadius = (exteriorFinishStyle === 'texturedButtercream' && frostColor)
+        ? radius + sideDecorStandoff
+        : ((frostColor && exteriorFinishStyle !== 'naked') ? radius + 0.06 : radius - 0.02);
 
       // (angle, localY) -> 0..1 coverage weight for Filling's own Piping
       // Design to shave its bumps against, when this tier's Checkered
@@ -1840,6 +2119,7 @@ const CakeScene = React.forwardRef(function CakeScene({
         const rawCoverageFn = getCheckerCoverageFn(effectiveRadius, height, {
           pattern: glazePatternForId,
           gapDashPeriod: sideCheckeredPatternSetId === 'xPattern' ? 2 : 1,
+          forGlaze: true,
         });
         const checkerOriginY = currentY + height / 2;
         // NOTE: deliberately NO Math.PI/2 reflection here (unlike
@@ -1965,13 +2245,29 @@ const CakeScene = React.forwardRef(function CakeScene({
         };
       })();
 
+      // Glaze's own Chevron Pattern coverage — takes the already-reflected
+      // angle as-is (just like glazeCheckerCoverageFn and glazeTriangleCoverageFn)
+      // and passes forGlaze: true to clear the stripe footprint.
+      const glazeChevronCoverageFn = (() => {
+        if (!glazeWindowStyleOk) return null;
+        if (sideDecorationSetId !== 'chevronPattern') return null;
+        const chevronEffectiveRadius = glazeDecoRadius;
+        const chevronHeight = height * 0.92;
+        const rawCoverageFn = getChevronCoverageFn(chevronEffectiveRadius, chevronHeight, {
+          setId: sideChevronPatternSetId || 'multiColor',
+          forGlaze: true,
+        });
+        const chevronOriginY = currentY + height / 2;
+        return (glazeArg, absoluteY) => rawCoverageFn(glazeArg, absoluteY - chevronOriginY);
+      })();
+
       // Same idea again — Scatter Pearls' own build call also uses
       // sideDecorationRadius (never ridgedTextureRadius) and height *
       // 0.92, matched exactly here for the same reason as Chevron above.
       const scatterPearlsCoverageFn = (() => {
         if (exteriorFinishStyle !== 'naked') return null;
         if (sideDecorationSetId !== 'scatterPearls') return null;
-        const pearlsEffectiveRadius = radius - 0.02 + glazeMaxProtrusion;
+        const pearlsEffectiveRadius = radius - 0.02 + sideGlazeClearance;
         const pearlsHeight = height * 0.92;
         const rawCoverageFn = getScatterPearlsCoverageFn(pearlsEffectiveRadius, pearlsHeight, {
           variant: sideScatterPearlsSetId || 'randomScatter',
@@ -2003,10 +2299,11 @@ const CakeScene = React.forwardRef(function CakeScene({
       const glazeScatterPearlsCoverageFn = (() => {
         if (!glazeWindowStyleOk) return null;
         if (sideDecorationSetId !== 'scatterPearls') return null;
-        const pearlsEffectiveRadius = glazeDecoRadius;
+        const pearlsEffectiveRadius = (frostColor && exteriorFinishStyle !== 'naked') ? radius + 0.06 : radius - 0.02;
         const pearlsHeight = height * 0.92;
         const rawCoverageFn = getScatterPearlsCoverageFn(pearlsEffectiveRadius, pearlsHeight, {
           variant: sideScatterPearlsSetId || 'randomScatter',
+          forGlaze: true,
         });
         const pearlsOriginY = currentY + height / 2;
         return (glazeArg, absoluteY) => rawCoverageFn(glazeArg, absoluteY - pearlsOriginY);
@@ -2017,12 +2314,12 @@ const CakeScene = React.forwardRef(function CakeScene({
       // sites further below — in the naked case gated on here,
       // ridgedTextureRadius falls back to exactly the same
       // sideDecorationRadius formula the other coverage functions above
-      // already mirror, so the same `radius - 0.02 + glazeMaxProtrusion`
+      // already mirror, so the same `radius - 0.02 + sideGlazeClearance`
       // applies here too.
       const pipingScrollsCoverageFn = (() => {
         if (exteriorFinishStyle !== 'naked') return null;
         if (sideDecorationSetId !== 'pipingScrolls') return null;
-        const scrollsEffectiveRadius = radius - 0.02 + glazeMaxProtrusion;
+        const scrollsEffectiveRadius = radius - 0.02 + sideGlazeClearance;
         const scrollsHeight = height * 0.85;
         const rawCoverageFn = getPipingScrollsCoverageFn(scrollsEffectiveRadius, scrollsHeight, {
           variant: sidePipingScrollsSetId || 'waveRope',
@@ -2067,7 +2364,7 @@ const CakeScene = React.forwardRef(function CakeScene({
       const sunshinePlayCoverageFn = (() => {
         if (exteriorFinishStyle !== 'naked') return null;
         if (sideDecorationSetId !== 'sunshinePlay') return null;
-        const sunshineEffectiveRadius = radius - 0.02 + glazeMaxProtrusion;
+        const sunshineEffectiveRadius = radius - 0.02 + sideGlazeClearance;
         const sunshineHeight = height * 0.85;
         const rawCoverageFn = getSunshinePlayCoverageFn(sunshineEffectiveRadius, sunshineHeight, {
           variant: sideSunshinePlaySetId || 'rainbowArc',
@@ -2114,7 +2411,7 @@ const CakeScene = React.forwardRef(function CakeScene({
       const victorianLambethCoverageFn = (() => {
         if (exteriorFinishStyle !== 'naked') return null;
         if (sideDecorationSetId !== 'victorianLambeth') return null;
-        const lambethEffectiveRadius = radius - 0.02 + glazeMaxProtrusion + lambethStandoff;
+        const lambethEffectiveRadius = radius - 0.02 + sideGlazeClearance + lambethStandoff;
         const rawCoverageFn = getVictorianLambethCoverageFn(lambethEffectiveRadius, lambethHeight, {
           variant: sideVictorianLambethSetId || 'classic',
         });
@@ -2180,7 +2477,7 @@ const CakeScene = React.forwardRef(function CakeScene({
       // (side.mode is single-valued), so at most one term in this chain
       // is ever non-null and the order doesn't matter.
       const glazeSideCoverageFn = (
-        glazeCheckerCoverageFn || glazeTriangleCoverageFn || chevronCoverageFn ||
+        glazeCheckerCoverageFn || glazeTriangleCoverageFn || glazeChevronCoverageFn ||
         glazeScatterPearlsCoverageFn || glazePipingScrollsCoverageFn ||
         glazeSunshinePlayCoverageFn || glazeVictorianLambethCoverageFn || null
       );
@@ -2391,16 +2688,17 @@ const CakeScene = React.forwardRef(function CakeScene({
           : FROST_CAP_H + height + FROST_H + tierSeamOverlap;
 
         const domeH = isOverallTopTier ? (domeAmount + 0.05) : 0;
+        const frostRadius = radius + 0.08;
 
         const frostGeo = exteriorFinishStyle === 'texturedButtercream'
           ? (
             buttercreamTexture === 'ribbonWrap'
-              ? buildRibbonWrapButtercreamGeometry(radius + 0.06, totalFrostHeight, domeH)
+              ? buildRibbonWrapButtercreamGeometry(frostRadius, totalFrostHeight, domeH)
               : buttercreamTexture === 'verticalPiping'
-                ? buildVerticalPipingButtercreamGeometry(radius + 0.06, totalFrostHeight, domeH)
-                : buildTexturedButtercreamGeometry(radius + 0.06, totalFrostHeight, domeH) // 'ridged', also the default
+                ? buildVerticalPipingButtercreamGeometry(frostRadius, totalFrostHeight, domeH)
+                : buildTexturedButtercreamGeometry(frostRadius, totalFrostHeight, domeH) // 'ridged', also the default
           )
-          : buildOrganicFrostingGeometry(radius + 0.06, totalFrostHeight, domeH);
+          : buildOrganicFrostingGeometry(frostRadius, totalFrostHeight, domeH);
         // Same fix as Mashed Circles/Mashed Swirls in the filling loop
         // above (see applyVerticalGradientUV's doc comment in
         // frostingMaterial.js): the three Textured Buttercream ridge/
@@ -2617,7 +2915,7 @@ const CakeScene = React.forwardRef(function CakeScene({
       // fall back to outside Textured Buttercream (see ridgedTextureRadius
       // below), and the one Scatter Pearls always uses, so it needs the
       // same clearance folded in here too, not just at sideDecorStandoff.
-      const sideDecorationRadius = (hasFrostingForDeco ? radius + 0.06 : radius - 0.02) + glazeMaxProtrusion;
+      const sideDecorationRadius = (hasFrostingForDeco ? radius + 0.06 : radius - 0.02) + sideGlazeClearance;
 
       // Chevron Pattern, Piping Scrolls, Sunshine Play, and Victorian
       // Lambeth all need the same Textured Buttercream ridge-clearance fix
@@ -2836,12 +3134,12 @@ const CakeScene = React.forwardRef(function CakeScene({
     // implemented) — it falls back to a flat clearance sized to fully
     // clear that texture's own amplitude instead of following it.
     if (surfaceTreatmentMode === 'glaze') {
-      const carve = GLAZE_PATTERN_CARVES[surfaceTreatmentPattern] || GLAZE_PATTERN_CARVES.longGaps;
+      const carve = getCakeGlazeCarve(surfaceTreatmentPattern);
       let ridgeProfileFn = null;
       let ridgeSpacing = null;
       let edgeFadeCycles = 4.5; // how many ridge cycles the boundary fade covers — overridden per texture below
       let coatThickness;   // undefined -> buildGlazeGeometry's own 0.06 default
-      let sideSamples;     // undefined -> buildGlazeGeometry's own 48 default (fine for a flat/smooth side)
+      let sideSamples = lastActiveSideCoverageFn ? 160 : undefined; // default 160 when coverage active for smooth profile, else buildGlazeGeometry default
       let ridgeHugStrength; // undefined -> buildGlazeGeometry's own full-strength (1) default
       let edgeFadeDist;     // undefined -> buildGlazeGeometry's own 0.4 default
       if (lastHasFrosting && exteriorFinishStyle === 'texturedButtercream') {
@@ -3057,13 +3355,13 @@ const CakeScene = React.forwardRef(function CakeScene({
           // every window down relative to the Side decoration.
           coverageFn: lastActiveSideCoverageFn
             ? (angle, y) => {
-                if (interiorPreview && overallClipConfig.side.planes?.length) {
-                  if (!isAngleUnclippedByPlanes(angle, overallClipConfig.side.planes, overallClipConfig.side.clipIntersection)) {
-                    return 0;
-                  }
+              if (interiorPreview && overallClipConfig.side.planes?.length) {
+                if (!isAngleUnclippedByPlanes(angle, overallClipConfig.side.planes, overallClipConfig.side.clipIntersection)) {
+                  return 0;
                 }
-                return lastActiveSideCoverageFn(Math.PI / 2 - angle, lastFrostMeshY + y);
               }
+              return lastActiveSideCoverageFn(Math.PI / 2 - angle, lastFrostMeshY + y);
+            }
             : undefined,
         },
       );
@@ -3086,7 +3384,7 @@ const CakeScene = React.forwardRef(function CakeScene({
       for (const descriptor of layerGlazeDescriptors) {
         if (descriptor.mode !== 'glaze') continue;
 
-        const carve = GLAZE_PATTERN_CARVES[descriptor.pattern] || GLAZE_PATTERN_CARVES.longGaps;
+        const carve = getCakeGlazeCarve(descriptor.pattern);
         const tierGlazeOptions = getTierGlazeProfileOptions({
           descriptor,
           exteriorFinishStyle,
@@ -3123,13 +3421,13 @@ const CakeScene = React.forwardRef(function CakeScene({
             // read Glaze's raw angle.
             coverageFn: descriptor.coverageFn
               ? (angle, y) => {
-                  if (interiorPreview && tierClipConfig.side.planes?.length) {
-                    if (!isAngleUnclippedByPlanes(angle, tierClipConfig.side.planes, tierClipConfig.side.clipIntersection)) {
-                      return 0;
-                    }
+                if (interiorPreview && tierClipConfig.side.planes?.length) {
+                  if (!isAngleUnclippedByPlanes(angle, tierClipConfig.side.planes, tierClipConfig.side.clipIntersection)) {
+                    return 0;
                   }
-                  return descriptor.coverageFn(Math.PI / 2 - angle, descriptor.frostMeshY + y);
                 }
+                return descriptor.coverageFn(Math.PI / 2 - angle, descriptor.frostMeshY + y);
+              }
               : undefined,
           },
         );
@@ -3150,7 +3448,7 @@ const CakeScene = React.forwardRef(function CakeScene({
     // lower tiers here with their own dimensions and positions.
     if (!isIndividual && surfaceTreatmentMode === 'glaze' && layerGlazeDescriptors.length > 1) {
       for (const descriptor of layerGlazeDescriptors.slice(0, -1)) {
-        const carve = GLAZE_PATTERN_CARVES[descriptor.pattern] || GLAZE_PATTERN_CARVES.longGaps;
+        const carve = getCakeGlazeCarve(descriptor.pattern);
         const tierGlazeOptions = getTierGlazeProfileOptions({
           descriptor,
           exteriorFinishStyle,
@@ -3173,13 +3471,13 @@ const CakeScene = React.forwardRef(function CakeScene({
             // and Math.PI/2 - angle reasoning.
             coverageFn: descriptor.coverageFn
               ? (angle, y) => {
-                  if (interiorPreview && overallClipConfig.side.planes?.length) {
-                    if (!isAngleUnclippedByPlanes(angle, overallClipConfig.side.planes, overallClipConfig.side.clipIntersection)) {
-                      return 0;
-                    }
+                if (interiorPreview && overallClipConfig.side.planes?.length) {
+                  if (!isAngleUnclippedByPlanes(angle, overallClipConfig.side.planes, overallClipConfig.side.clipIntersection)) {
+                    return 0;
                   }
-                  return descriptor.coverageFn(Math.PI / 2 - angle, descriptor.frostMeshY + y);
                 }
+                return descriptor.coverageFn(Math.PI / 2 - angle, descriptor.frostMeshY + y);
+              }
               : undefined,
           },
         );
@@ -3519,8 +3817,8 @@ const CakeScene = React.forwardRef(function CakeScene({
         const middleY = middleFruitRimBuilder
           ? (ledgeY + 0.04)
           : middleBeadedPattern
-          ? (ledgeY + 0.02)
-          : (ledgeY + 0.03);
+            ? (ledgeY + 0.02)
+            : (ledgeY + 0.03);
 
         if (middleBeadedPattern) {
           const middleTrim = buildBeadedTrimRing(
@@ -3542,9 +3840,9 @@ const CakeScene = React.forwardRef(function CakeScene({
           const isAltTip = typeof middleTip === 'string' && middleTip.includes('Alt');
           const secondaryMat = isAltTip
             ? getFrostingMaterial(
-                activeMiddleSlot.pipingSecondaryColor || '#D6293E',
-                activeMiddleSlot.pipingSecondaryColorId,
-              )
+              activeMiddleSlot.pipingSecondaryColor || '#D6293E',
+              activeMiddleSlot.pipingSecondaryColorId,
+            )
             : null;
           const middlePiping = buildPipingRing(middleTip, middlePipingMat, {
             radius: middleRadius,
@@ -3563,12 +3861,12 @@ const CakeScene = React.forwardRef(function CakeScene({
       // Slot-placed and manually placed items (filtered against Edge Edible Delicates if active)
       const itemsToRender = isDelicatesEdgeOnTop
         ? pruneItemsCollidingWithEdgeDelicates(
-            placedItems,
-            edgeConfig,
-            topRadius,
-            centerDecorScale,
-            exteriorFinishStyle
-          )
+          placedItems,
+          edgeConfig,
+          topRadius,
+          centerDecorScale,
+          exteriorFinishStyle
+        )
         : placedItems;
 
       for (const item of itemsToRender) {
@@ -3651,6 +3949,16 @@ const CakeScene = React.forwardRef(function CakeScene({
       }
     }
 
+    // When shape is rectangle, morph all geometry and placements into a boxy rectangle
+    if (cakeShape === 'rectangle') {
+      morphGroupToBoxyRectangle(group, BASE_RADIUS);
+    }
+
+    // When shape is square, morph all geometry into a square box (equal width and depth)
+    if (cakeShape === 'square') {
+      morphGroupToBoxyRectangle(group, BASE_RADIUS, BASE_RADIUS, BASE_RADIUS);
+    }
+
     // Fixed baseline — bottom of the cake sits at y=0, cake rises upward.
     const baselineY = 0;
     if (baselineYRef.current === 0 || group.position.y !== baselineY) {
@@ -3705,7 +4013,17 @@ const CakeScene = React.forwardRef(function CakeScene({
       controlsRef.current = controls;
       controls.enableDamping = true;
       controls.dampingFactor = 0.08;
-      controls.minDistance = 8;
+      // Zoom floor — how close scrolling/pinching may dolly the camera
+      // toward the orbit target (0, 4, 0). The old floor of 8 sat at the
+      // plate rim of even the default 8" cake (BASE_RADIUS 4 + rim 1.4),
+      // so zooming in stalled well short of the frosting, and tall stacks'
+      // top tiers stayed out of close-up reach entirely (the target is at
+      // mid-cake height, so the climb toward the top eats the distance
+      // budget). 4 lands the camera at the reference cake's frosted wall —
+      // decoration-level detail. The widest cakes (12" tiers, rim ~7.4)
+      // can still be clipped into at extreme zoom on flat orbit angles;
+      // scrolling back out recovers immediately.
+      controls.minDistance = 4;
       controls.maxDistance = 45;
       controls.maxPolarAngle = Math.PI - 0.05;
       controls.target.set(0, 4, 0);
@@ -4533,15 +4851,14 @@ const CakeScene = React.forwardRef(function CakeScene({
       ) : null}
       <div
         ref={mountRef}
-        className={`w-full h-full ${
-          disabled
+        className={`w-full h-full ${disabled
             ? 'pointer-events-none'
             : isFreeformArmed
               ? 'cursor-none'
               : isToolActive
                 ? 'cursor-crosshair'
                 : 'cursor-grab active:cursor-grabbing'
-        }`}
+          }`}
       />
     </div>
   );

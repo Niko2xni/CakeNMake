@@ -99,6 +99,47 @@ export function getInteriorPreviewClippingConfig({ hasFrosting, hasDrip, hasSide
 }
 
 /**
+ * Builds an Interior Preview config whose cut planes pass through a piece's
+ * world-space origin. Petit Fours renders four separate pieces away from the
+ * cake group's origin, so the shared cake-centered planes would otherwise
+ * clip each piece at a different relative angle.
+ */
+export function getPieceInteriorPreviewClippingConfig({
+  hasFrosting,
+  hasDrip,
+  hasSide,
+  interiorPreview,
+  position,
+}) {
+  const config = getInteriorPreviewClippingConfig({
+    hasFrosting,
+    hasDrip,
+    hasSide,
+    interiorPreview,
+  });
+  if (!interiorPreview || !position) return config;
+
+  const translatePlanes = ({ planes, ...materialConfig }) => ({
+    ...materialConfig,
+    planes: planes.map((plane) => {
+      const translated = plane.clone();
+      translated.constant -= (
+        plane.normal.x * (position.x || 0) +
+        plane.normal.y * (position.y || 0) +
+        plane.normal.z * (position.z || 0)
+      );
+      return translated;
+    }),
+  });
+
+  return {
+    frosting: translatePlanes(config.frosting),
+    drip: translatePlanes(config.drip),
+    side: translatePlanes(config.side),
+  };
+}
+
+/**
  * Frees GPU resources (geometry buffers, compiled shader programs, and
  * textures) for everything under obj, EXCEPT anything tagged
  * userData.sharedCache — those are intentionally reused across rebuilds
@@ -168,4 +209,3 @@ export function isAngleUnclippedByPlanes(angle, planes, clipIntersection = false
   }
   return planes.every((p) => (p.normal.x * cosA + p.normal.z * sinA + p.constant) >= -1e-4);
 }
-

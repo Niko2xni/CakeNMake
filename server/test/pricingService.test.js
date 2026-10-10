@@ -88,11 +88,11 @@ test('cake quote prices textured buttercream finish for single and two-tier cake
     exteriorFinish: { style: 'texturedButtercream' },
   }, priceBook);
   assert.equal(quote2Tier.totalMinor, 270000); // ₱2,700
-  assert.equal(quote2Tier.lineItems[0].label, 'Bottom Tier Textured Cake (8x5)');
+  assert.equal(quote2Tier.lineItems[0].label, 'Bottom Tier Textured Cake (8x6)');
   assert.equal(quote2Tier.lineItems[0].lineTotalMinor, 170000); // ₱1,700
   assert.deepEqual(quote2Tier.lineItems[0].details, [
     'Bottom Tier',
-    '8x5',
+    '8x6',
     'Textured: Ridge Comb',
     'Vanilla Sponge',
     'Filling: None',
@@ -160,6 +160,14 @@ test('drip breakdown displays Drip with design and sugar color for 1-tier, and s
     'Design: Long Drips',
     'Sugar Color: Vanilla',
   ]);
+
+  const naturalTear2Quote = buildQuote({
+    structure: { size: 'big', layers: 1 },
+    surfaceTreatment: { mode: 'glaze', pattern: 'naturalTear2' },
+  });
+  const naturalTear2Line = naturalTear2Quote.lineItems.find((line) => line.componentKey === 'glaze');
+  assert.equal(naturalTear2Line.label, 'Drip — Natural Tear 2');
+  assert.equal(naturalTear2Line.lineTotalMinor, 10000);
 
   // 2-Tier Drip
   const quote2 = buildQuote({
@@ -373,7 +381,7 @@ test('two-tier quote prices and generates accurate specs for Uniform vs Individu
 
   assert.deepEqual(uniformBottom.details, [
     'Bottom Tier',
-    '8x5',
+    '8x6',
     'Frosted Finish',
     'Chocolate Sponge',
     'Filling: Strawberry (2 Layers)',
@@ -410,7 +418,7 @@ test('two-tier quote prices and generates accurate specs for Uniform vs Individu
 
   assert.deepEqual(indBottom.details, [
     'Bottom Tier',
-    '8x5',
+    '8x6',
     'Naked Finish',
     'Chocolate Sponge',
     'Filling: Vanilla (1 Layer)',
@@ -429,6 +437,65 @@ test('two-tier quote prices and generates accurate specs for Uniform vs Individu
 });
 
 
+
+test('petits fours quote prices a 4-piece set and each individually configured variation', () => {
+  const priceBook = {
+    version: 6,
+    effectiveAt: new Date('2026-09-24T14:00:00.000Z'),
+    rates: {
+      sponge: {
+        naked: { classicCube: 400 },
+        frosted: { classicCube: 500, largeCube: 800 },
+      },
+    },
+  };
+
+  // Uniform: one set line priced from the whole 4-pack rate. Detection must
+  // come from the new cakeFormat model, not the retired shape marker.
+  const uniformQuote = buildQuote({
+    structure: { cakeFormat: 'petitsFour', format: 'petitsFour', size: 'classicCube', layers: 1, shape: 'rectangle', layerDesign: 'uniform' },
+    sponge: { flavor: 'chocolate' },
+    filling: { enabled: false },
+    exteriorFinish: { style: 'fullyFrosted' },
+  }, priceBook);
+  const setLine = uniformQuote.lineItems.find((line) => line.componentKey === 'sponge');
+  assert.equal(setLine.label, 'Petits Four Set — Frosted (1" Cube (4 pcs))');
+  assert.equal(setLine.lineTotalMinor, 50000); // ₱500 for the set
+  assert.deepEqual(setLine.details, [
+    'Petits Four (4 pcs)',
+    '1x1',
+    'Frosted Finish',
+    'Chocolate Sponge',
+    'Filling: None',
+    'Piping Design: None',
+    'Piping Sugar Color: Vanilla',
+  ]);
+  assert.deepEqual(uniformQuote.warnings, []);
+
+  // Individual: four variant lines split from the same 4-pack rate. The
+  // shape stays 'rectangle' and no format marker is set — the cube size must
+  // be enough to keep the Petit Fours pricing path.
+  const individualQuote = buildQuote({
+    structure: { size: 'largeCube', layers: 1, shape: 'rectangle', layerDesign: 'individual' },
+    sponge: { layerFlavors: ['vanilla', 'chocolate', 'ube', 'vanilla'] },
+    filling: { enabled: false },
+    exteriorFinish: { layerStyles: ['fullyFrosted', 'fullyFrosted', 'naked', 'naked'] },
+  }, priceBook);
+  const variationLines = [0, 1, 2, 3].map((p) => individualQuote.lineItems.find((line) => line.componentKey === `sponge-variation-${p}`));
+  assert.equal(variationLines[0].label, 'Petit Four — Variant 1 (Frosted, 2" Cube)');
+  assert.equal(variationLines[0].lineTotalMinor, 20000); // ₱800 / 4 pieces
+  assert.deepEqual(variationLines[0].details, [
+    'Variant 1',
+    '2x2',
+    'Frosted Finish',
+    'Vanilla Sponge',
+    'Filling: None',
+    'Piping Design: None',
+    'Piping Sugar Color: Vanilla',
+  ]);
+  assert.equal(variationLines[2].lineTotalMinor, 10000); // naked falls back to the 4-pack naked rate
+  assert.equal(individualQuote.lineItems.some((line) => line.componentKey === 'sponge'), false);
+});
 
 test('retired flat inscriptions are ignored while placed letters remain priced', () => {
   const config = { structure: { size: 'big', layers: 1 }, center: { mode: 'text', text: { middle: 'Legacy inscription' } } };

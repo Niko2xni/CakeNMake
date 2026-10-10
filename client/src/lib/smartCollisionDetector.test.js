@@ -317,7 +317,15 @@ describe('Smart Collision Detector for Center Tab Designs', () => {
     expect(prunedCherry.map((it) => it.id)).toEqual(['safe-center']);
   });
 
-  it('calculates correct top tier radius for small and big cakes with 1 or 2 layers', () => {
+  it('calculates correct top tier radius for all cake sizes with 1 or 2 layers', () => {
+    expect(getTopTierRadiusFromConfig({ structure: { size: '6x6', layers: 1 } })).toBe(3.0);
+    expect(getTopTierRadiusFromConfig({ structure: { size: '6x6', layers: 2 } })).toBe(2.0);
+    expect(getTopTierRadiusFromConfig({ structure: { size: '8x8', layers: 1 } })).toBe(4.0);
+    expect(getTopTierRadiusFromConfig({ structure: { size: '8x8', layers: 2 } })).toBe(3.0);
+    expect(getTopTierRadiusFromConfig({ structure: { size: '10x10', layers: 1 } })).toBe(5.0);
+    expect(getTopTierRadiusFromConfig({ structure: { size: '10x10', layers: 2 } })).toBe(4.0);
+    expect(getTopTierRadiusFromConfig({ structure: { size: '12x12', layers: 1 } })).toBe(6.0);
+    expect(getTopTierRadiusFromConfig({ structure: { size: '12x12', layers: 2 } })).toBe(5.0);
     expect(getTopTierRadiusFromConfig({ structure: { size: 'big', layers: 1 } })).toBe(4.0);
     expect(getTopTierRadiusFromConfig({ structure: { size: 'big', layers: 2 } })).toBe(3.0);
     expect(getTopTierRadiusFromConfig({ structure: { size: 'small', layers: 1 } })).toBe(3.0);

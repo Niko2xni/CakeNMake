@@ -1,5 +1,7 @@
 'use strict';
 
+const { isPetitsFourStructure } = require('../../lib/cakeConfig');
+
 // Cake pricing rules — draft. Pure functions, no I/O: give it the designer's
 // (new-format) config and a rates table, get back the same shape the quote
 // endpoint already returns to the frontend:
@@ -219,6 +221,8 @@ const DRIP_SECTIONS = [
     title: 'Drip Patterns',
     description: 'Poured glaze coats and dripping silhouette patterns',
     items: [
+      { id: 'naturalTear', label: 'Natural Tear', defaultPrice: 100 },
+      { id: 'naturalTear2', label: 'Natural Tear 2', defaultPrice: 100 },
       { id: 'longGaps', label: 'Long Drips', defaultPrice: 100 },
       { id: 'longShortAlt', label: 'Long & Short Drips', defaultPrice: 110 },
       { id: 'shortDrips', label: 'Short Drips', defaultPrice: 90 },
@@ -245,9 +249,9 @@ const DEFAULT_RATES = {
   // One tier on its own. Filling is part of the sponge price (no charge).
   // Any flavor costs the same.
   sponge: {
-    naked: { big: 1500, small: 700 }, //   8x5 | 6x4
-    frosted: { big: 1700, small: 1000 }, // Frosted
-    textured: { big: 1700, small: 1000 }, // Textured
+    naked: { classicCube: 400, largeCube: 600, miniBento: 350, standardBento: 450, largeBento: 550, '6x6': 700, '8x8': 1500, '10x10': 2200, '12x12': 3000, big: 1500, small: 700 }, // Petits Four, Bento, 6x6, 8x8, 10x10, 12x12
+    frosted: { classicCube: 500, largeCube: 800, miniBento: 500, standardBento: 600, largeBento: 750, '6x6': 1000, '8x8': 1700, '10x10': 2500, '12x12': 3400, big: 1700, small: 1000 }, // Frosted
+    textured: { classicCube: 500, largeCube: 800, miniBento: 500, standardBento: 600, largeBento: 750, '6x6': 1000, '8x8': 1700, '10x10': 2500, '12x12': 3400, big: 1700, small: 1000 }, // Textured
   },
   // Two tiers: 8x5 bottom + 6x4 top, priced as a set.
   // Naked: 1500 + 700 = 2200. Frosted / Textured: 1700 + 1000 = 2700.
@@ -403,7 +407,8 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
 
   const structure = config.structure || {};
   const tiers = structure.layers === 2 ? 2 : 1;
-  const isIndividual = structure.layerDesign === 'individual' && tiers > 1;
+  const isPetitsFour = isPetitsFourStructure(structure);
+  const isIndividual = structure.layerDesign === 'individual' && (tiers > 1 || isPetitsFour);
   const exterior = config.exteriorFinish || {};
   const styleOfTier = (i) => (isIndividual ? (exterior.layerStyles || [])[i] : exterior.style) || exterior.style || 'naked';
 
@@ -417,8 +422,8 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
       .replace(/\b\w/g, (c) => c.toUpperCase());
   };
 
-  const getTierSpecs = (tierIndex = 0, sizeClass = 'big', tierLabel = '1 Tier', finishCls = 'naked') => {
-    const dims = sizeClass === 'big' ? '8x5' : '6x4';
+  const getTierSpecs = (tierIndex = 0, sizeClass = '8x8', tierLabel = '1 Tier', finishCls = 'naked') => {
+    const dims = sizeClass === 'classicCube' ? '1x1' : sizeClass === 'largeCube' ? '2x2' : sizeClass === 'miniBento' ? '3.5x2' : sizeClass === 'standardBento' ? '4x2' : sizeClass === 'largeBento' ? '5x3' : sizeClass === '12x12' ? '12x10' : sizeClass === '10x10' ? '10x8' : sizeClass === '6x6' || sizeClass === 'small' ? '6x4' : sizeClass === '4x4' ? '4x3' : sizeClass === '4x3' ? '4x3' : sizeClass === '6x4' ? '6x4' : sizeClass === '8x6' ? '8x6' : sizeClass === '10x8' ? '10x8' : '8x6';
     let finish = `${finishLabel(finishCls)} Finish`;
     if (finishCls === 'textured') {
       const textureId = isIndividual
@@ -477,30 +482,50 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
     ];
   };
 
-  if (tiers === 1) {
+  if (isPetitsFour) {
+    const size = structure.size || 'classicCube';
+    if (!isIndividual) {
+      const cls = frostClass(styleOfTier(0));
+      const price = rates.sponge?.[cls]?.[size] ?? rates.sponge?.[cls]?.classicCube ?? 500;
+      const dims = size === 'largeCube' ? '2" Cube (4 pcs)' : '1" Cube (4 pcs)';
+      const specs = getTierSpecs(0, size, 'Petits Four (4 pcs)', cls);
+      add('sponge', `Petits Four Set — ${finishLabel(cls)} (${dims})`, price, 1, specs);
+    } else {
+      for (let p = 0; p < 4; p++) {
+        const cls = frostClass(styleOfTier(p));
+        const fullPrice = rates.sponge?.[cls]?.[size] ?? rates.sponge?.[cls]?.classicCube ?? 500;
+        const piecePrice = Math.round(fullPrice / 4);
+        const dims = size === 'largeCube' ? '2" Cube' : '1" Cube';
+        const specs = getTierSpecs(p, size, `Variant ${p + 1}`, cls);
+        add(`sponge-variation-${p}`, `Petit Four — Variant ${p + 1} (${finishLabel(cls)}, ${dims})`, piecePrice, 1, specs);
+      }
+    }
+  } else if (tiers === 1) {
     const cls = frostClass(styleOfTier(0));
-    const size = structure.size === 'small' ? 'small' : 'big';
-    const price = rates.sponge?.[cls]?.[size] ?? (cls === 'textured' ? rates.sponge?.frosted?.[size] : undefined);
-    const dims = size === 'big' ? '8x5' : '6x4';
+    const size = structure.size || '8x8';
+    const price = rates.sponge?.[cls]?.[size] ?? rates.sponge?.[cls]?.[size === '6x6' || size === 'small' ? 'small' : 'big'] ?? (cls === 'textured' ? (rates.sponge?.frosted?.[size] ?? rates.sponge?.frosted?.[size === '6x6' || size === 'small' ? 'small' : 'big']) : undefined);
+    const dims = size === 'miniBento' ? '3.5x2' : size === 'standardBento' ? '4x2' : size === 'largeBento' ? '5x3' : size === '12x12' ? '12x10' : size === '10x10' ? '10x8' : size === '6x6' || size === 'small' ? '6x4' : '8x6';
     const specs = getTierSpecs(0, size, '1 Tier', cls);
     if (price == null) missing(`1 tier ${cls} sponge ${dims}`, 'no price configured');
     else add('sponge', `1 Tier ${finishLabel(cls)} Cake (${dims})`, price, 1, specs);
-  } else if (structure.size === 'small') {
-    missing('2 tier sponge 6x4', 'only the 8x5 two-tier set is priced');
   } else {
-    // 2 Tiers: Split into independent Bottom Tier (8x5) and Top Tier (6x4) line items
+    // 2 Tiers: Split into independent Bottom Tier and Top Tier line items
     const bottom = frostClass(styleOfTier(0));
     const top = frostClass(styleOfTier(1));
-    const b = rates.sponge?.[bottom]?.big ?? (bottom === 'textured' ? rates.sponge?.frosted?.big : undefined);
-    const t = rates.sponge?.[top]?.small ?? (top === 'textured' ? rates.sponge?.frosted?.small : undefined);
+    const baseSize = structure.size || '8x8';
+    const topSize = baseSize === '12x12' ? '10x8' : baseSize === '10x10' ? '8x6' : baseSize === '6x6' || baseSize === 'small' ? '4x3' : '6x4';
+    const b = rates.sponge?.[bottom]?.[baseSize] ?? rates.sponge?.[bottom]?.big ?? (bottom === 'textured' ? (rates.sponge?.frosted?.[baseSize] ?? rates.sponge?.frosted?.big) : undefined);
+    const t = rates.sponge?.[top]?.[topSize] ?? rates.sponge?.[top]?.small ?? (top === 'textured' ? (rates.sponge?.frosted?.[topSize] ?? rates.sponge?.frosted?.small) : undefined);
 
     if (b == null || t == null) {
       missing('2 tier sponge', 'no price configured');
     } else {
-      const d0 = getTierSpecs(0, 'big', 'Bottom Tier', bottom);
-      const d1 = getTierSpecs(1, 'small', 'Top Tier', top);
-      add('sponge', `Bottom Tier ${finishLabel(bottom)} Cake (8x5)`, b, 1, d0);
-      add('sponge-top', `Top Tier ${finishLabel(top)} Cake (6x4)`, t, 1, d1);
+      const baseDims = baseSize === '12x12' ? '12x10' : baseSize === '10x10' ? '10x8' : baseSize === '6x6' || baseSize === 'small' ? '6x4' : '8x6';
+      const topDims = baseSize === '12x12' ? '10x8' : baseSize === '10x10' ? '8x6' : baseSize === '6x6' || baseSize === 'small' ? '4x3' : '6x4';
+      const d0 = getTierSpecs(0, baseSize, 'Bottom Tier', bottom);
+      const d1 = getTierSpecs(1, topSize, 'Top Tier', top);
+      add('sponge', `Bottom Tier ${finishLabel(bottom)} Cake (${baseDims})`, b, 1, d0);
+      add('sponge-top', `Top Tier ${finishLabel(top)} Cake (${topDims})`, t, 1, d1);
     }
   }
 
@@ -516,7 +541,7 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
         ? (surface.layerTreatments?.[tierIdx] || surface || {})
         : (surface || {});
       if (tierSurface.mode === 'glaze') {
-        const patternId = tierSurface.pattern || 'longGaps';
+        const patternId = tierSurface.pattern || 'naturalTear2';
         const specificDripPrice = rates.drip?.[patternId] ?? DEFAULT_DRIP_RATES[patternId] ?? rates.glazePerTier ?? 100;
         const dripLabel = DRIP_SECTIONS[0]?.items?.find((it) => it.id === patternId)?.label || title(patternId);
         if (specificDripPrice == null) {
@@ -542,7 +567,7 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
   } else {
     // 1 Tier Drip
     if (surface.mode === 'glaze') {
-      const patternId = surface.pattern || 'longGaps';
+      const patternId = surface.pattern || 'naturalTear2';
       const specificDripPrice = rates.drip?.[patternId] ?? DEFAULT_DRIP_RATES[patternId] ?? rates.glazePerTier ?? 100;
       const dripLabel = DRIP_SECTIONS[0]?.items?.find((it) => it.id === patternId)?.label || title(patternId);
       if (specificDripPrice == null) {
@@ -850,9 +875,25 @@ function filterPrunedPlacedItems(config) {
   const spec = DELICATES_SPECS[tip];
   if (!spec) return items;
 
-  const size = config?.structure?.size || 'big';
+  const size = config?.structure?.size || '8x8';
   const layers = config?.structure?.layers || 1;
-  const topRadius = size === 'small' ? (layers >= 2 ? 2.0 : 3.0) : (layers >= 2 ? 3.0 : 4.0);
+  const topRadius = size === 'classicCube'
+    ? 0.5
+    : size === 'largeCube'
+    ? 1.0
+    : size === 'miniBento'
+    ? 1.75
+    : size === 'standardBento'
+    ? 2.0
+    : size === 'largeBento'
+    ? 2.5
+    : size === '12x12'
+    ? (layers >= 2 ? 5.0 : 6.0)
+    : size === '10x10'
+    ? (layers >= 2 ? 4.0 : 5.0)
+    : size === '6x6' || size === 'small'
+    ? (layers >= 2 ? 2.0 : 3.0)
+    : (layers >= 2 ? 3.0 : 4.0);
   const finish = config?.exteriorFinish?.style || 'fullyFrosted';
   const surfaceRadius = finish === 'naked' ? topRadius - 0.02 : topRadius + (finish === 'texturedButtercream' ? 0.08 : 0.06);
   const ringRadius = Math.max(0.15, surfaceRadius - spec.inset);

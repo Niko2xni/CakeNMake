@@ -52,6 +52,19 @@ describe('internal blueprint', () => {
     expect(details.sections.find((s) => s.title === 'Side').items).toHaveLength(1);
     expect(details.sections.some((s) => s.title === 'Edge')).toBe(false);
   });
+  it('lists all four Petit Fours variants when each piece is configured individually', () => {
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.structure = { ...config.structure, cakeFormat: 'petitsFour', format: 'petitsFour', size: 'classicCube', layers: 1, layerDesign: 'individual' };
+    config.sponge.layerFlavors = ['vanilla', 'chocolate', 'ube', 'vanilla'];
+    const details = buildBlueprintDetails(config, null);
+    const rows = details.sections[0].items;
+    expect(rows[0].label).toBe('Format');
+    expect(rows[0].detail).toContain('Petit Fours');
+    expect(rows.find((r) => r.label === 'Variant 1 Sponge Flavor').detail).toBe('Vanilla');
+    expect(rows.find((r) => r.label === 'Variant 2 Sponge Flavor').detail).toBe('Chocolate');
+    expect(rows.find((r) => r.label === 'Variant 3 Sponge Flavor').detail).toBe('Ube');
+    expect(rows.find((r) => r.label === 'Variant 4 Sponge Flavor').detail).toBe('Vanilla');
+  });
   it('wraps long details onto additional pages', () => {
     const details = { sections: [{ title: 'Center', items: Array.from({ length: 60 }, () => ({ label: 'Decoration', detail: 'Long selected design detail '.repeat(10), priceText: 'See quote' })) }] };
     expect(buildBlueprintPdf({ details }).getNumberOfPages()).toBeGreaterThan(3);

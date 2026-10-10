@@ -1,49 +1,52 @@
 import React from 'react';
 import { FLAVORS, FROSTING_FILLING_FLAVOR_ORDER } from '@/lib/cakeFlavors';
-import { FINISH_STYLES, BUTTERCREAM_TEXTURES } from '@/lib/cakeConfig';
+import { FINISH_STYLES, BUTTERCREAM_TEXTURES, isPetitsFourStructure } from '@/lib/cakeConfig';
 import SugarColorSection from './SugarColorSection';
 
 export default function ExteriorFinishSection({ exterior, structure, activeLayer, onChange, sugarColor, onSugarColorChange }) {
-  const isIndividual = structure.layerDesign === 'individual' && structure.layers > 1;
+  const isPetitsFour = isPetitsFourStructure(structure);
+  const isIndividual = structure.layerDesign === 'individual' && (structure.layers > 1 || isPetitsFour);
+  const layerCount = isPetitsFour ? 4 : (structure?.layers || 2);
+  const pieceLabel = (label) => (isIndividual ? (isPetitsFour ? `Variation ${activeLayer + 1} ${label}` : `Tier ${activeLayer + 1} ${label}`) : label);
 
   const updateStyle = (style) => {
     if (isIndividual) {
-      const newLayerStyles = [...(exterior.layerStyles || Array(structure.layers).fill('fullyFrosted'))];
+      const newLayerStyles = [...(exterior.layerStyles || Array(layerCount).fill('fullyFrosted'))];
       newLayerStyles[activeLayer] = style;
       onChange({ ...exterior, layerStyles: newLayerStyles });
     } else {
       onChange({
         ...exterior,
         style,
-        layerStyles: Array(structure?.layers || 2).fill(style),
+        layerStyles: Array(layerCount).fill(style),
       });
     }
   };
 
   const updateFlavor = (flavor) => {
     if (isIndividual) {
-      const newLayerFlavors = [...(exterior.layerFlavors || Array(structure.layers).fill('vanilla'))];
+      const newLayerFlavors = [...(exterior.layerFlavors || Array(layerCount).fill('vanilla'))];
       newLayerFlavors[activeLayer] = flavor;
       onChange({ ...exterior, layerFlavors: newLayerFlavors });
     } else {
       onChange({
         ...exterior,
         flavor,
-        layerFlavors: Array(structure?.layers || 2).fill(flavor),
+        layerFlavors: Array(layerCount).fill(flavor),
       });
     }
   };
 
   const updateButtercreamTexture = (buttercreamTexture) => {
     if (isIndividual) {
-      const newLayerTextures = [...(exterior.layerButtercreamTextures || Array(structure.layers).fill('ridged'))];
+      const newLayerTextures = [...(exterior.layerButtercreamTextures || Array(layerCount).fill('ridged'))];
       newLayerTextures[activeLayer] = buttercreamTexture;
       onChange({ ...exterior, layerButtercreamTextures: newLayerTextures });
     } else {
       onChange({
         ...exterior,
         buttercreamTexture,
-        layerButtercreamTextures: Array(structure?.layers || 2).fill(buttercreamTexture),
+        layerButtercreamTextures: Array(layerCount).fill(buttercreamTexture),
       });
     }
   };
@@ -85,7 +88,7 @@ export default function ExteriorFinishSection({ exterior, structure, activeLayer
       {/* Finish Style */}
       <div>
         <span className="text-xs text-muted-foreground mb-2 block">
-          {isIndividual ? `Tier ${activeLayer + 1} Finish Style` : 'Finish Style'}
+          {pieceLabel('Finish Style')}
         </span>
         <div className="space-y-2">
           {FINISH_STYLES.map((style) => {
@@ -122,7 +125,7 @@ export default function ExteriorFinishSection({ exterior, structure, activeLayer
           {showButtercreamTextureOptions && (
             <div>
               <span className="text-xs text-muted-foreground mb-2 block">
-                {isIndividual ? `Tier ${activeLayer + 1} Texture` : 'Buttercream Texture'}
+                {pieceLabel('Buttercream Texture')}
               </span>
               {/* Secondary tier: smaller grid-of-chips (same style as Sugar
                   Color's Match Flavor/Pick Color buttons — grid-cols-2,
@@ -163,7 +166,7 @@ export default function ExteriorFinishSection({ exterior, structure, activeLayer
           >
           <div>
             <span className="text-xs text-muted-foreground mb-2 block">
-                {isIndividual ? `Tier ${activeLayer + 1} Flavor` : 'Frosting Flavor'}
+                {pieceLabel('Frosting Flavor')}
             </span>
             <div className="grid grid-cols-2 gap-2">
               {FROSTING_FILLING_FLAVOR_ORDER.map((flavorId) => {

@@ -123,3 +123,42 @@ export function blendHex(hexA, hexB, t) {
   const bl = Math.round(a[2] + (b[2] - a[2]) * t);
   return `#${[r, g, bl].map(v => v.toString(16).padStart(2, '0')).join('')}`;
 }
+
+/**
+ * Calculates radial distance at angle theta to the perimeter of a rounded box
+ * with half-width W, half-depth D, and corner radius rc.
+ */
+export function getBoxyRadius(theta, W, D, rc = 0.35) {
+  let angle = theta % (Math.PI * 2);
+  if (angle < 0) angle += Math.PI * 2;
+
+  const cosT = Math.cos(angle);
+  const sinT = Math.sin(angle);
+  const ux = Math.abs(cosT);
+  const uz = Math.abs(sinT);
+
+  if (ux < 1e-6) return D;
+  if (uz < 1e-6) return W;
+
+  const safeRc = Math.min(rc, Math.min(W, D) * 0.45);
+  const xc = Math.max(0, W - safeRc);
+  const zc = Math.max(0, D - safeRc);
+
+  const thetaEdgeX = Math.atan2(zc, W);
+  const thetaEdgeZ = Math.atan2(D, xc);
+  const thetaQuad = Math.atan2(uz, ux);
+
+  if (thetaQuad <= thetaEdgeX) {
+    return W / ux;
+  } else if (thetaQuad >= thetaEdgeZ) {
+    return D / uz;
+  } else {
+    const B = ux * xc + uz * zc;
+    const C = xc * xc + zc * zc - safeRc * safeRc;
+    const disc = B * B - C;
+    if (disc >= 0) {
+      return B + Math.sqrt(disc);
+    }
+    return Math.max(W, D);
+  }
+}

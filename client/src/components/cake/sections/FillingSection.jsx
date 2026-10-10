@@ -1,13 +1,16 @@
 import React from 'react';
 import { FLAVORS, FROSTING_FILLING_FLAVOR_ORDER } from '@/lib/cakeFlavors';
-import { FILLING_LAYER_OPTIONS, FILLING_PIPING_DESIGNS } from '@/lib/cakeConfig';
+import { FILLING_LAYER_OPTIONS, FILLING_PIPING_DESIGNS, isPetitsFourStructure } from '@/lib/cakeConfig';
 import SetPicker from '../SetPicker';
 import SugarColorSection from './SugarColorSection';
 
 const DEFAULT_PIPING = { tip: null, colorId: 'vanilla' };
 
 export default function FillingSection({ filling, structure, exteriorFinish, interiorPreview, activeLayer, onChange, sugarColor, onSugarColorChange }) {
-  const isIndividual = structure?.layerDesign === 'individual' && structure?.layers > 1;
+  const isPetitsFour = isPetitsFourStructure(structure);
+  const isIndividual = structure?.layerDesign === 'individual' && (structure?.layers > 1 || isPetitsFour);
+  const layerCount = isPetitsFour ? 4 : (structure?.layers || 2);
+  const pieceLabel = (label) => (isIndividual ? (isPetitsFour ? `Variation ${activeLayer + 1} ${label}` : `Tier ${activeLayer + 1} ${label}`) : label);
   const piping = filling.piping || DEFAULT_PIPING;
 
   const currentFinishStyle = isIndividual
@@ -25,14 +28,14 @@ export default function FillingSection({ filling, structure, exteriorFinish, int
 
   const updateFlavor = (flavor) => {
     if (isIndividual) {
-      const newLayerFlavors = [...(filling.layerFlavors || Array(structure.layers).fill('vanilla'))];
+      const newLayerFlavors = [...(filling.layerFlavors || Array(layerCount).fill('vanilla'))];
       newLayerFlavors[activeLayer] = flavor;
       onChange({ ...filling, layerFlavors: newLayerFlavors });
     } else {
       onChange({
         ...filling,
         flavor,
-        layerFlavors: Array(structure?.layers || 2).fill(flavor),
+        layerFlavors: Array(layerCount).fill(flavor),
       });
     }
   };
@@ -57,7 +60,7 @@ export default function FillingSection({ filling, structure, exteriorFinish, int
           logic in updateLayers is unchanged. */}
       <div>
         <span className="text-xs text-muted-foreground mb-2 block">
-          {isIndividual ? `Tier ${activeLayer + 1} Filling Layers` : 'Filling Layers'}
+          {pieceLabel('Filling Layers')}
         </span>
         <div className="grid grid-cols-4 gap-2">
           {/* None option */}
@@ -131,7 +134,7 @@ export default function FillingSection({ filling, structure, exteriorFinish, int
           >
           <div>
             <span className="text-xs text-muted-foreground mb-2 block">
-              {isIndividual ? `Tier ${activeLayer + 1} Filling Flavor` : 'Filling Flavor'}
+              {pieceLabel('Filling Flavor')}
             </span>
             <div className="grid grid-cols-2 gap-2">
               {FROSTING_FILLING_FLAVOR_ORDER.map((flavorId) => {

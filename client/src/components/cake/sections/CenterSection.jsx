@@ -223,14 +223,14 @@ function ArmedItemControls({
   );
 }
 
-function LetterButton({ letter, isArmed, disabled = false, onSelect, onContextMenu }) {
+function LetterButton({ letter, isArmed, isArmedTool = false, disabled = false, onSelect, onContextMenu }) {
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={() => onSelect(letter.toolId)}
       onContextMenu={onContextMenu}
-      title={letter.label}
+      title={isArmedTool ? `Remove ${letter.label}` : letter.label}
       className={`aspect-square rounded-lg text-sm font-bold transition-all duration-150 border-2 ${
         disabled
           ? 'opacity-40 cursor-not-allowed bg-muted border-transparent text-muted-foreground'
@@ -239,7 +239,12 @@ function LetterButton({ letter, isArmed, disabled = false, onSelect, onContextMe
           : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
       }`}
     >
-      {letter.label}
+      {/* armLetterTool deselects the armed tool when its own letter is
+          clicked again, so an ARMED letter swaps its glyph for an X. A
+          letter merely highlighted because its placed item is selected on
+          the cake still re-arms on click (nothing to deselect), so it
+          keeps showing the glyph. */}
+      {isArmedTool ? <X className="h-5 w-5" strokeWidth={3} aria-hidden="true" /> : letter.label}
     </button>
   );
 }
@@ -254,6 +259,7 @@ function LetterGroup({
   label,
   letters,
   activeLetterToolId,
+  armedToolId = null,
   disabled = false,
   onSelect,
   onContextMenu,
@@ -280,6 +286,7 @@ function LetterGroup({
               <LetterButton
                 letter={letter}
                 isArmed={isArmed}
+                isArmedTool={armedToolId === letter.toolId}
                 disabled={disabled}
                 onSelect={onSelect}
                 onContextMenu={onContextMenu}
@@ -687,7 +694,7 @@ export default function CenterSection({
                   disabled={isMaxReached}
                   onClick={() => armDecorationTool(design.toolId)}
                   onContextMenu={deselectArmedTool}
-                  title={isMaxReached ? `${design.label} (Max limit reached: ${limit})` : design.label}
+                  title={isMaxReached ? `${design.label} (Max limit reached: ${limit})` : isArmed ? `Remove ${design.label}` : design.label}
                   className={`flex flex-col items-center justify-between gap-1.5 rounded-xl p-3 text-center transition-all duration-200 border-2 ${
                     isMaxReached
                       ? 'opacity-60 cursor-not-allowed bg-muted/40 border-dashed border-border/60 text-muted-foreground'
@@ -696,7 +703,20 @@ export default function CenterSection({
                       : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
                   }`}
                 >
-                  <span className="text-xs font-semibold">{design.label}</span>
+                  {/* armDecorationTool disarms the armed design when its own
+                      card is clicked again — selected card swaps its label
+                      for an X ("click to remove"), like the letter grid. */}
+                  {isArmed ? (
+                    /* flex-1 grows to fill the space above the count badge
+                       (or the whole card when there's no badge), so the X
+                       sits dead-center instead of hugging the top edge
+                       where the label normally starts. */
+                    <span className="flex flex-1 items-center justify-center">
+                      <X className="h-5 w-5" strokeWidth={3} aria-hidden="true" />
+                    </span>
+                  ) : (
+                    <span className="text-xs font-semibold">{design.label}</span>
+                  )}
                   {limit !== null && (
                     <span
                       className={`text-[10px] font-medium px-2 py-0.5 rounded-full transition-colors ${
@@ -761,6 +781,7 @@ export default function CenterSection({
               label="Uppercase"
               letters={BUTTERCREAM_LETTERS_UPPER}
               activeLetterToolId={activeLetterToolId}
+              armedToolId={armedCenterType}
               disabled={isCenterItemAtLimit(placedItems, 'letterUpperA')}
               onSelect={armLetterTool}
               onContextMenu={deselectArmedTool}
@@ -773,6 +794,7 @@ export default function CenterSection({
               label="Lowercase"
               letters={BUTTERCREAM_LETTERS_LOWER}
               activeLetterToolId={activeLetterToolId}
+              armedToolId={armedCenterType}
               disabled={isCenterItemAtLimit(placedItems, 'letterLowerA')}
               onSelect={armLetterTool}
               onContextMenu={deselectArmedTool}

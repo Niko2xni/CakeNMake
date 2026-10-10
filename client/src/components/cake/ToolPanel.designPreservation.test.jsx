@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import ToolPanel from './ToolPanel';
-import { DEFAULT_CONFIG } from '@/lib/cakeConfig';
+import { DEFAULT_CONFIG, GLAZE_PATTERNS } from '@/lib/cakeConfig';
 import { adaptConfigToLegacy } from '@/lib/configAdapter';
 
 vi.mock('./AIChatPanel', () => ({ default: () => <div>AI editor</div> }));
@@ -39,6 +39,47 @@ it('opening every manual tab after AI preserves all cake settings', () => {
   expect(state.changed).not.toHaveBeenCalled();
 });
 
+it('shows only Fundamentals and Center for Petit Fours and restores Side and Edge for other formats', () => {
+  const initial = structuredClone(DEFAULT_CONFIG);
+  let setConfig;
+  function Harness() {
+    const [config, updateConfig] = useState(initial);
+    setConfig = updateConfig;
+    return <ToolPanel config={config} onChange={updateConfig} />;
+  }
+
+  render(<Harness />);
+  fireEvent.click(screen.getByRole('button', { name: 'Edge', exact: true }));
+  act(() => {
+    setConfig((config) => ({
+      ...config,
+      structure: {
+        ...config.structure,
+        cakeFormat: 'petitsFour',
+        format: 'petitsFour',
+        size: 'classicCube',
+        layers: 1,
+      },
+    }));
+  });
+
+  expect(screen.getByRole('button', { name: 'Fundamentals', exact: true })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Center', exact: true })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Side', exact: true })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Edge', exact: true })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Fundamentals', exact: true })).toHaveClass('bg-card');
+
+  act(() => {
+    setConfig((config) => ({
+      ...config,
+      structure: { ...config.structure, cakeFormat: 'standard', format: 'standard', size: '8x8' },
+    }));
+  });
+
+  expect(screen.getByRole('button', { name: 'Side', exact: true })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Edge', exact: true })).toBeInTheDocument();
+});
+
 for (const mode of ['both', 'topBottomSeparate']) {
   it(`preserves visible borders when navigating edge slots from ${mode}`, () => {
     const state = mount(mode);
@@ -55,3 +96,88 @@ for (const mode of ['both', 'topBottomSeparate']) {
     }
   });
 }
+
+it('shows the Surface Sugar Color controls only when the active individual tier has Glaze', () => {
+  const config = structuredClone(DEFAULT_CONFIG);
+  config.structure = { ...config.structure, layers: 2, layerDesign: 'individual' };
+  config.surfaceTreatment = {
+    mode: 'glaze',
+    pattern: 'longGaps',
+    layerTreatments: [
+      { mode: null, pattern: 'shortWave' },
+      { mode: 'glaze', pattern: 'midWave' },
+    ],
+  };
+  const view = render(<ToolPanel config={config} onChange={vi.fn()} activeLayer={0} />);
+
+  expect(screen.queryByText('Flavor Color')).not.toBeInTheDocument();
+
+  view.rerender(<ToolPanel config={config} onChange={vi.fn()} activeLayer={1} />);
+  expect(screen.getByText('Flavor Color')).toBeInTheDocument();
+
+  view.rerender(<ToolPanel config={config} onChange={vi.fn()} activeLayer={0} />);
+  expect(screen.queryByText('Flavor Color')).not.toBeInTheDocument();
+});
+
+it('keeps the Fundamentals Surface Treatment section open while cycling through drip patterns', () => {
+  const initial = structuredClone(DEFAULT_CONFIG);
+  let current;
+  function Harness() {
+    const [config, setConfig] = useState(initial);
+    current = config;
+    return <ToolPanel config={config} onChange={setConfig} />;
+  }
+  render(<Harness />);
+
+  for (let cycle = 0; cycle < 6; cycle++) {
+    fireEvent.click(screen.getByRole('button', { name: 'Drip' }));
+    for (const pattern of GLAZE_PATTERNS) {
+      const patternButton = [...document.querySelectorAll('button')]
+        .find(button => button.textContent.startsWith(pattern.label));
+      expect(patternButton, `${pattern.label} should be available`).toBeDefined();
+      fireEvent.click(patternButton);
+      expect(screen.getByText('Pattern')).toBeInTheDocument();
+      expect(current.surfaceTreatment.pattern).toBe(pattern.id);
+      for (const tier of current.surfaceTreatment.layerTreatments) {
+        expect(tier.layerTreatments).toBeUndefined();
+      }
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Turn off Drip' }));
+    expect(current.surfaceTreatment.mode).toBeNull();
+  }
+});
+
+it('defaults Standard and Bento to Long Drips and remembers Petit Fours Natural Tear', () => {
+  const initial = structuredClone(DEFAULT_CONFIG);
+  let current;
+  function Harness() {
+    const [config, setConfig] = useState(initial);
+    current = config;
+    return <ToolPanel config={config} onChange={setConfig} />;
+  }
+  const view = render(<Harness />);
+  const buttonStartingWith = (label) => [...view.container.querySelectorAll('button')]
+    .find(button => button.textContent.startsWith(label));
+
+  fireEvent.click(buttonStartingWith('Drip'));
+  expect(buttonStartingWith('Long Drips').className).toContain('border-primary');
+
+  fireEvent.click(buttonStartingWith('Petit Fours'));
+  fireEvent.click(buttonStartingWith('Natural Tear'));
+  expect(current.surfaceTreatment.pattern).toBe('longGaps');
+
+  fireEvent.click(buttonStartingWith('Standard'));
+  expect(current.surfaceTreatment.pattern).toBe('longGaps');
+  expect(buttonStartingWith('Long Drips').className).toContain('border-primary');
+
+  fireEvent.click(buttonStartingWith('Bento'));
+  expect(current.surfaceTreatment.pattern).toBe('longGaps');
+  expect(buttonStartingWith('Long Drips').className).toContain('border-primary');
+
+  fireEvent.click(buttonStartingWith('Petit Fours'));
+  expect(current.surfaceTreatment.patternsByFormat).toMatchObject({
+    standard: 'longGaps',
+    petitsFour: 'longGaps',
+  });
+  expect(buttonStartingWith('Natural Tear').className).toContain('border-primary');
+});

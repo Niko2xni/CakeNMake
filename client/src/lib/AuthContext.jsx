@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef, useCallback } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { accountApi } from '@/services/api';
@@ -16,6 +16,9 @@ export const AuthProvider = ({ children }) => {
   const [authChecked, setAuthChecked] = useState(!auth);
   const [appPublicSettings, setAppPublicSettings] = useState(null);
   const sessionRevision = useRef(0);
+  const accountSyncRetryCount = useRef(0);
+  const accountSyncInProgress = useRef(false);
+  const accountSyncRetryRevision = useRef(0);
 
   const refreshAccount = async () => {
     const revision = sessionRevision.current;
@@ -25,6 +28,81 @@ export const AuthProvider = ({ children }) => {
     setAuthError(null);
     return response.user;
   };
+
+  const retryAccountSync = useCallback(async () => {
+    const currentUser = auth?.currentUser || user;
+    if (!currentUser || accountSyncInProgress.current) return;
+
+    accountSyncInProgress.current = true;
+    const retryRevision = ++accountSyncRetryRevision.current;
+    const revision = ++sessionRevision.current;
+    setIsLoadingAuth(true);
+    setAuthError(null);
+    try {
+      const response = await accountApi.sync();
+      if (revision !== sessionRevision.current) return;
+      setUser(currentUser);
+      setAccount(response.user);
+      setIsAuthenticated(true);
+      accountSyncRetryCount.current = 0;
+    } catch (error) {
+      if (revision !== sessionRevision.current) return;
+      setUser(currentUser);
+      setAccount(null);
+      setIsAuthenticated(false);
+      setAuthError({
+        type: error.code || 'account_sync_failed',
+        message: error.message || 'Your account could not be loaded.',
+        status: error.status,
+      });
+    } finally {
+      if (retryRevision === accountSyncRetryRevision.current) {
+        accountSyncInProgress.current = false;
+      }
+      if (revision === sessionRevision.current) {
+        setAuthChecked(true);
+        setIsLoadingAuth(false);
+      }
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || !authError) {
+      accountSyncRetryCount.current = 0;
+      return undefined;
+    }
+
+    const permanentCodes = ['user_not_registered', 'ACCOUNT_SUSPENDED', 'AUTH_REQUIRED'];
+    const permanentStatuses = [400, 401, 403, 404, 409, 422];
+    if (permanentCodes.includes(authError.type) || permanentStatuses.includes(authError.status)) {
+      return undefined;
+    }
+
+    let active = true;
+    let timer;
+    const scheduleRetry = () => {
+      const delay = Math.min(1000 * (2 ** accountSyncRetryCount.current), 30000);
+      accountSyncRetryCount.current += 1;
+      timer = setTimeout(async () => {
+        if (!active) return;
+        await retryAccountSync();
+        if (active) scheduleRetry();
+      }, delay);
+    };
+    const retryOnReconnect = async () => {
+      clearTimeout(timer);
+      await retryAccountSync();
+      if (active) scheduleRetry();
+    };
+
+    scheduleRetry();
+    window.addEventListener('online', retryOnReconnect);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+      window.removeEventListener('online', retryOnReconnect);
+    };
+  }, [user?.uid, authError?.type, authError?.status, retryAccountSync]);
 
   useEffect(() => {
     if (!account || account.role !== 'customer') return undefined;
@@ -59,6 +137,8 @@ export const AuthProvider = ({ children }) => {
     const unsubscribe = onAuthStateChanged(auth, async (nextUser) => {
       if (!active) return;
       const revision = ++sessionRevision.current;
+      accountSyncRetryRevision.current += 1;
+      accountSyncInProgress.current = false;
       if ((nextUser?.uid || null) !== currentUid) disconnectChatSocket();
       currentUid = nextUser?.uid || null;
 
@@ -69,6 +149,7 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
         setAccount(null);
         setIsAuthenticated(false);
+        setAuthError(null);
         setAuthChecked(true);
         setIsLoadingAuth(false);
         return;
@@ -113,6 +194,8 @@ export const AuthProvider = ({ children }) => {
     }
 
     sessionRevision.current++;
+    accountSyncRetryRevision.current += 1;
+    accountSyncInProgress.current = false;
     setUser(null);
     setAccount(null);
     setIsAuthenticated(false);
@@ -155,6 +238,7 @@ export const AuthProvider = ({ children }) => {
       checkUserAuth,
       checkAppState,
       refreshAccount,
+      retryAccountSync,
     }}>
       {children}
     </AuthContext.Provider>

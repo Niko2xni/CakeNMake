@@ -785,6 +785,32 @@ input[data-input-otp]:focus,
   }
 }
 
+.cn-home-details-panel > * {
+  flex-shrink: 0;
+}
+
+.cn-home-details-thumbnail {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  flex-shrink: 0;
+  width: 100%;
+  border-radius: 16px;
+  border: 1px solid var(--cn-line);
+  background: rgba(236, 224, 208, 0.32);
+}
+
+.cn-home-details-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 260ms ease;
+}
+
+.cn-home-details-thumbnail:hover img {
+  transform: scale(1.02);
+}
+
 .cn-design-skeleton { overflow: hidden; border: 1px solid var(--cn-line); border-radius: 17px; background: rgba(255, 250, 242, 0.68); }
 .cn-design-skeleton span { display: block; background: linear-gradient(90deg, rgba(236,224,208,.36), rgba(255,250,242,.78), rgba(236,224,208,.36)); background-size: 220% 100%; animation: cn-shimmer 1.4s ease infinite; }
 .cn-design-skeleton span:first-child { aspect-ratio: 16 / 9; }

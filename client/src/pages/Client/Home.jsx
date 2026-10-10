@@ -716,7 +716,7 @@ export default function ClientHome() {
             </div>
 
             {/* Thumbnail / Image Preview */}
-            <div className="my-4 rounded-xl overflow-hidden border border-[var(--cn-line)] bg-[var(--cn-paper)] aspect-video relative group">
+            <div className="cn-home-details-thumbnail my-4 rounded-xl overflow-hidden border border-[var(--cn-line)] bg-[var(--cn-paper)] aspect-video shrink-0 relative group">
               {selectedDesign.thumbnail ? (
                 <img
                   src={selectedDesign.thumbnail}

@@ -26,6 +26,8 @@
 import {
   SIZE_OPTIONS,
   LAYER_OPTIONS,
+  SHAPE_OPTIONS,
+  CAKE_FORMAT_OPTIONS,
   FINISH_STYLES,
   BUTTERCREAM_TEXTURES,
   FILLING_LAYER_OPTIONS,
@@ -72,12 +74,14 @@ export const CAKE_AI_TOOLS = [
   },
   {
     name: 'set_structure',
-    description: 'Change the cake size and/or number of tiers.',
+    description: 'Change the cake format (Standard, Bento Cake, Petit Fours), size, shape, and/or number of tiers. Bento and Petit Fours are single-piece formats: picking one of their sizes switches the format automatically, and 2 tiers are rejected.',
     input_schema: {
       type: 'object',
       properties: {
+        cakeFormat: { type: 'string', enum: ids(CAKE_FORMAT_OPTIONS), description: 'standard, bento, or petitsFour. Switching format picks a matching size when the current size belongs to another format.' },
         size: { type: 'string', enum: ids(SIZE_OPTIONS) },
         layers: { type: 'integer', enum: ids(LAYER_OPTIONS) },
+        shape: { type: 'string', enum: ids(SHAPE_OPTIONS), description: 'Visual shape of the cake or of each Petit Fours piece.' },
       },
     },
   },

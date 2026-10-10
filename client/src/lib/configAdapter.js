@@ -13,7 +13,7 @@
 // SUGAR_COLORS replaces the old DECORATIVE_COLORS + FROSTING_COLOR_PALETTE
 // split (see cakeConfig.js) — one merged, fully-priced list, one resolver.
 
-import { SUGAR_COLORS } from './cakeConfig';
+import { SUGAR_COLORS, getCakeFormat, getSurfaceTreatmentPattern, isPetitsFourStructure, resolveStructureShape } from './cakeConfig';
 import { normalizeTreatmentConfig } from './treatmentConfig';
 
 function resolveColor(colorId) {
@@ -60,7 +60,9 @@ export function adaptConfigToLegacy(newConfig) {
   const side = newConfig.side || {};
   const place = newConfig.place || {};
 
-  const isIndividual = structure.layerDesign === 'individual' && structure.layers > 1;
+  const isPetitsFour = isPetitsFourStructure(structure);
+  const isIndividual = structure.layerDesign === 'individual' && (structure.layers > 1 || isPetitsFour);
+  const variationCount = isPetitsFour ? 4 : (structure.layers || 1);
   const resolveContextSugarColor = (context, index = null, allowDefault = false) => {
     const value = sugarColorOverrides[index === null ? context : `${context}-${index}`] || sugarColorOverrides[context];
     if (allowDefault && value?.mode === 'default' && value.colorId) return resolveColor(value.colorId);
@@ -81,17 +83,19 @@ export function adaptConfigToLegacy(newConfig) {
 
   // Map structure
   const layers = structure.layers || 1;
-  const cakeSize = structure.size || 'big';
-  const realSize = newConfig.realSize || { diameter: 8, height: 5 };
+  const cakeSize = structure.size || '8x8';
+  const cakeFormat = getCakeFormat(structure);
+  const shape = resolveStructureShape(structure);
+  const realSize = newConfig.realSize || { diameter: 8, height: 6 };
 
   // Map sponge flavor
   let cakeColor, layerColors;
   if (isIndividual) {
-    layerColors = sponge.layerFlavors || Array(layers).fill('vanilla');
+    layerColors = sponge.layerFlavors || Array(variationCount).fill('vanilla');
     cakeColor = layerColors[0] || 'vanilla';
   } else {
     cakeColor = sponge.flavor || 'vanilla';
-    layerColors = Array(layers).fill(cakeColor);
+    layerColors = Array(variationCount).fill(cakeColor);
   }
 
   // Ensure cakeColor is never undefined
@@ -107,16 +111,16 @@ export function adaptConfigToLegacy(newConfig) {
   if (fillingEnabled) {
     // Only set filling colors if filling is actually enabled
     if (isIndividual) {
-      layerFillings = filling.layerFlavors || Array(layers).fill('vanilla');
+      layerFillings = filling.layerFlavors || Array(variationCount).fill('vanilla');
       fillingColor = layerFillings[0];
     } else {
       fillingColor = filling.flavor || 'vanilla';
-      layerFillings = Array(layers).fill(fillingColor);
+      layerFillings = Array(variationCount).fill(fillingColor);
     }
   } else {
     // Filling is disabled - set colors to null
     fillingColor = null;
-    layerFillings = Array(layers).fill(null);
+    layerFillings = Array(variationCount).fill(null);
   }
 
   // filling.piping.tip/.colorId are preserved no matter what (never deleted
@@ -150,13 +154,13 @@ export function adaptConfigToLegacy(newConfig) {
   const fillingSugarColorData = resolveContextSugarColorWithId('filling');
   const fillingSugarColorHex = fillingSugarColorData?.hex || null;
   const fillingSugarColorId = fillingSugarColorData?.id || null;
-  const layerFillingSugarColors = Array.from({ length: layers }, (_, index) => resolveContextSugarColor('filling', isIndividual ? index : null));
+  const layerFillingSugarColors = Array.from({ length: variationCount }, (_, index) => resolveContextSugarColor('filling', isIndividual ? index : null));
   // Mirrors layerSurfaceFrostingColorIds below for 'exterior' — the id
   // half of layerFillingSugarColors, needed so CakeScene can look up
   // pattern/gradient/metallic SUGAR_COLORS (Marble, Ombré, Rainbow Swirl,
   // Gold Shimmer, Watercolor Pastel Mix, Red-White Gradient) instead of
   // falling back to their flat hex — see fillingPipingColorId below.
-  const layerFillingSugarColorIds = Array.from({ length: layers }, (_, index) => resolveContextSugarColorWithId('filling', isIndividual ? index : null)?.id || null);
+  const layerFillingSugarColorIds = Array.from({ length: variationCount }, (_, index) => resolveContextSugarColorWithId('filling', isIndividual ? index : null)?.id || null);
   // Piping color always follows the Filling Flavor's own Sugar Color —
   // the override hex when Pick Color is set, otherwise the flavor's
   // natural color — for every Piping Design state, not just Mashed
@@ -183,13 +187,13 @@ export function adaptConfigToLegacy(newConfig) {
   if (exteriorFinish.style === null) {
     // No exterior finish selected - don't apply frosting
     frostingColor = null;
-    layerFrostings = Array(layers).fill(null);
+    layerFrostings = Array(variationCount).fill(null);
   } else if (isIndividual) {
-    layerFrostings = exteriorFinish.layerFlavors || Array(layers).fill('vanilla');
+    layerFrostings = exteriorFinish.layerFlavors || Array(variationCount).fill('vanilla');
     frostingColor = layerFrostings[0] || 'vanilla';
   } else {
     frostingColor = exteriorFinish.flavor || 'vanilla';
-    layerFrostings = Array(layers).fill(frostingColor);
+    layerFrostings = Array(variationCount).fill(frostingColor);
   }
 
   // ── Sugar Color — "what does the coating look like," independent of
@@ -211,8 +215,8 @@ export function adaptConfigToLegacy(newConfig) {
   const sugarColorData = resolveContextSugarColorWithId('exterior');
   const surfaceFrostingColorHex = sugarColorData?.hex || null;
   const surfaceFrostingColorId = sugarColorData?.id || null;
-  const layerSurfaceFrostingColors = Array.from({ length: layers }, (_, index) => resolveContextSugarColor('exterior', isIndividual ? index : null));
-  const layerSurfaceFrostingColorIds = Array.from({ length: layers }, (_, index) => resolveContextSugarColorWithId('exterior', isIndividual ? index : null)?.id || null);
+  const layerSurfaceFrostingColors = Array.from({ length: variationCount }, (_, index) => resolveContextSugarColor('exterior', isIndividual ? index : null));
+  const layerSurfaceFrostingColorIds = Array.from({ length: variationCount }, (_, index) => resolveContextSugarColorWithId('exterior', isIndividual ? index : null)?.id || null);
   // Passed through separately (not yet read by CakeScene) so the person's
   // chosen color for a future Pick Color variant isn't lost — same
   // "implemented: false but data-preserved" pattern as the unbuilt
@@ -237,27 +241,26 @@ export function adaptConfigToLegacy(newConfig) {
   // color (frostColor, sideNoNameColor, etc.), rather than
   // resolveSugarColorHex's "null unless colorOverride" shape, since Glaze
   // has no equivalent "no color chosen yet" state — picking Glaze at all
-  // means a color applies. surfaceTreatmentPattern passes through the six
+  // means a color applies. surfaceTreatmentPattern passes through the
   // GLAZE_PATTERNS ids as-is (no resolution needed, same as
-  // buttercreamTexture above) — falls back to 'longGaps' so older saved
-  // configs without a pattern field still render one of the six rather
-  // than an unhandled id.
+  // buttercreamTexture above) — older saved configs without a pattern
+  // field resolve to the active format's default.
   const surfaceTreatmentMode = isIndividual ? null : (surfaceTreatment.mode || null);
   const surfaceTreatmentColorHex = surfaceTreatmentMode === 'glaze'
     ? (resolveContextSugarColor('surface', null, true) || resolveColor('vanilla'))
     : null;
-  const surfaceTreatmentPattern = surfaceTreatment.pattern || 'longGaps';
-  const layerSurfaceTreatmentModes = Array.from({ length: layers }, (_, index) => {
+  const surfaceTreatmentPattern = getSurfaceTreatmentPattern(surfaceTreatment, structure);
+  const layerSurfaceTreatmentModes = Array.from({ length: variationCount }, (_, index) => {
     const treatment = surfaceTreatment.layerTreatments?.[index] || surfaceTreatment;
     return treatment.mode || null;
   });
-  const layerSurfaceTreatmentColors = Array.from({ length: layers }, (_, index) => (
+  const layerSurfaceTreatmentColors = Array.from({ length: variationCount }, (_, index) => (
     layerSurfaceTreatmentModes[index] === 'glaze'
       ? (resolveContextSugarColor('surface', isIndividual ? index : null, true) || resolveColor('vanilla'))
       : null
   ));
-  const layerSurfaceTreatmentPatterns = Array.from({ length: layers }, (_, index) => (
-    (surfaceTreatment.layerTreatments?.[index] || surfaceTreatment).pattern || 'longGaps'
+  const layerSurfaceTreatmentPatterns = Array.from({ length: variationCount }, (_, index) => (
+    getSurfaceTreatmentPattern(surfaceTreatment.layerTreatments?.[index] || surfaceTreatment, structure)
   ));
 
   const centerSugarColorData = resolveContextSugarColorWithId('center', null, true);
@@ -422,6 +425,8 @@ export function adaptConfigToLegacy(newConfig) {
     // Legacy structure
     layers,
     cakeSize,
+    cakeFormat,
+    shape,
     realSize,
     designMode: isIndividual ? 'individual' : 'uniform',
 
@@ -444,6 +449,7 @@ export function adaptConfigToLegacy(newConfig) {
 
     // Exterior finish style (needed for rendering logic)
     exteriorFinishStyle: exteriorFinish.style || 'fullyFrosted',
+    layerStyles: isIndividual ? (exteriorFinish.layerStyles || Array(variationCount).fill(exteriorFinish.style || 'fullyFrosted')) : Array(variationCount).fill(exteriorFinish.style || 'fullyFrosted'),
     // Only meaningful to CakeScene when exteriorFinishStyle is
     // 'texturedButtercream' — picks Ridged Comb / Ribbon Wrap / Vertical
     // Piping. Same flat-value-only limitation as exteriorFinishStyle
@@ -452,6 +458,7 @@ export function adaptConfigToLegacy(newConfig) {
     // isn't read here — CakeScene doesn't render per-tier style
     // differences today regardless of what's picked per layer.
     buttercreamTexture: exteriorFinish.buttercreamTexture || 'ridged',
+    layerButtercreamTextures: isIndividual ? (exteriorFinish.layerButtercreamTextures || Array(variationCount).fill(exteriorFinish.buttercreamTexture || 'ridged')) : Array(variationCount).fill(exteriorFinish.buttercreamTexture || 'ridged'),
 
     // Sugar Color (formerly Surface) — surfaceFrostingColorHex IS rendered
     // in CakeScene.jsx (replacing the flavor color) when
@@ -537,14 +544,22 @@ export function adaptConfigFromLegacy(legacyConfig) {
 
   // Convert legacy config to new bakery-style format
   const isIndividual = legacyConfig.designMode === 'individual' && legacyConfig.layers > 1;
+  const inferredFormat = getCakeFormat({
+    cakeFormat: legacyConfig.cakeFormat,
+    size: legacyConfig.cakeSize,
+    shape: legacyConfig.shape,
+  });
 
   return {
     structure: {
-      size: legacyConfig.cakeSize || 'big',
+      cakeFormat: inferredFormat,
+      format: inferredFormat,
+      size: legacyConfig.cakeSize || '8x8',
       layers: legacyConfig.layers || 1,
+      shape: resolveStructureShape({ shape: legacyConfig.shape }),
       layerDesign: isIndividual ? 'individual' : 'uniform',
     },
-    realSize: legacyConfig.realSize || { diameter: 8, height: 5 },
+    realSize: legacyConfig.realSize || { diameter: 8, height: 6 },
 
     sponge: {
       flavor: legacyConfig.cakeColor || 'vanilla',

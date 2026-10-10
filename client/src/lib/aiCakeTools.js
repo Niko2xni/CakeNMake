@@ -16,6 +16,10 @@
 
 import {
   SIZE_OPTIONS,
+  STANDARD_SIZE_OPTIONS,
+  PETITS_FOUR_SIZE_OPTIONS,
+  BENTO_SIZE_OPTIONS,
+  getCakeFormat,
   CHECKERED_PATTERN_SETS,
   TRIANGLE_PATTERN_SETS,
   CHEVRON_PATTERN_SETS,
@@ -49,6 +53,13 @@ const sideSets = {
   victorianLambeth: VICTORIAN_LAMBETH_SETS,
 };
 
+// Size ids grouped by format — 'small'/'big' stay accepted as legacy aliases
+// of 6x6/8x8 so saved designs from before the Cake Format rework keep editing.
+const petitsFourSizeIds = PETITS_FOUR_SIZE_OPTIONS.map((option) => option.id);
+const bentoSizeIds = BENTO_SIZE_OPTIONS.map((option) => option.id);
+const standardSizeIds = [...STANDARD_SIZE_OPTIONS.map((option) => option.id), 'small', 'big'];
+const formatForSize = (size) => (petitsFourSizeIds.includes(size) ? 'petitsFour' : bentoSizeIds.includes(size) ? 'bento' : 'standard');
+
 export function validateCakeAiTool(name, input) {
   const tool = CAKE_AI_TOOLS.find(candidate => candidate.name === name);
   if (!tool) return `Unknown cake tool '${name}'.`;
@@ -78,6 +89,9 @@ export function applyCakeAiTool(name, input, ctx) {
   if (error) return { error };
   const { config, onChange, quote } = ctx;
   const tiers = config.structure?.layers || 1;
+  // Slot count for per-piece data arrays: Petit Fours always carry 4
+  // Variants, mirroring configAdapter.js's own variationCount.
+  const variationCount = getCakeFormat(config.structure) === 'petitsFour' ? 4 : tiers;
 
   switch (name) {
     case 'set_edge_border': {
@@ -135,7 +149,7 @@ export function applyCakeAiTool(name, input, ctx) {
       }
       if (lines.length > 3) return { error: 'Cake text supports at most three lines. Please shorten the message.' };
       const radius = getTopTierRadiusFromConfig(config), scale = radius / 4;
-      const style = config.structure?.layerDesign === 'individual' ? config.exteriorFinish?.layerStyles?.[tiers - 1] || config.exteriorFinish?.style : config.exteriorFinish?.style;
+      const style = config.structure?.layerDesign === 'individual' ? config.exteriorFinish?.layerStyles?.[variationCount - 1] || config.exteriorFinish?.style : config.exteriorFinish?.style;
       const boundary = getDelicatesAwareBoundaryRadius(radius, config.edge, style);
       const obstacles = [...getEdgeDelicatesObstacles(config.edge, radius, style), ...retained.map(item => getItemFootprint(item, scale))];
       const added = [];
@@ -163,12 +177,44 @@ export function applyCakeAiTool(name, input, ctx) {
     }
     case 'set_structure': {
       const nextStructure = { ...config.structure, ...input };
-      if (nextStructure.size === 'small' && nextStructure.layers > 1) {
-        if (input.layers > 1) return { error: 'Small cakes support one tier only. Select a big cake for two tiers.' };
+      // Format resolution: an explicit cakeFormat wins; otherwise the final
+      // size decides ('classicCube'/'largeCube' → Petit Fours, '*Bento' →
+      // Bento). 'bento'/'petitsFour' on `shape` still acts as a format
+      // request for compatibility, but `shape` itself is purely visual now
+      // ('round' | 'rectangle') — picking a shape never resets the size or
+      // format, and Petit Fours keep honoring it like Bento does.
+      const requestedFormat = ['standard', 'bento', 'petitsFour'].includes(input.cakeFormat)
+        ? input.cakeFormat
+        : (input.shape === 'bento' || input.shape === 'petitsFour' ? input.shape : null);
+      const format = requestedFormat || formatForSize(nextStructure.size);
+      if (format === 'petitsFour' && !petitsFourSizeIds.includes(nextStructure.size)) nextStructure.size = 'classicCube';
+      if (format === 'bento' && !bentoSizeIds.includes(nextStructure.size)) nextStructure.size = 'standardBento';
+      if (format === 'standard' && !standardSizeIds.includes(nextStructure.size)) nextStructure.size = '8x8';
+      nextStructure.cakeFormat = format;
+      nextStructure.format = format;
+      nextStructure.shape = input.shape === 'round' || input.shape === 'rectangle' || input.shape === 'square'
+        ? input.shape
+        : (nextStructure.shape === 'rectangle' || nextStructure.shape === 'square' ? nextStructure.shape : 'round');
+      
+      // If square shape is selected, ensure size is 6x6 or 8x8
+      if (nextStructure.shape === 'square' && nextStructure.size !== '6x6' && nextStructure.size !== '8x8') {
+        nextStructure.size = '8x8';
+      }
+      const isPetitsFour = format === 'petitsFour';
+      const isBento = format === 'bento';
+      
+      // Always enforce single tier for all cake types
+      if (nextStructure.layers === 2 || input.layers === 2) {
+        if (input.layers === 2) {
+          return { error: 'All cakes are limited to 1 tier only.' };
+        }
         nextStructure.layers = 1;
       }
-      if (nextStructure.layers === 1) nextStructure.layerDesign = 'uniform';
-      const realSize = SIZE_OPTIONS.find(option => option.id === nextStructure.size).dimensions;
+      
+      // Always use uniform layer design for single tier
+      nextStructure.layerDesign = 'uniform';
+      const sizeOpt = SIZE_OPTIONS.find(option => option.id === nextStructure.size);
+      const realSize = sizeOpt ? sizeOpt.dimensions : (config.realSize || { diameter: 8, height: 8 });
       const tierCountChanged = nextStructure.layers !== config.structure?.layers;
       if (!tierCountChanged) {
         onChange({ ...config, structure: nextStructure, realSize: { ...realSize } });
@@ -194,7 +240,7 @@ export function applyCakeAiTool(name, input, ctx) {
     }
 
     case 'set_sponge_flavor': {
-      const nextSponge = { ...config.sponge, flavor: input.flavor, layerFlavors: Array(tiers).fill(input.flavor) };
+      const nextSponge = { ...config.sponge, flavor: input.flavor, layerFlavors: Array(variationCount).fill(input.flavor) };
       onChange({ ...config, sponge: nextSponge });
       return { label: `Sponge flavor → ${input.flavor}`, result: nextSponge };
     }
@@ -203,7 +249,7 @@ export function applyCakeAiTool(name, input, ctx) {
       const nextFilling = { ...config.filling };
       if (input.enabled != null) nextFilling.enabled = input.enabled;
       if (input.layers != null) { nextFilling.layers = input.layers; if (input.enabled == null) nextFilling.enabled = true; }
-      if (input.flavor != null) { nextFilling.flavor = input.flavor; nextFilling.layerFlavors = Array(tiers).fill(input.flavor); }
+      if (input.flavor != null) { nextFilling.flavor = input.flavor; nextFilling.layerFlavors = Array(variationCount).fill(input.flavor); }
       if (input.pipingDesign != null) {
         nextFilling.piping = { ...nextFilling.piping, tip: input.pipingDesign === 'none' ? null : input.pipingDesign };
       }
@@ -213,9 +259,9 @@ export function applyCakeAiTool(name, input, ctx) {
 
     case 'set_exterior_finish': {
       const nextExterior = { ...config.exteriorFinish, ...input };
-      if (input.style) nextExterior.layerStyles = Array(tiers).fill(input.style);
-      if (input.flavor) nextExterior.layerFlavors = Array(tiers).fill(input.flavor);
-      if (input.buttercreamTexture) nextExterior.layerButtercreamTextures = Array(tiers).fill(input.buttercreamTexture);
+      if (input.style) nextExterior.layerStyles = Array(variationCount).fill(input.style);
+      if (input.flavor) nextExterior.layerFlavors = Array(variationCount).fill(input.flavor);
+      if (input.buttercreamTexture) nextExterior.layerButtercreamTextures = Array(variationCount).fill(input.buttercreamTexture);
       onChange({ ...config, exteriorFinish: nextExterior });
       return { label: `Exterior finish → ${nextExterior.style}`, result: nextExterior };
     }
@@ -232,14 +278,14 @@ export function applyCakeAiTool(name, input, ctx) {
       const current = config.sugarColorOverrides?.[key] || DEFAULT_CONFIG.sugarColor;
       const next = { ...current, ...(input.mode ? { mode: input.mode } : input.colorId ? { mode: 'colorOverride' } : {}), ...(input.colorId ? { colorId: input.colorId } : {}) };
       const overrides = { ...(config.sugarColorOverrides || {}), [key]: next };
-      for (let tier = 0; tier < tiers; tier++) overrides[`${key}-${tier}`] = { ...next };
+      for (let tier = 0; tier < variationCount; tier++) overrides[`${key}-${tier}`] = { ...next };
       // A naked tier has no coating to tint. Make an explicit exterior
       // color request visible, preserving existing frosted textures.
       let exteriorFinish = config.exteriorFinish;
       let addedFrosting = false;
       if (context === 'exterior' && next.mode === 'colorOverride') {
         const individual = config.structure?.layerDesign === 'individual';
-        const layerStyles = Array.from({ length: tiers }, (_, tier) => {
+        const layerStyles = Array.from({ length: variationCount }, (_, tier) => {
           const style = (individual ? exteriorFinish?.layerStyles?.[tier] : null)
             || exteriorFinish?.style || DEFAULT_CONFIG.exteriorFinish.style;
           if (style !== 'naked') return style;
@@ -267,7 +313,7 @@ export function applyCakeAiTool(name, input, ctx) {
       const next = { ...config.surfaceTreatment };
       if (input.enabled != null) next.mode = input.enabled ? 'glaze' : null;
       if (input.pattern != null) next.pattern = input.pattern;
-      next.layerTreatments = Array.from({ length: tiers }, (_, index) => ({
+      next.layerTreatments = Array.from({ length: variationCount }, (_, index) => ({
         ...(config.surfaceTreatment?.layerTreatments?.[index] || {}),
         ...(input.enabled != null ? { mode: next.mode } : {}),
         ...(input.pattern != null ? { pattern: next.pattern } : {}),
@@ -282,7 +328,7 @@ export function applyCakeAiTool(name, input, ctx) {
       if (mode && input.setId) {
         next[mode] = { ...(config.side?.[mode] || {}), setId: input.setId };
       }
-      next.layerTreatments = Array.from({ length: tiers }, (_, index) => ({
+      next.layerTreatments = Array.from({ length: variationCount }, (_, index) => ({
         ...(config.side?.layerTreatments?.[index] || config.side), mode,
         ...(mode && input.setId ? { [mode]: { ...(config.side?.layerTreatments?.[index]?.[mode] || next[mode]), setId: input.setId } } : {}),
         layerTreatments: undefined,
@@ -300,7 +346,7 @@ export function applyCakeAiTool(name, input, ctx) {
       const radius = getTopTierRadiusFromConfig(config);
       const scale = radius / 4;
       const style = config.structure?.layerDesign === 'individual'
-        ? config.exteriorFinish?.layerStyles?.[tiers - 1] || config.exteriorFinish?.style
+        ? config.exteriorFinish?.layerStyles?.[variationCount - 1] || config.exteriorFinish?.style
         : config.exteriorFinish?.style;
       const boundary = getDelicatesAwareBoundaryRadius(radius, config.edge, style);
       const obstacles = getEdgeDelicatesObstacles(config.edge, radius, style);

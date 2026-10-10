@@ -159,7 +159,7 @@ export default function SetPicker({
         <div>
           <span className="text-[10px] text-muted-foreground mb-1.5 block">{colorLabel}</span>
           <div className={`flex flex-wrap gap-2 ${disabled ? 'opacity-40' : ''}`}>
-            {SUGAR_COLORS.map((c) => {
+            {SUGAR_COLORS.filter(c => !c.isPattern).map((c) => {
               const active = (colorId || 'vanilla') === c.id;
               return (
                 <button

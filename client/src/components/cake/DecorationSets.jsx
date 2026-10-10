@@ -45,6 +45,23 @@ function buildDripUnitGeometry() {
   return new THREE.LatheGeometry(points, 10);
 }
 
+/**
+ * Petit Fours "Tiny Tip" drip geometry — thin body with bulbous tip only
+ * at the bottom end, not in the middle like standard drips. Much smaller
+ * scale appropriate for mini cakes.
+ */
+function buildTinyTipDripGeometry() {
+  const points = [
+    new THREE.Vector2(0.0, -1.0),    // tip — closed off (radius 0)
+    new THREE.Vector2(0.06, -0.85),  // bulbous tip — widest point at the bottom
+    new THREE.Vector2(0.045, -0.70), // narrow quickly after bulb
+    new THREE.Vector2(0.035, -0.50), // thin body
+    new THREE.Vector2(0.030, -0.25), // thin body continues
+    new THREE.Vector2(0.032, 0.0),   // top — small attachment radius
+  ];
+  return new THREE.LatheGeometry(points, 8);
+}
+
 export function buildDripRing(radius, colorHex, rand, opts = {}) {
   const count = opts.count ?? Math.max(14, Math.round((radius * Math.PI * 2) / 0.5));
   const baseLength = opts.baseLength ?? 0.9;
@@ -57,6 +74,53 @@ export function buildDripRing(radius, colorHex, rand, opts = {}) {
     const lengthVariation = 0.55 + rand() * 0.9; // irregular drip lengths, like real gravity-fed icing
     dummy.position.set(Math.sin(angle) * radius, 0, Math.cos(angle) * radius);
     dummy.scale.set(1, baseLength * lengthVariation, 1);
+    dummy.updateMatrix();
+    mesh.setMatrixAt(i, dummy.matrix);
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+  mesh.castShadow = true;
+  return mesh;
+}
+
+/**
+ * Petit Fours drip patterns — only 3 drips per piece, each with uneven
+ * length. Pattern determines drip characteristics (geometry and base length).
+ */
+export function buildPetitFoursDripRing(radius, colorHex, rand, pattern = 'tinyTip') {
+  const count = 3;
+  const mat = new THREE.MeshPhysicalMaterial({ color: colorHex, roughness: 0.28, clearcoat: 0.55 });
+  
+  // Select geometry and base length based on pattern
+  let geo, baseLength;
+  if (pattern === 'tinyTip') {
+    geo = buildTinyTipDripGeometry();
+    baseLength = 0.4; // Short drips with bulbous tips
+  } else if (pattern === 'petitShort') {
+    geo = buildDripUnitGeometry(); // Use standard geometry
+    baseLength = 0.3; // Very short
+  } else if (pattern === 'petitMedium') {
+    geo = buildDripUnitGeometry();
+    baseLength = 0.5; // Medium length
+  } else if (pattern === 'petitLong') {
+    geo = buildDripUnitGeometry();
+    baseLength = 0.7; // Longer drips
+  } else {
+    // Default to tinyTip
+    geo = buildTinyTipDripGeometry();
+    baseLength = 0.4;
+  }
+  
+  const mesh = new THREE.InstancedMesh(geo, mat, count);
+  const dummy = new THREE.Object3D();
+  
+  // Position 3 drips unevenly around the piece
+  const baseAngles = [0, 2.2, 4.5]; // Uneven spacing (not 0, 2.09, 4.19)
+  
+  for (let i = 0; i < count; i++) {
+    const angle = baseAngles[i] + rand() * 0.2;
+    const lengthVariation = 0.7 + rand() * 0.6; // Each drip has different length
+    dummy.position.set(Math.sin(angle) * radius, 0, Math.cos(angle) * radius);
+    dummy.scale.set(0.8, baseLength * lengthVariation, 0.8); // Smaller scale for mini cakes
     dummy.updateMatrix();
     mesh.setMatrixAt(i, dummy.matrix);
   }
@@ -854,6 +918,29 @@ export function getCheckerCoverageFn(radius, height, opts = {}) {
     return c * c * (3 - 2 * c);
   };
 
+  if (opts.forGlaze) {
+    const ramp = Math.min(0.05, (1 - CHECKER_GAP_RATIO) * 0.5);
+    const inner = half - ramp;
+    const outer = half;
+    return (angle, localY) => {
+      const wrappedAngle = ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      const colF = wrappedAngle / cellAngle;
+      const rowF = (localY + height / 2) / cellHeight;
+      const col = Math.floor(colF);
+      const row = Math.floor(rowF);
+      if (row < 0 || row >= rows) return 0;
+      if (!covered.has(row * cols + col)) return 0;
+
+      const fx = Math.abs(colF - col - 0.5);
+      const fy = Math.abs(rowF - row - 0.5);
+      const maxF = Math.max(fx, fy);
+      if (maxF <= inner) return 1;
+      if (maxF >= outer) return 0;
+      const t = (maxF - inner) / (outer - inner);
+      return 1 - (t * t * t * (t * (t * 6 - 15) + 10));
+    };
+  }
+
   return (angle, localY) => {
     const wrappedAngle = ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
     const colF = wrappedAngle / cellAngle;
@@ -872,6 +959,10 @@ export function getCheckerCoverageFn(radius, height, opts = {}) {
     if (distInsideEdge <= 0) return 0;
     return smoothstep(distInsideEdge / smoothWidth);
   };
+}
+
+export function getGlazeCheckerCoverageFn(radius, height, opts = {}) {
+  return getCheckerCoverageFn(radius, height, { ...opts, forGlaze: true });
 }
 
 export function buildCheckerSideSquares(radius, height, opts = {}) {
@@ -1205,7 +1296,7 @@ export function getGlazeTriangleCoverageFn(radius, height, opts = {}) {
   const { cells, cols, rows, cellAngle, cellHeight } = computeTriangleLayout(radius, height, opts);
   const covered = new Set(cells.map(({ row, col }) => row * cols + col));
   const half = TRIANGLE_GAP_RATIO / 2;
-  const smoothWidth = Math.min(half, 0.12);
+  const ramp = Math.min(0.06, (1 - TRIANGLE_GAP_RATIO) * 0.5);
   const smoothstep = (t) => {
     const c = Math.min(1, Math.max(0, t));
     return c * c * (3 - 2 * c);
@@ -1222,15 +1313,17 @@ export function getGlazeTriangleCoverageFn(radius, height, opts = {}) {
 
     const fx = Math.abs(colF - col - 0.5);
     const fyFromBase = (rowF - row - 0.5) + half; // 0 at the base edge, 2*half at the apex
-    if (fyFromBase <= 0 || fyFromBase >= 2 * half) return 0;
-    const v = fyFromBase / (2 * half);            // 0 base .. 1 apex
-    const halfWidthHere = (1 - v) * half;         // tapers to a point
-    // Distance inside the nearest edge: the two slanted sides (measured
-    // horizontally, slightly generous vs. true perpendicular distance) or
-    // the flat base.
-    const inside = Math.min(halfWidthHere - fx, fyFromBase);
-    if (inside <= 0) return 0;
-    return smoothstep(inside / smoothWidth);
+    if (fyFromBase < 0 || fyFromBase > 2 * half) return 0;
+    const v = Math.min(1, Math.max(0, fyFromBase / (2 * half))); // 0 base .. 1 apex
+    const halfWidthHere = Math.max(0, (1 - v) * half);
+    const distFromSlanted = fx - halfWidthHere;
+    const distFromBase = -fyFromBase;
+    const distFromApex = fyFromBase - 2 * half;
+    const distOutside = Math.max(distFromSlanted, distFromBase, distFromApex);
+    if (distOutside >= 0) return 0;
+    if (distOutside <= -ramp) return 1;
+    const t = (distOutside - (-ramp)) / ramp;
+    return 1 - (t * t * t * (t * (t * 6 - 15) + 10));
   };
 }
 
@@ -1670,11 +1763,23 @@ export function getScatterPearlsCoverageFn(radius, height, opts = {}) {
       const arcDist = radius * dAngle;
       const yDist = localY - p.y;
       const dist = Math.sqrt(arcDist * arcDist + yDist * yDist);
-      const distInsideEdge = p.footprintR - dist;
-      if (distInsideEdge <= 0) continue;
       const smoothWidth = Math.max(0.02, p.footprintR * 0.25);
-      coverage = Math.max(coverage, smoothstep(distInsideEdge / smoothWidth));
-      if (coverage >= 1) break; // fully covered — no need to keep scanning the rest
+      if (opts.forGlaze) {
+        if (dist >= p.footprintR) continue;
+        const distInside = p.footprintR - dist;
+        if (distInside >= smoothWidth) {
+          coverage = 1;
+          break;
+        }
+        const t = distInside / smoothWidth;
+        const weight = t * t * (3 - 2 * t);
+        coverage = Math.max(coverage, weight);
+      } else {
+        const distInsideEdge = p.footprintR - dist;
+        if (distInsideEdge <= 0) continue;
+        coverage = Math.max(coverage, smoothstep(distInsideEdge / smoothWidth));
+        if (coverage >= 1) break; // fully covered — no need to keep scanning the rest
+      }
     }
     return coverage;
   };
@@ -1696,7 +1801,7 @@ const MULTI_COLOR_PALETTE = [
 ];
 
 function buildChevronRowGeometry(radius, rowY, rowHeight, numTeeth, thickness, embedOverride) {
-  const stepsPerTooth = 8;
+  const stepsPerTooth = 16;
   const totalSteps = numTeeth * stepsPerTooth;
   // Same opts.embedOverride escape hatch as buildCheckerSideSquares/
   // buildTriangleSideShapes — see buildCheckerSideSquares' comment.
@@ -1804,10 +1909,16 @@ export function getChevronCoverageFn(radius, height, opts = {}) {
     activeRowYs.push(-height / 2 + (r + 0.5) * rowHeight);
   }
 
-  const smoothWidth = Math.max(0.01, bandHeight * 0.08);
+  const smoothWidth = opts.forGlaze
+    ? Math.max(0.04, bandHeight * 0.20)
+    : Math.max(0.01, bandHeight * 0.08);
   const smoothstep = (t) => {
     const c = Math.min(1, Math.max(0, t));
     return c * c * (3 - 2 * c);
+  };
+  const smootherstep = (t) => {
+    const c = Math.min(1, Math.max(0, t));
+    return c * c * c * (c * (c * 6 - 15) + 10);
   };
 
   return (angle, localY) => {
@@ -1819,10 +1930,23 @@ export function getChevronCoverageFn(radius, height, opts = {}) {
     let coverage = 0;
     for (const rowY of activeRowYs) {
       const distFromCenter = Math.abs(localY - (rowY + yOffset));
-      const distInsideEdge = bandHeight / 2 - distFromCenter;
-      if (distInsideEdge <= 0) continue;
-      coverage = Math.max(coverage, smoothstep(distInsideEdge / smoothWidth));
-      if (coverage >= 1) break;
+      if (opts.forGlaze) {
+        const halfBand = bandHeight / 2;
+        if (distFromCenter >= halfBand) continue;
+        const distInside = halfBand - distFromCenter;
+        if (distInside >= smoothWidth) {
+          coverage = 1;
+          break;
+        }
+        const t = distInside / smoothWidth;
+        const weight = smootherstep(t);
+        coverage = Math.max(coverage, weight);
+      } else {
+        const distInsideEdge = bandHeight / 2 - distFromCenter;
+        if (distInsideEdge <= 0) continue;
+        coverage = Math.max(coverage, smoothstep(distInsideEdge / smoothWidth));
+        if (coverage >= 1) break;
+      }
     }
     return coverage;
   };

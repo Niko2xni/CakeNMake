@@ -42,13 +42,16 @@ import { FLAVORS } from './cakeFlavors';
 export const DEFAULT_CONFIG = {
   // 1. Cake Structure
   structure: {
-    size: 'big', // 'big' (8×5) | 'small' (6×5)
+    cakeFormat: 'standard', // 'standard' | 'bento' | 'petitsFour'
+    format: 'standard',
+    size: '8x8', // '6x6' | '8x8' | '10x10' | '12x12' | 'miniBento' | 'standardBento' | 'largeBento' | 'classicCube' | 'largeCube'
     layers: 1, // 1 or 2
+    shape: 'round', // 'round' | 'rectangle' | 'square'
     layerDesign: 'uniform', // 'uniform' | 'individual'
   },
   realSize: {
     diameter: 8,
-    height: 5
+    height: 6
   },
 
   // 2. Interior
@@ -241,16 +244,84 @@ export const BUTTERCREAM_TEXTURES = [
 ];
 
 // Size options
-export const SIZE_OPTIONS = [
-  { id: 'big', label: '8×5', dimensions: { diameter: 8, height: 5 } },
-  { id: 'small', label: '6×4', dimensions: { diameter: 6, height: 4 } },
+export const STANDARD_SIZE_OPTIONS = [
+  { id: '6x6', label: '6×6', dimensions: { diameter: 6, height: 4 } },
+  { id: '8x8', label: '8×8', dimensions: { diameter: 8, height: 6 } },
+  { id: '10x10', label: '10×10', dimensions: { diameter: 10, height: 8 } },
+  { id: '12x12', label: '12×12', dimensions: { diameter: 12, height: 10 } },
 ];
+
+// Bento size options (single tier only)
+export const BENTO_SIZE_OPTIONS = [
+  { id: 'miniBento', label: '3.5x2', dimensions: { diameter: 3.5, height: 2 } },
+  { id: 'standardBento', label: '4x2', dimensions: { diameter: 4, height: 2 } },
+  { id: 'largeBento', label: '5x3', dimensions: { diameter: 5, height: 3 } },
+];
+
+// Petits Four size options (single tier 4-pack)
+export const PETITS_FOUR_SIZE_OPTIONS = [
+  { id: 'classicCube', label: '1x1', dimensions: { diameter: 1, height: 1, width: 1, length: 1 } },
+  { id: 'largeCube', label: '2x2', dimensions: { diameter: 2, height: 2, width: 2, length: 2 } },
+];
+
+export const SIZE_OPTIONS = [
+  ...STANDARD_SIZE_OPTIONS,
+  ...BENTO_SIZE_OPTIONS,
+  ...PETITS_FOUR_SIZE_OPTIONS,
+];
+
+// Cake Format / Cake Type options (top-level structure selection)
+export const CAKE_FORMAT_OPTIONS = [
+  { id: 'standard', label: 'Standard' },
+  { id: 'bento', label: 'Bento' },
+  { id: 'petitsFour', label: 'Petit Fours' },
+];
+
+export const CAKE_TYPE_OPTIONS = CAKE_FORMAT_OPTIONS;
 
 // Layer options
 export const LAYER_OPTIONS = [
   { id: 1, label: '1 Tier' },
   { id: 2, label: '2 Tiers' },
 ];
+
+// Shape options
+export const SHAPE_OPTIONS = [
+  { id: 'round', label: 'Round' },
+  { id: 'rectangle', label: 'Rectangle' },
+  { id: 'square', label: 'Square' },
+];
+
+const PETITS_FOUR_SIZE_IDS = PETITS_FOUR_SIZE_OPTIONS.map((option) => option.id);
+const BENTO_SIZE_IDS = BENTO_SIZE_OPTIONS.map((option) => option.id);
+
+export function getCakeFormat(structure = {}) {
+  const explicit = structure.cakeFormat || structure.format;
+  if (explicit === 'standard' || explicit === 'bento' || explicit === 'petitsFour') {
+    return explicit;
+  }
+  if (structure.shape === 'petitsFour' || PETITS_FOUR_SIZE_IDS.includes(structure.size)) {
+    return 'petitsFour';
+  }
+  if (structure.shape === 'bento' || BENTO_SIZE_IDS.includes(structure.size)) {
+    return 'bento';
+  }
+  return 'standard';
+}
+
+export function isPetitsFourStructure(structure) {
+  return getCakeFormat(structure) === 'petitsFour';
+}
+
+export function isBentoStructure(structure) {
+  return getCakeFormat(structure) === 'bento';
+}
+
+export function resolveStructureShape(structure = {}) {
+  if (structure.shape === 'rectangle' || structure.shape === 'petitsFour') return 'rectangle';
+  if (structure.shape === 'square') return 'square';
+  return 'round';
+}
 
 // Filling layer options
 export const FILLING_LAYER_OPTIONS = [
@@ -442,7 +513,7 @@ export const SURFACE_TREATMENT_MODES = [
   { id: 'glaze', label: 'Drip', implemented: true },
 ];
 
-// ─── Glaze Patterns — six variants of the poured-and-dripping silhouette
+// ─── Glaze Patterns — variants of the poured-and-dripping silhouette
 // (surfaceTreatment.pattern, only relevant when mode === 'glaze'), the
 // same "pick a variant" shape BUTTERCREAM_TEXTURES already uses for
 // Textured Buttercream. All six share the same underlying mechanism (see
@@ -471,6 +542,29 @@ export const GLAZE_PATTERNS = [
   { id: 'midWave', label: 'Mid Coverage', description: 'Reaches about halfway down, with a soft rippled edge', implemented: true },
   { id: 'shortWave', label: 'Short Coverage', description: 'A shallow coat near the top, with a soft rippled edge', implemented: true },
 ];
+
+// ─── Petit Fours Glaze Patterns — Drips & Coverage with uneven distribution ──
+// These patterns copy the format of Drips and Coverage designs from Standard,
+// combined into an organic uneven distribution tailored for mini-cake cubes,
+// featuring the signature poured ganache "Tear Fall" design.
+export const PETIT_FOURS_GLAZE_PATTERNS = [
+  { id: 'unevenCombo', label: 'Tear Fall', description: 'Organic ganache coverage with flowing, varied teardrop drips', implemented: true, petitsFoursOnly: true },
+  { id: 'longGaps', label: 'Natural Tear', description: 'Long, hand-poured drips with an uneven, natural flow', implemented: true, petitsFoursOnly: true },
+  { id: 'tinyTip', label: 'Wave Curve', description: 'A smooth glaze cap with a softly undulating edge', implemented: true, petitsFoursOnly: true },
+  { id: 'longWave', label: 'Full Coverage', description: 'Reaches almost to the base, with soft rippled edge', implemented: true, petitsFoursOnly: true },
+  { id: 'midWave', label: 'Mid Coverage', description: 'Reaches about halfway down, with soft rippled edge', implemented: true, petitsFoursOnly: true },
+  { id: 'shortWave', label: 'Short Coverage', description: 'A shallow coat near the top, with soft rippled edge', implemented: true, petitsFoursOnly: true },
+];
+
+export function getSurfaceTreatmentPattern(treatment = {}, structure = {}) {
+  const patternSet = isPetitsFourStructure(structure) ? 'petitsFour' : 'standard';
+  const availablePatterns = patternSet === 'petitsFour' ? PETIT_FOURS_GLAZE_PATTERNS : GLAZE_PATTERNS;
+  const availableIds = new Set(availablePatterns.map(({ id }) => id));
+  const formatPattern = treatment.patternsByFormat?.[patternSet];
+  if (availableIds.has(formatPattern)) return formatPattern;
+  if (availableIds.has(treatment.pattern)) return treatment.pattern;
+  return patternSet === 'petitsFour' ? 'longGaps' : 'longGaps';
+}
 
 
 // ─── Checkered Pattern — numbered coverage variants, classic black+white ──
@@ -1004,11 +1098,23 @@ export function getFerreroAwareBoundaryRadius(topRadius = 4, edgeConfig = null, 
  * Derives the topmost tier's radius directly from cake configuration.
  */
 export function getTopTierRadiusFromConfig(config) {
-  const size = config?.structure?.size || 'big';
+  const size = config?.structure?.size || '8x8';
   const layers = config?.structure?.layers || 1;
-  if (size === 'small') {
+  if (size === 'classicCube') return 0.5;
+  if (size === 'largeCube') return 1.0;
+  if (size === 'miniBento') return 1.75;
+  if (size === 'standardBento') return 2.0;
+  if (size === 'largeBento') return 2.5;
+  if (size === '12x12') {
+    return layers >= 2 ? 5.0 : 6.0;
+  }
+  if (size === '10x10') {
+    return layers >= 2 ? 4.0 : 5.0;
+  }
+  if (size === '6x6' || size === 'small') {
     return layers >= 2 ? 2.0 : 3.0;
   }
+  // '8x8' or 'big' or default
   return layers >= 2 ? 3.0 : 4.0;
 }
 

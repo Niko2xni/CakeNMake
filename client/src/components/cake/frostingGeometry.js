@@ -37,8 +37,8 @@ export function buildOrganicFrostingGeometry(radius, height, topDomeHeight = 0) 
     path.lineTo(0, height);
   }
 
-  // Generate LatheGeometry (48 radial segments)
-  const geo = new THREE.LatheGeometry(path.getPoints(8), 48);
+  // Generate LatheGeometry (128 radial segments for smooth corner coverage)
+  const geo = new THREE.LatheGeometry(path.getPoints(12), 128);
 
   // Fix UV coordinates for proper vertical gradient mapping
   const uvAttribute = geo.attributes.uv;
@@ -59,7 +59,7 @@ export function buildOrganicFrostingGeometry(radius, height, topDomeHeight = 0) 
     uvAttribute.setY(i, normalizedY);
   }
 
-  // Apply subtle organic wobble to the outer vertices
+  // Apply subtle organic wobble to the outer vertices (always positive so frosting never dips below base radius)
   const vertex = new THREE.Vector3();
 
   for (let i = 0; i < posAttribute.count; i++) {
@@ -70,10 +70,10 @@ export function buildOrganicFrostingGeometry(radius, height, topDomeHeight = 0) 
     if (distSq > (radius * 0.5) * (radius * 0.5)) {
       const angle = Math.atan2(vertex.z, vertex.x);
 
-      // Low-frequency sine/cosine wobble
+      // Low-frequency positive organic wobble
       const wobble =
-        Math.sin(angle * 3 + vertex.y * 2) * 0.02 +
-        Math.cos(angle * 5 - vertex.y * 1.5) * 0.015;
+        (Math.sin(angle * 3 + vertex.y * 2) * 0.5 + 0.5) * 0.01 +
+        (Math.cos(angle * 5 - vertex.y * 1.5) * 0.5 + 0.5) * 0.008;
 
       const dist = Math.sqrt(distSq);
       const newDist = dist + wobble;

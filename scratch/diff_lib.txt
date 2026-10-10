@@ -1,0 +1,124 @@
+diff --git a/client/src/lib/aiCakeToolSchemas.js b/client/src/lib/aiCakeToolSchemas.js
+index 0bb8c61..b8f9e0c 100644
+--- a/client/src/lib/aiCakeToolSchemas.js
++++ b/client/src/lib/aiCakeToolSchemas.js
+@@ -26,6 +26,7 @@
+ import {
+   SIZE_OPTIONS,
+   LAYER_OPTIONS,
++  SHAPE_OPTIONS,
+   FINISH_STYLES,
+   BUTTERCREAM_TEXTURES,
+   FILLING_LAYER_OPTIONS,
+@@ -72,12 +73,13 @@ export const CAKE_AI_TOOLS = [
+   },
+   {
+     name: 'set_structure',
+-    description: 'Change the cake size and/or number of tiers.',
++    description: 'Change the cake size, shape, and/or number of tiers.',
+     input_schema: {
+       type: 'object',
+       properties: {
+         size: { type: 'string', enum: ids(SIZE_OPTIONS) },
+         layers: { type: 'integer', enum: ids(LAYER_OPTIONS) },
++        shape: { type: 'string', enum: ids(SHAPE_OPTIONS) },
+       },
+     },
+   },
+diff --git a/client/src/lib/aiCakeTools.js b/client/src/lib/aiCakeTools.js
+index e1b826e..df0e70f 100644
+--- a/client/src/lib/aiCakeTools.js
++++ b/client/src/lib/aiCakeTools.js
+@@ -163,12 +163,36 @@ export function applyCakeAiTool(name, input, ctx) {
+     }
+     case 'set_structure': {
+       const nextStructure = { ...config.structure, ...input };
+-      if (nextStructure.size === 'small' && nextStructure.layers > 1) {
+-        if (input.layers > 1) return { error: 'Small cakes support one tier only. Select a big cake for two tiers.' };
++      const isPetitsFour = nextStructure.shape === 'petitsFour' || ['classicCube', 'largeCube'].includes(nextStructure.size);
++      const isBento = nextStructure.shape === 'bento' || ['miniBento', 'standardBento', 'largeBento'].includes(nextStructure.size);
++      if (input.shape === 'petitsFour' && !['classicCube', 'largeCube'].includes(nextStructure.size)) {
++        nextStructure.size = 'classicCube';
++      } else if (input.shape === 'bento' && !['miniBento', 'standardBento', 'largeBento'].includes(nextStructure.size)) {
++        nextStructure.size = 'standardBento';
++      } else if (input.shape && input.shape !== 'bento' && input.shape !== 'petitsFour' && ['miniBento', 'standardBento', 'largeBento', 'classicCube', 'largeCube'].includes(nextStructure.size)) {
++        nextStructure.size = '8x8';
++      }
++      if (isPetitsFour && nextStructure.layers === 2) {
++        if (input.layers === 2) {
++          return { error: 'Petits Four cakes do not support 2 tiers.' };
++        }
++        nextStructure.layers = 1;
++      }
++      if (isBento && nextStructure.layers === 2) {
++        if (input.layers === 2) {
++          return { error: 'Bento cakes do not support 2 tiers.' };
++        }
++        nextStructure.layers = 1;
++      }
++      if ((nextStructure.size === '6x6' || nextStructure.size === 'small') && nextStructure.layers === 2) {
++        if (input.layers === 2) {
++          return { error: '6×6 cake does not support 2 tiers.' };
++        }
+         nextStructure.layers = 1;
+       }
+-      if (nextStructure.layers === 1) nextStructure.layerDesign = 'uniform';
+-      const realSize = SIZE_OPTIONS.find(option => option.id === nextStructure.size).dimensions;
++      if (nextStructure.layers === 1 && !isPetitsFour) nextStructure.layerDesign = 'uniform';
++      const sizeOpt = SIZE_OPTIONS.find(option => option.id === nextStructure.size);
++      const realSize = sizeOpt ? sizeOpt.dimensions : (config.realSize || { diameter: 8, height: 8 });
+       const tierCountChanged = nextStructure.layers !== config.structure?.layers;
+       if (!tierCountChanged) {
+         onChange({ ...config, structure: nextStructure, realSize: { ...realSize } });
+diff --git a/client/src/lib/blueprintDetails.js b/client/src/lib/blueprintDetails.js
+index 8993c71..7f6d63a 100644
+--- a/client/src/lib/blueprintDetails.js
++++ b/client/src/lib/blueprintDetails.js
+@@ -12,7 +12,9 @@ export function buildBlueprintDetails(config, quote, designName = '') {
+   };
+   const layers = config.structure?.layers || 1;
+   const individual = layers > 1 && config.structure?.layerDesign === 'individual';
+-  const fundamentals = [['Tiers', `${layers} tier(s) · ${config.realSize?.diameter || ''} in diameter · ${config.realSize?.height || ''} in height`, ['base.standard', `size.${config.structure?.size || 'big'}`, 'tier.additional']]];
++  const sizeKey = config.structure?.size || '8x8';
++  const sizeAliases = sizeKey === '8x8' || sizeKey === 'big' ? ['size.8x8', 'size.big'] : sizeKey === '6x6' || sizeKey === 'small' ? ['size.6x6', 'size.small'] : [`size.${sizeKey}`];
++  const fundamentals = [['Tiers', `${layers} tier(s) · ${config.realSize?.diameter || ''} in diameter · ${config.realSize?.height || ''} in height`, ['base.standard', ...sizeAliases, 'tier.additional']]];
+   for (let i = 0; i < (individual ? layers : 1); i++) {
+     const prefix = individual ? `Tier ${i + 1} ` : '';
+     const sponge = individual ? config.sponge?.layerFlavors?.[i] || config.sponge?.flavor : config.sponge?.flavor;
+diff --git a/client/src/lib/cakePricingRules.js b/client/src/lib/cakePricingRules.js
+index 85a7b05..13fbdcf 100644
+--- a/client/src/lib/cakePricingRules.js
++++ b/client/src/lib/cakePricingRules.js
+@@ -216,9 +216,9 @@ export const DEFAULT_EDGE_RATES = Object.fromEntries(
+ 
+ export const DEFAULT_RATES = {
+   sponge: {
+-    naked: { big: 1500, small: 700 }, // 8x5 | 6x4
+-    frosted: { big: 1700, small: 1000 }, // Frosted
+-    textured: { big: 1700, small: 1000 }, // Textured
++    naked: { '6x6': 700, '8x8': 1500, '10x10': 2200, '12x12': 3000, big: 1500, small: 700 }, // 6x6, 8x8, 10x10, 12x12
++    frosted: { '6x6': 1000, '8x8': 1700, '10x10': 2500, '12x12': 3400, big: 1700, small: 1000 }, // Frosted
++    textured: { '6x6': 1000, '8x8': 1700, '10x10': 2500, '12x12': 3400, big: 1700, small: 1000 }, // Textured
+   },
+   twoTier: { naked: 2200, frosted: 2700, textured: 2700 },
+   glazePerTier: 100,
+diff --git a/client/src/lib/tierDesignSync.js b/client/src/lib/tierDesignSync.js
+index 4452cb2..6c8fe0f 100644
+--- a/client/src/lib/tierDesignSync.js
++++ b/client/src/lib/tierDesignSync.js
+@@ -1,4 +1,4 @@
+-import { DEFAULT_CONFIG } from './cakeConfig';
++import { DEFAULT_CONFIG, isPetitsFourStructure } from './cakeConfig';
+ 
+ /**
+  * Synchronizes the cake configuration when toggling between 'uniform' and 'individual'
+@@ -11,7 +11,8 @@ import { DEFAULT_CONFIG } from './cakeConfig';
+  */
+ export function syncTierDesignOnToggle(config, targetDesign, activeLayer = 0) {
+   if (!config) return config;
+-  const layers = config.structure?.layers || 2;
++  const isPetitsFour = isPetitsFourStructure(config.structure);
++  const layers = isPetitsFour ? 4 : (config.structure?.layers || 2);
+   const newStructure = {
+     ...(config.structure || DEFAULT_CONFIG.structure),
+     layerDesign: targetDesign,

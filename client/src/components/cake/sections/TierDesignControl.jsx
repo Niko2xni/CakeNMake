@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link, Unlink } from 'lucide-react';
+import { isPetitsFourStructure } from '@/lib/cakeConfig';
 
 export default function TierDesignControl({ structure, onChange, onToggle }) {
   const toggleTierDesign = () => {
@@ -14,12 +15,19 @@ export default function TierDesignControl({ structure, onChange, onToggle }) {
     });
   };
 
+  const isPetitsFour = isPetitsFourStructure(structure);
+
   return (
     <div className="flex items-center justify-between">
       <div>
-        <p className="text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">Tier Design</p>
+        <p className="text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">
+          {isPetitsFour ? 'Variation Design' : 'Tier Design'}
+        </p>
         <p className="text-[10px] text-muted-foreground mt-0.5">
-          {structure.layerDesign === 'uniform' ? 'All tiers share the same style' : 'Each tier has its own style'}
+          {isPetitsFour
+            ? (structure.layerDesign === 'uniform' ? 'All 4 pieces share the same style' : 'Each piece has its own style')
+            : (structure.layerDesign === 'uniform' ? 'All tiers share the same style' : 'Each tier has its own style')
+          }
         </p>
       </div>
       <button

@@ -9,20 +9,23 @@ import {
   PIPING_SCROLLS_SETS,
   SUNSHINE_PLAY_SETS,
   VICTORIAN_LAMBETH_SETS,
+  isPetitsFourStructure,
 } from '@/lib/cakeConfig';
 import SugarColorSection from './SugarColorSection';
 import { flatTreatment } from '@/lib/treatmentConfig';
 
 export default function SideSection({ side, structure, activeLayer = 0, onChange, sugarColor, onSugarColorChange }) {
   const [activeChevronColorSlot, setActiveChevronColorSlot] = useState('primary');
-  const isIndividual = structure?.layerDesign === 'individual' && structure?.layers > 1;
-  const tierLabel = (label) => (isIndividual ? `Tier ${activeLayer + 1} ${label}` : label);
+  const isPetitsFour = isPetitsFourStructure(structure);
+  const isIndividual = structure?.layerDesign === 'individual' && (structure?.layers > 1 || isPetitsFour);
+  const tierCount = isPetitsFour ? 4 : (structure?.layers || 2);
+  const tierLabel = (label) => (isIndividual ? (isPetitsFour ? `Variation ${activeLayer + 1} ${label}` : `Tier ${activeLayer + 1} ${label}`) : label);
   const activeSide = isIndividual ? (side.layerTreatments?.[activeLayer] || side) : side;
 
   const updateSide = (nextSide) => {
     nextSide = flatTreatment(nextSide);
     if (!isIndividual) {
-      const layersCount = Math.max(structure?.layers || 2, 2);
+      const layersCount = Math.max(tierCount, 2);
       const layerTreatments = Array.from(
         { length: layersCount },
         () => ({ ...nextSide })
@@ -32,7 +35,7 @@ export default function SideSection({ side, structure, activeLayer = 0, onChange
     }
 
     const layerTreatments = Array.from(
-      { length: Math.max(structure.layers, side.layerTreatments?.length || 0) },
+      { length: Math.max(tierCount, side.layerTreatments?.length || 0) },
       (_, index) => flatTreatment(side.layerTreatments?.[index] || side),
     );
     layerTreatments[activeLayer] = nextSide;

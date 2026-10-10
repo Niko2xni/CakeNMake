@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { X } from 'lucide-react';
 import {
   BEADED_TRIM_VARIATIONS_DELUXE,
   BORDER_PIPING_VARIATIONS_DELUXE,
@@ -377,14 +378,18 @@ function VariantRow({ label, variants, currentSlot, updateSlot, showSugarColor =
                     piping: { ...currentSlot.piping, tip: active ? null : variant.id },
                   })
                 }
-                title={variant.label}
+                title={active ? `Remove ${variant.label}` : variant.label}
                 className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
                   active
                     ? 'bg-primary text-primary-foreground border-primary shadow-md'
                     : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
                 }`}
               >
-                {i + 1}
+                {/* The onClick above clears the tip when this variant is
+                    already active, so the selected circle swaps its number
+                    for an X — the shared "click to remove this" affordance
+                    (same as Center's armed tools and Glaze's toggle). */}
+                {active ? <X className="h-5 w-5" strokeWidth={3} aria-hidden="true" /> : i + 1}
               </button>
               {showColorHere && (
                 <div className="w-full basis-full pt-2">

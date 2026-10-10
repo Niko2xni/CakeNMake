@@ -1,5 +1,6 @@
 import React from 'react';
-import { SURFACE_TREATMENT_MODES, GLAZE_PATTERNS } from '@/lib/cakeConfig';
+import { X } from 'lucide-react';
+import { SURFACE_TREATMENT_MODES, GLAZE_PATTERNS, PETIT_FOURS_GLAZE_PATTERNS, getSurfaceTreatmentPattern, isPetitsFourStructure } from '@/lib/cakeConfig';
 import { flatTreatment } from '@/lib/treatmentConfig';
 
 // Surface Treatment — Glaze. An overlay layer, independent of both Sugar
@@ -22,14 +23,22 @@ import { flatTreatment } from '@/lib/treatmentConfig';
 // variants — see the Pattern picker below, which uses the same list-of-
 // variants shape ExteriorFinishSection's Buttercream Texture picker uses
 // for Ridged Comb/Ribbon Wrap.
-export default function SurfaceTreatmentSection({ surfaceTreatment, onChange, isIndividual = false, activeLayer = 0 }) {
-  const sectionLabel = isIndividual ? `Tier ${activeLayer + 1} Drip` : 'Surface Treatment';
+export default function SurfaceTreatmentSection({ surfaceTreatment, onChange, isIndividual = false, activeLayer = 0, structure = null }) {
+  const isPetitsFour = isPetitsFourStructure(structure);
+  const sectionLabel = isIndividual
+    ? (isPetitsFour ? `Variation ${activeLayer + 1} Drip` : `Tier ${activeLayer + 1} Drip`)
+    : 'Surface Treatment';
   const activeTreatment = flatTreatment(isIndividual
     ? (surfaceTreatment.layerTreatments?.[activeLayer] || surfaceTreatment)
     : surfaceTreatment);
   const mode = activeTreatment.mode || null;
   const glaze = SURFACE_TREATMENT_MODES.find((m) => m.id === 'glaze');
   const active = mode === 'glaze';
+  const minSlots = isPetitsFour ? 4 : 2;
+  const patternSet = isPetitsFour ? 'petitsFour' : 'standard';
+  const otherPatternSet = isPetitsFour ? 'standard' : 'petitsFour';
+  const patternOptions = isPetitsFour ? PETIT_FOURS_GLAZE_PATTERNS : GLAZE_PATTERNS;
+  const selectedPattern = getSurfaceTreatmentPattern(activeTreatment, structure);
 
   const toggleGlaze = () => {
     const nextTreatment = { ...activeTreatment, mode: active ? null : 'glaze' };
@@ -37,7 +46,7 @@ export default function SurfaceTreatmentSection({ surfaceTreatment, onChange, is
       ? {
           ...surfaceTreatment,
           layerTreatments: Object.assign(
-            Array.from({ length: Math.max(2, surfaceTreatment.layerTreatments?.length || 0) }, (_, index) => (
+            Array.from({ length: Math.max(minSlots, surfaceTreatment.layerTreatments?.length || 0) }, (_, index) => (
               flatTreatment(surfaceTreatment.layerTreatments?.[index] || { mode: null, pattern: 'longGaps' })
             )),
             { [activeLayer]: nextTreatment },
@@ -45,17 +54,23 @@ export default function SurfaceTreatmentSection({ surfaceTreatment, onChange, is
         }
       : {
           ...nextTreatment,
-          layerTreatments: Array.from({ length: 2 }, () => ({ ...nextTreatment })),
+          layerTreatments: Array.from({ length: minSlots }, () => ({ ...nextTreatment })),
         });
   };
 
   const updatePattern = (pattern) => {
-    const nextTreatment = { ...activeTreatment, pattern };
+    const otherPatterns = isPetitsFour ? GLAZE_PATTERNS : PETIT_FOURS_GLAZE_PATTERNS;
+    const patternsByFormat = { ...(activeTreatment.patternsByFormat || {}) };
+    if (!patternsByFormat[otherPatternSet] && otherPatterns.some(({ id }) => id === activeTreatment.pattern)) {
+      patternsByFormat[otherPatternSet] = activeTreatment.pattern;
+    }
+    patternsByFormat[patternSet] = pattern;
+    const nextTreatment = { ...activeTreatment, pattern, patternsByFormat };
     onChange(isIndividual
       ? {
           ...surfaceTreatment,
           layerTreatments: Object.assign(
-            Array.from({ length: Math.max(2, surfaceTreatment.layerTreatments?.length || 0) }, (_, index) => (
+            Array.from({ length: Math.max(minSlots, surfaceTreatment.layerTreatments?.length || 0) }, (_, index) => (
               flatTreatment(surfaceTreatment.layerTreatments?.[index] || { mode: null, pattern: 'longGaps' })
             )),
             { [activeLayer]: nextTreatment },
@@ -63,7 +78,7 @@ export default function SurfaceTreatmentSection({ surfaceTreatment, onChange, is
         }
       : {
           ...nextTreatment,
-          layerTreatments: Array.from({ length: 2 }, () => ({ ...nextTreatment })),
+          layerTreatments: Array.from({ length: minSlots }, () => ({ ...nextTreatment })),
         });
   };
 
@@ -74,13 +89,24 @@ export default function SurfaceTreatmentSection({ surfaceTreatment, onChange, is
         <button
           type="button"
           onClick={toggleGlaze}
+          title={active ? `Turn off ${glaze.label}` : undefined}
+          aria-label={active ? `Turn off ${glaze.label}` : undefined}
           className={`w-full py-2 px-3 rounded-lg text-left transition-all duration-150 border-2 ${
             active
               ? 'bg-primary text-primary-foreground border-primary shadow-md'
               : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
           }`}
         >
-          <span className="block text-xs font-semibold">{glaze.label}</span>
+          {/* toggleGlaze clears the mode when Glaze is already active, so the
+              selected button swaps its label for an X — the shared "click to
+              remove this" affordance (same as Center's armed tools and
+              Edge's active design circles). Mandatory radio-style options
+              that can't be deselected keep their labels instead. */}
+          {active ? (
+            <X className="mx-auto block h-5 w-5" strokeWidth={3} aria-hidden="true" />
+          ) : (
+            <span className="block text-xs font-semibold">{glaze.label}</span>
+          )}
           {!glaze.implemented && (
             <span className={`block text-[10px] ${active ? 'text-primary-foreground/80' : 'text-muted-foreground/70'}`}>
               Coming soon
@@ -105,8 +131,8 @@ export default function SurfaceTreatmentSection({ surfaceTreatment, onChange, is
               needs to read as a nested sub-choice, not another top-level
               option list at the same visual weight as the Glaze toggle. */}
           <div className="grid grid-cols-2 gap-2">
-            {GLAZE_PATTERNS.map((pattern) => {
-              const isActive = (activeTreatment.pattern || 'longGaps') === pattern.id;
+            {patternOptions.map((pattern) => {
+              const isActive = selectedPattern === pattern.id;
               return (
                 <button
                   key={pattern.id}

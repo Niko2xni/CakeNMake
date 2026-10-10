@@ -25,11 +25,12 @@ vi.mock('firebase/auth', () => ({
 import { AuthProvider, useAuth } from './AuthContext';
 
 function AccountProbe() {
-  const { account, isAuthenticated, authError, user, logout } = useAuth();
+  const { account, isAuthenticated, authError, user, logout, retryAccountSync } = useAuth();
 
   return (
     <div>
       <button onClick={() => logout(false)}>Sign out</button>
+      <button onClick={retryAccountSync}>Retry account sync</button>
       <span data-testid="user">{user?.uid || 'none'}</span>
       <span data-testid="authenticated">{String(isAuthenticated)}</span>
       <span data-testid="role">{account?.role || 'none'}</span>
@@ -97,5 +98,55 @@ describe('AuthProvider account hydration', () => {
     });
     expect(screen.getByTestId('authenticated')).toHaveTextContent('false');
     expect(screen.getByTestId('role')).toHaveTextContent('none');
+  });
+
+  it('keeps the restored Firebase session and recovers the account after a temporary sync failure', async () => {
+    authMocks.sync
+      .mockRejectedValueOnce(new Error('Network unavailable'))
+      .mockResolvedValueOnce({ user: { firebaseUid: 'firebase-user-1', role: 'customer' } });
+    authMocks.onAuthStateChanged.mockImplementationOnce((_auth, callback) => {
+      callback({ uid: 'firebase-user-1' });
+      return vi.fn();
+    });
+
+    render(<AuthProvider><AccountProbe /></AuthProvider>);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('error')).toHaveTextContent('account_sync_failed');
+    });
+    expect(screen.getByTestId('user')).toHaveTextContent('firebase-user-1');
+    expect(screen.getByTestId('authenticated')).toHaveTextContent('false');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry account sync' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('authenticated')).toHaveTextContent('true');
+    });
+    expect(screen.getByTestId('role')).toHaveTextContent('customer');
+    expect(screen.getByTestId('error')).toHaveTextContent('none');
+  });
+
+  it('retries account synchronization when the browser reconnects', async () => {
+    authMocks.sync
+      .mockRejectedValueOnce(new Error('Network unavailable'))
+      .mockResolvedValueOnce({ user: { firebaseUid: 'firebase-user-1', role: 'customer' } });
+    authMocks.onAuthStateChanged.mockImplementationOnce((_auth, callback) => {
+      callback({ uid: 'firebase-user-1' });
+      return vi.fn();
+    });
+
+    render(<AuthProvider><AccountProbe /></AuthProvider>);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('error')).toHaveTextContent('account_sync_failed');
+    });
+    await act(async () => {
+      window.dispatchEvent(new Event('online'));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('authenticated')).toHaveTextContent('true');
+    });
+    expect(screen.getByTestId('role')).toHaveTextContent('customer');
   });
 });

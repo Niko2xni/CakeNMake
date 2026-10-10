@@ -192,9 +192,13 @@ export const DRIP_SECTIONS = [
     title: 'Drip Patterns',
     description: 'Poured glaze coats and dripping silhouette patterns',
     items: [
+      { id: 'naturalTear', label: 'Natural Tear', defaultPrice: 100 },
+      { id: 'naturalTear2', label: 'Natural Tear 2', defaultPrice: 100 },
+      { id: 'unevenCombo', label: 'Uneven Drips & Coverage', defaultPrice: 110 },
       { id: 'longGaps', label: 'Long Drips', defaultPrice: 100 },
       { id: 'longShortAlt', label: 'Long & Short Drips', defaultPrice: 110 },
       { id: 'shortDrips', label: 'Short Drips', defaultPrice: 90 },
+      { id: 'tinyTip', label: 'Tiny Tip', defaultPrice: 85 },
       { id: 'longWave', label: 'Full Coverage', defaultPrice: 120 },
       { id: 'midWave', label: 'Mid Coverage', defaultPrice: 105 },
       { id: 'shortWave', label: 'Short Coverage', defaultPrice: 95 },
@@ -216,9 +220,9 @@ export const DEFAULT_EDGE_RATES = Object.fromEntries(
 
 export const DEFAULT_RATES = {
   sponge: {
-    naked: { big: 1500, small: 700 }, // 8x5 | 6x4
-    frosted: { big: 1700, small: 1000 }, // Frosted
-    textured: { big: 1700, small: 1000 }, // Textured
+    naked: { '6x6': 700, '8x8': 1500, '10x10': 2200, '12x12': 3000, big: 1500, small: 700 }, // 6x6, 8x8, 10x10, 12x12
+    frosted: { '6x6': 1000, '8x8': 1700, '10x10': 2500, '12x12': 3400, big: 1700, small: 1000 }, // Frosted
+    textured: { '6x6': 1000, '8x8': 1700, '10x10': 2500, '12x12': 3400, big: 1700, small: 1000 }, // Textured
   },
   twoTier: { naked: 2200, frosted: 2700, textured: 2700 },
   glazePerTier: 100,
@@ -279,4 +283,3 @@ export const CENTER_ITEM_META = {
   ...TEXT_PRICING_META,
   ...CENTER_PER_PIECE_META,
 };
-

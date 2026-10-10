@@ -13,7 +13,13 @@ import React from 'react';
  * Cake Size + Cake Layer COUNT (a Fundamentals/Cake Structure concern) —
  * a different thing that happens to also involve the word "layer."
  */
-export default function LayerTabStrip({ layers, activeLayer, onLayerChange }) {
+export default function LayerTabStrip({ layers, activeLayer, onLayerChange, isPetitsFour = false }) {
+  const getLabel = (i) => {
+    if (isPetitsFour) return `Variation ${i + 1}`;
+    if (layers === 2) return i === 0 ? 'Bottom Tier' : 'Top Tier';
+    return `Tier ${i + 1}`;
+  };
+
   return (
     <div className="flex gap-1 bg-muted/40 rounded-xl p-1">
       {Array.from({ length: layers }).map((_, i) => (
@@ -26,7 +32,7 @@ export default function LayerTabStrip({ layers, activeLayer, onLayerChange }) {
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
-          {layers === 2 ? (i === 0 ? 'Bottom Tier' : 'Top Tier') : (i === 0 ? 'Bottom Tier' : i === 1 ? 'Top Tier' : `Tier ${i + 1}`)}
+          {getLabel(i)}
         </button>
       ))}
     </div>

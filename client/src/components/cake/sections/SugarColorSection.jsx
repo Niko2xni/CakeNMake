@@ -78,8 +78,11 @@ export default function SugarColorSection({
   // keeping them here was pure redundant clutter. When excludePatternColors
   // is set, the six Pattern/multi-tone colors are dropped too, leaving
   // just the 12 flat colors (Plain accents + Designer palette).
+  // Temporarily hide ALL gradient/pattern colors (isPattern).
   const overrideColors = SUGAR_COLORS.filter((c) =>
-    !c.isFlavorMirror && !(excludePatternColors && c.isPattern)
+    !c.isFlavorMirror && 
+    !(excludePatternColors && c.isPattern) &&
+    !c.isPattern // Temporarily hide ALL gradient colors
   );
   const defaultColors = SUGAR_COLORS.filter((c) => c.isFlavorMirror);
   const COLORS_PER_PAGE = 6;

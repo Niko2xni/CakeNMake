@@ -42,13 +42,16 @@ const { FLAVORS } = require('./cakeFlavors');
 const DEFAULT_CONFIG = {
   // 1. Cake Structure
   structure: {
-    size: 'big', // 'big' (8×5) | 'small' (6×5)
+    cakeFormat: 'standard', // 'standard' | 'bento' | 'petitsFour'
+    format: 'standard',
+    size: '8x8', // '6x6' | '8x8' | '10x10' | '12x12' | 'miniBento' | 'standardBento' | 'largeBento' | 'classicCube' | 'largeCube'
     layers: 1, // 1 or 2
+    shape: 'round', // 'round' | 'rectangle' | 'square'
     layerDesign: 'uniform', // 'uniform' | 'individual'
   },
   realSize: {
     diameter: 8,
-    height: 5
+    height: 6
   },
 
   // 2. Interior
@@ -241,16 +244,84 @@ const BUTTERCREAM_TEXTURES = [
 ];
 
 // Size options
-const SIZE_OPTIONS = [
-  { id: 'big', label: '8×5', dimensions: { diameter: 8, height: 5 } },
-  { id: 'small', label: '6×4', dimensions: { diameter: 6, height: 4 } },
+const STANDARD_SIZE_OPTIONS = [
+  { id: '6x6', label: '6×6', dimensions: { diameter: 6, height: 4 } },
+  { id: '8x8', label: '8×8', dimensions: { diameter: 8, height: 6 } },
+  { id: '10x10', label: '10×10', dimensions: { diameter: 10, height: 8 } },
+  { id: '12x12', label: '12×12', dimensions: { diameter: 12, height: 10 } },
 ];
+
+// Bento size options (single tier only)
+const BENTO_SIZE_OPTIONS = [
+  { id: 'miniBento', label: '3.5x2', dimensions: { diameter: 3.5, height: 2 } },
+  { id: 'standardBento', label: '4x2', dimensions: { diameter: 4, height: 2 } },
+  { id: 'largeBento', label: '5x3', dimensions: { diameter: 5, height: 3 } },
+];
+
+// Petits Four size options (single tier 4-pack)
+const PETITS_FOUR_SIZE_OPTIONS = [
+  { id: 'classicCube', label: '1x1', dimensions: { diameter: 1, height: 1, width: 1, length: 1 } },
+  { id: 'largeCube', label: '2x2', dimensions: { diameter: 2, height: 2, width: 2, length: 2 } },
+];
+
+const SIZE_OPTIONS = [
+  ...STANDARD_SIZE_OPTIONS,
+  ...BENTO_SIZE_OPTIONS,
+  ...PETITS_FOUR_SIZE_OPTIONS,
+];
+
+// Cake Format / Cake Type options (top-level structure selection)
+const CAKE_FORMAT_OPTIONS = [
+  { id: 'standard', label: 'Standard' },
+  { id: 'bento', label: 'Bento' },
+  { id: 'petitsFour', label: 'Petit Fours' },
+];
+
+const CAKE_TYPE_OPTIONS = CAKE_FORMAT_OPTIONS;
 
 // Layer options
 const LAYER_OPTIONS = [
   { id: 1, label: '1 Tier' },
   { id: 2, label: '2 Tiers' },
 ];
+
+// Shape options
+const SHAPE_OPTIONS = [
+  { id: 'round', label: 'Round' },
+  { id: 'rectangle', label: 'Rectangle' },
+  { id: 'square', label: 'Square' },
+];
+
+const PETITS_FOUR_SIZE_IDS = PETITS_FOUR_SIZE_OPTIONS.map((option) => option.id);
+const BENTO_SIZE_IDS = BENTO_SIZE_OPTIONS.map((option) => option.id);
+
+function getCakeFormat(structure = {}) {
+  const explicit = structure.cakeFormat || structure.format;
+  if (explicit === 'standard' || explicit === 'bento' || explicit === 'petitsFour') {
+    return explicit;
+  }
+  if (structure.shape === 'petitsFour' || PETITS_FOUR_SIZE_IDS.includes(structure.size)) {
+    return 'petitsFour';
+  }
+  if (structure.shape === 'bento' || BENTO_SIZE_IDS.includes(structure.size)) {
+    return 'bento';
+  }
+  return 'standard';
+}
+
+function isPetitsFourStructure(structure) {
+  return getCakeFormat(structure) === 'petitsFour';
+}
+
+function isBentoStructure(structure) {
+  return getCakeFormat(structure) === 'bento';
+}
+
+function resolveStructureShape(structure = {}) {
+  if (structure.shape === 'rectangle' || structure.shape === 'petitsFour') return 'rectangle';
+  if (structure.shape === 'square') return 'square';
+  return 'round';
+}
 
 // Filling layer options
 const FILLING_LAYER_OPTIONS = [
@@ -442,7 +513,7 @@ const SURFACE_TREATMENT_MODES = [
   { id: 'glaze', label: 'Drip', implemented: true },
 ];
 
-// ─── Glaze Patterns — six variants of the poured-and-dripping silhouette
+// ─── Glaze Patterns — variants of the poured-and-dripping silhouette
 // (surfaceTreatment.pattern, only relevant when mode === 'glaze'), the
 // same "pick a variant" shape BUTTERCREAM_TEXTURES already uses for
 // Textured Buttercream. All six share the same underlying mechanism (see
@@ -470,6 +541,21 @@ const GLAZE_PATTERNS = [
   { id: 'longWave', label: 'Full Coverage', description: 'Reaches almost to the base, with a soft rippled edge', implemented: true },
   { id: 'midWave', label: 'Mid Coverage', description: 'Reaches about halfway down, with a soft rippled edge', implemented: true },
   { id: 'shortWave', label: 'Short Coverage', description: 'A shallow coat near the top, with a soft rippled edge', implemented: true },
+];
+
+// ─── Petit Fours Glaze Patterns — Drips & Coverage with uneven distribution ──
+// These patterns copy the format of Drips and Coverage designs from Standard,
+// combined into an organic uneven distribution tailored for mini-cake cubes,
+// featuring the signature poured ganache "Uneven Drip & Coverage" design.
+const PETIT_FOURS_GLAZE_PATTERNS = [
+  { id: 'unevenCombo', label: 'Uneven Drips & Coverage', description: 'Poured ganache combining coverage and varied dripping fingers', implemented: true, petitsFoursOnly: true },
+  { id: 'longGaps', label: 'Long Drips', description: 'Tall dripping fingers with uneven distribution', implemented: true, petitsFoursOnly: true },
+  { id: 'longShortAlt', label: 'Long & Short Drips', description: 'Tall fingers alternating with shorter ones', implemented: true, petitsFoursOnly: true },
+  { id: 'shortDrips', label: 'Short Drips', description: 'A ring of short, shallow drips', implemented: true, petitsFoursOnly: true },
+  { id: 'tinyTip', label: 'Tiny Tip', description: 'Small delicate drips with bulbous tips', implemented: true, petitsFoursOnly: true },
+  { id: 'longWave', label: 'Full Coverage', description: 'Reaches almost to the base, with soft rippled edge', implemented: true, petitsFoursOnly: true },
+  { id: 'midWave', label: 'Mid Coverage', description: 'Reaches about halfway down, with soft rippled edge', implemented: true, petitsFoursOnly: true },
+  { id: 'shortWave', label: 'Short Coverage', description: 'A shallow coat near the top, with soft rippled edge', implemented: true, petitsFoursOnly: true },
 ];
 
 
@@ -1004,11 +1090,23 @@ function getFerreroAwareBoundaryRadius(topRadius = 4, edgeConfig = null, exterio
  * Derives the topmost tier's radius directly from cake configuration.
  */
 function getTopTierRadiusFromConfig(config) {
-  const size = config?.structure?.size || 'big';
+  const size = config?.structure?.size || '8x8';
   const layers = config?.structure?.layers || 1;
-  if (size === 'small') {
+  if (size === 'classicCube') return 0.5;
+  if (size === 'largeCube') return 1.0;
+  if (size === 'miniBento') return 1.75;
+  if (size === 'standardBento') return 2.0;
+  if (size === 'largeBento') return 2.5;
+  if (size === '12x12') {
+    return layers >= 2 ? 5.0 : 6.0;
+  }
+  if (size === '10x10') {
+    return layers >= 2 ? 4.0 : 5.0;
+  }
+  if (size === '6x6' || size === 'small') {
     return layers >= 2 ? 2.0 : 3.0;
   }
+  // '8x8' or 'big' or default
   return layers >= 2 ? 3.0 : 4.0;
 }
 
@@ -1065,30 +1163,6 @@ function pruneItemsCollidingWithEdgeFerrero(
     centerDecorScale,
     exteriorFinishStyle
   );
-}
-
-/**
- * Checks if a candidate item footprint collides with any active Center Piping Text bounding boxes.
- */
-function isFootprintCollidingWithText(footprint, textBounds) {
-  if (!footprint || !textBounds || textBounds.length === 0) return false;
-  for (const b of textBounds) {
-    const w = b.maxX - b.minX;
-    const h = b.maxZ - b.minZ;
-    if (w <= 0 || h <= 0) continue;
-    const textBoxFp = {
-      type: 'obb',
-      x: (b.minX + b.maxX) * 0.5,
-      z: (b.minZ + b.maxZ) * 0.5,
-      halfLength: w * 0.5,
-      halfWidth: h * 0.5,
-      angle: 0,
-    };
-    if (doFootprintsClash(footprint, textBoxFp, 0.02)) {
-      return true;
-    }
-  }
-  return false;
 }
 
 const CENTER_PLACEABLE_DESIGNS = [
@@ -1448,4 +1522,4 @@ function computeSlotPosition(slot, topRadius) {
   };
 }
 
-module.exports = { DEFAULT_CONFIG, FINISH_STYLES, BUTTERCREAM_TEXTURES, SIZE_OPTIONS, LAYER_OPTIONS, FILLING_LAYER_OPTIONS, PIPING_TIPS, FILLING_PIPING_DESIGNS, SIZE_OPTIONS_CUSTOM, SUGAR_COLORS, SUGAR_COLOR_MODES, SURFACE_TREATMENT_MODES, GLAZE_PATTERNS, CHECKERED_PATTERN_SETS, TRIANGLE_PATTERN_SETS, CENTER_ITEM_LIMITS, isLetterDesignId, getCenterItemLimit, getCenterItemCount, isCenterItemAtLimit, CENTER_ITEM_RADII, getCenterItemRadius, getItemFootprint, doFootprintsClash, isFootprintInBoundary, doItemsClash, CENTER_BOUNDARY_RATIO, CENTER_BOUNDARY_RESERVE, getCenterPlacementBoundaryRadius, EDIBLE_DELICATES_RIM_SPECS, getActiveEdgeDelicateTip, getEdgeDelicatesObstacles, getEdgeFerreroObstacles, getDelicatesAwareBoundaryRadius, getFerreroAwareBoundaryRadius, getTopTierRadiusFromConfig, pruneItemsCollidingWithEdgeDelicates, pruneItemsCollidingWithEdgeFerrero, isFootprintCollidingWithText, CENTER_PLACEABLE_DESIGNS, BUTTERCREAM_LETTERS_UPPER, BUTTERCREAM_LETTERS_LOWER, BUTTERCREAM_LETTERS, BRACELET_BEADS_VARIATIONS, SCALLOPS_VARIATIONS, EDGE_DECORATION_SETS, PIPING_TIPS_DELUXE, BEADED_TRIM_VARIATIONS_DELUXE, BORDER_PIPING_SOLID_VARIATIONS, BORDER_PIPING_ALTERNATING_VARIATIONS, BORDER_PIPING_VARIATIONS_DELUXE, DOLLOPS_SOLID_VARIATIONS_DELUXE, DOLLOPS_SOLID_CHERRY_VARIATIONS_DELUXE, DOLLOPS_ALTERNATING_VARIATIONS_DELUXE, DOLLOPS_ALTERNATING_CHERRY_VARIATIONS_DELUXE, DOLLOPS_VARIATIONS_DELUXE, WHIPPED_CREAM_SOLID_VARIATIONS, WHIPPED_CREAM_ALTERNATING_VARIATIONS, WHIPPED_CREAM_CHERRY_VARIATIONS, WHIPPED_CREAM_VARIATIONS, FRUIT_CONFECTION_RIM_OPTIONS, WHIPPED_CREAM_AND_RIM_VARIATIONS_DELUXE, EDGE_PIPING_OPTIONS, CHEVRON_PATTERN_SETS, SCATTER_PEARLS_SETS, PIPING_SCROLLS_SETS, SUNSHINE_PLAY_SETS, VICTORIAN_LAMBETH_SETS, SIDE_TREATMENTS, SLOT_RINGS, TOP_SURFACE_SLOTS, PLACEABLE_DECORATIONS, PLACE_ITEM_RADII, getSlotById, computeSlotPosition };
+module.exports = { DEFAULT_CONFIG, FINISH_STYLES, BUTTERCREAM_TEXTURES, STANDARD_SIZE_OPTIONS, BENTO_SIZE_OPTIONS, PETITS_FOUR_SIZE_OPTIONS, SIZE_OPTIONS, CAKE_FORMAT_OPTIONS, CAKE_TYPE_OPTIONS, LAYER_OPTIONS, SHAPE_OPTIONS, getCakeFormat, isPetitsFourStructure, isBentoStructure, resolveStructureShape, FILLING_LAYER_OPTIONS, PIPING_TIPS, FILLING_PIPING_DESIGNS, SIZE_OPTIONS_CUSTOM, SUGAR_COLORS, SUGAR_COLOR_MODES, SURFACE_TREATMENT_MODES, GLAZE_PATTERNS, PETIT_FOURS_GLAZE_PATTERNS, CHECKERED_PATTERN_SETS, TRIANGLE_PATTERN_SETS, CENTER_ITEM_LIMITS, isLetterDesignId, getCenterItemLimit, getCenterItemCount, isCenterItemAtLimit, CENTER_ITEM_RADII, getCenterItemRadius, getItemFootprint, doFootprintsClash, isFootprintInBoundary, doItemsClash, CENTER_BOUNDARY_RATIO, CENTER_BOUNDARY_RESERVE, getCenterPlacementBoundaryRadius, EDIBLE_DELICATES_RIM_SPECS, getActiveEdgeDelicateTip, getEdgeDelicatesObstacles, getEdgeFerreroObstacles, getDelicatesAwareBoundaryRadius, getFerreroAwareBoundaryRadius, getTopTierRadiusFromConfig, pruneItemsCollidingWithEdgeDelicates, pruneItemsCollidingWithEdgeFerrero, CENTER_PLACEABLE_DESIGNS, BUTTERCREAM_LETTERS_UPPER, BUTTERCREAM_LETTERS_LOWER, BUTTERCREAM_LETTERS, BRACELET_BEADS_VARIATIONS, SCALLOPS_VARIATIONS, EDGE_DECORATION_SETS, PIPING_TIPS_DELUXE, BEADED_TRIM_VARIATIONS_DELUXE, BORDER_PIPING_SOLID_VARIATIONS, BORDER_PIPING_ALTERNATING_VARIATIONS, BORDER_PIPING_VARIATIONS_DELUXE, DOLLOPS_SOLID_VARIATIONS_DELUXE, DOLLOPS_SOLID_CHERRY_VARIATIONS_DELUXE, DOLLOPS_ALTERNATING_VARIATIONS_DELUXE, DOLLOPS_ALTERNATING_CHERRY_VARIATIONS_DELUXE, DOLLOPS_VARIATIONS_DELUXE, WHIPPED_CREAM_SOLID_VARIATIONS, WHIPPED_CREAM_ALTERNATING_VARIATIONS, WHIPPED_CREAM_CHERRY_VARIATIONS, WHIPPED_CREAM_VARIATIONS, FRUIT_CONFECTION_RIM_OPTIONS, WHIPPED_CREAM_AND_RIM_VARIATIONS_DELUXE, EDGE_PIPING_OPTIONS, CHEVRON_PATTERN_SETS, SCATTER_PEARLS_SETS, PIPING_SCROLLS_SETS, SUNSHINE_PLAY_SETS, VICTORIAN_LAMBETH_SETS, SIDE_TREATMENTS, SLOT_RINGS, TOP_SURFACE_SLOTS, PLACEABLE_DECORATIONS, PLACE_ITEM_RADII, getSlotById, computeSlotPosition };

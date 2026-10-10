@@ -36,7 +36,7 @@ import BakeryDesigner from '@/pages/BakeryAdmin/BakeryDesigner';
 import BakeryProfile from '@/pages/BakeryAdmin/BakeryProfile';
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, authChecked, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const { user, isLoadingAuth, authChecked, isLoadingPublicSettings, authError, navigateToLogin, retryAccountSync } = useAuth();
 
   // Keep the active route's layout visible while public settings or auth load.
   if (isLoadingPublicSettings || (isLoadingAuth && !authChecked)) {
@@ -47,11 +47,34 @@ const AuthenticatedApp = () => {
   if (authError) {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
-    } else if (authError.type === 'auth_required') {
-      // Redirect to login automatically
-      navigateToLogin();
-      return null;
     }
+  }
+
+  if (user && (authError || isLoadingAuth)) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-background px-4">
+        <section role="alert" className="w-full max-w-md space-y-4 rounded-2xl border bg-card p-6 text-center shadow-lg">
+          <h1 className="text-lg font-semibold">Reconnecting to your account</h1>
+          <p className="text-sm text-muted-foreground">
+            Your sign-in is still active, but CakeNMake could not load your account. We’ll keep trying automatically.
+          </p>
+          {authError?.message && <p className="text-xs text-muted-foreground">{authError.message}</p>}
+          <button
+            type="button"
+            onClick={retryAccountSync}
+            disabled={isLoadingAuth}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+          >
+            {isLoadingAuth ? 'Retrying…' : 'Retry now'}
+          </button>
+        </section>
+      </main>
+    );
+  }
+
+  if (authError?.type === 'auth_required') {
+    navigateToLogin();
+    return null;
   }
 
   // Render the main app

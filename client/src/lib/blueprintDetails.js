@@ -11,10 +11,17 @@ export function buildBlueprintDetails(config, quote, designName = '') {
     if (items.length) sections.push({ title, items: items.map(([label, detail, keys = [], weight = 1]) => ({ label, detail, keys, weight, priceMinor: null, priceText: quote ? 'Included' : 'Unavailable' })) });
   };
   const layers = config.structure?.layers || 1;
-  const individual = layers > 1 && config.structure?.layerDesign === 'individual';
-  const fundamentals = [['Tiers', `${layers} tier(s) · ${config.realSize?.diameter || ''} in diameter · ${config.realSize?.height || ''} in height`, ['base.standard', `size.${config.structure?.size || 'big'}`, 'tier.additional']]];
-  for (let i = 0; i < (individual ? layers : 1); i++) {
-    const prefix = individual ? `Tier ${i + 1} ` : '';
+  // Petit Fours mirror configAdapter's own slot count: 4 individually
+  // configurable variants even though the structure keeps layers = 1.
+  const isPetitsFour = options.isPetitsFourStructure(config.structure);
+  const variationCount = isPetitsFour ? 4 : layers;
+  const individual = (layers > 1 || isPetitsFour) && config.structure?.layerDesign === 'individual';
+  const pieceName = isPetitsFour ? 'Variant' : 'Tier';
+  const sizeKey = config.structure?.size || '8x8';
+  const sizeAliases = sizeKey === '8x8' || sizeKey === 'big' ? ['size.8x8', 'size.big'] : sizeKey === '6x6' || sizeKey === 'small' ? ['size.6x6', 'size.small'] : [`size.${sizeKey}`];
+  const fundamentals = [[isPetitsFour ? 'Format' : 'Tiers', isPetitsFour ? `Petit Fours · 4 pieces · ${name(sizeKey)}` : `${layers} tier(s) · ${config.realSize?.diameter || ''} in diameter · ${config.realSize?.height || ''} in height`, ['base.standard', ...sizeAliases, 'tier.additional']]];
+  for (let i = 0; i < (individual ? variationCount : 1); i++) {
+    const prefix = individual ? `${pieceName} ${i + 1} ` : '';
     const sponge = individual ? config.sponge?.layerFlavors?.[i] || config.sponge?.flavor : config.sponge?.flavor;
     fundamentals.push([`${prefix}Sponge Flavor`, name(sponge), [`sponge.${sponge}`]]);
     const fillingFlavor = individual ? config.filling?.layerFlavors?.[i] || config.filling?.flavor : config.filling?.flavor;
@@ -25,7 +32,7 @@ export function buildBlueprintDetails(config, quote, designName = '') {
     const texture = individual ? finish.layerButtercreamTextures?.[i] || finish.buttercreamTexture : finish.buttercreamTexture;
     fundamentals.push([`${prefix}Exterior Finish`, [name(style), style !== 'naked' && name(flavor), style === 'texturedButtercream' && name(texture)].filter(Boolean).join(' · '), [`finish.${style}`, ...(style !== 'naked' ? [`frosting.${flavor}`] : []), ...(style === 'texturedButtercream' ? [`texture.${texture}`] : [])]]);
     const surface = individual ? config.surfaceTreatment?.layerTreatments?.[i] || config.surfaceTreatment : config.surfaceTreatment;
-    if (surface?.mode) fundamentals.push([`${prefix}Surface Treatment`, `${name(surface.mode)} · ${name(surface.pattern)}`, [`surface.${surface.mode}`]]);
+    if (surface?.mode) fundamentals.push([`${prefix}Surface Treatment`, `${name(surface.mode)} · ${name(options.getSurfaceTreatmentPattern(surface, config.structure))}`, [`surface.${surface.mode}`]]);
   }
   if (config.filling?.enabled && config.filling.piping?.tip) fundamentals.push(['Filling Piping', `${name(config.filling.piping.tip)} · ${name(config.filling.piping.colorId)}`, ['edge.piping']]);
   if (config.sugarColor?.mode === 'colorOverride') fundamentals.push(['Sugar Color', name(config.sugarColor.colorId), [`color.${config.sugarColor.colorId}`]]);
@@ -34,11 +41,11 @@ export function buildBlueprintDetails(config, quote, designName = '') {
   });
   addSection('Fundamentals', fundamentals);
   const sideItems = [];
-  for (let i = 0; i < (individual ? layers : 1); i++) {
+  for (let i = 0; i < (individual ? variationCount : 1); i++) {
     const side = individual ? config.side?.layerTreatments?.[i] || config.side : config.side;
     if (side?.mode) {
       const choice = side[side.mode] || {};
-      sideItems.push([`${individual ? `Tier ${i + 1} ` : ''}${name(side.mode)}`, [name(choice.setId), name(choice.colorId), choice.flavorId && name(choice.flavorId)].filter(Boolean).join(' · '), [`side.${side.mode}`, 'side.treatment']]);
+      sideItems.push([`${individual ? `${pieceName} ${i + 1} ` : ''}${name(side.mode)}`, [name(choice.setId), name(choice.colorId), choice.flavorId && name(choice.flavorId)].filter(Boolean).join(' · '), [`side.${side.mode}`, 'side.treatment']]);
     }
   }
   addSection('Side', sideItems);

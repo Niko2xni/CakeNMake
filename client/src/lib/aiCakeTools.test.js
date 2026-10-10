@@ -83,20 +83,96 @@ describe('Cake AI edits without a provider', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it('updates real dimensions and removes center items when a smaller cake removes a tier', () => {
+  it('updates real dimensions and removes center items when changing tier structure', () => {
     const config = structuredClone(DEFAULT_CONFIG);
     config.structure.layers = 2;
     config.structure.layerDesign = 'individual';
     config.place.items = [{ id: 'one', type: 'center-cherry-default' }, { id: 'other', type: 'candle' }];
-    const { next } = execute('set_structure', { size: 'small' }, config);
-    expect(next.structure).toMatchObject({ size: 'small', layers: 1, layerDesign: 'uniform' });
-    expect(next.realSize).toEqual(SIZE_OPTIONS.find(size => size.id === 'small').dimensions);
+    const { next } = execute('set_structure', { size: '6x6', layers: 1 }, config);
+    expect(next.structure).toMatchObject({ size: '6x6', layers: 1, layerDesign: 'uniform' });
+    expect(next.realSize).toEqual(SIZE_OPTIONS.find(size => size.id === '6x6').dimensions);
     expect(next.place.items).toEqual([{ id: 'other', type: 'candle' }]);
     expect(config.structure.layers).toBe(2);
   });
 
-  it('rejects requesting two tiers on a small cake', () => {
-    expect(execute('set_structure', { size: 'small', layers: 2 }).response.error).toBeTruthy();
+  it('updates cake size to 10x10 and 12x12 with correct real dimensions', () => {
+    const { next: next10 } = execute('set_structure', { size: '10x10' });
+    expect(next10.structure.size).toBe('10x10');
+    expect(next10.realSize).toEqual({ diameter: 10, height: 8 });
+
+    const { next: next12 } = execute('set_structure', { size: '12x12' });
+    expect(next12.structure.size).toBe('12x12');
+    expect(next12.realSize).toEqual({ diameter: 12, height: 10 });
+  });
+
+  it('rejects 2 tiers for all cake sizes', () => {
+    const { response } = execute('set_structure', { size: '6x6', layers: 2 });
+    expect(response.error).toBe('All cakes are limited to 1 tier only.');
+  });
+
+  it('updates cake shape to rectangle, square, and round', () => {
+    const { next: nextRect } = execute('set_structure', { shape: 'rectangle' });
+    expect(nextRect.structure.shape).toBe('rectangle');
+
+    const { next: nextSquare } = execute('set_structure', { shape: 'square' });
+    expect(nextSquare.structure.shape).toBe('square');
+    // Square shape should default to 8x8 if current size isn't 6x6 or 8x8
+    expect(['6x6', '8x8']).toContain(nextSquare.structure.size);
+
+    const { next: nextRound } = execute('set_structure', { shape: 'round' });
+    expect(nextRound.structure.shape).toBe('round');
+  });
+
+  it('switches to Petit Fours with a matching size and keeps the Cake Shape', () => {
+    const { next } = execute('set_structure', { cakeFormat: 'petitsFour' });
+    expect(next.structure).toMatchObject({ cakeFormat: 'petitsFour', format: 'petitsFour', size: 'classicCube', layers: 1, shape: 'round' });
+    expect(next.realSize).toEqual(SIZE_OPTIONS.find(size => size.id === 'classicCube').dimensions);
+
+    // Picking a shape must never reset the format or size of the four pieces.
+    const shaped = execute('set_structure', { shape: 'rectangle' }, next).next;
+    expect(shaped.structure).toMatchObject({ cakeFormat: 'petitsFour', size: 'classicCube', shape: 'rectangle' });
+  });
+
+  it('picks a matching size when switching between formats', () => {
+    const bento = execute('set_structure', { cakeFormat: 'bento' }).next;
+    expect(bento.structure).toMatchObject({ cakeFormat: 'bento', size: 'standardBento', layers: 1 });
+
+    const standard = execute('set_structure', { cakeFormat: 'standard' }, bento).next;
+    expect(standard.structure).toMatchObject({ cakeFormat: 'standard', size: '8x8' });
+  });
+
+  it('rejects two tiers for all cake types', () => {
+    expect(execute('set_structure', { layers: 2 }).response.error).toBe('All cakes are limited to 1 tier only.');
+    expect(execute('set_structure', { size: 'miniBento', layers: 2 }).response.error).toBe('All cakes are limited to 1 tier only.');
+    expect(execute('set_structure', { size: 'largeCube', layers: 2 }).response.error).toBe('All cakes are limited to 1 tier only.');
+    expect(execute('set_structure', { size: '8x8', layers: 2 }).response.error).toBe('All cakes are limited to 1 tier only.');
+    expect(execute('set_structure', { size: '10x10', layers: 2 }).response.error).toBe('All cakes are limited to 1 tier only.');
+  });
+
+  it('restricts square shape to 6x6 and 8x8 sizes only', () => {
+    // Setting square shape with a non-allowed size should force size to 8x8
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.structure.size = '10x10';
+    const { next } = execute('set_structure', { shape: 'square' }, config);
+    expect(next.structure.shape).toBe('square');
+    expect(next.structure.size).toBe('8x8');
+
+    // Square shape with 6x6 should work fine
+    const { next: next6x6 } = execute('set_structure', { size: '6x6', shape: 'square' });
+    expect(next6x6.structure).toMatchObject({ size: '6x6', shape: 'square' });
+
+    // Square shape with 8x8 should work fine
+    const { next: next8x8 } = execute('set_structure', { size: '8x8', shape: 'square' });
+    expect(next8x8.structure).toMatchObject({ size: '8x8', shape: 'square' });
+  });
+
+  it('fills all four Petit Fours variant slots for per-piece edits', () => {
+    const petits = execute('set_structure', { cakeFormat: 'petitsFour' }).next;
+    const flavors = execute('set_sponge_flavor', { flavor: 'chocolate' }, petits).next;
+    expect(flavors.sponge.layerFlavors).toEqual(Array(4).fill('chocolate'));
+
+    const finished = execute('set_exterior_finish', { style: 'fullyFrosted' }, petits).next;
+    expect(finished.exteriorFinish.layerStyles).toEqual(Array(4).fill('fullyFrosted'));
   });
 
   it('changes whole-cake flavors on both individually configured tiers', () => {

@@ -1,4 +1,4 @@
-import { DEFAULT_CONFIG } from './cakeConfig';
+import { DEFAULT_CONFIG, isPetitsFourStructure } from './cakeConfig';
 
 /**
  * Synchronizes the cake configuration when toggling between 'uniform' and 'individual'
@@ -11,7 +11,8 @@ import { DEFAULT_CONFIG } from './cakeConfig';
  */
 export function syncTierDesignOnToggle(config, targetDesign, activeLayer = 0) {
   if (!config) return config;
-  const layers = config.structure?.layers || 2;
+  const isPetitsFour = isPetitsFourStructure(config.structure);
+  const layers = isPetitsFour ? 4 : (config.structure?.layers || 2);
   const newStructure = {
     ...(config.structure || DEFAULT_CONFIG.structure),
     layerDesign: targetDesign,
@@ -51,8 +52,9 @@ export function syncTierDesignOnToggle(config, targetDesign, activeLayer = 0) {
 
     const uniformSurface = config.surfaceTreatment || DEFAULT_CONFIG.surfaceTreatment;
     const uniformTreatment = {
+      ...(uniformSurface.patternsByFormat ? { patternsByFormat: { ...uniformSurface.patternsByFormat } } : {}),
       mode: uniformSurface.mode || null,
-      pattern: uniformSurface.pattern || 'longGaps',
+      pattern: uniformSurface.pattern || 'naturalTear2',
     };
     const surfaceTreatment = {
       ...uniformSurface,
@@ -121,16 +123,21 @@ export function syncTierDesignOnToggle(config, targetDesign, activeLayer = 0) {
       layerButtercreamTextures: Array(layers).fill(buttercreamTexture),
     };
 
-    const tierTreatment = config.surfaceTreatment?.layerTreatments?.[tierIdx] || config.surfaceTreatment || { mode: null, pattern: 'longGaps' };
+    const tierTreatment = config.surfaceTreatment?.layerTreatments?.[tierIdx] || config.surfaceTreatment || { mode: null, pattern: 'naturalTear2' };
     const treatmentMode = tierTreatment.mode || null;
-    const treatmentPattern = tierTreatment.pattern || 'longGaps';
+    const treatmentPattern = tierTreatment.pattern || 'naturalTear2';
+    const patternsByFormat = tierTreatment.patternsByFormat
+      ? { ...tierTreatment.patternsByFormat }
+      : undefined;
     const surfaceTreatment = {
       ...(config.surfaceTreatment || DEFAULT_CONFIG.surfaceTreatment),
       mode: treatmentMode,
       pattern: treatmentPattern,
+      ...(patternsByFormat ? { patternsByFormat } : {}),
       layerTreatments: Array.from({ length: layers }, () => ({
         mode: treatmentMode,
         pattern: treatmentPattern,
+        ...(patternsByFormat ? { patternsByFormat: { ...patternsByFormat } } : {}),
       })),
     };
 

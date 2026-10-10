@@ -309,13 +309,17 @@ export function computePricingChanges(rates = {}, activeRates = {}) {
     textured: 'Textured Buttercream',
   };
   const sizeLabels = {
-    small: 'Small (6×4)',
-    big: 'Big (8×5)',
+    '6x6': '6×6',
+    '8x8': '8×8',
+    '10x10': '10×10',
+    '12x12': '12×12',
+    small: '6×6',
+    big: '8×8',
   };
 
   // 1. Fundamentals 1-Tier
   ['naked', 'frosted', 'textured'].forEach((finish) => {
-    ['small', 'big'].forEach((size) => {
+    ['6x6', '8x8', '10x10', '12x12'].forEach((size) => {
       const curr = rates?.sponge?.[finish]?.[size] ?? DEFAULT_RATES.sponge?.[finish]?.[size];
       const old = activeRates?.sponge?.[finish]?.[size] ?? DEFAULT_RATES.sponge?.[finish]?.[size];
       checkDiff('Fundamentals (1-Tier)', `${finishLabels[finish] || finish} · ${sizeLabels[size] || size}`, curr, old);
@@ -425,7 +429,7 @@ export default function BakeryPricing() {
 
   // Live Simulator state
   const [simLayers, setSimLayers] = useState(1);
-  const [simSize, setSimSize] = useState('big');
+  const [simSize, setSimSize] = useState('8x8');
   const [simFinish, setSimFinish] = useState('frosted');
   const [simSpongeFlavor, setSimSpongeFlavor] = useState('Vanilla');
   const [simFilling, setSimFilling] = useState('Chocolate');
@@ -645,13 +649,17 @@ export default function BakeryPricing() {
     }));
   }, [edgeSearch, activeEdgeSection]);
 
+  // Legacy rate tables keyed 1-tier sponge prices as small/big; mirror the
+  // server calculator's fallback so old drafts still resolve a price.
+  const spongeRateForSize = (table, size) => table?.[size] ?? table?.[size === '6x6' ? 'small' : 'big'];
+
   // Simulation calculator
   const simTotal = useMemo(() => {
     let total = 0;
     const currentRates = rates || DEFAULT_RATES;
     // Sponge
     if (simLayers === 1) {
-      total += currentRates.sponge?.[simFinish]?.[simSize] ?? (simFinish === 'textured' ? currentRates.sponge?.frosted?.[simSize] : 0) ?? 0;
+      total += spongeRateForSize(currentRates.sponge?.[simFinish], simSize) ?? (simFinish === 'textured' ? spongeRateForSize(currentRates.sponge?.frosted, simSize) : 0) ?? 0;
     } else {
       total += currentRates.twoTier?.[simFinish] ?? (simFinish === 'textured' ? currentRates.twoTier?.frosted : 0) ?? 0;
     }
@@ -889,7 +897,7 @@ export default function BakeryPricing() {
                 <div>
                   <h2 className="text-base font-bold text-gray-900">1-Tier Cake Pricing</h2>
                   <p className="text-xs text-gray-500">
-                    Sponge base cake pricing by size (6×4 Small vs 8×5 Big) and finish style.
+                    Sponge base cake pricing by size (6×6, 8×8, 10×10, 12×12) and finish style.
                   </p>
                 </div>
 
@@ -903,18 +911,32 @@ export default function BakeryPricing() {
 
                     <div className="grid grid-cols-2 gap-3">
                       <PriceStepper
-                        label="Small (6×4)"
-                        value={rates.sponge?.naked?.small ?? 700}
-                        activeValue={activeRates.sponge?.naked?.small}
+                        label="6×6"
+                        value={rates.sponge?.naked?.['6x6'] ?? rates.sponge?.naked?.small ?? 700}
+                        activeValue={activeRates.sponge?.naked?.['6x6'] ?? activeRates.sponge?.naked?.small}
                         disabled={!isDraftActive}
-                        onChange={(val) => setSpongePrice('naked', 'small', val)}
+                        onChange={(val) => setSpongePrice('naked', '6x6', val)}
                       />
                       <PriceStepper
-                        label="Big (8×5)"
-                        value={rates.sponge?.naked?.big ?? 1500}
-                        activeValue={activeRates.sponge?.naked?.big}
+                        label="8×8"
+                        value={rates.sponge?.naked?.['8x8'] ?? rates.sponge?.naked?.big ?? 1500}
+                        activeValue={activeRates.sponge?.naked?.['8x8'] ?? activeRates.sponge?.naked?.big}
                         disabled={!isDraftActive}
-                        onChange={(val) => setSpongePrice('naked', 'big', val)}
+                        onChange={(val) => setSpongePrice('naked', '8x8', val)}
+                      />
+                      <PriceStepper
+                        label="10×10"
+                        value={rates.sponge?.naked?.['10x10'] ?? 2200}
+                        activeValue={activeRates.sponge?.naked?.['10x10']}
+                        disabled={!isDraftActive}
+                        onChange={(val) => setSpongePrice('naked', '10x10', val)}
+                      />
+                      <PriceStepper
+                        label="12×12"
+                        value={rates.sponge?.naked?.['12x12'] ?? 3000}
+                        activeValue={activeRates.sponge?.naked?.['12x12']}
+                        disabled={!isDraftActive}
+                        onChange={(val) => setSpongePrice('naked', '12x12', val)}
                       />
                     </div>
                   </div>
@@ -928,18 +950,32 @@ export default function BakeryPricing() {
 
                     <div className="grid grid-cols-2 gap-3">
                       <PriceStepper
-                        label="Small (6×4)"
-                        value={rates.sponge?.frosted?.small ?? 1000}
-                        activeValue={activeRates.sponge?.frosted?.small}
+                        label="6×6"
+                        value={rates.sponge?.frosted?.['6x6'] ?? rates.sponge?.frosted?.small ?? 1000}
+                        activeValue={activeRates.sponge?.frosted?.['6x6'] ?? activeRates.sponge?.frosted?.small}
                         disabled={!isDraftActive}
-                        onChange={(val) => setSpongePrice('frosted', 'small', val)}
+                        onChange={(val) => setSpongePrice('frosted', '6x6', val)}
                       />
                       <PriceStepper
-                        label="Big (8×5)"
-                        value={rates.sponge?.frosted?.big ?? 1700}
-                        activeValue={activeRates.sponge?.frosted?.big}
+                        label="8×8"
+                        value={rates.sponge?.frosted?.['8x8'] ?? rates.sponge?.frosted?.big ?? 1700}
+                        activeValue={activeRates.sponge?.frosted?.['8x8'] ?? activeRates.sponge?.frosted?.big}
                         disabled={!isDraftActive}
-                        onChange={(val) => setSpongePrice('frosted', 'big', val)}
+                        onChange={(val) => setSpongePrice('frosted', '8x8', val)}
+                      />
+                      <PriceStepper
+                        label="10×10"
+                        value={rates.sponge?.frosted?.['10x10'] ?? 2500}
+                        activeValue={activeRates.sponge?.frosted?.['10x10']}
+                        disabled={!isDraftActive}
+                        onChange={(val) => setSpongePrice('frosted', '10x10', val)}
+                      />
+                      <PriceStepper
+                        label="12×12"
+                        value={rates.sponge?.frosted?.['12x12'] ?? 3400}
+                        activeValue={activeRates.sponge?.frosted?.['12x12']}
+                        disabled={!isDraftActive}
+                        onChange={(val) => setSpongePrice('frosted', '12x12', val)}
                       />
                     </div>
                   </div>
@@ -953,18 +989,32 @@ export default function BakeryPricing() {
 
                     <div className="grid grid-cols-2 gap-3">
                       <PriceStepper
-                        label="Small (6×4)"
-                        value={rates.sponge?.textured?.small ?? 1000}
-                        activeValue={activeRates.sponge?.textured?.small}
+                        label="6×6"
+                        value={rates.sponge?.textured?.['6x6'] ?? rates.sponge?.textured?.small ?? 1000}
+                        activeValue={activeRates.sponge?.textured?.['6x6'] ?? activeRates.sponge?.textured?.small}
                         disabled={!isDraftActive}
-                        onChange={(val) => setSpongePrice('textured', 'small', val)}
+                        onChange={(val) => setSpongePrice('textured', '6x6', val)}
                       />
                       <PriceStepper
-                        label="Big (8×5)"
-                        value={rates.sponge?.textured?.big ?? 1700}
-                        activeValue={activeRates.sponge?.textured?.big}
+                        label="8×8"
+                        value={rates.sponge?.textured?.['8x8'] ?? rates.sponge?.textured?.big ?? 1700}
+                        activeValue={activeRates.sponge?.textured?.['8x8'] ?? activeRates.sponge?.textured?.big}
                         disabled={!isDraftActive}
-                        onChange={(val) => setSpongePrice('textured', 'big', val)}
+                        onChange={(val) => setSpongePrice('textured', '8x8', val)}
+                      />
+                      <PriceStepper
+                        label="10×10"
+                        value={rates.sponge?.textured?.['10x10'] ?? 2500}
+                        activeValue={activeRates.sponge?.textured?.['10x10']}
+                        disabled={!isDraftActive}
+                        onChange={(val) => setSpongePrice('textured', '10x10', val)}
+                      />
+                      <PriceStepper
+                        label="12×12"
+                        value={rates.sponge?.textured?.['12x12'] ?? 3400}
+                        activeValue={activeRates.sponge?.textured?.['12x12']}
+                        disabled={!isDraftActive}
+                        onChange={(val) => setSpongePrice('textured', '12x12', val)}
                       />
                     </div>
                   </div>
@@ -1490,16 +1540,21 @@ export default function BakeryPricing() {
                         <div>
                           <label className="text-xs font-semibold text-gray-600 block mb-1">1-Tier Size</label>
                           <div className="flex gap-2">
-                            {['small', 'big'].map((s) => (
+                            {[
+                              { key: '6x6', label: '6×6' },
+                              { key: '8x8', label: '8×8' },
+                              { key: '10x10', label: '10×10' },
+                              { key: '12x12', label: '12×12' },
+                            ].map(({ key, label }) => (
                               <button
-                                key={s}
+                                key={key}
                                 type="button"
-                                onClick={() => setSimSize(s)}
-                                className={`flex-1 py-1.5 rounded-lg text-xs font-bold uppercase transition-colors ${
-                                  simSize === s ? 'bg-primary text-white' : 'bg-white border border-pink-100 text-gray-700'
+                                onClick={() => setSimSize(key)}
+                                className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                                  simSize === key ? 'bg-primary text-white' : 'bg-white border border-pink-100 text-gray-700'
                                 }`}
                               >
-                                {s === 'small' ? '6×4 (Small)' : '8×5 (Big)'}
+                                {label}
                               </button>
                             ))}
                           </div>
@@ -1675,7 +1730,7 @@ export default function BakeryPricing() {
                           <div className="flex flex-col">
                             <span>
                               {simLayers === 1
-                                ? `1-Tier ${simFinish === 'naked' ? 'Naked' : simFinish === 'textured' ? 'Textured' : 'Frosted'} (${simSize === 'big' ? '8×5' : '6×4'})`
+                                ? `1-Tier ${simFinish === 'naked' ? 'Naked' : simFinish === 'textured' ? 'Textured' : 'Frosted'} (${simSize.replace('x', '×')})`
                                 : `2-Tier ${simFinish === 'naked' ? 'Naked' : simFinish === 'textured' ? 'Textured' : 'Frosted'} Set`}
                             </span>
                             <span className="text-[10px] text-gray-500 font-medium">
@@ -1685,7 +1740,7 @@ export default function BakeryPricing() {
                           <span className="font-bold">
                             {money(
                               simLayers === 1
-                                ? (rates.sponge?.[simFinish]?.[simSize] ?? (simFinish === 'textured' ? rates.sponge?.frosted?.[simSize] : 0))
+                                ? (spongeRateForSize(rates.sponge?.[simFinish], simSize) ?? (simFinish === 'textured' ? spongeRateForSize(rates.sponge?.frosted, simSize) : 0))
                                 : (rates.twoTier?.[simFinish] ?? (simFinish === 'textured' ? rates.twoTier?.frosted : 0))
                             )}
                           </span>

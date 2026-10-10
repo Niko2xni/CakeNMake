@@ -20,6 +20,7 @@ describe('syncTierDesignOnToggle', () => {
       surfaceTreatment: {
         mode: 'glaze',
         pattern: 'draped',
+        patternsByFormat: { standard: 'midWave', petitsFour: 'tinyTip' },
         layerTreatments: [
           { mode: null, pattern: 'longGaps' },
           { mode: null, pattern: 'longGaps' },
@@ -54,8 +55,8 @@ describe('syncTierDesignOnToggle', () => {
 
     // Surface Treatment
     expect(individualConfig.surfaceTreatment.layerTreatments).toEqual([
-      { mode: 'glaze', pattern: 'draped' },
-      { mode: 'glaze', pattern: 'draped' },
+      { mode: 'glaze', pattern: 'draped', patternsByFormat: { standard: 'midWave', petitsFour: 'tinyTip' } },
+      { mode: 'glaze', pattern: 'draped', patternsByFormat: { standard: 'midWave', petitsFour: 'tinyTip' } },
     ]);
 
     // Side Treatment
@@ -92,7 +93,7 @@ describe('syncTierDesignOnToggle', () => {
         pattern: 'longGaps',
         layerTreatments: [
           { mode: null, pattern: 'longGaps' },
-          { mode: 'glaze', pattern: 'draped' },
+          { mode: 'glaze', pattern: 'draped', patternsByFormat: { standard: 'shortWave', petitsFour: 'tinyTip' } },
         ],
       },
       side: {
@@ -132,6 +133,7 @@ describe('syncTierDesignOnToggle', () => {
     // Surface Treatment
     expect(uniformConfig.surfaceTreatment.mode).toBe('glaze');
     expect(uniformConfig.surfaceTreatment.pattern).toBe('draped');
+    expect(uniformConfig.surfaceTreatment.patternsByFormat).toEqual({ standard: 'shortWave', petitsFour: 'tinyTip' });
 
     // Side Treatment
     expect(uniformConfig.side.mode).toBe('scatterPearls');

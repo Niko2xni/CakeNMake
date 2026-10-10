@@ -16,17 +16,35 @@ vi.mock('./cakeFonts', () => ({
   getPacificoFont: () => null,
   getHandwrittenFont: () => null,
   areFontsReady: () => false,
-  onFontsReady: () => () => {},
+  onFontsReady: () => () => { },
 }));
 
 import {
+  getCakeGlazeCarve,
   getEdgeSlotsToRender,
   getMiddlePipingRadius,
   getTierGlazeProfileOptions,
   makeFillingBandHugFn,
 } from './CakeScene';
+import { getNaturalTearGlazeCarve, getPetitFoursGlazeCarve, GLAZE_PATTERN_CARVES } from './cakeConstants';
+import { buildGlazeGeometry } from './frostingGeometry';
 
 describe('CakeScene edge and Glaze helpers', () => {
+  it('uses GLAZE_PATTERN_CARVES for Standard and Bento designs', () => {
+    expect(getCakeGlazeCarve('longGaps')).toEqual(GLAZE_PATTERN_CARVES.longGaps);
+    expect(getCakeGlazeCarve('shortDrips')).toEqual(GLAZE_PATTERN_CARVES.shortDrips);
+    expect(getCakeGlazeCarve('longWave')).toEqual(GLAZE_PATTERN_CARVES.longWave);
+  });
+
+  it('keeps the Petit Fours Natural Tear profile for both Standard pattern ids', () => {
+    const petitFours = getPetitFoursGlazeCarve('longGaps', 0);
+    for (const pattern of ['naturalTear', 'naturalTear2']) {
+      const profile = getNaturalTearGlazeCarve(pattern).customProfileFn;
+      expect(profile(0.4)).toBeCloseTo(petitFours.customProfileFn(0.4));
+      expect(profile(0.95)).toBeCloseTo(petitFours.customProfileFn(0.95));
+    }
+  });
+
   it('renders both stored Edge slots in separate mode and preserves Both mode', () => {
     const edgeTop = { pipingTip: 'top-design' };
     const edgeBottom = { pipingTip: 'bottom-design' };
@@ -92,6 +110,122 @@ describe('CakeScene edge and Glaze helpers', () => {
 
     expect(options.ridgeProfileFn).toBeNull();
     expect(options.coatThickness).toBeCloseTo(0.1725);
+  });
+
+  it('Petit Fours unevenCombo glaze carve has thin drips with minimal mantle', () => {
+    const carve = getPetitFoursGlazeCarve('unevenCombo', 0);
+    expect(typeof carve.customProfileFn).toBe('function');
+    // Mantle baseline is reduced to almost nothing (0.025) to highlight the thin drips
+    const val0 = carve.customProfileFn(0);
+    expect(val0).toBeGreaterThanOrEqual(0.025);
+  });
+
+  it('buildGlazeGeometry hugs cake radius flush without hollow clearance when wallThickness matches coatThickness', () => {
+    const geo = buildGlazeGeometry(1.0, 1.0, 0, () => 0.5, {
+      coatThickness: 0.05,
+      wallThickness: 0.05,
+    });
+    const pos = geo.getAttribute('position');
+    expect(pos.count).toBeGreaterThan(0);
+    let minSideInnerRadius = Infinity;
+    for (let i = 0; i < pos.count; i++) {
+      const y = pos.getY(i);
+      // Sample vertices on the side wall below shoulder bevel
+      if (y <= 0.85) {
+        const x = pos.getX(i);
+        const z = pos.getZ(i);
+        const r = Math.sqrt(x * x + z * z);
+        minSideInnerRadius = Math.min(minSideInnerRadius, r);
+      }
+    }
+    // Inner wall on the side should hug contactRadius (1.002), not float off with empty air
+    expect(minSideInnerRadius).toBeCloseTo(1.002, 2);
+  });
+
+  it('builds smooth normals along a Natural Tear drip', () => {
+    const carve = getNaturalTearGlazeCarve('naturalTear');
+    const geo = buildGlazeGeometry(3, 5, 0.25, () => 0.5, {
+      carve,
+      coatThickness: 0.08,
+    });
+    const normals = geo.getAttribute('normal');
+
+    expect(normals.count).toBeGreaterThan(0);
+    for (let index = 0; index < normals.count; index++) {
+      expect(Number.isFinite(normals.getX(index))).toBe(true);
+      expect(Number.isFinite(normals.getY(index))).toBe(true);
+      expect(Number.isFinite(normals.getZ(index))).toBe(true);
+    }
+  });
+
+  it('Petit Fours 1x1 glaze covers the top hill bump completely without puncture', () => {
+    const radius = 0.5;
+    const height = 1.0;
+    const domeAmount = 0.05;
+    const pfCoat = 0.045;
+    const pfBevel = 0.06;
+    const geo = buildGlazeGeometry(radius, height, domeAmount, () => 0.5, {
+      coatThickness: pfCoat,
+      wallThickness: pfCoat,
+      capLift: pfCoat,
+      bevelSize: pfBevel,
+    });
+    const pos = geo.getAttribute('position');
+    expect(pos.count).toBeGreaterThan(0);
+    // Sample outer vertices on the top dome (r <= 0.44 where sponge dome sits between 1.00 and 1.05)
+    let minTopOuterY = Infinity;
+    // Outer wall vertices precede inner wall and rim copy vertices
+    const outerWallCount = Math.floor((pos.count - 258) / 2);
+    for (let i = 0; i < outerWallCount; i++) {
+      const x = pos.getX(i);
+      const y = pos.getY(i);
+      const z = pos.getZ(i);
+      const r = Math.sqrt(x * x + z * z);
+      if (r <= 0.44 && y >= 0.9) {
+        minTopOuterY = Math.min(minTopOuterY, y);
+      }
+    }
+    // Glaze top outer surface must remain strictly higher than the sponge dome shoulder (1.00)
+    expect(minTopOuterY).toBeGreaterThanOrEqual(1.04);
+  });
+
+  it('Petit Fours glaze carve seamlessly blends mantle and adds connected circular beads to drip ends', () => {
+    const carve = getPetitFoursGlazeCarve('unevenCombo', 0, () => 0.5);
+    expect(typeof carve.customProfileFn).toBe('function');
+    expect(typeof carve.thicknessMulFn).toBe('function');
+
+    // Test deeper arched mantle base: between drips, mantle arches gracefully (0.12 - 0.22)
+    const mantleFarDepth = carve.customProfileFn(0.0);
+    expect(mantleFarDepth).toBeGreaterThan(0.12);
+    expect(mantleFarDepth).toBeLessThan(0.22);
+
+    // Test upside-down triangle funnel extending down before the drip (depth > 0.22)
+    const triangleDepth = carve.customProfileFn(0.32 + 0.035);
+    expect(triangleDepth).toBeGreaterThan(0.22);
+
+    // Test circular bottom at tip of first drip (center ~0.32)
+    const tipDepth = carve.customProfileFn(0.32);
+    expect(tipDepth).toBeGreaterThan(0.9);
+
+    // Test 3D thickness multiplier: subtle natural bump at the tip (> 1.15), outside is 1.0
+    const beadBulge = carve.thicknessMulFn(0.32, 0.55 * (1 - (0.92 - 0.026)), 0.55);
+    expect(beadBulge).toBeGreaterThan(1.15);
+    expect(beadBulge).toBeLessThan(1.50);
+
+    const stemThickness = carve.thicknessMulFn(0.32, 0.55 * (1 - 0.4), 0.55);
+    expect(stemThickness).toBeCloseTo(1.0);
+
+    // Test buildGlazeGeometry integration
+    const geo = buildGlazeGeometry(0.5, 0.8, 0.04, () => 0.5, {
+      carve,
+      coatThickness: 0.045,
+      wallThickness: 0.045,
+      capLift: 0.045,
+      bevelSize: 0.06,
+      edgeFadeDist: 0.025,
+      sideSamples: 64,
+    });
+    expect(geo.getAttribute('position').count).toBeGreaterThan(0);
   });
 });
 

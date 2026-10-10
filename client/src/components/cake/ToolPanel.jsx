@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { DEFAULT_CONFIG, pruneItemsCollidingWithEdgeDelicates, getTopTierRadiusFromConfig } from '@/lib/cakeConfig';
+import { DEFAULT_CONFIG, getSurfaceTreatmentPattern, pruneItemsCollidingWithEdgeDelicates, getTopTierRadiusFromConfig, isPetitsFourStructure } from '@/lib/cakeConfig';
 import CakeStructureSection from './sections/CakeStructureSection';
 import SpongeFlavorSection from './sections/SpongeFlavorSection';
 import FillingSection from './sections/FillingSection';
@@ -112,7 +112,20 @@ export default function ToolPanel({
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
-  const isIndividual = config.structure?.layerDesign === 'individual' && config.structure?.layers > 1;
+  const isPetitsFour = isPetitsFourStructure(config.structure);
+  const isIndividual = config.structure?.layerDesign === 'individual' && (config.structure?.layers > 1 || isPetitsFour);
+  const tabs = isPetitsFour
+    ? TABS.filter(({ id }) => id !== 'side' && id !== 'edge')
+    : TABS;
+  const activeTab = isPetitsFour && (tab === 'side' || tab === 'edge')
+    ? 'fundamentals'
+    : tab;
+
+  useEffect(() => {
+    if (activeTab !== tab) {
+      setTab(activeTab);
+    }
+  }, [activeTab, tab]);
 
   // Fully Frosted and Textured Buttercream both physically cover the
   // sponge and filling — a change made to either while one of these
@@ -142,11 +155,11 @@ export default function ToolPanel({
   useEffect(() => () => clearTimeout(frostedNoticeTimeoutRef.current), []);
 
   useEffect(() => {
-    const maxLayer = (config.structure?.layers || 1) - 1;
+    const maxLayer = (isPetitsFour ? 4 : (config.structure?.layers || 1)) - 1;
     if (activeLayer > maxLayer) {
       setActiveLayer(0);
     }
-  }, [config.structure?.layers, activeLayer]);
+  }, [config.structure?.layers, isPetitsFour, activeLayer]);
 
   // Refs to each collapsible section's own wrapper, keyed by section id —
   // used to scroll a section into view right after IT opens, so expanding
@@ -196,7 +209,7 @@ export default function ToolPanel({
   // Edge/Side aren't wired to per-tier indirection yet (flagged as a known
   // gap, see CAKE_SETS_REWORK_SPEC.md §11), so it's hidden on those tabs
   // rather than showing a control that wouldn't do anything there.
-  const showLayerStrip = isIndividual && ['fundamentals', 'side', 'center', 'edge'].includes(tab);
+  const showLayerStrip = isIndividual && ['fundamentals', 'side', 'center', 'edge'].includes(activeTab);
 
   const toggleInteriorPreview = () => {
     onChange({ ...config, interiorPreview: !config.interiorPreview });
@@ -209,9 +222,38 @@ export default function ToolPanel({
   };
 
   const handleStructureChange = (newStructure, newRealSize) => {
+    const currentFormat = isPetitsFourStructure(config.structure) ? 'petitsFour' : 'standard';
+    const nextFormat = isPetitsFourStructure(newStructure) ? 'petitsFour' : 'standard';
+    let nextConfig = { ...config, structure: newStructure, realSize: newRealSize };
+    if (currentFormat !== nextFormat) {
+      const surface = config.surfaceTreatment || DEFAULT_CONFIG.surfaceTreatment;
+      const currentIsIndividual = config.structure?.layerDesign === 'individual'
+        && ((config.structure?.layers || 1) > 1 || currentFormat === 'petitsFour');
+      const currentTreatment = currentIsIndividual
+        ? (surface.layerTreatments?.[activeLayer] || surface)
+        : surface;
+      const patternsByFormat = {
+        ...(surface.patternsByFormat || {}),
+        ...(currentTreatment.patternsByFormat || {}),
+        [currentFormat]: getSurfaceTreatmentPattern(currentTreatment, config.structure),
+      };
+      const nextPattern = getSurfaceTreatmentPattern({ patternsByFormat }, newStructure);
+      const layerTreatments = Array.isArray(surface.layerTreatments)
+        ? surface.layerTreatments.map((treatment, index) => index === activeLayer
+          ? { ...treatment, pattern: nextPattern, patternsByFormat: { ...patternsByFormat } }
+          : treatment)
+        : surface.layerTreatments;
+      nextConfig.surfaceTreatment = {
+        ...surface,
+        pattern: nextPattern,
+        patternsByFormat,
+        ...(layerTreatments ? { layerTreatments } : {}),
+      };
+    }
+
     const tierCountChanged = newStructure.layers !== config.structure?.layers;
     if (!tierCountChanged) {
-      onChange({ ...config, structure: newStructure, realSize: newRealSize });
+      onChange(nextConfig);
       return;
     }
 
@@ -223,9 +265,7 @@ export default function ToolPanel({
     );
 
     const baseConfig = {
-      ...config,
-      structure: newStructure,
-      realSize: newRealSize,
+      ...nextConfig,
       place: { ...(config.place || {}), items: centerItems },
       placedItems: legacyPlacedItems,
     };
@@ -346,6 +386,9 @@ export default function ToolPanel({
   const sideSugarColor = (isIndividual
     ? (config.sugarColorOverrides?.[`side-${activeLayer}`] || config.sugarColorOverrides?.side)
     : config.sugarColorOverrides?.side) || DEFAULT_CONFIG.sugarColor;
+  const activeSurfaceTreatment = isIndividual
+    ? (config.surfaceTreatment?.layerTreatments?.[activeLayer] ?? config.surfaceTreatment ?? DEFAULT_CONFIG.surfaceTreatment)
+    : (config.surfaceTreatment || DEFAULT_CONFIG.surfaceTreatment);
 
   return (
     <div className="cn-designer-tool-panel relative flex flex-col h-full bg-card rounded-2xl shadow-xl border border-border/50 overflow-hidden select-none">
@@ -502,7 +545,7 @@ export default function ToolPanel({
             <>
 {/* Tab switcher — balanced 2x2 layout for the four remaining sections */}
               <div className="grid grid-cols-2 gap-2 px-4 py-2 bg-muted/30">
-                {TABS.map(({ id, label, icon: Icon, zIndex }) => (
+                {tabs.map(({ id, label, icon: Icon, zIndex }) => (
                   <button
                     key={id}
                     onClick={() => {
@@ -511,7 +554,7 @@ export default function ToolPanel({
                     }}
                     style={{ zIndex }}
                     className={`relative flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-lg text-xs font-semibold transition-all duration-200 ${
-                      tab === id
+                      activeTab === id
                         ? 'bg-card shadow text-foreground'
                         : 'text-muted-foreground hover:text-foreground'
                     }`}
@@ -534,7 +577,7 @@ export default function ToolPanel({
               animate={{ opacity: 1 }}
               transition={{ duration: 0.2 }}
             >
-              {config.structure?.layers > 1 && tab !== 'center' && tab !== 'edge' && (
+              {(config.structure?.layers > 1 || isPetitsFour) && activeTab !== 'center' && activeTab !== 'edge' && (
                 <>
                   <TierDesignControl
                     structure={config.structure}
@@ -549,7 +592,8 @@ export default function ToolPanel({
                   />
                   {showLayerStrip && (
                     <LayerTabStrip
-                      layers={config.structure.layers}
+                      layers={isPetitsFour ? 4 : config.structure.layers}
+                      isPetitsFour={isPetitsFour}
                       activeLayer={activeLayer}
                       onLayerChange={setActiveLayer}
                     />
@@ -557,7 +601,7 @@ export default function ToolPanel({
                 </>
               )}
 
-              {tab === 'fundamentals' && (
+              {activeTab === 'fundamentals' && (
                 <>
                   {/* 1. Cake Structure */}
                   <div ref={registerSectionRef('structure')} className="scroll-mt-4">
@@ -778,6 +822,7 @@ export default function ToolPanel({
                           surfaceTreatment={config.surfaceTreatment || DEFAULT_CONFIG.surfaceTreatment}
                           isIndividual={isIndividual}
                           activeLayer={activeLayer}
+                          structure={config.structure}
                           onChange={(newSurfaceTreatment) => {
                             onChange({
                               ...config,
@@ -785,9 +830,7 @@ export default function ToolPanel({
                             });
                           }}
                         />
-                        {((isIndividual
-                          ? (config.surfaceTreatment?.layerTreatments?.[activeLayer]?.mode || config.surfaceTreatment?.mode)
-                          : config.surfaceTreatment?.mode) === 'glaze') && renderSugarColor('surface')}
+                        {activeSurfaceTreatment.mode === 'glaze' && renderSugarColor('surface')}
                       </div>
                     </CollapsibleContent>
                   </Collapsible>
@@ -795,7 +838,7 @@ export default function ToolPanel({
                 </>
               )}
 
-              {tab === 'center' && (
+              {activeTab === 'center' && (
                 <>
                   <CenterSection
                     center={config.center || DEFAULT_CONFIG.center}
@@ -817,7 +860,7 @@ export default function ToolPanel({
                 </>
               )}
 
-              {tab === 'edge' && (() => {
+              {activeTab === 'edge' && (() => {
                 const currentSlot = config.edge?.mode === 'both' ? 'both' : (config.edge?.activeSlot || activeEdgeSlot || 'top');
                 const edgeContext = currentSlot === 'both' ? 'edgeBoth' : `edge${currentSlot.charAt(0).toUpperCase()}${currentSlot.slice(1)}`;
                 return (
@@ -860,7 +903,7 @@ export default function ToolPanel({
                 );
               })()}
 
-              {tab === 'side' && (
+              {activeTab === 'side' && (
                 <>
                   <SideSection
                     side={config.side || DEFAULT_CONFIG.side}

@@ -1,19 +1,22 @@
 import React from 'react';
 import { FLAVORS, FLAVOR_ORDER } from '@/lib/cakeFlavors';
+import { isPetitsFourStructure } from '@/lib/cakeConfig';
 
 export default function SpongeFlavorSection({ sponge, structure, activeLayer, onChange }) {
-  const isIndividual = structure.layerDesign === 'individual' && structure.layers > 1;
+  const isPetitsFour = isPetitsFourStructure(structure);
+  const isIndividual = structure.layerDesign === 'individual' && (structure.layers > 1 || isPetitsFour);
+  const layerCount = isPetitsFour ? 4 : (structure?.layers || 2);
 
   const updateFlavor = (flavor) => {
     if (isIndividual) {
-      const newLayerFlavors = [...(sponge.layerFlavors || Array(structure.layers).fill('vanilla'))];
+      const newLayerFlavors = [...(sponge.layerFlavors || Array(layerCount).fill('vanilla'))];
       newLayerFlavors[activeLayer] = flavor;
       onChange({ ...sponge, layerFlavors: newLayerFlavors });
     } else {
       onChange({
         ...sponge,
         flavor,
-        layerFlavors: Array(structure?.layers || 2).fill(flavor),
+        layerFlavors: Array(layerCount).fill(flavor),
       });
     }
   };
@@ -30,7 +33,7 @@ export default function SpongeFlavorSection({ sponge, structure, activeLayer, on
       {/* Flavor Selection */}
       <div>
         <span className="text-xs text-muted-foreground mb-2 block">
-          {isIndividual ? `Tier ${activeLayer + 1} Flavor` : 'Sponge Flavor'}
+          {isIndividual ? (isPetitsFour ? `Variation ${activeLayer + 1} Flavor` : `Layer ${activeLayer + 1} Flavor`) : 'Sponge Flavor'}
         </span>
         <div className="grid grid-cols-2 gap-2">
           {FLAVOR_ORDER.map((flavorId) => {
