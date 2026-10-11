@@ -697,6 +697,10 @@ export function getDecorationLandingY(anchor, px, pz, topMetrics) {
       const upsideDownFactor = Math.abs(upY);
       nestle += upsideDownFactor * 0.20;
     }
+  } else if (designId === 'blueberry') {
+    nestle += 0.015;
+  } else if (designId === 'mangoCube' || designId === 'mango') {
+    nestle += 0.015;
   } else if (designId === 'strawberry') {
     const upY = anchor.userData.localUpY ?? 1.0;
     // Base extra nestle so strawberry rests firmly in frosting on all sides:
