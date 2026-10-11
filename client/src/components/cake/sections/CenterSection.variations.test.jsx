@@ -13,23 +13,36 @@ import CenterSection from './CenterSection';
 import {
   STRAWBERRY_VARIATION_SETS,
   BENTO_STRAWBERRY_VARIATION_SETS,
+  BLUEBERRY_VARIATION_SETS,
+  BENTO_BLUEBERRY_VARIATION_SETS,
+  MANGO_VARIATION_SETS,
+  BENTO_MANGO_VARIATION_SETS,
   getCenterItemLimit,
 } from '@/lib/cakeConfig';
 
 describe('CenterSection Variations', () => {
-  it('has exactly 6 variations for both standard and bento cakes', () => {
+  it('has exactly 6 variations for strawberry, blueberry, and mango on both standard and bento cakes', () => {
     expect(STRAWBERRY_VARIATION_SETS).toHaveLength(6);
     expect(BENTO_STRAWBERRY_VARIATION_SETS).toHaveLength(6);
-    // Ensure all bento variations have at most 4 strawberries placed
-    BENTO_STRAWBERRY_VARIATION_SETS.forEach((set) => {
+    expect(BLUEBERRY_VARIATION_SETS).toHaveLength(6);
+    expect(BENTO_BLUEBERRY_VARIATION_SETS).toHaveLength(6);
+    expect(MANGO_VARIATION_SETS).toHaveLength(6);
+    expect(BENTO_MANGO_VARIATION_SETS).toHaveLength(6);
+
+    // Ensure all bento variations have at most 4 items placed
+    [...BENTO_STRAWBERRY_VARIATION_SETS, ...BENTO_BLUEBERRY_VARIATION_SETS, ...BENTO_MANGO_VARIATION_SETS].forEach((set) => {
       expect(set.placements.length).toBeLessThanOrEqual(4);
     });
   });
 
-  it('enforces maximum 4 strawberries for bento cake format and 10 for standard', () => {
+  it('enforces maximum 4 items for bento cake format for strawberry, blueberry, and mango', () => {
     expect(getCenterItemLimit('strawberry', { cakeFormat: 'bento' })).toBe(4);
+    expect(getCenterItemLimit('blueberry', { cakeFormat: 'bento' })).toBe(4);
+    expect(getCenterItemLimit('mangoCube', { cakeFormat: 'bento' })).toBe(4);
+
     expect(getCenterItemLimit('strawberry', { cakeFormat: 'standard' })).toBe(10);
-    expect(getCenterItemLimit('strawberry')).toBe(10);
+    expect(getCenterItemLimit('blueberry', { cakeFormat: 'standard' })).toBe(10);
+    expect(getCenterItemLimit('mangoCube', { cakeFormat: 'standard' })).toBe(12);
   });
 
   it('renders Decorations, Text, and Variations tab buttons', () => {
@@ -46,7 +59,7 @@ describe('CenterSection Variations', () => {
     expect(screen.getByRole('button', { name: 'Variations' })).toBeInTheDocument();
   });
 
-  it('switches to Variations tab when clicked and displays 6 Strawberry variations', () => {
+  it('switches to Variations tab when clicked and displays Strawberry, Blueberry, and Mango Cube options', () => {
     const onChange = vi.fn();
     const center = { mode: 'decorations' };
     const { rerender } = render(
@@ -67,13 +80,15 @@ describe('CenterSection Variations', () => {
     );
 
     expect(screen.getByText('Strawberry')).toBeInTheDocument();
-    // Verify all 6 numbered choices are rendered
-    for (let i = 1; i <= 6; i++) {
-      expect(screen.getByRole('button', { name: String(i) })).toBeInTheDocument();
-    }
+    expect(screen.getByText('Blueberry')).toBeInTheDocument();
+    expect(screen.getByText('Mango Cube')).toBeInTheDocument();
+
+    // Verify all 3 options have 6 variation buttons each (total 18 numbered buttons)
+    const buttons1 = screen.getAllByRole('button', { name: '1' });
+    expect(buttons1).toHaveLength(3);
   });
 
-  it('displays 6 variations and places at most 4 strawberries when format is bento', () => {
+  it('displays 6 variations and places at most 4 items for blueberry and mango when format is bento', () => {
     const onChange = vi.fn();
     const onPlacedItemsChange = vi.fn();
     const structure = { cakeFormat: 'bento' };
@@ -90,28 +105,28 @@ describe('CenterSection Variations', () => {
     );
 
     expect(screen.getByText('Strawberry')).toBeInTheDocument();
-    for (let i = 1; i <= 6; i++) {
-      expect(screen.getByRole('button', { name: String(i) })).toBeInTheDocument();
-    }
+    expect(screen.getByText('Blueberry')).toBeInTheDocument();
+    expect(screen.getByText('Mango Cube')).toBeInTheDocument();
 
-    // Click choice 5 (Center Diamond - 4 strawberries)
-    const choice5 = screen.getByRole('button', { name: '5' });
-    fireEvent.click(choice5);
+    // Click choice 5 for Blueberry (Center Diamond - 4 blueberries)
+    const choice5Buttons = screen.getAllByRole('button', { name: '5' });
+    // choice5Buttons[1] is Blueberry's button 5
+    fireEvent.click(choice5Buttons[1]);
 
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({
         mode: 'variations',
-        variations: expect.objectContaining({ strawberry: 'centerDiamond' }),
+        variations: expect.objectContaining({ blueberry: 'centerDiamond' }),
       })
     );
 
     const updater = onPlacedItemsChange.mock.calls[0][0];
     const newItems = updater([]);
     expect(newItems).toHaveLength(4);
-    expect(newItems.length).toBeLessThanOrEqual(4);
+    expect(newItems.every(it => it.type === 'center-blueberry-default' && it.source === 'variation')).toBe(true);
   });
 
-  it('shows limit of 4 for strawberry decoration card when structure is bento', () => {
+  it('shows limit of 4 for blueberry and mango decoration cards when structure is bento', () => {
     const center = { mode: 'decorations' };
     const structure = { cakeFormat: 'bento' };
 
@@ -126,6 +141,12 @@ describe('CenterSection Variations', () => {
 
     const strawberryButton = screen.getByTitle('Strawberry');
     expect(strawberryButton).toHaveTextContent('0 / 4');
+
+    const blueberryButton = screen.getByTitle('Blueberry');
+    expect(blueberryButton).toHaveTextContent('0 / 4');
+
+    const mangoButton = screen.getByTitle('Mango Cube');
+    expect(mangoButton).toHaveTextContent('0 / 4');
   });
 
   it('places strawberry variation items on the cake when a numbered choice is selected', () => {
@@ -142,8 +163,8 @@ describe('CenterSection Variations', () => {
       />
     );
 
-    // Click choice 2 (Center Trio)
-    const choice2 = screen.getByRole('button', { name: '2' });
+    // Click choice 2 (Center Trio for strawberry)
+    const choice2 = screen.getAllByRole('button', { name: '2' })[0];
     fireEvent.click(choice2);
 
     expect(onChange).toHaveBeenCalledWith(
@@ -188,7 +209,7 @@ describe('CenterSection Variations', () => {
     );
 
     // Click choice 1 which is currently active
-    const choice1 = screen.getByRole('button', { name: '1' });
+    const choice1 = screen.getByTitle('Remove Single Center');
     fireEvent.click(choice1);
 
     expect(onChange).toHaveBeenCalledWith(

@@ -645,8 +645,10 @@ export function getCenterItemLimit(designId, structureOrFormat) {
   const isBento = typeof structureOrFormat === 'string'
     ? structureOrFormat === 'bento'
     : isBentoStructure(structureOrFormat || {});
-  if (designId === 'strawberry' && isBento) {
-    return 4;
+  if (isBento) {
+    if (designId === 'strawberry' || designId === 'blueberry' || designId === 'mangoCube' || designId === 'mango') {
+      return 4;
+    }
   }
   return CENTER_ITEM_LIMITS[designId] ?? null;
 }
@@ -1329,6 +1331,251 @@ export const BENTO_STRAWBERRY_VARIATION_SETS = [
   },
 ];
 
+export const BLUEBERRY_VARIATION_SETS = [
+  {
+    id: 'singleCenter',
+    label: 'Single Center',
+    placements: [
+      { x: 0, z: 0, rotation: 0 },
+    ],
+  },
+  {
+    id: 'trioCluster',
+    label: 'Center Trio',
+    placements: [
+      { x: 0, z: -0.32, rotation: 0 },
+      { x: 0.28, z: 0.16, rotation: 2.094 },
+      { x: -0.28, z: 0.16, rotation: 4.189 },
+    ],
+  },
+  {
+    id: 'centerDiamond',
+    label: 'Center Diamond',
+    placements: [
+      { x: 0, z: -0.38, rotation: 0 },
+      { x: 0.38, z: 0, rotation: 1.571 },
+      { x: 0, z: 0.38, rotation: 3.142 },
+      { x: -0.38, z: 0, rotation: 4.712 },
+    ],
+  },
+  {
+    id: 'crescentArc',
+    label: 'Crescent Arc',
+    placements: [
+      { x: -1.4, z: -0.6, rotation: -0.8 },
+      { x: -0.9, z: -1.2, rotation: -0.5 },
+      { x: -0.3, z: -1.5, rotation: -0.2 },
+      { x: 0.3, z: -1.5, rotation: 0.2 },
+      { x: 0.9, z: -1.2, rotation: 0.5 },
+      { x: 1.4, z: -0.6, rotation: 0.8 },
+    ],
+  },
+  {
+    id: 'blossomRadial',
+    label: 'Blossom Radial',
+    placements: [
+      { x: 0, z: 0, rotation: 0 },
+      { x: 0, z: -0.95, rotation: 0 },
+      { x: 0.82, z: -0.475, rotation: 1.047 },
+      { x: 0.82, z: 0.475, rotation: 2.094 },
+      { x: 0, z: 0.95, rotation: 3.142 },
+      { x: -0.82, z: 0.475, rotation: 4.189 },
+      { x: -0.82, z: -0.475, rotation: 5.236 },
+    ],
+  },
+  {
+    id: 'crownRing',
+    label: 'Outer Ring',
+    placements: [
+      { x: 0, z: -1.6, rotation: 0 },
+      { x: 0.94, z: -1.3, rotation: 0.628 },
+      { x: 1.52, z: -0.49, rotation: 1.257 },
+      { x: 1.52, z: 0.49, rotation: 1.885 },
+      { x: 0.94, z: 1.3, rotation: 2.513 },
+      { x: 0, z: 1.6, rotation: 3.142 },
+      { x: -0.94, z: 1.3, rotation: 3.770 },
+      { x: -1.52, z: 0.49, rotation: 4.398 },
+      { x: -1.52, z: -0.49, rotation: 5.027 },
+      { x: -0.94, z: -1.3, rotation: 5.655 },
+    ],
+  },
+];
+
+export const BENTO_BLUEBERRY_VARIATION_SETS = [
+  {
+    id: 'singleCenter',
+    label: 'Single Center',
+    placements: [
+      { x: 0, z: 0, rotation: 0 },
+    ],
+  },
+  {
+    id: 'duoCenter',
+    label: 'Center Duo',
+    placements: [
+      { x: -0.26, z: 0, rotation: -0.2 },
+      { x: 0.26, z: 0, rotation: 0.2 },
+    ],
+  },
+  {
+    id: 'trioCluster',
+    label: 'Center Trio',
+    placements: [
+      { x: 0, z: -0.28, rotation: 0 },
+      { x: 0.24, z: 0.14, rotation: 2.094 },
+      { x: -0.24, z: 0.14, rotation: 4.189 },
+    ],
+  },
+  {
+    id: 'crescentArc',
+    label: 'Crescent Arc',
+    placements: [
+      { x: -0.65, z: -0.35, rotation: -0.5 },
+      { x: -0.35, z: -0.65, rotation: 0 },
+      { x: 0.1, z: -0.75, rotation: 0.5 },
+    ],
+  },
+  {
+    id: 'centerDiamond',
+    label: 'Center Diamond',
+    placements: [
+      { x: 0, z: -0.35, rotation: 0 },
+      { x: 0.35, z: 0, rotation: 1.571 },
+      { x: 0, z: 0.35, rotation: 3.142 },
+      { x: -0.35, z: 0, rotation: 4.712 },
+    ],
+  },
+  {
+    id: 'fourCorners',
+    label: '4 Corners Ring',
+    placements: [
+      { x: 0, z: -0.75, rotation: 0 },
+      { x: 0.75, z: 0, rotation: 1.571 },
+      { x: 0, z: 0.75, rotation: 3.142 },
+      { x: -0.75, z: 0, rotation: 4.712 },
+    ],
+  },
+];
+
+export const MANGO_VARIATION_SETS = [
+  {
+    id: 'singleCenter',
+    label: 'Single Center',
+    placements: [
+      { x: 0, z: 0, rotation: 0 },
+    ],
+  },
+  {
+    id: 'duoCenter',
+    label: 'Center Duo',
+    placements: [
+      { x: -0.28, z: 0, rotation: 0.35 },
+      { x: 0.28, z: 0, rotation: -0.35 },
+    ],
+  },
+  {
+    id: 'trioCluster',
+    label: 'Center Trio',
+    placements: [
+      { x: 0, z: -0.32, rotation: 0.2 },
+      { x: 0.28, z: 0.18, rotation: 2.1 },
+      { x: -0.28, z: 0.18, rotation: 4.2 },
+    ],
+  },
+  {
+    id: 'centerDiamond',
+    label: 'Center Diamond',
+    placements: [
+      { x: 0, z: -0.42, rotation: 0 },
+      { x: 0.42, z: 0, rotation: 1.571 },
+      { x: 0, z: 0.42, rotation: 3.142 },
+      { x: -0.42, z: 0, rotation: 4.712 },
+    ],
+  },
+  {
+    id: 'crescentArc',
+    label: 'Crescent Arc',
+    placements: [
+      { x: -1.35, z: -0.65, rotation: -0.7 },
+      { x: -0.85, z: -1.15, rotation: -0.4 },
+      { x: -0.3, z: -1.45, rotation: -0.1 },
+      { x: 0.3, z: -1.45, rotation: 0.1 },
+      { x: 0.85, z: -1.15, rotation: 0.4 },
+      { x: 1.35, z: -0.65, rotation: 0.7 },
+    ],
+  },
+  {
+    id: 'blossomRadial',
+    label: 'Blossom Radial',
+    placements: [
+      { x: 0, z: 0, rotation: 0 },
+      { x: 0, z: -1.35, rotation: 0 },
+      { x: 1.05, z: -0.85, rotation: 0.897 },
+      { x: 1.31, z: 0.32, rotation: 1.795 },
+      { x: 0.59, z: 1.21, rotation: 2.693 },
+      { x: -0.59, z: 1.21, rotation: 3.590 },
+      { x: -1.31, z: 0.32, rotation: 4.488 },
+      { x: -1.05, z: -0.85, rotation: 5.386 },
+    ],
+  },
+];
+
+export const BENTO_MANGO_VARIATION_SETS = [
+  {
+    id: 'singleCenter',
+    label: 'Single Center',
+    placements: [
+      { x: 0, z: 0, rotation: 0 },
+    ],
+  },
+  {
+    id: 'duoCenter',
+    label: 'Center Duo',
+    placements: [
+      { x: -0.28, z: 0, rotation: 0.35 },
+      { x: 0.28, z: 0, rotation: -0.35 },
+    ],
+  },
+  {
+    id: 'trioCluster',
+    label: 'Center Trio',
+    placements: [
+      { x: 0, z: -0.32, rotation: 0.2 },
+      { x: 0.28, z: 0.17, rotation: 2.1 },
+      { x: -0.28, z: 0.17, rotation: 4.2 },
+    ],
+  },
+  {
+    id: 'crescentArc',
+    label: 'Crescent Arc',
+    placements: [
+      { x: -0.65, z: -0.35, rotation: -0.4 },
+      { x: -0.35, z: -0.68, rotation: 0.1 },
+      { x: 0.12, z: -0.78, rotation: 0.5 },
+    ],
+  },
+  {
+    id: 'centerDiamond',
+    label: 'Center Diamond',
+    placements: [
+      { x: 0, z: -0.38, rotation: 0 },
+      { x: 0.38, z: 0, rotation: 1.571 },
+      { x: 0, z: 0.38, rotation: 3.142 },
+      { x: -0.38, z: 0, rotation: 4.712 },
+    ],
+  },
+  {
+    id: 'fourCorners',
+    label: '4 Corners Ring',
+    placements: [
+      { x: 0, z: -0.78, rotation: 0 },
+      { x: 0.78, z: 0, rotation: 1.571 },
+      { x: 0, z: 0.78, rotation: 3.142 },
+      { x: -0.78, z: 0, rotation: 4.712 },
+    ],
+  },
+];
+
 export function getCenterVariations(structure = {}) {
   const isBento = isBentoStructure(structure);
   return [
@@ -1338,6 +1585,20 @@ export function getCenterVariations(structure = {}) {
       label: 'Strawberry',
       toolId: 'center-strawberry-default',
       sets: isBento ? BENTO_STRAWBERRY_VARIATION_SETS : STRAWBERRY_VARIATION_SETS,
+    },
+    {
+      id: 'blueberry',
+      designId: 'blueberry',
+      label: 'Blueberry',
+      toolId: 'center-blueberry-default',
+      sets: isBento ? BENTO_BLUEBERRY_VARIATION_SETS : BLUEBERRY_VARIATION_SETS,
+    },
+    {
+      id: 'mangoCube',
+      designId: 'mangoCube',
+      label: 'Mango Cube',
+      toolId: 'center-mangoCube-default',
+      sets: isBento ? BENTO_MANGO_VARIATION_SETS : MANGO_VARIATION_SETS,
     },
   ];
 }
