@@ -1713,6 +1713,12 @@ const CakeScene = React.forwardRef(function CakeScene({
         const pieceFillingSugarColor = (isIndividual ? layerFillingSugarColors?.[p] : null) || fillingPipingColor;
         const pieceFillingSugarColorId = (isIndividual ? layerFillingSugarColorIds?.[p] : null) || fillingPipingColorId;
 
+        const pfFrostCapH = isClassic ? 0.04 : 0.06;
+        const totalFrostHeight = pieceHeight + pfFrostCapH;
+        const pfFrostRadius = pieceRadius + (isClassic ? 0.04 : 0.06);
+        const pfDomeHeight = domeAmount + (isClassic ? 0.02 : 0.03);
+        const pfSpongeRadius = pieceHasFrost ? Math.max(0.2, pieceRadius - (isClassic ? 0.06 : 0.09)) : pieceRadius;
+
         const totalFillingHeight = pieceFillingEnabled ? (pieceHeight * 0.12 * pieceFillingLayers) : 0;
         const spongeHeight = pieceHeight - totalFillingHeight;
         const spongeMat = cakeKey ? getSpongeMaterial(cakeKey) : null;
@@ -1723,9 +1729,9 @@ const CakeScene = React.forwardRef(function CakeScene({
         for (let s = 0; s < (pieceFillingEnabled ? pieceFillingLayers + 1 : 1); s++) {
           const isTopSection = s === (pieceFillingEnabled ? pieceFillingLayers : 0);
           const currentSectionH = spongeSectionHeight;
-          const spongeGeom = buildSpongeProfileGeometry(pieceRadius, currentSectionH, {
-            topBumpHeight: isTopSection ? domeAmount : 0,
-            bevelSize: 0.1,
+          const spongeGeom = buildSpongeProfileGeometry(pfSpongeRadius, currentSectionH, {
+            topBumpHeight: isTopSection ? (pieceHasFrost ? Math.max(0, domeAmount - 0.02) : domeAmount) : 0,
+            bevelSize: pieceHasFrost ? (isClassic ? 0.08 : 0.12) : 0.1,
             bevelTop: !(pieceFillingEnabled && s < pieceFillingLayers),
             bevelBottom: !(pieceFillingEnabled && s > 0),
           });
@@ -1743,12 +1749,13 @@ const CakeScene = React.forwardRef(function CakeScene({
               pieceFillingSugarColorId || null
             );
             let fillGeom;
+            const fillRadius = pfSpongeRadius * 0.98;
             if (pieceFillingPipingTip === 'mashedCircles' || pieceFillingPipingTip === 'mashedSwirls') {
               const isSwirl = pieceFillingPipingTip === 'mashedSwirls';
               const buildMashedGeom = isSwirl ? buildMashedSwirlFillingGeometry : buildMashedCircleFillingGeometry;
-              fillGeom = buildMashedGeom(pieceRadius * 0.98, fillingH, { rand });
+              fillGeom = buildMashedGeom(fillRadius, fillingH, { rand });
             } else {
-              fillGeom = new THREE.CylinderGeometry(pieceRadius * 0.98, pieceRadius * 0.98, fillingH, 48);
+              fillGeom = new THREE.CylinderGeometry(fillRadius, fillRadius, fillingH, 48);
             }
             const fillMesh = new THREE.Mesh(fillGeom, fillMat);
             fillMesh.position.y = spongeCurrentY + fillingH / 2;
@@ -1767,15 +1774,16 @@ const CakeScene = React.forwardRef(function CakeScene({
           let frostGeom;
           if (currentStyle === 'texturedButtercream') {
             if (currentTexture === 'ribbonWrap') {
-              frostGeom = buildRibbonWrapButtercreamGeometry(pieceRadius + 0.04, pieceHeight, domeAmount, rand);
+              frostGeom = buildRibbonWrapButtercreamGeometry(pfFrostRadius, totalFrostHeight, pfDomeHeight, rand);
             } else if (currentTexture === 'verticalPiping') {
-              frostGeom = buildVerticalPipingButtercreamGeometry(pieceRadius + 0.04, pieceHeight, domeAmount, rand);
+              frostGeom = buildVerticalPipingButtercreamGeometry(pfFrostRadius, totalFrostHeight, pfDomeHeight, rand);
             } else {
-              frostGeom = buildTexturedButtercreamGeometry(pieceRadius + 0.04, pieceHeight, domeAmount, rand);
+              frostGeom = buildTexturedButtercreamGeometry(pfFrostRadius, totalFrostHeight, pfDomeHeight, rand);
             }
           } else {
-            frostGeom = buildOrganicFrostingGeometry(pieceRadius + 0.04, pieceHeight, domeAmount, rand);
+            frostGeom = buildOrganicFrostingGeometry(pfFrostRadius, totalFrostHeight, pfDomeHeight, rand);
           }
+          applyVerticalGradientUV(frostGeom);
           const frostMesh = new THREE.Mesh(frostGeom, frostMat);
           frostMesh.position.y = 0;
           frostMesh.castShadow = true;
@@ -1791,13 +1799,15 @@ const CakeScene = React.forwardRef(function CakeScene({
           glazeMat.clipShadows = true;
           coveringMaterialsRef.current.push(glazeMat);
           const carve = getPetitFoursGlazeCarve(glazePattern, p, rand);
-          const underlyingRadius = pieceHasFrost ? pieceRadius + 0.04 : pieceRadius;
+          const underlyingRadius = pieceHasFrost ? pfFrostRadius : pieceRadius;
+          const underlyingHeight = pieceHasFrost ? totalFrostHeight : pieceHeight;
+          const underlyingDome = pieceHasFrost ? pfDomeHeight : domeAmount;
           const pfCoat = Math.max(0.026, underlyingRadius * 0.055);
           const pfBevel = Math.min(0.08, Math.max(0.04, underlyingRadius * 0.09));
           const glazeGeom = buildGlazeGeometry(
             underlyingRadius,
-            pieceHeight,
-            domeAmount,
+            underlyingHeight,
+            underlyingDome,
             rand,
             {
               carve,
@@ -1822,7 +1832,7 @@ const CakeScene = React.forwardRef(function CakeScene({
           const dripPattern = isIndividual
             ? (layerSurfaceTreatmentPatterns?.[p] || surfaceTreatmentPattern || 'tinyTip')
             : (surfaceTreatmentPattern || 'tinyTip');
-          const pieceTopY = pieceHeight + (pieceHasFrost ? 0.08 : 0.04);
+          const pieceTopY = pieceHeight + (pieceHasFrost ? (pfFrostCapH + 0.02) : 0.04);
           const dripRing = buildPetitFoursDripRing(pieceRadius, dripColor, rand, dripPattern);
           dripRing.position.y = pieceTopY;
           dripRing.material.clippingPlanes = pieceClipConfig.drip.planes;
@@ -1846,7 +1856,7 @@ const CakeScene = React.forwardRef(function CakeScene({
         group.add(pieceGroup);
       }
 
-      const pfTopY = pieceHeight + (exteriorFinishStyle !== 'naked' ? 0.04 : 0);
+      const pfTopY = pieceHeight + (exteriorFinishStyle !== 'naked' ? (isClassic ? 0.04 : 0.06) : 0);
       topMetricsRef.current = {
         radius: plateRadius,
         baseY: pfTopY,

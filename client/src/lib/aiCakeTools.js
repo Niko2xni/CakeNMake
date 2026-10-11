@@ -215,28 +215,36 @@ export function applyCakeAiTool(name, input, ctx) {
       nextStructure.layerDesign = 'uniform';
       const sizeOpt = SIZE_OPTIONS.find(option => option.id === nextStructure.size);
       const realSize = sizeOpt ? sizeOpt.dimensions : (config.realSize || { diameter: 8, height: 8 });
+      const currentFormat = getCakeFormat(config.structure);
+      const nextFormat = getCakeFormat(nextStructure);
+      const formatChanged = currentFormat !== nextFormat;
       const tierCountChanged = nextStructure.layers !== config.structure?.layers;
-      if (!tierCountChanged) {
+      if (!tierCountChanged && !formatChanged) {
         onChange({ ...config, structure: nextStructure, realSize: { ...realSize } });
         return { label: 'Updated cake structure', result: nextStructure };
       }
-      // Mirror ToolPanel.handleStructureChange: shrinking/growing tier
-      // count orphans center placements tied to a tier that no longer
-      // exists, so strip them the same way the manual control does.
-      const centerItems = (config.place?.items || []).filter(
-        (item) => !(typeof item.type === 'string' && item.type.startsWith('center-'))
-      );
-      const legacyPlacedItems = (config.placedItems || []).filter(
-        (item) => !(typeof item.type === 'string' && item.type.startsWith('center-'))
-      );
+      // Mirror ToolPanel.handleStructureChange: changing format or shrinking/growing
+      // tier count orphans center placements tied to the previous tier/format,
+      // so strip them the same way the manual control does.
+      const isCenterItem = (item) => typeof item.type === 'string' && item.type.startsWith('center-');
+      const centerItems = nextFormat === 'petitsFour'
+        ? []
+        : (config.place?.items || []).filter((item) => !isCenterItem(item));
+      const legacyPlacedItems = nextFormat === 'petitsFour'
+        ? []
+        : (config.placedItems || []).filter((item) => !isCenterItem(item));
       onChange(syncTierDesignOnToggle({
         ...config,
         structure: nextStructure,
         realSize: { ...realSize },
+        center: {
+          ...(config.center || {}),
+          variations: {},
+        },
         place: { ...(config.place || {}), items: centerItems },
         placedItems: legacyPlacedItems,
       }, nextStructure.layerDesign, 0));
-      return { label: `Set cake to ${nextStructure.layers} tier(s)`, result: nextStructure };
+      return { label: formatChanged ? `Changed format to ${nextFormat}` : `Set cake to ${nextStructure.layers} tier(s)`, result: nextStructure };
     }
 
     case 'set_sponge_flavor': {

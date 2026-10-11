@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { DEFAULT_CONFIG, getSurfaceTreatmentPattern, pruneItemsCollidingWithEdgeDelicates, getTopTierRadiusFromConfig, isPetitsFourStructure } from '@/lib/cakeConfig';
+import { DEFAULT_CONFIG, getSurfaceTreatmentPattern, pruneItemsCollidingWithEdgeDelicates, getTopTierRadiusFromConfig, isPetitsFourStructure, getCakeFormat } from '@/lib/cakeConfig';
 import CakeStructureSection from './sections/CakeStructureSection';
 import SpongeFlavorSection from './sections/SpongeFlavorSection';
 import FillingSection from './sections/FillingSection';
@@ -222,20 +222,22 @@ export default function ToolPanel({
   };
 
   const handleStructureChange = (newStructure, newRealSize) => {
-    const currentFormat = isPetitsFourStructure(config.structure) ? 'petitsFour' : 'standard';
-    const nextFormat = isPetitsFourStructure(newStructure) ? 'petitsFour' : 'standard';
+    const currentCakeFormat = getCakeFormat(config.structure);
+    const nextCakeFormat = getCakeFormat(newStructure);
+    const currentSurfaceFormat = isPetitsFourStructure(config.structure) ? 'petitsFour' : 'standard';
+    const nextSurfaceFormat = isPetitsFourStructure(newStructure) ? 'petitsFour' : 'standard';
     let nextConfig = { ...config, structure: newStructure, realSize: newRealSize };
-    if (currentFormat !== nextFormat) {
+    if (currentSurfaceFormat !== nextSurfaceFormat) {
       const surface = config.surfaceTreatment || DEFAULT_CONFIG.surfaceTreatment;
       const currentIsIndividual = config.structure?.layerDesign === 'individual'
-        && ((config.structure?.layers || 1) > 1 || currentFormat === 'petitsFour');
+        && ((config.structure?.layers || 1) > 1 || currentSurfaceFormat === 'petitsFour');
       const currentTreatment = currentIsIndividual
         ? (surface.layerTreatments?.[activeLayer] || surface)
         : surface;
       const patternsByFormat = {
         ...(surface.patternsByFormat || {}),
         ...(currentTreatment.patternsByFormat || {}),
-        [currentFormat]: getSurfaceTreatmentPattern(currentTreatment, config.structure),
+        [currentSurfaceFormat]: getSurfaceTreatmentPattern(currentTreatment, config.structure),
       };
       const nextPattern = getSurfaceTreatmentPattern({ patternsByFormat }, newStructure);
       const layerTreatments = Array.isArray(surface.layerTreatments)
@@ -252,25 +254,31 @@ export default function ToolPanel({
     }
 
     const tierCountChanged = newStructure.layers !== config.structure?.layers;
-    const formatChanged = currentFormat !== nextFormat;
+    const formatChanged = currentCakeFormat !== nextCakeFormat;
     if (!tierCountChanged && !formatChanged) {
       onChange(nextConfig);
       return;
     }
 
-    const centerItems = nextFormat === 'petitsFour'
+    if (formatChanged) {
+      onSelectTool?.(null);
+      onCenterItemSelect?.(null);
+    }
+
+    const isCenterItem = (item) => typeof item.type === 'string' && item.type.startsWith('center-');
+    const centerItems = nextCakeFormat === 'petitsFour'
       ? []
-      : (config.place?.items || []).filter(
-          (item) => !(typeof item.type === 'string' && item.type.startsWith('center-'))
-        );
-    const legacyPlacedItems = nextFormat === 'petitsFour'
+      : (config.place?.items || []).filter((item) => !isCenterItem(item));
+    const legacyPlacedItems = nextCakeFormat === 'petitsFour'
       ? []
-      : (config.placedItems || []).filter(
-          (item) => !(typeof item.type === 'string' && item.type.startsWith('center-'))
-        );
+      : (config.placedItems || []).filter((item) => !isCenterItem(item));
 
     const baseConfig = {
       ...nextConfig,
+      center: {
+        ...(nextConfig.center || {}),
+        variations: {},
+      },
       place: { ...(config.place || {}), items: centerItems },
       placedItems: legacyPlacedItems,
     };

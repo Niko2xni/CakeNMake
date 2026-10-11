@@ -221,7 +221,7 @@ describe('CenterSection Variations', () => {
     expect(onPlacedItemsChange).toHaveBeenCalled();
     const updater = onPlacedItemsChange.mock.calls[0][0];
     const newItems = updater([]);
-    expect(newItems).toHaveLength(3);
+    expect(newItems).toHaveLength(5);
     expect(newItems.every(it => it.type === 'center-strawberry-default' && it.source === 'variation')).toBe(true);
   });
 
@@ -409,7 +409,7 @@ describe('CenterSection Variations', () => {
 
     const updater = onPlacedItemsChange.mock.calls[0][0];
     const updated = updater(placedItems);
-    expect(updated).toHaveLength(4);
+    expect(updated).toHaveLength(6);
     expect(updated.every(it => it.type === 'center-blueberry-default')).toBe(true);
   });
 
@@ -469,8 +469,8 @@ describe('CenterSection Variations', () => {
 
     const updater = onPlacedItemsChange.mock.calls[0][0];
     const newItems = updater(placedItems);
-    // duoCenter has 1 strawberry and 1 blueberry
-    expect(newItems).toHaveLength(2);
+    // duoCenter has 3 strawberries and 4 blueberries
+    expect(newItems).toHaveLength(7);
     expect(newItems.some(it => it.type === 'center-strawberry-default' && it.source === 'variation')).toBe(true);
     expect(newItems.some(it => it.type === 'center-blueberry-default' && it.source === 'variation')).toBe(true);
     expect(newItems.every(it => it.variationType === 'strawberryAndBlueberry')).toBe(true);
@@ -552,8 +552,8 @@ describe('CenterSection Variations', () => {
 
     const updater = onPlacedItemsChange.mock.calls[0][0];
     const newItems = updater([]);
-    // trioCenter has 1 strawberry, 1 blueberry, 1 mango cube
-    expect(newItems).toHaveLength(3);
+    // trioCenter (Centerpiece Medley) on standard has 12 fruits
+    expect(newItems).toHaveLength(12);
     expect(newItems.some(it => it.type === 'center-strawberry-default')).toBe(true);
     expect(newItems.some(it => it.type === 'center-blueberry-default')).toBe(true);
     expect(newItems.some(it => it.type === 'center-mangoCube-default')).toBe(true);

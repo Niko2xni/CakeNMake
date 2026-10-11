@@ -212,3 +212,111 @@ it('clears center decorations when switching between single cake formats and Pet
   expect(current.placedItems).toEqual([]);
 });
 
+it('clears center decorations and variations when switching from standard cake to bento', () => {
+  const onSelectTool = vi.fn();
+  const onCenterItemSelect = vi.fn();
+  const initial = {
+    ...DEFAULT_CONFIG,
+    structure: {
+      ...DEFAULT_CONFIG.structure,
+      cakeFormat: 'standard',
+      format: 'standard',
+      size: '8x8',
+    },
+    center: {
+      ...DEFAULT_CONFIG.center,
+      mode: 'variations',
+      variations: { strawberry: 'strawberry-set-1' },
+    },
+    place: {
+      items: [
+        { id: '1', type: 'center-strawberry-default', x: 0, z: -1.75, source: 'variation' },
+        { id: '2', type: 'center-strawberry-default', x: 1.75, z: 0, source: 'variation' },
+      ],
+    },
+    placedItems: [
+      { id: '1', type: 'center-strawberry-default', x: 0, z: -1.75, source: 'variation' },
+      { id: '2', type: 'center-strawberry-default', x: 1.75, z: 0, source: 'variation' },
+    ],
+  };
+  let current = initial;
+  function Harness() {
+    const [config, setConfig] = useState(initial);
+    current = config;
+    return (
+      <ToolPanel
+        config={config}
+        onChange={setConfig}
+        onSelectTool={onSelectTool}
+        onCenterItemSelect={onCenterItemSelect}
+      />
+    );
+  }
+  const view = render(<Harness />);
+  const buttonStartingWith = (label) => [...view.container.querySelectorAll('button')]
+    .find((button) => button.textContent.startsWith(label));
+
+  expect(current.place.items).toHaveLength(2);
+  fireEvent.click(buttonStartingWith('Bento'));
+
+  expect(current.structure.cakeFormat).toBe('bento');
+  expect(current.place.items).toEqual([]);
+  expect(current.placedItems).toEqual([]);
+  expect(current.center.variations).toEqual({});
+  expect(onSelectTool).toHaveBeenCalledWith(null);
+  expect(onCenterItemSelect).toHaveBeenCalledWith(null);
+});
+
+it('clears center decorations and variations when switching from bento cake to standard', () => {
+  const onSelectTool = vi.fn();
+  const onCenterItemSelect = vi.fn();
+  const initial = {
+    ...DEFAULT_CONFIG,
+    structure: {
+      ...DEFAULT_CONFIG.structure,
+      cakeFormat: 'bento',
+      format: 'bento',
+      size: 'standardBento',
+    },
+    center: {
+      ...DEFAULT_CONFIG.center,
+      mode: 'variations',
+      variations: { blueberry: 'blueberry-set-2' },
+    },
+    place: {
+      items: [
+        { id: '1', type: 'center-blueberry-default', x: 0, z: -0.5, source: 'variation' },
+      ],
+    },
+    placedItems: [
+      { id: '1', type: 'center-blueberry-default', x: 0, z: -0.5, source: 'variation' },
+    ],
+  };
+  let current = initial;
+  function Harness() {
+    const [config, setConfig] = useState(initial);
+    current = config;
+    return (
+      <ToolPanel
+        config={config}
+        onChange={setConfig}
+        onSelectTool={onSelectTool}
+        onCenterItemSelect={onCenterItemSelect}
+      />
+    );
+  }
+  const view = render(<Harness />);
+  const buttonStartingWith = (label) => [...view.container.querySelectorAll('button')]
+    .find((button) => button.textContent.startsWith(label));
+
+  expect(current.place.items).toHaveLength(1);
+  fireEvent.click(buttonStartingWith('Standard'));
+
+  expect(current.structure.cakeFormat).toBe('standard');
+  expect(current.place.items).toEqual([]);
+  expect(current.placedItems).toEqual([]);
+  expect(current.center.variations).toEqual({});
+  expect(onSelectTool).toHaveBeenCalledWith(null);
+  expect(onCenterItemSelect).toHaveBeenCalledWith(null);
+});
+
