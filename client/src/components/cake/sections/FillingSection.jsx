@@ -18,12 +18,62 @@ export default function FillingSection({ filling, structure, exteriorFinish, int
     : (exteriorFinish?.style || 'fullyFrosted');
   const isFrostedOrTextured = currentFinishStyle === 'fullyFrosted' || currentFinishStyle === 'texturedButtercream';
 
+  const getActiveEnabled = () => {
+    if (isIndividual) {
+      return (filling.layerEnabled || [])[activeLayer] ?? filling.enabled ?? false;
+    }
+    return filling.enabled ?? false;
+  };
+
+  const getActiveLayers = () => {
+    if (isIndividual) {
+      return (filling.layerLayers || [])[activeLayer] ?? filling.layers ?? 1;
+    }
+    return filling.layers ?? 1;
+  };
+
+  const getActivePiping = () => {
+    if (isIndividual) {
+      return (filling.layerPipings || [])[activeLayer] || filling.piping || DEFAULT_PIPING;
+    }
+    return filling.piping || DEFAULT_PIPING;
+  };
+
+  const getActiveFlavor = () => {
+    if (isIndividual) {
+      return (filling.layerFlavors || [])[activeLayer] || 'vanilla';
+    }
+    return filling.flavor || 'vanilla';
+  };
+
+  const activeEnabled = getActiveEnabled();
+  const activeLayers = getActiveLayers();
+  const activePiping = getActivePiping();
+
   const updateLayers = (layers) => {
-    onChange({
-      ...filling,
-      enabled: layers > 0,  // Enable if layers > 0, disable if 0 (None)
-      layers: layers > 0 ? layers : 1  // Keep layers value even when disabled
-    });
+    const isEnabled = layers > 0;
+    const layerVal = layers > 0 ? layers : 1;
+    if (isIndividual) {
+      const newLayerEnabled = [...(filling.layerEnabled || Array(layerCount).fill(filling.enabled ?? false))];
+      const newLayerLayers = [...(filling.layerLayers || Array(layerCount).fill(filling.layers || 1))];
+      newLayerEnabled[activeLayer] = isEnabled;
+      newLayerLayers[activeLayer] = layerVal;
+      onChange({
+        ...filling,
+        enabled: newLayerEnabled.some(Boolean),
+        layers: layerVal,
+        layerEnabled: newLayerEnabled,
+        layerLayers: newLayerLayers,
+      });
+    } else {
+      onChange({
+        ...filling,
+        enabled: isEnabled,
+        layers: layerVal,
+        layerEnabled: Array(layerCount).fill(isEnabled),
+        layerLayers: Array(layerCount).fill(layerVal),
+      });
+    }
   };
 
   const updateFlavor = (flavor) => {
@@ -40,15 +90,26 @@ export default function FillingSection({ filling, structure, exteriorFinish, int
     }
   };
 
-  const getActiveFlavor = () => {
-    if (isIndividual) {
-      return (filling.layerFlavors || [])[activeLayer] || 'vanilla';
-    }
-    return filling.flavor || 'vanilla';
-  };
-
   const updatePiping = (changes) => {
-    onChange({ ...filling, piping: { ...piping, ...changes } });
+    if (isIndividual) {
+      const currentActivePiping = getActivePiping();
+      const nextPiping = { ...currentActivePiping, ...changes };
+      const newLayerPipings = Array.from({ length: layerCount }, (_, i) => ({
+        ...((filling.layerPipings || [])[i] || filling.piping || DEFAULT_PIPING),
+      }));
+      newLayerPipings[activeLayer] = nextPiping;
+      onChange({
+        ...filling,
+        piping: nextPiping,
+        layerPipings: newLayerPipings,
+      });
+    } else {
+      onChange({
+        ...filling,
+        piping: { ...piping, ...changes },
+        layerPipings: Array.from({ length: layerCount }, () => ({ ...piping, ...changes })),
+      });
+    }
   };
 
   return (
@@ -67,7 +128,7 @@ export default function FillingSection({ filling, structure, exteriorFinish, int
           <button
             onClick={() => updateLayers(0)}
             className={`flex flex-col items-center justify-center gap-1 rounded-xl p-3 text-xs font-semibold transition-all duration-200 border-2 ${
-              !filling.enabled
+              !activeEnabled
                 ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-[1.02]'
                 : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
             }`}
@@ -80,7 +141,7 @@ export default function FillingSection({ filling, structure, exteriorFinish, int
               key={option.id}
               onClick={() => updateLayers(option.id)}
               className={`flex flex-col items-center justify-center gap-1 rounded-xl p-3 text-xs font-semibold transition-all duration-200 border-2 ${
-                filling.enabled && filling.layers === option.id
+                activeEnabled && activeLayers === option.id
                   ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-[1.02]'
                   : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
               }`}
@@ -92,7 +153,7 @@ export default function FillingSection({ filling, structure, exteriorFinish, int
       </div>
 
       {/* Only show flavor/piping options if filling is enabled */}
-      {filling.enabled && (
+      {activeEnabled && (
         <>
           {/* Piping — how the exposed filling edge between layers is
               piped, using Filling's own design vocabulary (not Edge/Side's
@@ -115,7 +176,7 @@ export default function FillingSection({ filling, structure, exteriorFinish, int
           <SetPicker
             label="Piping Design"
             sets={FILLING_PIPING_DESIGNS}
-            activeSetId={piping.tip}
+            activeSetId={activePiping.tip}
             onSelectSet={(tip) => updatePiping({ tip })}
             disabledItemIds={isFrostedOrTextured ? ['mashedCircles', 'mashedSwirls'] : []}
             numberFromNone

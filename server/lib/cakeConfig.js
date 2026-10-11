@@ -65,6 +65,12 @@ const DEFAULT_CONFIG = {
     layers: 1, // 1, 2, or 3
     flavor: 'vanilla',
     layerFlavors: ['vanilla', 'vanilla'],
+    layerEnabled: [false, false],
+    layerLayers: [1, 1],
+    layerPipings: [
+      { tip: null, colorId: 'vanilla' },
+      { tip: null, colorId: 'vanilla' },
+    ],
     // Piping is separate from the filling's own eating flavor above — this
     // is a decorative border piped onto the exposed filling edge.
     // Only visible on Naked cakes / with Interior Preview on (Full Frosting

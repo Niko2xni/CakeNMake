@@ -47,6 +47,8 @@ describe('syncTierDesignOnToggle', () => {
 
     // Filling
     expect(individualConfig.filling.layerFlavors).toEqual(['strawberry', 'strawberry']);
+    expect(individualConfig.filling.layerLayers).toEqual([2, 2]);
+    expect(individualConfig.filling.layerEnabled).toEqual([true, true]);
 
     // Exterior Finish
     expect(individualConfig.exteriorFinish.layerStyles).toEqual(['fullyFrosted', 'fullyFrosted']);
@@ -122,7 +124,11 @@ describe('syncTierDesignOnToggle', () => {
 
     // Filling
     expect(uniformConfig.filling.flavor).toBe('cheese');
+    expect(uniformConfig.filling.layers).toBe(2);
+    expect(uniformConfig.filling.enabled).toBe(true);
     expect(uniformConfig.filling.layerFlavors).toEqual(['cheese', 'cheese']);
+    expect(uniformConfig.filling.layerLayers).toEqual([2, 2]);
+    expect(uniformConfig.filling.layerEnabled).toEqual([true, true]);
 
     // Exterior Finish
     expect(uniformConfig.exteriorFinish.style).toBe('texturedButtercream');
@@ -141,5 +147,24 @@ describe('syncTierDesignOnToggle', () => {
     // Sugar Colors
     expect(uniformConfig.sugarColorOverrides.exterior).toEqual({ mode: 'colorOverride', colorId: 'lavender' });
     expect(uniformConfig.sugarColorOverrides.side).toEqual({ mode: 'colorOverride', colorId: 'gold' });
+  });
+
+  it('syncs 4 variants for Petits Fours with individual filling and finish', () => {
+    const pfConfig = {
+      ...DEFAULT_CONFIG,
+      structure: { cakeFormat: 'petitsFour', size: 'classicCube', layers: 1, layerDesign: 'uniform' },
+      sponge: { flavor: 'vanilla' },
+      filling: { enabled: true, layers: 1, flavor: 'vanilla', piping: { tip: 'mashedSwirls', colorId: 'vanilla' } },
+      exteriorFinish: { style: 'naked' },
+    };
+
+    const individualPf = syncTierDesignOnToggle(pfConfig, 'individual', 0);
+    expect(individualPf.structure.layerDesign).toBe('individual');
+    expect(individualPf.sponge.layerFlavors).toHaveLength(4);
+    expect(individualPf.filling.layerFlavors).toHaveLength(4);
+    expect(individualPf.filling.layerLayers).toEqual([1, 1, 1, 1]);
+    expect(individualPf.filling.layerEnabled).toEqual([true, true, true, true]);
+    expect(individualPf.filling.layerPipings).toHaveLength(4);
+    expect(individualPf.exteriorFinish.layerStyles).toEqual(['naked', 'naked', 'naked', 'naked']);
   });
 });

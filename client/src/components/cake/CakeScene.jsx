@@ -1524,6 +1524,7 @@ const CakeScene = React.forwardRef(function CakeScene({
       // — picks which of the three ripple geometries below gets built.
       buttercreamTexture = 'ridged',
       fillingPipingTip = null, fillingPipingColor = '#F6DEAB', fillingPipingColorId = null,
+      layerFillingEnabled = [], layerFillingLayers = [], layerFillingPipingTips = [],
       layerFillingSugarColors = [], layerFillingSugarColorIds = [],
       // New Surface/Center/Edge/Side/Place fields — all pre-resolved to real
       // hex colors by configAdapter.js. NONE of these have corresponding
@@ -1706,21 +1707,27 @@ const CakeScene = React.forwardRef(function CakeScene({
           position: pos,
         });
 
-        const totalFillingHeight = fillingEnabled ? (pieceHeight * 0.12 * fillingLayers) : 0;
+        const pieceFillingEnabled = isIndividual ? (layerFillingEnabled?.[p] ?? fillingEnabled) : fillingEnabled;
+        const pieceFillingLayers = isIndividual ? (layerFillingLayers?.[p] ?? fillingLayers) : fillingLayers;
+        const pieceFillingPipingTip = isIndividual ? (layerFillingPipingTips?.[p] ?? fillingPipingTip) : fillingPipingTip;
+        const pieceFillingSugarColor = (isIndividual ? layerFillingSugarColors?.[p] : null) || fillingPipingColor;
+        const pieceFillingSugarColorId = (isIndividual ? layerFillingSugarColorIds?.[p] : null) || fillingPipingColorId;
+
+        const totalFillingHeight = pieceFillingEnabled ? (pieceHeight * 0.12 * pieceFillingLayers) : 0;
         const spongeHeight = pieceHeight - totalFillingHeight;
         const spongeMat = cakeKey ? getSpongeMaterial(cakeKey) : null;
 
         // Sponge
         let spongeCurrentY = 0;
-        const spongeSectionHeight = spongeHeight / (fillingEnabled ? fillingLayers + 1 : 1);
-        for (let s = 0; s < (fillingEnabled ? fillingLayers + 1 : 1); s++) {
-          const isTopSection = s === (fillingEnabled ? fillingLayers : 0);
+        const spongeSectionHeight = spongeHeight / (pieceFillingEnabled ? pieceFillingLayers + 1 : 1);
+        for (let s = 0; s < (pieceFillingEnabled ? pieceFillingLayers + 1 : 1); s++) {
+          const isTopSection = s === (pieceFillingEnabled ? pieceFillingLayers : 0);
           const currentSectionH = spongeSectionHeight;
           const spongeGeom = buildSpongeProfileGeometry(pieceRadius, currentSectionH, {
             topBumpHeight: isTopSection ? domeAmount : 0,
             bevelSize: 0.1,
-            bevelTop: !(fillingEnabled && s < fillingLayers),
-            bevelBottom: !(fillingEnabled && s > 0),
+            bevelTop: !(pieceFillingEnabled && s < pieceFillingLayers),
+            bevelBottom: !(pieceFillingEnabled && s > 0),
           });
           const spongeMesh = new THREE.Mesh(spongeGeom, spongeMat || new THREE.MeshStandardMaterial({ color: '#F6DEAB' }));
           spongeMesh.position.y = spongeCurrentY + currentSectionH / 2;
@@ -1729,10 +1736,20 @@ const CakeScene = React.forwardRef(function CakeScene({
           pieceGroup.add(spongeMesh);
           spongeCurrentY += currentSectionH;
 
-          if (fillingEnabled && s < fillingLayers) {
+          if (pieceFillingEnabled && s < pieceFillingLayers) {
             const fillingH = pieceHeight * 0.12;
-            const fillMat = getFrostingMaterial(fillColor || '#FFF4DC', null);
-            const fillGeom = new THREE.CylinderGeometry(pieceRadius * 0.98, pieceRadius * 0.98, fillingH, 48);
+            const fillMat = getFrostingMaterial(
+              pieceFillingSugarColor || fillColor || '#FFF4DC',
+              pieceFillingSugarColorId || null
+            );
+            let fillGeom;
+            if (pieceFillingPipingTip === 'mashedCircles' || pieceFillingPipingTip === 'mashedSwirls') {
+              const isSwirl = pieceFillingPipingTip === 'mashedSwirls';
+              const buildMashedGeom = isSwirl ? buildMashedSwirlFillingGeometry : buildMashedCircleFillingGeometry;
+              fillGeom = buildMashedGeom(pieceRadius * 0.98, fillingH, { rand });
+            } else {
+              fillGeom = new THREE.CylinderGeometry(pieceRadius * 0.98, pieceRadius * 0.98, fillingH, 48);
+            }
             const fillMesh = new THREE.Mesh(fillGeom, fillMat);
             fillMesh.position.y = spongeCurrentY + fillingH / 2;
             pieceGroup.add(fillMesh);
@@ -2082,7 +2099,10 @@ const CakeScene = React.forwardRef(function CakeScene({
       // Build layer with separate sections: Sponge Body + Filling Layers + Frosting Shell
 
       // Calculate sponge height (subtract filling space if enabled)
-      const totalFillingHeight = fillingEnabled ? (FILLING_H * fillingLayers) : 0;
+      const tierFillingEnabled = isIndividual ? (layerFillingEnabled?.[i] ?? fillingEnabled) : fillingEnabled;
+      const tierFillingLayers = isIndividual ? (layerFillingLayers?.[i] ?? fillingLayers) : fillingLayers;
+      const tierFillingPipingTip = isIndividual ? (layerFillingPipingTips?.[i] ?? fillingPipingTip) : fillingPipingTip;
+      const totalFillingHeight = tierFillingEnabled ? (FILLING_H * tierFillingLayers) : 0;
       const spongeHeight = height - totalFillingHeight;
 
       // Sponge Body (main interior cake body) - use procedural texture system
@@ -2101,7 +2121,7 @@ const CakeScene = React.forwardRef(function CakeScene({
 
       // Build sponge sections separated by filling layers
       let spongeCurrentY = currentY;
-      const spongeSectionHeight = spongeHeight / (fillingEnabled ? fillingLayers + 1 : 1);
+      const spongeSectionHeight = spongeHeight / (tierFillingEnabled ? tierFillingLayers + 1 : 1);
 
       // The pointy-top dome amount is derived from the FULL tier height (not the
       // per-section height above), so it stays constant no matter how many
@@ -2648,9 +2668,9 @@ const CakeScene = React.forwardRef(function CakeScene({
       );
       lastActiveSideCoverageFn = glazeSideCoverageFn;
 
-      for (let s = 0; s < (fillingEnabled ? fillingLayers + 1 : 1); s++) {
-        const isTopSection = s === (fillingEnabled ? fillingLayers + 1 : 1) - 1;
-        const fillingActive = fillingEnabled && !!fillColor;
+      for (let s = 0; s < (tierFillingEnabled ? tierFillingLayers + 1 : 1); s++) {
+        const isTopSection = s === (tierFillingEnabled ? tierFillingLayers + 1 : 1) - 1;
+        const fillingActive = tierFillingEnabled && !!fillColor;
 
         let bottomSocketHeight = 0;
         // (Socket-into-the-tier-below removed — see the matching removal of
@@ -2672,7 +2692,7 @@ const CakeScene = React.forwardRef(function CakeScene({
           bevelSize: isFrostedTier ? 0.22 : 0.18,
           // Flush (no taper) on any face that meets a filling layer, so the
           // filling can sit flat against it with no gap.
-          bevelTop: !(fillingActive && s < fillingLayers),
+          bevelTop: !(fillingActive && s < tierFillingLayers),
           bevelBottom: !(fillingActive && s > 0),
         });
 
@@ -2687,7 +2707,7 @@ const CakeScene = React.forwardRef(function CakeScene({
         spongeCurrentY += spongeSectionHeight;
 
         // Add filling layer after sponge section (except after last section)
-        if (fillingEnabled && s < fillingLayers && fillColor) {
+        if (tierFillingEnabled && s < tierFillingLayers && fillColor) {
           const fillingY = spongeCurrentY + FILLING_H / 2;
 
           // "Mashed Circles" and "Mashed Swirls" both replace the filling
@@ -2699,7 +2719,7 @@ const CakeScene = React.forwardRef(function CakeScene({
           // diagonal slash groove pattern switched on — see
           // buildMashedSwirlFillingGeometry, a thin wrapper right below
           // buildMashedCircleFillingGeometry.
-          if (fillingPipingTip === 'mashedCircles' || fillingPipingTip === 'mashedSwirls') {
+          if (tierFillingPipingTip === 'mashedCircles' || tierFillingPipingTip === 'mashedSwirls') {
             // Uses getFrostingMaterial (the same buttercream shader as
             // Fully Frosted / Textured Buttercream elsewhere in this file),
             // NOT getFillingMaterial — that one's tuned for a glossy
@@ -2716,7 +2736,7 @@ const CakeScene = React.forwardRef(function CakeScene({
               layerFillingSugarColors[i] || fillingPipingColor,
               layerFillingSugarColorIds[i] || fillingPipingColorId
             );
-            const isSwirl = fillingPipingTip === 'mashedSwirls';
+            const isSwirl = tierFillingPipingTip === 'mashedSwirls';
             const buildMashedGeometry = isSwirl
               ? buildMashedSwirlFillingGeometry
               : buildMashedCircleFillingGeometry;

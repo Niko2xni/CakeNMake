@@ -446,8 +446,12 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
       : config.sponge?.flavor;
     const spongeName = `${title(sponge || 'Vanilla')} Sponge`;
 
-    const fillingEnabled = config.filling?.enabled !== false;
-    const fillingLayers = config.filling?.layers || 1;
+    const fillingEnabled = isIndividual && Array.isArray(config.filling?.layerEnabled)
+      ? config.filling.layerEnabled[tierIndex] !== false
+      : config.filling?.enabled !== false;
+    const fillingLayers = isIndividual && Array.isArray(config.filling?.layerLayers)
+      ? config.filling.layerLayers[tierIndex] || 1
+      : config.filling?.layers || 1;
     const fillingFlavor = isIndividual
       ? config.filling?.layerFlavors?.[tierIndex] || config.filling?.flavor
       : config.filling?.flavor;
@@ -455,7 +459,9 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
       ? `Filling: ${title(fillingFlavor || 'Vanilla')} (${fillingLayers} ${fillingLayers === 1 ? 'Layer' : 'Layers'})`
       : 'Filling: None';
 
-    const piping = config.filling?.piping;
+    const piping = isIndividual && Array.isArray(config.filling?.layerPipings)
+      ? config.filling.layerPipings[tierIndex] || config.filling?.piping
+      : config.filling?.piping;
     const pipingTip = piping?.tip ? title(piping.tip) : 'None';
 
     const fillingSugar = (isIndividual ? config.sugarColorOverrides?.[`filling-${tierIndex}`] : null)

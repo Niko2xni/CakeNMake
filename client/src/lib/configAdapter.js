@@ -108,11 +108,32 @@ export function adaptConfigToLegacy(newConfig) {
   const fillingLayers = fillingEnabled ? (filling.layers || 1) : 0;  // Only use layers if enabled
   let fillingColor, layerFillings;
 
-  if (fillingEnabled) {
+  const layerFillingEnabled = Array.from({ length: variationCount }, (_, index) => {
+    if (!isIndividual) return fillingEnabled;
+    if (filling.layerEnabled && filling.layerEnabled[index] !== undefined) {
+      return Boolean(filling.layerEnabled[index]);
+    }
+    return fillingEnabled;
+  });
+
+  const layerFillingLayers = Array.from({ length: variationCount }, (_, index) => {
+    if (!isIndividual) return fillingLayers;
+    const isPieceEnabled = layerFillingEnabled[index];
+    if (!isPieceEnabled) return 0;
+    const pieceLayers = (filling.layerLayers && filling.layerLayers[index] !== undefined)
+      ? filling.layerLayers[index]
+      : (filling.layers || 1);
+    return pieceLayers;
+  });
+
+  if (fillingEnabled || (isIndividual && layerFillingEnabled.some(Boolean))) {
     // Only set filling colors if filling is actually enabled
     if (isIndividual) {
-      layerFillings = filling.layerFlavors || Array(variationCount).fill('vanilla');
-      fillingColor = layerFillings[0];
+      const rawFlavors = filling.layerFlavors || Array(variationCount).fill('vanilla');
+      layerFillings = Array.from({ length: variationCount }, (_, index) => {
+        return layerFillingEnabled[index] ? (rawFlavors[index] || 'vanilla') : null;
+      });
+      fillingColor = layerFillings.find(Boolean) || rawFlavors[0] || 'vanilla';
     } else {
       fillingColor = filling.flavor || 'vanilla';
       layerFillings = Array(variationCount).fill(fillingColor);
@@ -151,6 +172,17 @@ export function adaptConfigToLegacy(newConfig) {
   // not just Fully Frosted alone.
   const regionsHidden = exteriorFinish.style === 'fullyFrosted' || exteriorFinish.style === 'texturedButtercream';
   const fillingPipingTip = (fillingEnabled && piping.tip && !regionsHidden) ? piping.tip : null;
+  const layerFillingPipingTips = Array.from({ length: variationCount }, (_, index) => {
+    const isPieceEnabled = layerFillingEnabled[index];
+    const pieceStyle = isIndividual
+      ? (exteriorFinish.layerStyles?.[index] || exteriorFinish.style || 'fullyFrosted')
+      : (exteriorFinish.style || 'fullyFrosted');
+    const pieceHidden = pieceStyle === 'fullyFrosted' || pieceStyle === 'texturedButtercream';
+    const piecePiping = isIndividual
+      ? (filling.layerPipings?.[index] || filling.piping || {})
+      : (filling.piping || {});
+    return (isPieceEnabled && piecePiping.tip && !pieceHidden) ? piecePiping.tip : null;
+  });
   const fillingSugarColorData = resolveContextSugarColorWithId('filling');
   const fillingSugarColorHex = fillingSugarColorData?.hex || null;
   const fillingSugarColorId = fillingSugarColorData?.id || null;
@@ -444,6 +476,9 @@ export function adaptConfigToLegacy(newConfig) {
     fillingPipingTip,
     fillingPipingColor,
     fillingPipingColorId,
+    layerFillingEnabled,
+    layerFillingLayers,
+    layerFillingPipingTips,
     layerFillingSugarColors,
     layerFillingSugarColorIds,
 

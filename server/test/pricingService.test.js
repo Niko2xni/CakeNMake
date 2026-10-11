@@ -495,6 +495,32 @@ test('petits fours quote prices a 4-piece set and each individually configured v
   ]);
   assert.equal(variationLines[2].lineTotalMinor, 10000); // naked falls back to the 4-pack naked rate
   assert.equal(individualQuote.lineItems.some((line) => line.componentKey === 'sponge'), false);
+
+  const individualQuoteWithFilling = buildQuote({
+    structure: { size: 'largeCube', layers: 1, shape: 'rectangle', layerDesign: 'individual' },
+    sponge: { layerFlavors: ['chocolate', 'cheese', 'strawberry', 'ube'] },
+    filling: {
+      enabled: true,
+      layerEnabled: [true, true, false, true],
+      layerLayers: [1, 2, 1, 3],
+      layerFlavors: ['chocolate', 'cheese', 'strawberry', 'ube'],
+      layerPipings: [
+        { tip: null, colorId: 'vanilla' },
+        { tip: 'mashedCircles', colorId: 'cheese' },
+        { tip: null, colorId: 'strawberry' },
+        { tip: 'mashedSwirls', colorId: 'ube' },
+      ],
+    },
+    exteriorFinish: { layerStyles: ['naked', 'naked', 'naked', 'naked'] },
+  }, priceBook);
+
+  const varLines = [0, 1, 2, 3].map((p) => individualQuoteWithFilling.lineItems.find((line) => line.componentKey === `sponge-variation-${p}`));
+  assert.equal(varLines[0].details[4], 'Filling: Chocolate (1 Layer)');
+  assert.equal(varLines[1].details[4], 'Filling: Cheese (2 Layers)');
+  assert.equal(varLines[1].details[5], 'Piping Design: Mashed Circles');
+  assert.equal(varLines[2].details[4], 'Filling: None');
+  assert.equal(varLines[3].details[4], 'Filling: Ube (3 Layers)');
+  assert.equal(varLines[3].details[5], 'Piping Design: Mashed Swirls');
 });
 
 test('retired flat inscriptions are ignored while placed letters remain priced', () => {

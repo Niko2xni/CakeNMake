@@ -24,8 +24,14 @@ export function buildBlueprintDetails(config, quote, designName = '') {
     const prefix = individual ? `${pieceName} ${i + 1} ` : '';
     const sponge = individual ? config.sponge?.layerFlavors?.[i] || config.sponge?.flavor : config.sponge?.flavor;
     fundamentals.push([`${prefix}Sponge Flavor`, name(sponge), [`sponge.${sponge}`]]);
+    const fillingEnabled = individual && Array.isArray(config.filling?.layerEnabled)
+      ? config.filling.layerEnabled[i] !== false
+      : config.filling?.enabled;
+    const fillingLayers = individual && Array.isArray(config.filling?.layerLayers)
+      ? config.filling.layerLayers[i] || 1
+      : config.filling?.layers || 1;
     const fillingFlavor = individual ? config.filling?.layerFlavors?.[i] || config.filling?.flavor : config.filling?.flavor;
-    if (config.filling?.enabled) fundamentals.push([`${prefix}Filling`, `${name(fillingFlavor)} · ${config.filling.layers} filling layer(s)`, ['filling.layer', `filling.${fillingFlavor}`]]);
+    if (fillingEnabled) fundamentals.push([`${prefix}Filling`, `${name(fillingFlavor)} · ${fillingLayers} filling layer(s)`, ['filling.layer', `filling.${fillingFlavor}`]]);
     const finish = config.exteriorFinish || {};
     const style = individual ? finish.layerStyles?.[i] || finish.style : finish.style;
     const flavor = individual ? finish.layerFlavors?.[i] || finish.flavor : finish.flavor;
@@ -34,7 +40,17 @@ export function buildBlueprintDetails(config, quote, designName = '') {
     const surface = individual ? config.surfaceTreatment?.layerTreatments?.[i] || config.surfaceTreatment : config.surfaceTreatment;
     if (surface?.mode) fundamentals.push([`${prefix}Surface Treatment`, `${name(surface.mode)} · ${name(options.getSurfaceTreatmentPattern(surface, config.structure))}`, [`surface.${surface.mode}`]]);
   }
-  if (config.filling?.enabled && config.filling.piping?.tip) fundamentals.push(['Filling Piping', `${name(config.filling.piping.tip)} · ${name(config.filling.piping.colorId)}`, ['edge.piping']]);
+  if (!individual) {
+    if (config.filling?.enabled && config.filling.piping?.tip) fundamentals.push(['Filling Piping', `${name(config.filling.piping.tip)} · ${name(config.filling.piping.colorId)}`, ['edge.piping']]);
+  } else {
+    for (let i = 0; i < variationCount; i++) {
+      const isPieceEnabled = config.filling?.layerEnabled ? config.filling.layerEnabled[i] !== false : config.filling?.enabled;
+      const piecePiping = config.filling?.layerPipings?.[i] || config.filling?.piping;
+      if (isPieceEnabled && piecePiping?.tip) {
+        fundamentals.push([`${pieceName} ${i + 1} Filling Piping`, `${name(piecePiping.tip)} · ${name(piecePiping.colorId)}`, ['edge.piping']]);
+      }
+    }
+  }
   if (config.sugarColor?.mode === 'colorOverride') fundamentals.push(['Sugar Color', name(config.sugarColor.colorId), [`color.${config.sugarColor.colorId}`]]);
   Object.entries(config.sugarColorOverrides || {}).forEach(([context, color]) => {
     if (color?.mode === 'colorOverride' && color.colorId) fundamentals.push([`${name(context)} Color`, name(color.colorId), [`color.${color.colorId}`]]);

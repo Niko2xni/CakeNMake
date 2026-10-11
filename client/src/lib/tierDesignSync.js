@@ -30,10 +30,19 @@ export function syncTierDesignOnToggle(config, targetDesign, activeLayer = 0) {
     };
 
     const uniformFillingFlavor = config.filling?.flavor || 'vanilla';
+    const uniformFillingLayers = config.filling?.layers || 1;
+    const uniformFillingEnabled = config.filling?.enabled ?? false;
+    const uniformPiping = config.filling?.piping || { tip: null, colorId: 'vanilla' };
     const filling = {
       ...(config.filling || DEFAULT_CONFIG.filling),
       flavor: uniformFillingFlavor,
+      layers: uniformFillingLayers,
+      enabled: uniformFillingEnabled,
+      piping: { ...uniformPiping },
       layerFlavors: Array(layers).fill(uniformFillingFlavor),
+      layerLayers: Array(layers).fill(uniformFillingLayers),
+      layerEnabled: Array(layers).fill(uniformFillingEnabled),
+      layerPipings: Array.from({ length: layers }, () => ({ ...uniformPiping })),
     };
 
     const uniformFinish = config.exteriorFinish || DEFAULT_CONFIG.exteriorFinish;
@@ -103,10 +112,25 @@ export function syncTierDesignOnToggle(config, targetDesign, activeLayer = 0) {
     };
 
     const fillingFlavor = config.filling?.layerFlavors?.[tierIdx] || config.filling?.flavor || 'vanilla';
+    const fillingLayers = (config.filling?.layerLayers && config.filling.layerLayers[tierIdx] !== undefined)
+      ? config.filling.layerLayers[tierIdx]
+      : (config.filling?.layers || 1);
+    const fillingEnabled = (config.filling?.layerEnabled && config.filling.layerEnabled[tierIdx] !== undefined)
+      ? config.filling.layerEnabled[tierIdx]
+      : (config.filling?.enabled ?? false);
+    const fillingPiping = (config.filling?.layerPipings && config.filling.layerPipings[tierIdx])
+      ? config.filling.layerPipings[tierIdx]
+      : (config.filling?.piping || { tip: null, colorId: 'vanilla' });
     const filling = {
       ...(config.filling || DEFAULT_CONFIG.filling),
       flavor: fillingFlavor,
+      layers: fillingLayers,
+      enabled: fillingEnabled,
+      piping: { ...fillingPiping },
       layerFlavors: Array(layers).fill(fillingFlavor),
+      layerLayers: Array(layers).fill(fillingLayers),
+      layerEnabled: Array(layers).fill(fillingEnabled),
+      layerPipings: Array.from({ length: layers }, () => ({ ...fillingPiping })),
     };
 
     const currentFinish = config.exteriorFinish || DEFAULT_CONFIG.exteriorFinish;
