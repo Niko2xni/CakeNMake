@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { getFrostingMaterial } from '../frostingMaterial';
+import { getFrostingMaterial, applyVerticalGradientUV } from '../frostingMaterial';
 
 /**
  * Custom THREE.Curve subclass for 3D polar rope curves around a cylinder.
@@ -651,6 +651,45 @@ export function getVictorianLambethGlazeCoverageFn(radius, height, opts = {}) {
  *   See VICTORIAN_LAMBETH_SETS in cakeConfig.js.
  * @returns {THREE.Group} Group containing the complete Victorian Lambeth piping.
  */
+/**
+ * Merges multiple BufferGeometries into a single BufferGeometry.
+ */
+function localMerge(geos) {
+  const pos = [];
+  const norm = [];
+  const uv = [];
+  const idx = [];
+  let off = 0;
+  for (const g of geos) {
+    if (!g.getAttribute('normal')) g.computeVertexNormals();
+    const pa = g.getAttribute('position');
+    const na = g.getAttribute('normal');
+    const ua = g.getAttribute('uv');
+    for (let i = 0; i < pa.count; i++) {
+      pos.push(pa.getX(i), pa.getY(i), pa.getZ(i));
+      norm.push(na.getX(i), na.getY(i), na.getZ(i));
+      if (ua) {
+        uv.push(ua.getX(i), ua.getY(i));
+      }
+    }
+    const ia = g.getIndex();
+    if (ia) {
+      for (let i = 0; i < ia.count; i++) idx.push(ia.getX(i) + off);
+    } else {
+      for (let i = 0; i < pa.count; i++) idx.push(i + off);
+    }
+    off += pa.count;
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.Float32BufferAttribute(norm, 3));
+  if (uv.length > 0) {
+    out.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  }
+  out.setIndex(idx);
+  return out;
+}
+
 export function buildVictorianLambeth(radius, height, icingColorHex, pearlColorHex = '#ffffff', variant = 'classic', icingColorId = null) {
   const masterGroup = new THREE.Group();
 
@@ -1135,6 +1174,8 @@ export function buildVictorianLambeth(radius, height, icingColorHex, pearlColorH
       )
     : null;
 
+  const curtainGeos = [];
+
   // Outer loop over vertical bands — a single {yOffset:0, angleOffset:0}
   // entry for every existing variant (so their output is identical to
   // before this existed), two entries only for 'doubleBand' (see `bands`
@@ -1176,6 +1217,7 @@ export function buildVictorianLambeth(radius, height, icingColorHex, pearlColorH
       const anchorYOffset = showTopRopes ? -ROPES_ONLY_EXTRA_DROP * H : 0;
       anchor.position.set(anchorR * Math.sin(currentAngle), 0.42 * H + bandYOffset + anchorYOffset, anchorR * Math.cos(currentAngle));
       anchor.rotation.y = currentAngle;
+      anchor.userData.isRigidDecor = true;
       masterGroup.add(anchor);
     }
 
@@ -1185,6 +1227,7 @@ export function buildVictorianLambeth(radius, height, icingColorHex, pearlColorH
       const fleur = buildFleurDeLis();
       fleur.position.set(R_fleur * Math.sin(currentAngle), motifY, R_fleur * Math.cos(currentAngle));
       fleur.rotation.y = currentAngle;
+      fleur.userData.isRigidDecor = true;
       masterGroup.add(fleur);
     }
 
@@ -1217,6 +1260,7 @@ export function buildVictorianLambeth(radius, height, icingColorHex, pearlColorH
       topFleurWrapper.add(topFleur);
       topFleurWrapper.position.set(R_fleur * Math.sin(midAngle), topFleurY, R_fleur * Math.cos(midAngle));
       topFleurWrapper.rotation.y = midAngle;
+      topFleurWrapper.userData.isRigidDecor = true;
       masterGroup.add(topFleurWrapper);
     }
 
@@ -1228,12 +1272,12 @@ export function buildVictorianLambeth(radius, height, icingColorHex, pearlColorH
     // bottomDrop.position.set(R_pearl * Math.sin(currentAngle), -0.39 * H, R_pearl * Math.cos(currentAngle));
     // masterGroup.add(bottomDrop);
 
-    // 3. ONE Clean Solid 3D Volumetric Curtain Mesh
+    // 3. Collect Volumetric 3D Curtain Geometry per segment in world space
     if (showCurtain && curtainGeoSingle) {
-      const curtainMesh = new THREE.Mesh(curtainGeoSingle, icingMat);
-      curtainMesh.rotation.y = midAngle;
-      curtainMesh.position.y = 0.28 * H + bandYOffset;
-      masterGroup.add(curtainMesh);
+      const segGeo = curtainGeoSingle.clone();
+      segGeo.translate(0, 0.28 * H + bandYOffset, 0);
+      segGeo.applyMatrix4(new THREE.Matrix4().makeRotationY(midAngle));
+      curtainGeos.push(segGeo);
     }
 
     // 4. Secondary Piped Ropes (Exposed on top of and across the single curtain drape)
@@ -1332,6 +1376,7 @@ export function buildVictorianLambeth(radius, height, icingColorHex, pearlColorH
     if (showLowPearl) {
       const lowPearl = new THREE.Mesh(new THREE.SphereGeometry(0.10, 16, 16), pearlMat);
       lowPearl.position.set(lowPearlR * Math.sin(midAngle), lowPearlY, lowPearlR * Math.cos(midAngle));
+      lowPearl.userData.isRigidDecor = true;
       masterGroup.add(lowPearl);
     }
 
@@ -1344,6 +1389,16 @@ export function buildVictorianLambeth(radius, height, icingColorHex, pearlColorH
       masterGroup.add(offsetRopeMesh);
     }
   }
+  }
+
+  // Merged Volumetric Curtain Drape Mesh (single centered mesh that morphs cleanly on square/rectangle)
+  if (curtainGeos.length > 0) {
+    const mergedCurtainGeo = localMerge(curtainGeos);
+    for (const g of curtainGeos) g.dispose();
+    if (curtainGeoSingle) curtainGeoSingle.dispose();
+    applyVerticalGradientUV(mergedCurtainGeo);
+    const curtainMesh = new THREE.Mesh(mergedCurtainGeo, icingMat);
+    masterGroup.add(curtainMesh);
   }
 
   return masterGroup;

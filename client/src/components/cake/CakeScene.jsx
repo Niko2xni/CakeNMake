@@ -807,6 +807,17 @@ function isPlacedItemNode(node) {
   return false;
 }
 
+function isRigidDecorNode(obj) {
+  let curr = obj;
+  while (curr) {
+    if (curr.userData?.isRigidDecor) {
+      return curr;
+    }
+    curr = curr.parent;
+  }
+  return null;
+}
+
 function morphGroupToBoxyRectangle(cakeGroup, baseRadius, customW = null, customD = null) {
   if (!cakeGroup) return;
   const W = customW !== null ? customW : baseRadius * 1.25;
@@ -841,6 +852,48 @@ function morphGroupToBoxyRectangle(cakeGroup, baseRadius, customW = null, custom
             child.position.x *= scale;
             child.position.z *= scale;
           }
+        }
+      }
+      return;
+    }
+
+    const decorRoot = isRigidDecorNode(child);
+    if (decorRoot) {
+      if (child !== decorRoot) {
+        // Child mesh or sub-group of a rigid decoration assembly (e.g. rosettes, leaves, teardrops)
+        return;
+      }
+
+      const rx = child.position.x;
+      const rz = child.position.z;
+      const r = Math.sqrt(rx * rx + rz * rz);
+      if (r > 0.001) {
+        const phi = Math.atan2(rx, rz);
+        const theta = Math.atan2(rz, rx);
+        const targetR = getBoxyRadius(theta, W, D, rc);
+        const scale = targetR / baseRadius;
+        child.position.x *= scale;
+        child.position.z *= scale;
+
+        const dPhi = 0.002;
+        const phi1 = phi - dPhi;
+        const theta1 = Math.atan2(Math.cos(phi1), Math.sin(phi1));
+        const R1 = getBoxyRadius(theta1, W, D, rc);
+        const p1x = R1 * Math.sin(phi1);
+        const p1z = R1 * Math.cos(phi1);
+
+        const phi2 = phi + dPhi;
+        const theta2 = Math.atan2(Math.cos(phi2), Math.sin(phi2));
+        const R2 = getBoxyRadius(theta2, W, D, rc);
+        const p2x = R2 * Math.sin(phi2);
+        const p2z = R2 * Math.cos(phi2);
+
+        const tx = p2x - p1x;
+        const tz = p2z - p1z;
+        const nx = -tz;
+        const nz = tx;
+        if (Math.abs(nx) > 1e-6 || Math.abs(nz) > 1e-6) {
+          child.rotation.y = Math.atan2(nx, nz);
         }
       }
       return;
