@@ -181,3 +181,34 @@ it('defaults Standard and Bento to Long Drips and remembers Petit Fours Natural 
   });
   expect(buttonStartingWith('Natural Tear').className).toContain('border-primary');
 });
+
+it('clears center decorations when switching between single cake formats and Petit Fours', () => {
+  const initial = {
+    ...DEFAULT_CONFIG,
+    structure: {
+      ...DEFAULT_CONFIG.structure,
+      cakeFormat: 'bento',
+      format: 'bento',
+      size: 'standardBento',
+    },
+    placedItems: [
+      { id: '1', type: 'center-strawberry-default', x: 0, z: -0.42 },
+      { id: '2', type: 'center-strawberry-default', x: 0.42, z: 0 },
+    ],
+  };
+  let current = initial;
+  function Harness() {
+    const [config, setConfig] = useState(initial);
+    current = config;
+    return <ToolPanel config={config} onChange={setConfig} />;
+  }
+  const view = render(<Harness />);
+  const buttonStartingWith = (label) => [...view.container.querySelectorAll('button')]
+    .find((button) => button.textContent.startsWith(label));
+
+  expect(current.placedItems).toHaveLength(2);
+  fireEvent.click(buttonStartingWith('Petit Fours'));
+  expect(current.structure.cakeFormat).toBe('petitsFour');
+  expect(current.placedItems).toEqual([]);
+});
+

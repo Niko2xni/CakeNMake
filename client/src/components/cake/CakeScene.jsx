@@ -576,7 +576,20 @@ export function getCakeTopSurfacePoint(x, z, topMetrics) {
   if (!topMetrics) {
     return { y: 0 };
   }
-  const { baseY = 0, domeHeight = 0, radius = 4 } = topMetrics;
+  const { baseY = 0, domeHeight = 0, radius = 4, isPetitsFour, gridPositions = [], pieceRadius = 0.5 } = topMetrics;
+  if (isPetitsFour && gridPositions.length > 0) {
+    let minD = Infinity;
+    for (const pos of gridPositions) {
+      const d = Math.hypot(x - pos.x, z - pos.z);
+      if (d < minD) minD = d;
+    }
+    const R = Math.max(0.1, pieceRadius - 0.05);
+    if (minD < R) {
+      const factor = 1 - (minD / R) * (minD / R);
+      return { y: baseY + domeHeight * factor };
+    }
+    return { y: baseY };
+  }
   const r = Math.sqrt(x * x + z * z);
   const R = Math.max(0.1, radius - 0.18); // shoulder radius where dome meets bevel
 
@@ -774,6 +787,22 @@ function isPlaceItemTool(toolType) {
   return typeof toolType === 'string' && Object.prototype.hasOwnProperty.call(PLACE_ITEM_RADII, toolType);
 }
 
+function isPlacedItemNode(node) {
+  let curr = node;
+  while (curr) {
+    if (
+      curr.userData?.isPlacedItem ||
+      curr.userData?.placedItemId ||
+      curr.userData?.itemType ||
+      curr.name?.startsWith('placed-')
+    ) {
+      return true;
+    }
+    curr = curr.parent;
+  }
+  return false;
+}
+
 function morphGroupToBoxyRectangle(cakeGroup, baseRadius, customW = null, customD = null) {
   if (!cakeGroup) return;
   const W = customW !== null ? customW : baseRadius * 1.25;
@@ -783,11 +812,40 @@ function morphGroupToBoxyRectangle(cakeGroup, baseRadius, customW = null, custom
   const transformedGeometries = new Set();
 
   cakeGroup.traverse((child) => {
+    if (isPlacedItemNode(child)) {
+      // Placed items (strawberries, blueberries, cherries, candles, etc.) are 3D decorations.
+      // Their meshes and internal geometry/parts must NEVER be morphed into rectangles.
+      if (child.isMesh) {
+        return;
+      }
+
+      // Reposition placed items onto the rectangular cake surface.
+      // Only scale the top-level placement group (whose parent is itemGroup and itemGroup's parent is cakeGroup,
+      // or itemGroup itself if it was positioned directly) once, so internal relative offsets are preserved.
+      const isItemPlacementRoot =
+        (child.userData?.isPlacedItem && child.parent === cakeGroup) ||
+        (child.parent && child.parent.userData?.isPlacedItem && child.parent.parent === cakeGroup);
+
+      if (child.isGroup && isItemPlacementRoot) {
+        const isCentered = Math.abs(child.position.x) < 0.001 && Math.abs(child.position.z) < 0.001;
+        if (!isCentered) {
+          const r = Math.sqrt(child.position.x * child.position.x + child.position.z * child.position.z);
+          if (r > 0.001) {
+            const theta = Math.atan2(child.position.z, child.position.x);
+            const targetR = getBoxyRadius(theta, W, D, rc);
+            const scale = targetR / baseRadius;
+            child.position.x *= scale;
+            child.position.z *= scale;
+          }
+        }
+      }
+      return;
+    }
+
     if (child.isMesh && child.geometry && !transformedGeometries.has(child.geometry)) {
       const isCentered = Math.abs(child.position.x) < 0.001 && Math.abs(child.position.z) < 0.001;
-      const isPlacedItem = child.userData?.isPlacedItem || child.name?.startsWith('placed-');
 
-      if (isCentered && !isPlacedItem) {
+      if (isCentered) {
         transformedGeometries.add(child.geometry);
         child.geometry = child.geometry.clone();
         const pos = child.geometry.attributes.position;
@@ -1589,6 +1647,7 @@ const CakeScene = React.forwardRef(function CakeScene({
       const gridOffset = isClassic ? 0.75 : 1.35;
       const plateRadius = isClassic ? 2.2 : 3.4;
       const plateRim = isClassic ? 2.4 : 3.6;
+      const domeAmount = pieceHeight * 0.05;
 
       if (plateVisible !== false) {
         const plate = new THREE.Mesh(
@@ -1646,7 +1705,6 @@ const CakeScene = React.forwardRef(function CakeScene({
         const totalFillingHeight = fillingEnabled ? (pieceHeight * 0.12 * fillingLayers) : 0;
         const spongeHeight = pieceHeight - totalFillingHeight;
         const spongeMat = cakeKey ? getSpongeMaterial(cakeKey) : null;
-        const domeAmount = pieceHeight * 0.05;
 
         // Sponge
         let spongeCurrentY = 0;
@@ -1765,6 +1823,88 @@ const CakeScene = React.forwardRef(function CakeScene({
         }
         pieceGroup.position.set(pos.x, 0, pos.z);
         group.add(pieceGroup);
+      }
+
+      const pfTopY = pieceHeight + (exteriorFinishStyle !== 'naked' ? 0.04 : 0);
+      topMetricsRef.current = {
+        radius: plateRadius,
+        baseY: pfTopY,
+        topY: pfTopY,
+        domeHeight: domeAmount,
+        centerDecorScale: isClassic ? 0.45 : 0.65,
+        isPetitsFour: true,
+        gridOffset,
+        pieceRadius,
+        gridPositions,
+      };
+
+      for (const item of placedItems) {
+        let px = item.x || 0;
+        let pz = item.z || 0;
+
+        // Snap to piece center if it's placed near one of the 4 petit cakes
+        let closestPiece = gridPositions[0];
+        let minD = Infinity;
+        for (const pos of gridPositions) {
+          const d = Math.hypot(px - pos.x, pz - pos.z);
+          if (d < minD) {
+            minD = d;
+            closestPiece = pos;
+          }
+        }
+        if (minD <= pieceRadius * 1.25) {
+          px = closestPiece.x;
+          pz = closestPiece.z;
+        } else {
+          continue; // Item does not belong to any petit cake piece -- do not render floating in the air
+        }
+
+        const isCenter = item.type && item.type.startsWith('center-');
+        const centerToolParsed = isCenter ? parseCenterTool(item.type) : null;
+
+        const itemGroup = new THREE.Group();
+        itemGroup.userData.isPlacedItem = true;
+        itemGroup.userData.slotId = item.slotId || null;
+        itemGroup.userData.placedItemId = item.id || null;
+        itemGroup.userData.itemType = item.type || null;
+
+        let py = pfTopY;
+
+        if (item.type === 'cherry') {
+          py = pfTopY - 0.045;
+          addCherry(itemGroup, px, py, pz, rand);
+        } else if (item.type === 'blueberry') {
+          py = pfTopY - 0.035;
+          addBlueberry(itemGroup, px, py, pz, rand);
+        } else if (item.type === 'mango' || item.type === 'mangoCube') {
+          py = pfTopY - 0.03;
+          addMangoCube(itemGroup, px, py, pz, rand);
+        } else if (item.type === 'strawberry') {
+          py = pfTopY - 0.045;
+          addStrawberry(itemGroup, px, py, pz);
+        } else if (item.type && item.type.startsWith('center-') && centerToolParsed?.designId) {
+          const { designId, orientation } = centerToolParsed;
+          const tiltX = item.tiltX !== undefined ? item.tiltX : 0;
+          const rotationY = item.rotation !== undefined ? item.rotation : 0;
+          const tiltZ = item.tiltZ !== undefined ? item.tiltZ : 0;
+          const itemColor = isButtercreamLetterDesign(designId)
+            ? centerTextColor
+            : centerDecorationColor;
+          const itemColorId = isButtercreamLetterDesign(designId)
+            ? (centerTextColorMode === 'individual' ? (item.colorId || item.sugarColor?.colorId) : centerTextColorId)
+            : centerDecorationColorId;
+          const resolvedItemColor = itemColorId
+            ? (SUGAR_COLORS.find((color) => color.id === itemColorId)?.hex || itemColor)
+            : itemColor;
+          const rotatedGroup = buildRotatedDecoration(
+            designId, orientation, tiltX, rotationY,
+            isClassic ? 0.45 : 0.65, resolvedItemColor, rand, tiltZ, itemColorId
+          );
+          py = pfTopY;
+          rotatedGroup.position.set(px, py, pz);
+          itemGroup.add(rotatedGroup);
+        }
+        group.add(itemGroup);
       }
 
       const baselineY = 0;
@@ -3913,6 +4053,7 @@ const CakeScene = React.forwardRef(function CakeScene({
         const centerToolParsed = isCenter ? parseCenterTool(item.type) : null;
 
         const itemGroup = new THREE.Group();
+        itemGroup.userData.isPlacedItem = true;
         itemGroup.userData.slotId = item.slotId || null;
         itemGroup.userData.placedItemId = item.id || null;
         itemGroup.userData.itemType = item.type || null;
@@ -4281,6 +4422,30 @@ const CakeScene = React.forwardRef(function CakeScene({
         const limit = getCenterItemLimit(designId, cakeConfigRef.current?.structure);
         if (limit !== null && getCenterItemCount(placedItems, designId) >= limit) {
           return { x, z, valid: false, reason: 'limit' };
+        }
+
+        if (topMetricsRef.current?.isPetitsFour) {
+          const { gridPositions = [], pieceRadius = 0.5 } = topMetricsRef.current;
+          let targetPiece = null;
+          for (const pos of gridPositions) {
+            const d = Math.hypot(x - pos.x, z - pos.z);
+            if (d <= pieceRadius * 1.25) {
+              targetPiece = pos;
+              break;
+            }
+          }
+          if (!targetPiece) {
+            return { x, z, valid: false, reason: 'boundary' };
+          }
+          // On Petits Fours, max placeable center decoration for each petit cake is one
+          const alreadyOnPiece = placedItems.some((item) => {
+            const d = Math.hypot((item.x || 0) - targetPiece.x, (item.z || 0) - targetPiece.z);
+            return d <= pieceRadius * 1.25;
+          });
+          if (alreadyOnPiece) {
+            return { x: targetPiece.x, z: targetPiece.z, valid: false, reason: 'piece-limit' };
+          }
+          return { x: targetPiece.x, z: targetPiece.z, valid: true };
         }
 
         const centerDecorScale = topMetricsRef.current?.centerDecorScale ?? 1;

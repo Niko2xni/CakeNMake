@@ -23,6 +23,7 @@ import {
   getCenterItemLimit,
   getCenterItemCount,
   isCenterItemAtLimit,
+  isPetitsFourStructure,
 } from '@/lib/cakeConfig';
 import DecorationPreview from './DecorationPreview';
 import SugarColorSection from './SugarColorSection';
@@ -494,16 +495,12 @@ export default function CenterSection({
 
     if (currentSetId === variantId) {
       // Toggle off / deselect
-      const nextVariations = { ...(center.variations || {}) };
-      delete nextVariations[decoration.id];
       onChange({
         ...center,
-        variations: nextVariations,
+        variations: {},
       });
       onPlacedItemsChange?.((currentItems) =>
-        currentItems.filter(
-          (item) => !(item.source === 'variation' && item.variationType === decoration.id)
-        )
+        currentItems.filter((item) => item.source !== 'variation')
       );
       return;
     }
@@ -513,7 +510,7 @@ export default function CenterSection({
 
     const newItems = variant.placements.map((p, idx) => ({
       id: `center-var-${decoration.id}-${Date.now()}-${idx}`,
-      type: decoration.toolId,
+      type: p.type || p.toolId || decoration.toolId,
       x: p.x,
       z: p.z,
       rotation: p.rotation || 0,
@@ -527,16 +524,11 @@ export default function CenterSection({
     onChange({
       ...center,
       mode: 'variations',
-      variations: {
-        ...(center.variations || {}),
-        [decoration.id]: variantId,
-      },
+      variations: { [decoration.id]: variantId },
     });
 
     onPlacedItemsChange?.((currentItems) => {
-      const withoutExisting = currentItems.filter(
-        (item) => !(item.source === 'variation' && item.variationType === decoration.id)
-      );
+      const withoutExisting = currentItems.filter((item) => item.source !== 'variation');
       return [...withoutExisting, ...newItems];
     });
   };

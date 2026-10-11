@@ -13,25 +13,61 @@ import CenterSection from './CenterSection';
 import {
   STRAWBERRY_VARIATION_SETS,
   BENTO_STRAWBERRY_VARIATION_SETS,
+  PETITS_FOUR_STRAWBERRY_VARIATION_SETS,
   BLUEBERRY_VARIATION_SETS,
   BENTO_BLUEBERRY_VARIATION_SETS,
+  PETITS_FOUR_BLUEBERRY_VARIATION_SETS,
   MANGO_VARIATION_SETS,
   BENTO_MANGO_VARIATION_SETS,
+  PETITS_FOUR_MANGO_VARIATION_SETS,
+  STRAWBERRY_AND_BLUEBERRY_VARIATION_SETS,
+  BENTO_STRAWBERRY_AND_BLUEBERRY_VARIATION_SETS,
+  BLUEBERRY_AND_MANGO_VARIATION_SETS,
+  BENTO_BLUEBERRY_AND_MANGO_VARIATION_SETS,
+  STRAWBERRY_AND_MANGO_VARIATION_SETS,
+  BENTO_STRAWBERRY_AND_MANGO_VARIATION_SETS,
+  STRAWBERRY_BLUEBERRY_AND_MANGO_VARIATION_SETS,
+  BENTO_STRAWBERRY_BLUEBERRY_AND_MANGO_VARIATION_SETS,
+  getCenterVariations,
   getCenterItemLimit,
 } from '@/lib/cakeConfig';
 
 describe('CenterSection Variations', () => {
-  it('has exactly 6 variations for strawberry, blueberry, and mango on both standard and bento cakes', () => {
+  it('has exactly 6 variations for all 7 variation sections on both standard and bento cakes', () => {
     expect(STRAWBERRY_VARIATION_SETS).toHaveLength(6);
     expect(BENTO_STRAWBERRY_VARIATION_SETS).toHaveLength(6);
     expect(BLUEBERRY_VARIATION_SETS).toHaveLength(6);
     expect(BENTO_BLUEBERRY_VARIATION_SETS).toHaveLength(6);
     expect(MANGO_VARIATION_SETS).toHaveLength(6);
     expect(BENTO_MANGO_VARIATION_SETS).toHaveLength(6);
+    expect(STRAWBERRY_AND_BLUEBERRY_VARIATION_SETS).toHaveLength(6);
+    expect(BENTO_STRAWBERRY_AND_BLUEBERRY_VARIATION_SETS).toHaveLength(6);
+    expect(BLUEBERRY_AND_MANGO_VARIATION_SETS).toHaveLength(6);
+    expect(BENTO_BLUEBERRY_AND_MANGO_VARIATION_SETS).toHaveLength(6);
+    expect(STRAWBERRY_AND_MANGO_VARIATION_SETS).toHaveLength(6);
+    expect(BENTO_STRAWBERRY_AND_MANGO_VARIATION_SETS).toHaveLength(6);
+    expect(STRAWBERRY_BLUEBERRY_AND_MANGO_VARIATION_SETS).toHaveLength(6);
+    expect(BENTO_STRAWBERRY_BLUEBERRY_AND_MANGO_VARIATION_SETS).toHaveLength(6);
 
-    // Ensure all bento variations have at most 4 items placed
-    [...BENTO_STRAWBERRY_VARIATION_SETS, ...BENTO_BLUEBERRY_VARIATION_SETS, ...BENTO_MANGO_VARIATION_SETS].forEach((set) => {
-      expect(set.placements.length).toBeLessThanOrEqual(4);
+    // Ensure all bento variations have at most 6 items placed overall, and at most 4 of any single decoration
+    [
+      ...BENTO_STRAWBERRY_VARIATION_SETS,
+      ...BENTO_BLUEBERRY_VARIATION_SETS,
+      ...BENTO_MANGO_VARIATION_SETS,
+      ...BENTO_STRAWBERRY_AND_BLUEBERRY_VARIATION_SETS,
+      ...BENTO_BLUEBERRY_AND_MANGO_VARIATION_SETS,
+      ...BENTO_STRAWBERRY_AND_MANGO_VARIATION_SETS,
+      ...BENTO_STRAWBERRY_BLUEBERRY_AND_MANGO_VARIATION_SETS,
+    ].forEach((set) => {
+      expect(set.placements.length).toBeLessThanOrEqual(6);
+      const countByType = {};
+      set.placements.forEach((p) => {
+        const type = p.type || 'default';
+        countByType[type] = (countByType[type] || 0) + 1;
+      });
+      Object.values(countByType).forEach((count) => {
+        expect(count).toBeLessThanOrEqual(4);
+      });
     });
   });
 
@@ -59,7 +95,7 @@ describe('CenterSection Variations', () => {
     expect(screen.getByRole('button', { name: 'Variations' })).toBeInTheDocument();
   });
 
-  it('switches to Variations tab when clicked and displays Strawberry, Blueberry, and Mango Cube options', () => {
+  it('switches to Variations tab when clicked and displays all 7 options on standard cakes', () => {
     const onChange = vi.fn();
     const center = { mode: 'decorations' };
     const { rerender } = render(
@@ -82,13 +118,17 @@ describe('CenterSection Variations', () => {
     expect(screen.getByText('Strawberry')).toBeInTheDocument();
     expect(screen.getByText('Blueberry')).toBeInTheDocument();
     expect(screen.getByText('Mango Cube')).toBeInTheDocument();
+    expect(screen.getByText('Strawberry and Blueberry')).toBeInTheDocument();
+    expect(screen.getByText('Blueberry and Mango Cube')).toBeInTheDocument();
+    expect(screen.getByText('Strawberry and Mango Cube')).toBeInTheDocument();
+    expect(screen.getByText('Strawberry, Blueberry, and Mango Cube')).toBeInTheDocument();
 
-    // Verify all 3 options have 6 variation buttons each (total 18 numbered buttons)
+    // Verify all 7 options have 6 variation buttons each (total 42 numbered buttons)
     const buttons1 = screen.getAllByRole('button', { name: '1' });
-    expect(buttons1).toHaveLength(3);
+    expect(buttons1).toHaveLength(7);
   });
 
-  it('displays 6 variations and places at most 4 items for blueberry and mango when format is bento', () => {
+  it('displays all 7 options on bento format and places at most 4 items for combination variations', () => {
     const onChange = vi.fn();
     const onPlacedItemsChange = vi.fn();
     const structure = { cakeFormat: 'bento' };
@@ -107,6 +147,10 @@ describe('CenterSection Variations', () => {
     expect(screen.getByText('Strawberry')).toBeInTheDocument();
     expect(screen.getByText('Blueberry')).toBeInTheDocument();
     expect(screen.getByText('Mango Cube')).toBeInTheDocument();
+    expect(screen.getByText('Strawberry and Blueberry')).toBeInTheDocument();
+    expect(screen.getByText('Blueberry and Mango Cube')).toBeInTheDocument();
+    expect(screen.getByText('Strawberry and Mango Cube')).toBeInTheDocument();
+    expect(screen.getByText('Strawberry, Blueberry, and Mango Cube')).toBeInTheDocument();
 
     // Click choice 5 for Blueberry (Center Diamond - 4 blueberries)
     const choice5Buttons = screen.getAllByRole('button', { name: '5' });
@@ -223,4 +267,298 @@ describe('CenterSection Variations', () => {
     const updatedItems = updater(placedItems);
     expect(updatedItems).toHaveLength(0);
   });
+
+  it('has exactly 1 variation for each decoration option when cake format is petitsFour', () => {
+    expect(PETITS_FOUR_STRAWBERRY_VARIATION_SETS).toHaveLength(1);
+    expect(PETITS_FOUR_BLUEBERRY_VARIATION_SETS).toHaveLength(1);
+    expect(PETITS_FOUR_MANGO_VARIATION_SETS).toHaveLength(1);
+
+    const variations = getCenterVariations({ cakeFormat: 'petitsFour' });
+    expect(variations).toHaveLength(3);
+    variations.forEach((v) => {
+      expect(v.sets).toHaveLength(1);
+      // Exactly 4 placements, placing one decoration on each petit cake
+      expect(v.sets[0].placements).toHaveLength(4);
+    });
+  });
+
+  it('enforces limit of 4 items for petitsFour cake format', () => {
+    expect(getCenterItemLimit('strawberry', { cakeFormat: 'petitsFour' })).toBe(4);
+    expect(getCenterItemLimit('blueberry', { cakeFormat: 'petitsFour' })).toBe(4);
+    expect(getCenterItemLimit('mangoCube', { cakeFormat: 'petitsFour' })).toBe(4);
+  });
+
+  it('displays only 1 variation button for each decoration and places 4 items (1 per petit cake) on petitsFour format', () => {
+    const onChange = vi.fn();
+    const onPlacedItemsChange = vi.fn();
+    const structure = { cakeFormat: 'petitsFour' };
+    const center = { mode: 'variations' };
+
+    render(
+      <CenterSection
+        center={center}
+        structure={structure}
+        onChange={onChange}
+        onPlacedItemsChange={onPlacedItemsChange}
+        placedItems={[]}
+      />
+    );
+
+    expect(screen.getByText('Strawberry')).toBeInTheDocument();
+    expect(screen.getByText('Blueberry')).toBeInTheDocument();
+    expect(screen.getByText('Mango Cube')).toBeInTheDocument();
+
+    // Verify there is only 1 button for each option (3 buttons total with label '1')
+    const buttons1 = screen.getAllByRole('button', { name: '1' });
+    expect(buttons1).toHaveLength(3);
+
+    // Verify button '2' does not exist
+    expect(screen.queryByRole('button', { name: '2' })).not.toBeInTheDocument();
+
+    // Click variation 1 for Strawberry
+    fireEvent.click(buttons1[0]);
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'variations',
+        variations: expect.objectContaining({ strawberry: 'singlePerCake' }),
+      })
+    );
+
+    const updater = onPlacedItemsChange.mock.calls[0][0];
+    const newItems = updater([]);
+    // Exactly 4 strawberries placed: 1 per petit cake
+    expect(newItems).toHaveLength(4);
+    expect(newItems.every(it => it.type === 'center-strawberry-default' && it.source === 'variation')).toBe(true);
+  });
+
+  it('replaces existing variation when a different decoration variation is picked on petitsFour', () => {
+    const onChange = vi.fn();
+    const onPlacedItemsChange = vi.fn();
+    const structure = { cakeFormat: 'petitsFour' };
+    const center = {
+      mode: 'variations',
+      variations: { strawberry: 'singlePerCake' },
+    };
+    const placedItems = [
+      { id: '1', type: 'center-strawberry-default', source: 'variation', variationType: 'strawberry' },
+      { id: '2', type: 'center-strawberry-default', source: 'variation', variationType: 'strawberry' },
+      { id: '3', type: 'center-strawberry-default', source: 'variation', variationType: 'strawberry' },
+      { id: '4', type: 'center-strawberry-default', source: 'variation', variationType: 'strawberry' },
+    ];
+
+    render(
+      <CenterSection
+        center={center}
+        structure={structure}
+        onChange={onChange}
+        onPlacedItemsChange={onPlacedItemsChange}
+        placedItems={placedItems}
+      />
+    );
+
+    // Click variation 1 for Blueberry (buttons1[1])
+    const buttons1 = screen.getAllByRole('button', { name: '1' });
+    fireEvent.click(buttons1[1]);
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'variations',
+        variations: { blueberry: 'singlePerCake' },
+      })
+    );
+
+    const updater = onPlacedItemsChange.mock.calls[0][0];
+    const updated = updater(placedItems);
+    expect(updated).toHaveLength(4);
+    expect(updated.every(it => it.type === 'center-blueberry-default')).toBe(true);
+  });
+
+  it('replaces existing variation when a different decoration variation is picked on standard cakes (single option allowed)', () => {
+    const onChange = vi.fn();
+    const onPlacedItemsChange = vi.fn();
+    const structure = { cakeFormat: 'standard' };
+    const center = {
+      mode: 'variations',
+      variations: { strawberry: 'singleCenter' },
+    };
+    const placedItems = [
+      { id: '1', type: 'center-strawberry-default', source: 'variation', variationType: 'strawberry' },
+    ];
+
+    render(
+      <CenterSection
+        center={center}
+        structure={structure}
+        onChange={onChange}
+        onPlacedItemsChange={onPlacedItemsChange}
+        placedItems={placedItems}
+      />
+    );
+
+    // Click variation 3 for Blueberry (buttons3[1])
+    const buttons3 = screen.getAllByRole('button', { name: '3' });
+    fireEvent.click(buttons3[1]);
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'variations',
+        variations: { blueberry: 'centerDiamond' },
+      })
+    );
+
+    const updater = onPlacedItemsChange.mock.calls[0][0];
+    const updated = updater(placedItems);
+    expect(updated).toHaveLength(4);
+    expect(updated.every(it => it.type === 'center-blueberry-default')).toBe(true);
+  });
+
+  it('does not include combination variations on petitsFour cake format', () => {
+    const pfVariations = getCenterVariations({ cakeFormat: 'petitsFour' });
+    expect(pfVariations).toHaveLength(3);
+    const variationIds = pfVariations.map(v => v.id);
+    expect(variationIds).toEqual(['strawberry', 'blueberry', 'mangoCube']);
+    expect(variationIds).not.toContain('strawberryAndBlueberry');
+    expect(variationIds).not.toContain('blueberryAndMango');
+    expect(variationIds).not.toContain('strawberryAndMango');
+    expect(variationIds).not.toContain('strawberryBlueberryAndMango');
+  });
+
+  it('places combination variation items with distinct fruit types and supports mutual exclusivity', () => {
+    const onChange = vi.fn();
+    const onPlacedItemsChange = vi.fn();
+    const structure = { cakeFormat: 'standard' };
+    const center = {
+      mode: 'variations',
+      variations: { strawberry: 'singleCenter' },
+    };
+    const placedItems = [
+      { id: '1', type: 'center-strawberry-default', source: 'variation', variationType: 'strawberry' },
+    ];
+
+    render(
+      <CenterSection
+        center={center}
+        structure={structure}
+        onChange={onChange}
+        onPlacedItemsChange={onPlacedItemsChange}
+        placedItems={placedItems}
+      />
+    );
+
+    // Variation options on standard:
+    // 0: Strawberry
+    // 1: Blueberry
+    // 2: Mango Cube
+    // 3: Strawberry and Blueberry
+    // 4: Blueberry and Mango Cube
+    // 5: Strawberry and Mango Cube
+    // 6: Strawberry, Blueberry, and Mango Cube
+    const buttons1 = screen.getAllByRole('button', { name: '1' });
+    expect(buttons1).toHaveLength(7);
+
+    // Click variation 1 for 'Strawberry and Blueberry' (buttons1[3])
+    fireEvent.click(buttons1[3]);
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'variations',
+        variations: { strawberryAndBlueberry: 'duoCenter' },
+      })
+    );
+
+    const updater = onPlacedItemsChange.mock.calls[0][0];
+    const newItems = updater(placedItems);
+    // duoCenter has 1 strawberry and 1 blueberry
+    expect(newItems).toHaveLength(2);
+    expect(newItems.some(it => it.type === 'center-strawberry-default' && it.source === 'variation')).toBe(true);
+    expect(newItems.some(it => it.type === 'center-blueberry-default' && it.source === 'variation')).toBe(true);
+    expect(newItems.every(it => it.variationType === 'strawberryAndBlueberry')).toBe(true);
+  });
+
+  it('places mixed items for Blueberry and Mango Cube and Strawberry and Mango Cube variations', () => {
+    const onChange = vi.fn();
+    const onPlacedItemsChange = vi.fn();
+    const structure = { cakeFormat: 'bento' };
+    const center = { mode: 'variations' };
+
+    render(
+      <CenterSection
+        center={center}
+        structure={structure}
+        onChange={onChange}
+        onPlacedItemsChange={onPlacedItemsChange}
+        placedItems={[]}
+      />
+    );
+
+    // Click variation 1 for 'Blueberry and Mango Cube' (buttons1[4])
+    const buttons1 = screen.getAllByRole('button', { name: '1' });
+    fireEvent.click(buttons1[4]);
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variations: { blueberryAndMango: 'duoCenter' },
+      })
+    );
+
+    let updater = onPlacedItemsChange.mock.calls[0][0];
+    let newItems = updater([]);
+    expect(newItems).toHaveLength(2);
+    expect(newItems.some(it => it.type === 'center-blueberry-default')).toBe(true);
+    expect(newItems.some(it => it.type === 'center-mangoCube-default')).toBe(true);
+
+    // Now click variation 1 for 'Strawberry and Mango Cube' (buttons1[5])
+    fireEvent.click(buttons1[5]);
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variations: { strawberryAndMango: 'duoCenter' },
+      })
+    );
+
+    updater = onPlacedItemsChange.mock.calls[1][0];
+    newItems = updater(newItems);
+    expect(newItems).toHaveLength(2);
+    expect(newItems.some(it => it.type === 'center-strawberry-default')).toBe(true);
+    expect(newItems.some(it => it.type === 'center-mangoCube-default')).toBe(true);
+  });
+
+  it('places mixed items for Strawberry, Blueberry, and Mango Cube variation', () => {
+    const onChange = vi.fn();
+    const onPlacedItemsChange = vi.fn();
+    const structure = { cakeFormat: 'standard' };
+    const center = { mode: 'variations' };
+
+    render(
+      <CenterSection
+        center={center}
+        structure={structure}
+        onChange={onChange}
+        onPlacedItemsChange={onPlacedItemsChange}
+        placedItems={[]}
+      />
+    );
+
+    // Click variation 1 for 'Strawberry, Blueberry, and Mango Cube' (buttons1[6])
+    const buttons1 = screen.getAllByRole('button', { name: '1' });
+    fireEvent.click(buttons1[6]);
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variations: { strawberryBlueberryAndMango: 'trioCenter' },
+      })
+    );
+
+    const updater = onPlacedItemsChange.mock.calls[0][0];
+    const newItems = updater([]);
+    // trioCenter has 1 strawberry, 1 blueberry, 1 mango cube
+    expect(newItems).toHaveLength(3);
+    expect(newItems.some(it => it.type === 'center-strawberry-default')).toBe(true);
+    expect(newItems.some(it => it.type === 'center-blueberry-default')).toBe(true);
+    expect(newItems.some(it => it.type === 'center-mangoCube-default')).toBe(true);
+    expect(newItems.every(it => it.variationType === 'strawberryBlueberryAndMango')).toBe(true);
+  });
 });
+
+

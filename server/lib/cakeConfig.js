@@ -634,6 +634,15 @@ function isLetterDesignId(designId) {
 function getCenterItemLimit(designId, structureOrFormat) {
   if (!designId) return null;
   if (isLetterDesignId(designId)) return 50;
+  const isPetitsFour = typeof structureOrFormat === 'string'
+    ? structureOrFormat === 'petitsFour'
+    : isPetitsFourStructure(structureOrFormat || {});
+  if (isPetitsFour) {
+    if (designId === 'strawberry' || designId === 'blueberry' || designId === 'mangoCube' || designId === 'mango') {
+      return 4;
+    }
+    return 4;
+  }
   const isBento = typeof structureOrFormat === 'string'
     ? structureOrFormat === 'bento'
     : isBentoStructure(structureOrFormat || {});
@@ -1568,8 +1577,599 @@ const BENTO_MANGO_VARIATION_SETS = [
   },
 ];
 
+// Petits Fours variations (strictly 1 variation since each petit cake can only fit 1 decoration)
+function getPetitsFourVariationSets(offset = 0.75) {
+  return [
+    {
+      id: 'singlePerCake',
+      label: 'One Per Cake',
+      placements: [
+        { x: -offset, z: -offset, rotation: 0 },
+        { x: offset, z: -offset, rotation: 0 },
+        { x: -offset, z: offset, rotation: 0 },
+        { x: offset, z: offset, rotation: 0 },
+      ],
+    },
+  ];
+}
+
+const PETITS_FOUR_STRAWBERRY_VARIATION_SETS = getPetitsFourVariationSets(0.75);
+const PETITS_FOUR_BLUEBERRY_VARIATION_SETS = getPetitsFourVariationSets(0.75);
+const PETITS_FOUR_MANGO_VARIATION_SETS = getPetitsFourVariationSets(0.75);
+
+// ─── Center Combination Variations (Standard & Bento only) ───────────────────
+const STRAWBERRY_AND_BLUEBERRY_VARIATION_SETS = [
+  {
+    id: 'duoCenter',
+    label: 'Center Duo',
+    placements: [
+      { x: -0.35, z: 0, type: 'center-strawberry-default', rotation: -0.2 },
+      { x: 0.35, z: 0, type: 'center-blueberry-default', rotation: 0.2 },
+    ],
+  },
+  {
+    id: 'centerDiamond',
+    label: 'Center Diamond',
+    placements: [
+      { x: 0, z: -0.55, type: 'center-strawberry-default', rotation: 0 },
+      { x: 0.55, z: 0, type: 'center-blueberry-default', rotation: 1.571 },
+      { x: 0, z: 0.55, type: 'center-strawberry-default', rotation: 3.142 },
+      { x: -0.55, z: 0, type: 'center-blueberry-default', rotation: 4.712 },
+    ],
+  },
+  {
+    id: 'bouquetCluster',
+    label: 'Bouquet Cluster',
+    placements: [
+      { x: -0.38, z: -0.2, type: 'center-strawberry-default', rotation: -0.3 },
+      { x: 0.38, z: -0.2, type: 'center-strawberry-default', rotation: 0.3 },
+      { x: 0, z: -0.65, type: 'center-blueberry-default', rotation: 0 },
+      { x: -0.45, z: 0.42, type: 'center-blueberry-default', rotation: 2.5 },
+      { x: 0.45, z: 0.42, type: 'center-blueberry-default', rotation: 3.8 },
+    ],
+  },
+  {
+    id: 'crescentArc',
+    label: 'Crescent Arc',
+    placements: [
+      { x: -1.5, z: -0.7, type: 'center-strawberry-default', rotation: -1.0 },
+      { x: -0.8, z: -1.3, type: 'center-blueberry-default', rotation: -0.5 },
+      { x: 0, z: -1.55, type: 'center-strawberry-default', rotation: 0 },
+      { x: 0.8, z: -1.3, type: 'center-blueberry-default', rotation: 0.5 },
+      { x: 1.5, z: -0.7, type: 'center-strawberry-default', rotation: 1.0 },
+    ],
+  },
+  {
+    id: 'blossomRadial',
+    label: 'Blossom Radial',
+    placements: [
+      { x: 0, z: 0, type: 'center-strawberry-default', rotation: 0 },
+      { x: 0, z: -1.3, type: 'center-blueberry-default', rotation: 0 },
+      { x: 1.126, z: -0.65, type: 'center-strawberry-default', rotation: 1.047 },
+      { x: 1.126, z: 0.65, type: 'center-blueberry-default', rotation: 2.094 },
+      { x: 0, z: 1.3, type: 'center-strawberry-default', rotation: 3.142 },
+      { x: -1.126, z: 0.65, type: 'center-blueberry-default', rotation: 4.189 },
+      { x: -1.126, z: -0.65, type: 'center-strawberry-default', rotation: 5.236 },
+    ],
+  },
+  {
+    id: 'outerRing',
+    label: 'Outer Ring',
+    placements: [
+      { x: 0, z: -1.8, type: 'center-strawberry-default', rotation: 0 },
+      { x: 1.27, z: -1.27, type: 'center-blueberry-default', rotation: 0.785 },
+      { x: 1.8, z: 0, type: 'center-strawberry-default', rotation: 1.571 },
+      { x: 1.27, z: 1.27, type: 'center-blueberry-default', rotation: 2.356 },
+      { x: 0, z: 1.8, type: 'center-strawberry-default', rotation: 3.142 },
+      { x: -1.27, z: 1.27, type: 'center-blueberry-default', rotation: 3.927 },
+      { x: -1.8, z: 0, type: 'center-strawberry-default', rotation: 4.712 },
+      { x: -1.27, z: -1.27, type: 'center-blueberry-default', rotation: 5.498 },
+    ],
+  },
+];
+
+const BENTO_STRAWBERRY_AND_BLUEBERRY_VARIATION_SETS = [
+  {
+    id: 'duoCenter',
+    label: 'Center Duo',
+    placements: [
+      { x: -0.28, z: 0, type: 'center-strawberry-default', rotation: -0.2 },
+      { x: 0.28, z: 0, type: 'center-blueberry-default', rotation: 0.2 },
+    ],
+  },
+  {
+    id: 'trioCluster',
+    label: 'Center Trio',
+    placements: [
+      { x: 0, z: -0.22, type: 'center-strawberry-default', rotation: 0 },
+      { x: -0.28, z: 0.24, type: 'center-blueberry-default', rotation: 0 },
+      { x: 0.28, z: 0.24, type: 'center-blueberry-default', rotation: 0 },
+    ],
+  },
+  {
+    id: 'centerDiamond',
+    label: 'Center Diamond',
+    placements: [
+      { x: 0, z: -0.42, type: 'center-strawberry-default', rotation: 0 },
+      { x: 0.42, z: 0, type: 'center-blueberry-default', rotation: 1.571 },
+      { x: 0, z: 0.42, type: 'center-strawberry-default', rotation: 3.142 },
+      { x: -0.42, z: 0, type: 'center-blueberry-default', rotation: 4.712 },
+    ],
+  },
+  {
+    id: 'crescentArc',
+    label: 'Crescent Arc',
+    placements: [
+      { x: -0.65, z: -0.32, type: 'center-blueberry-default', rotation: -0.5 },
+      { x: -0.25, z: -0.62, type: 'center-strawberry-default', rotation: -0.2 },
+      { x: 0.25, z: -0.62, type: 'center-blueberry-default', rotation: 0.2 },
+      { x: 0.65, z: -0.32, type: 'center-strawberry-default', rotation: 0.5 },
+    ],
+  },
+  {
+    id: 'berryCrown',
+    label: 'Berry Crown',
+    placements: [
+      { x: -0.32, z: -0.20, type: 'center-strawberry-default', rotation: -0.2 },
+      { x: 0.32, z: -0.20, type: 'center-strawberry-default', rotation: 0.2 },
+      { x: -0.50, z: 0.28, type: 'center-blueberry-default', rotation: 0 },
+      { x: 0, z: 0.38, type: 'center-blueberry-default', rotation: 0 },
+      { x: 0.50, z: 0.28, type: 'center-blueberry-default', rotation: 0 },
+    ],
+  },
+  {
+    id: 'outerRing',
+    label: 'Outer Ring',
+    placements: [
+      { x: 0, z: -0.65, type: 'center-strawberry-default', rotation: 0 },
+      { x: 0.56, z: -0.325, type: 'center-blueberry-default', rotation: 1.047 },
+      { x: 0.56, z: 0.325, type: 'center-strawberry-default', rotation: 2.094 },
+      { x: 0, z: 0.65, type: 'center-blueberry-default', rotation: 3.142 },
+      { x: -0.56, z: 0.325, type: 'center-strawberry-default', rotation: 4.189 },
+      { x: -0.56, z: -0.325, type: 'center-blueberry-default', rotation: 5.236 },
+    ],
+  },
+];
+
+const BLUEBERRY_AND_MANGO_VARIATION_SETS = [
+  {
+    id: 'duoCenter',
+    label: 'Center Duo',
+    placements: [
+      { x: -0.3, z: 0, type: 'center-blueberry-default', rotation: 0.2 },
+      { x: 0.3, z: 0, type: 'center-mangoCube-default', rotation: -0.2 },
+    ],
+  },
+  {
+    id: 'centerDiamond',
+    label: 'Center Diamond',
+    placements: [
+      { x: 0, z: -0.44, type: 'center-blueberry-default', rotation: 0 },
+      { x: 0.44, z: 0, type: 'center-mangoCube-default', rotation: 1.571 },
+      { x: 0, z: 0.44, type: 'center-blueberry-default', rotation: 3.142 },
+      { x: -0.44, z: 0, type: 'center-mangoCube-default', rotation: 4.712 },
+    ],
+  },
+  {
+    id: 'clusterFive',
+    label: 'Center Cluster',
+    placements: [
+      { x: -0.35, z: -0.15, type: 'center-blueberry-default', rotation: 0 },
+      { x: 0.35, z: -0.15, type: 'center-blueberry-default', rotation: 0 },
+      { x: 0, z: -0.58, type: 'center-mangoCube-default', rotation: 0.5 },
+      { x: -0.42, z: 0.35, type: 'center-mangoCube-default', rotation: 1.5 },
+      { x: 0.42, z: 0.35, type: 'center-mangoCube-default', rotation: 2.5 },
+    ],
+  },
+  {
+    id: 'crescentArc',
+    label: 'Crescent Arc',
+    placements: [
+      { x: -1.35, z: -0.65, type: 'center-blueberry-default', rotation: -0.7 },
+      { x: -0.85, z: -1.15, type: 'center-mangoCube-default', rotation: -0.4 },
+      { x: -0.3, z: -1.45, type: 'center-blueberry-default', rotation: -0.1 },
+      { x: 0.3, z: -1.45, type: 'center-mangoCube-default', rotation: 0.1 },
+      { x: 0.85, z: -1.15, type: 'center-blueberry-default', rotation: 0.4 },
+      { x: 1.35, z: -0.65, type: 'center-mangoCube-default', rotation: 0.7 },
+    ],
+  },
+  {
+    id: 'blossomRadial',
+    label: 'Blossom Radial',
+    placements: [
+      { x: 0, z: 0, type: 'center-blueberry-default', rotation: 0 },
+      { x: 0, z: -1.2, type: 'center-mangoCube-default', rotation: 0 },
+      { x: 1.04, z: -0.6, type: 'center-blueberry-default', rotation: 1.047 },
+      { x: 1.04, z: 0.6, type: 'center-mangoCube-default', rotation: 2.094 },
+      { x: 0, z: 1.2, type: 'center-blueberry-default', rotation: 3.142 },
+      { x: -1.04, z: 0.6, type: 'center-mangoCube-default', rotation: 4.189 },
+      { x: -1.04, z: -0.6, type: 'center-blueberry-default', rotation: 5.236 },
+    ],
+  },
+  {
+    id: 'outerRing',
+    label: 'Outer Ring',
+    placements: [
+      { x: 0, z: -1.7, type: 'center-blueberry-default', rotation: 0 },
+      { x: 1.2, z: -1.2, type: 'center-mangoCube-default', rotation: 0.785 },
+      { x: 1.7, z: 0, type: 'center-blueberry-default', rotation: 1.571 },
+      { x: 1.2, z: 1.2, type: 'center-mangoCube-default', rotation: 2.356 },
+      { x: 0, z: 1.7, type: 'center-blueberry-default', rotation: 3.142 },
+      { x: -1.2, z: 1.2, type: 'center-mangoCube-default', rotation: 3.927 },
+      { x: -1.7, z: 0, type: 'center-blueberry-default', rotation: 4.712 },
+      { x: -1.2, z: -1.2, type: 'center-mangoCube-default', rotation: 5.498 },
+    ],
+  },
+];
+
+const BENTO_BLUEBERRY_AND_MANGO_VARIATION_SETS = [
+  {
+    id: 'duoCenter',
+    label: 'Center Duo',
+    placements: [
+      { x: -0.26, z: 0, type: 'center-blueberry-default', rotation: 0.2 },
+      { x: 0.26, z: 0, type: 'center-mangoCube-default', rotation: -0.2 },
+    ],
+  },
+  {
+    id: 'trioCluster',
+    label: 'Center Trio',
+    placements: [
+      { x: 0, z: -0.20, type: 'center-mangoCube-default', rotation: 0.3 },
+      { x: -0.26, z: 0.22, type: 'center-blueberry-default', rotation: 0 },
+      { x: 0.26, z: 0.22, type: 'center-blueberry-default', rotation: 0 },
+    ],
+  },
+  {
+    id: 'centerDiamond',
+    label: 'Center Diamond',
+    placements: [
+      { x: 0, z: -0.38, type: 'center-mangoCube-default', rotation: 0 },
+      { x: 0.38, z: 0, type: 'center-blueberry-default', rotation: 0 },
+      { x: 0, z: 0.38, type: 'center-mangoCube-default', rotation: 0 },
+      { x: -0.38, z: 0, type: 'center-blueberry-default', rotation: 0 },
+    ],
+  },
+  {
+    id: 'crescentArc',
+    label: 'Crescent Arc',
+    placements: [
+      { x: -0.65, z: -0.30, type: 'center-blueberry-default', rotation: -0.5 },
+      { x: -0.25, z: -0.60, type: 'center-mangoCube-default', rotation: -0.2 },
+      { x: 0.25, z: -0.60, type: 'center-blueberry-default', rotation: 0.2 },
+      { x: 0.65, z: -0.30, type: 'center-mangoCube-default', rotation: 0.5 },
+    ],
+  },
+  {
+    id: 'blossomCluster',
+    label: 'Blossom Cluster',
+    placements: [
+      { x: 0, z: 0, type: 'center-mangoCube-default', rotation: 0.4 },
+      { x: 0, z: -0.48, type: 'center-blueberry-default', rotation: 0 },
+      { x: 0.48, z: 0, type: 'center-blueberry-default', rotation: 0 },
+      { x: 0, z: 0.48, type: 'center-blueberry-default', rotation: 0 },
+      { x: -0.48, z: 0, type: 'center-blueberry-default', rotation: 0 },
+    ],
+  },
+  {
+    id: 'outerRing',
+    label: 'Outer Ring',
+    placements: [
+      { x: 0, z: -0.62, type: 'center-blueberry-default', rotation: 0 },
+      { x: 0.54, z: -0.31, type: 'center-mangoCube-default', rotation: 1.047 },
+      { x: 0.54, z: 0.31, type: 'center-blueberry-default', rotation: 2.094 },
+      { x: 0, z: 0.62, type: 'center-mangoCube-default', rotation: 3.142 },
+      { x: -0.54, z: 0.31, type: 'center-blueberry-default', rotation: 4.189 },
+      { x: -0.54, z: -0.31, type: 'center-mangoCube-default', rotation: 5.236 },
+    ],
+  },
+];
+
+const STRAWBERRY_AND_MANGO_VARIATION_SETS = [
+  {
+    id: 'duoCenter',
+    label: 'Center Duo',
+    placements: [
+      { x: -0.35, z: 0, type: 'center-strawberry-default', rotation: -0.2 },
+      { x: 0.35, z: 0, type: 'center-mangoCube-default', rotation: 0.2 },
+    ],
+  },
+  {
+    id: 'centerDiamond',
+    label: 'Center Diamond',
+    placements: [
+      { x: 0, z: -0.52, type: 'center-strawberry-default', rotation: 0 },
+      { x: 0.52, z: 0, type: 'center-mangoCube-default', rotation: 1.571 },
+      { x: 0, z: 0.52, type: 'center-strawberry-default', rotation: 3.142 },
+      { x: -0.52, z: 0, type: 'center-mangoCube-default', rotation: 4.712 },
+    ],
+  },
+  {
+    id: 'bouquetCluster',
+    label: 'Bouquet Cluster',
+    placements: [
+      { x: -0.38, z: -0.2, type: 'center-strawberry-default', rotation: -0.3 },
+      { x: 0.38, z: -0.2, type: 'center-strawberry-default', rotation: 0.3 },
+      { x: 0, z: -0.65, type: 'center-mangoCube-default', rotation: 0 },
+      { x: -0.45, z: 0.42, type: 'center-mangoCube-default', rotation: 2.5 },
+      { x: 0.45, z: 0.42, type: 'center-mangoCube-default', rotation: 3.8 },
+    ],
+  },
+  {
+    id: 'crescentArc',
+    label: 'Crescent Arc',
+    placements: [
+      { x: -1.45, z: -0.7, type: 'center-strawberry-default', rotation: -1.0 },
+      { x: -0.85, z: -1.25, type: 'center-mangoCube-default', rotation: -0.5 },
+      { x: 0, z: -1.6, type: 'center-strawberry-default', rotation: 0 },
+      { x: 0.85, z: -1.25, type: 'center-mangoCube-default', rotation: 0.5 },
+      { x: 1.45, z: -0.7, type: 'center-strawberry-default', rotation: 1.0 },
+    ],
+  },
+  {
+    id: 'blossomRadial',
+    label: 'Blossom Radial',
+    placements: [
+      { x: 0, z: 0, type: 'center-strawberry-default', rotation: 0 },
+      { x: 0, z: -1.3, type: 'center-mangoCube-default', rotation: 0 },
+      { x: 1.126, z: -0.65, type: 'center-strawberry-default', rotation: 1.047 },
+      { x: 1.126, z: 0.65, type: 'center-mangoCube-default', rotation: 2.094 },
+      { x: 0, z: 1.3, type: 'center-strawberry-default', rotation: 3.142 },
+      { x: -1.126, z: 0.65, type: 'center-mangoCube-default', rotation: 4.189 },
+      { x: -1.126, z: -0.65, type: 'center-strawberry-default', rotation: 5.236 },
+    ],
+  },
+  {
+    id: 'outerRing',
+    label: 'Outer Ring',
+    placements: [
+      { x: 0, z: -1.8, type: 'center-strawberry-default', rotation: 0 },
+      { x: 1.27, z: -1.27, type: 'center-mangoCube-default', rotation: 0.785 },
+      { x: 1.8, z: 0, type: 'center-strawberry-default', rotation: 1.571 },
+      { x: 1.27, z: 1.27, type: 'center-mangoCube-default', rotation: 2.356 },
+      { x: 0, z: 1.8, type: 'center-strawberry-default', rotation: 3.142 },
+      { x: -1.27, z: 1.27, type: 'center-mangoCube-default', rotation: 3.927 },
+      { x: -1.8, z: 0, type: 'center-strawberry-default', rotation: 4.712 },
+      { x: -1.27, z: -1.27, type: 'center-mangoCube-default', rotation: 5.498 },
+    ],
+  },
+];
+
+const BENTO_STRAWBERRY_AND_MANGO_VARIATION_SETS = [
+  {
+    id: 'duoCenter',
+    label: 'Center Duo',
+    placements: [
+      { x: -0.28, z: 0, type: 'center-strawberry-default', rotation: -0.2 },
+      { x: 0.28, z: 0, type: 'center-mangoCube-default', rotation: 0.2 },
+    ],
+  },
+  {
+    id: 'trioCluster',
+    label: 'Center Trio',
+    placements: [
+      { x: 0, z: -0.22, type: 'center-strawberry-default', rotation: 0 },
+      { x: -0.26, z: 0.22, type: 'center-mangoCube-default', rotation: 0 },
+      { x: 0.26, z: 0.22, type: 'center-mangoCube-default', rotation: 0 },
+    ],
+  },
+  {
+    id: 'centerDiamond',
+    label: 'Center Diamond',
+    placements: [
+      { x: 0, z: -0.42, type: 'center-strawberry-default', rotation: 0 },
+      { x: 0.42, z: 0, type: 'center-mangoCube-default', rotation: 1.571 },
+      { x: 0, z: 0.42, type: 'center-strawberry-default', rotation: 3.142 },
+      { x: -0.42, z: 0, type: 'center-mangoCube-default', rotation: 4.712 },
+    ],
+  },
+  {
+    id: 'crescentArc',
+    label: 'Crescent Arc',
+    placements: [
+      { x: -0.65, z: -0.32, type: 'center-mangoCube-default', rotation: -0.5 },
+      { x: -0.25, z: -0.62, type: 'center-strawberry-default', rotation: -0.2 },
+      { x: 0.25, z: -0.62, type: 'center-mangoCube-default', rotation: 0.2 },
+      { x: 0.65, z: -0.32, type: 'center-strawberry-default', rotation: 0.5 },
+    ],
+  },
+  {
+    id: 'tropicalCrown',
+    label: 'Tropical Crown',
+    placements: [
+      { x: -0.32, z: -0.20, type: 'center-strawberry-default', rotation: -0.2 },
+      { x: 0.32, z: -0.20, type: 'center-strawberry-default', rotation: 0.2 },
+      { x: -0.48, z: 0.28, type: 'center-mangoCube-default', rotation: 0 },
+      { x: 0, z: 0.38, type: 'center-mangoCube-default', rotation: 0 },
+      { x: 0.48, z: 0.28, type: 'center-mangoCube-default', rotation: 0 },
+    ],
+  },
+  {
+    id: 'outerRing',
+    label: 'Outer Ring',
+    placements: [
+      { x: 0, z: -0.65, type: 'center-strawberry-default', rotation: 0 },
+      { x: 0.56, z: -0.325, type: 'center-mangoCube-default', rotation: 1.047 },
+      { x: 0.56, z: 0.325, type: 'center-strawberry-default', rotation: 2.094 },
+      { x: 0, z: 0.65, type: 'center-mangoCube-default', rotation: 3.142 },
+      { x: -0.56, z: 0.325, type: 'center-strawberry-default', rotation: 4.189 },
+      { x: -0.56, z: -0.325, type: 'center-mangoCube-default', rotation: 5.236 },
+    ],
+  },
+];
+
+const STRAWBERRY_BLUEBERRY_AND_MANGO_VARIATION_SETS = [
+  {
+    id: 'trioCenter',
+    label: 'Center Trio',
+    placements: [
+      { x: 0, z: -0.38, type: 'center-strawberry-default', rotation: 0 },
+      { x: 0.35, z: 0.22, type: 'center-blueberry-default', rotation: 2.094 },
+      { x: -0.35, z: 0.22, type: 'center-mangoCube-default', rotation: 4.189 },
+    ],
+  },
+  {
+    id: 'quattroCluster',
+    label: 'Center Quartet',
+    placements: [
+      { x: -0.42, z: -0.42, type: 'center-strawberry-default', rotation: -0.5 },
+      { x: 0.42, z: -0.42, type: 'center-mangoCube-default', rotation: 0.5 },
+      { x: -0.42, z: 0.42, type: 'center-blueberry-default', rotation: 2.0 },
+      { x: 0.42, z: 0.42, type: 'center-strawberry-default', rotation: 3.5 },
+    ],
+  },
+  {
+    id: 'hexCluster',
+    label: 'Hex Cluster',
+    placements: [
+      { x: 0, z: -0.75, type: 'center-strawberry-default', rotation: 0 },
+      { x: 0.65, z: -0.375, type: 'center-blueberry-default', rotation: 1.047 },
+      { x: 0.65, z: 0.375, type: 'center-mangoCube-default', rotation: 2.094 },
+      { x: 0, z: 0.75, type: 'center-strawberry-default', rotation: 3.142 },
+      { x: -0.65, z: 0.375, type: 'center-blueberry-default', rotation: 4.189 },
+      { x: -0.65, z: -0.375, type: 'center-mangoCube-default', rotation: 5.236 },
+    ],
+  },
+  {
+    id: 'crescentArc',
+    label: 'Crescent Arc',
+    placements: [
+      { x: -1.5, z: -0.7, type: 'center-strawberry-default', rotation: -1.0 },
+      { x: -0.9, z: -1.25, type: 'center-blueberry-default', rotation: -0.6 },
+      { x: -0.3, z: -1.55, type: 'center-mangoCube-default', rotation: -0.2 },
+      { x: 0.3, z: -1.55, type: 'center-strawberry-default', rotation: 0.2 },
+      { x: 0.9, z: -1.25, type: 'center-blueberry-default', rotation: 0.6 },
+      { x: 1.5, z: -0.7, type: 'center-mangoCube-default', rotation: 1.0 },
+    ],
+  },
+  {
+    id: 'blossomRadial',
+    label: 'Blossom Radial',
+    placements: [
+      { x: 0, z: 0, type: 'center-strawberry-default', rotation: 0 },
+      { x: 0, z: -1.25, type: 'center-blueberry-default', rotation: 0 },
+      { x: 1.08, z: -0.625, type: 'center-mangoCube-default', rotation: 1.047 },
+      { x: 1.08, z: 0.625, type: 'center-blueberry-default', rotation: 2.094 },
+      { x: 0, z: 1.25, type: 'center-mangoCube-default', rotation: 3.142 },
+      { x: -1.08, z: 0.625, type: 'center-blueberry-default', rotation: 4.189 },
+      { x: -1.08, z: -0.625, type: 'center-mangoCube-default', rotation: 5.236 },
+    ],
+  },
+  {
+    id: 'outerRing',
+    label: 'Outer Ring',
+    placements: [
+      { x: 0, z: -1.75, type: 'center-strawberry-default', rotation: 0 },
+      { x: 1.125, z: -1.341, type: 'center-blueberry-default', rotation: 0.698 },
+      { x: 1.723, z: -0.304, type: 'center-mangoCube-default', rotation: 1.396 },
+      { x: 1.516, z: 0.875, type: 'center-strawberry-default', rotation: 2.094 },
+      { x: 0.599, z: 1.644, type: 'center-blueberry-default', rotation: 2.793 },
+      { x: -0.599, z: 1.644, type: 'center-mangoCube-default', rotation: 3.491 },
+      { x: -1.516, z: 0.875, type: 'center-strawberry-default', rotation: 4.189 },
+      { x: -1.723, z: -0.304, type: 'center-blueberry-default', rotation: 4.887 },
+      { x: -1.125, z: -1.341, type: 'center-mangoCube-default', rotation: 5.585 },
+    ],
+  },
+];
+
+const BENTO_STRAWBERRY_BLUEBERRY_AND_MANGO_VARIATION_SETS = [
+  {
+    id: 'trioCenter',
+    label: 'Center Trio',
+    placements: [
+      { x: 0, z: -0.24, type: 'center-strawberry-default', rotation: 0 },
+      { x: 0.28, z: 0.20, type: 'center-blueberry-default', rotation: 0 },
+      { x: -0.28, z: 0.20, type: 'center-mangoCube-default', rotation: 0 },
+    ],
+  },
+  {
+    id: 'petiteArc',
+    label: 'Crescent Arc',
+    placements: [
+      { x: -0.65, z: -0.32, type: 'center-mangoCube-default', rotation: -0.5 },
+      { x: -0.25, z: -0.62, type: 'center-blueberry-default', rotation: -0.2 },
+      { x: 0.25, z: -0.62, type: 'center-strawberry-default', rotation: 0.2 },
+      { x: 0.65, z: -0.32, type: 'center-blueberry-default', rotation: 0.5 },
+    ],
+  },
+  {
+    id: 'centerDiamond',
+    label: 'Center Diamond',
+    placements: [
+      { x: 0, z: -0.42, type: 'center-strawberry-default', rotation: 0 },
+      { x: 0.42, z: 0, type: 'center-mangoCube-default', rotation: 1.571 },
+      { x: 0, z: 0.42, type: 'center-blueberry-default', rotation: 3.142 },
+      { x: -0.42, z: 0, type: 'center-mangoCube-default', rotation: 4.712 },
+    ],
+  },
+  {
+    id: 'berryCrown',
+    label: 'Berry Crown',
+    placements: [
+      { x: -0.32, z: -0.22, type: 'center-strawberry-default', rotation: -0.2 },
+      { x: 0.32, z: -0.22, type: 'center-strawberry-default', rotation: 0.2 },
+      { x: -0.28, z: 0.30, type: 'center-mangoCube-default', rotation: 0 },
+      { x: 0.28, z: 0.30, type: 'center-blueberry-default', rotation: 0 },
+    ],
+  },
+  {
+    id: 'petiteBlossom',
+    label: 'Petite Blossom',
+    placements: [
+      { x: 0, z: 0, type: 'center-strawberry-default', rotation: 0 },
+      { x: 0, z: -0.52, type: 'center-blueberry-default', rotation: 0 },
+      { x: 0.50, z: 0, type: 'center-mangoCube-default', rotation: 1.571 },
+      { x: 0, z: 0.52, type: 'center-blueberry-default', rotation: 3.142 },
+      { x: -0.50, z: 0, type: 'center-mangoCube-default', rotation: 4.712 },
+    ],
+  },
+  {
+    id: 'harvestRing',
+    label: 'Harvest Ring',
+    placements: [
+      { x: 0, z: -0.65, type: 'center-strawberry-default', rotation: 0 },
+      { x: 0.56, z: -0.325, type: 'center-mangoCube-default', rotation: 1.047 },
+      { x: 0.56, z: 0.325, type: 'center-blueberry-default', rotation: 2.094 },
+      { x: 0, z: 0.65, type: 'center-strawberry-default', rotation: 3.142 },
+      { x: -0.56, z: 0.325, type: 'center-mangoCube-default', rotation: 4.189 },
+      { x: -0.56, z: -0.325, type: 'center-blueberry-default', rotation: 5.236 },
+    ],
+  },
+];
+
 function getCenterVariations(structure = {}) {
+  const isPetitsFour = isPetitsFourStructure(structure);
   const isBento = isBentoStructure(structure);
+
+  if (isPetitsFour) {
+    const isLarge = structure?.size === 'largeCube';
+    const offset = isLarge ? 1.35 : 0.75;
+    const pfSets = getPetitsFourVariationSets(offset);
+    return [
+      {
+        id: 'strawberry',
+        designId: 'strawberry',
+        label: 'Strawberry',
+        toolId: 'center-strawberry-default',
+        sets: pfSets,
+      },
+      {
+        id: 'blueberry',
+        designId: 'blueberry',
+        label: 'Blueberry',
+        toolId: 'center-blueberry-default',
+        sets: pfSets,
+      },
+      {
+        id: 'mangoCube',
+        designId: 'mangoCube',
+        label: 'Mango Cube',
+        toolId: 'center-mangoCube-default',
+        sets: pfSets,
+      },
+    ];
+  }
+
   return [
     {
       id: 'strawberry',
@@ -1591,6 +2191,30 @@ function getCenterVariations(structure = {}) {
       label: 'Mango Cube',
       toolId: 'center-mangoCube-default',
       sets: isBento ? BENTO_MANGO_VARIATION_SETS : MANGO_VARIATION_SETS,
+    },
+    {
+      id: 'strawberryAndBlueberry',
+      label: 'Strawberry and Blueberry',
+      toolId: 'center-strawberry-default',
+      sets: isBento ? BENTO_STRAWBERRY_AND_BLUEBERRY_VARIATION_SETS : STRAWBERRY_AND_BLUEBERRY_VARIATION_SETS,
+    },
+    {
+      id: 'blueberryAndMango',
+      label: 'Blueberry and Mango Cube',
+      toolId: 'center-blueberry-default',
+      sets: isBento ? BENTO_BLUEBERRY_AND_MANGO_VARIATION_SETS : BLUEBERRY_AND_MANGO_VARIATION_SETS,
+    },
+    {
+      id: 'strawberryAndMango',
+      label: 'Strawberry and Mango Cube',
+      toolId: 'center-strawberry-default',
+      sets: isBento ? BENTO_STRAWBERRY_AND_MANGO_VARIATION_SETS : STRAWBERRY_AND_MANGO_VARIATION_SETS,
+    },
+    {
+      id: 'strawberryBlueberryAndMango',
+      label: 'Strawberry, Blueberry, and Mango Cube',
+      toolId: 'center-strawberry-default',
+      sets: isBento ? BENTO_STRAWBERRY_BLUEBERRY_AND_MANGO_VARIATION_SETS : STRAWBERRY_BLUEBERRY_AND_MANGO_VARIATION_SETS,
     },
   ];
 }
@@ -1946,4 +2570,6 @@ function computeSlotPosition(slot, topRadius) {
   };
 }
 
-module.exports = { DEFAULT_CONFIG, FINISH_STYLES, BUTTERCREAM_TEXTURES, STANDARD_SIZE_OPTIONS, BENTO_SIZE_OPTIONS, PETITS_FOUR_SIZE_OPTIONS, SIZE_OPTIONS, CAKE_FORMAT_OPTIONS, CAKE_TYPE_OPTIONS, LAYER_OPTIONS, SHAPE_OPTIONS, getCakeFormat, isPetitsFourStructure, isBentoStructure, resolveStructureShape, FILLING_LAYER_OPTIONS, PIPING_TIPS, FILLING_PIPING_DESIGNS, SIZE_OPTIONS_CUSTOM, SUGAR_COLORS, SUGAR_COLOR_MODES, SURFACE_TREATMENT_MODES, GLAZE_PATTERNS, PETIT_FOURS_GLAZE_PATTERNS, CHECKERED_PATTERN_SETS, TRIANGLE_PATTERN_SETS, CENTER_ITEM_LIMITS, isLetterDesignId, getCenterItemLimit, getCenterItemCount, isCenterItemAtLimit, CENTER_ITEM_RADII, getCenterItemRadius, getItemFootprint, doFootprintsClash, isFootprintInBoundary, doItemsClash, CENTER_BOUNDARY_RATIO, CENTER_BOUNDARY_RESERVE, getCenterPlacementBoundaryRadius, EDIBLE_DELICATES_RIM_SPECS, getActiveEdgeDelicateTip, getEdgeDelicatesObstacles, getEdgeFerreroObstacles, getDelicatesAwareBoundaryRadius, getFerreroAwareBoundaryRadius, getTopTierRadiusFromConfig, pruneItemsCollidingWithEdgeDelicates, pruneItemsCollidingWithEdgeFerrero, CENTER_PLACEABLE_DESIGNS, STRAWBERRY_VARIATION_SETS, BENTO_STRAWBERRY_VARIATION_SETS, BLUEBERRY_VARIATION_SETS, BENTO_BLUEBERRY_VARIATION_SETS, MANGO_VARIATION_SETS, BENTO_MANGO_VARIATION_SETS, getCenterVariations, CENTER_VARIATIONS, BUTTERCREAM_LETTERS_UPPER, BUTTERCREAM_LETTERS_LOWER, BUTTERCREAM_LETTERS, BRACELET_BEADS_VARIATIONS, SCALLOPS_VARIATIONS, EDGE_DECORATION_SETS, PIPING_TIPS_DELUXE, BEADED_TRIM_VARIATIONS_DELUXE, BORDER_PIPING_SOLID_VARIATIONS, BORDER_PIPING_ALTERNATING_VARIATIONS, BORDER_PIPING_VARIATIONS_DELUXE, DOLLOPS_SOLID_VARIATIONS_DELUXE, DOLLOPS_SOLID_CHERRY_VARIATIONS_DELUXE, DOLLOPS_ALTERNATING_VARIATIONS_DELUXE, DOLLOPS_ALTERNATING_CHERRY_VARIATIONS_DELUXE, DOLLOPS_VARIATIONS_DELUXE, WHIPPED_CREAM_SOLID_VARIATIONS, WHIPPED_CREAM_ALTERNATING_VARIATIONS, WHIPPED_CREAM_CHERRY_VARIATIONS, WHIPPED_CREAM_VARIATIONS, FRUIT_CONFECTION_RIM_OPTIONS, WHIPPED_CREAM_AND_RIM_VARIATIONS_DELUXE, EDGE_PIPING_OPTIONS, CHEVRON_PATTERN_SETS, SCATTER_PEARLS_SETS, PIPING_SCROLLS_SETS, SUNSHINE_PLAY_SETS, VICTORIAN_LAMBETH_SETS, SIDE_TREATMENTS, SLOT_RINGS, TOP_SURFACE_SLOTS, PLACEABLE_DECORATIONS, PLACE_ITEM_RADII, getSlotById, computeSlotPosition };
+module.exports = { DEFAULT_CONFIG, FINISH_STYLES, BUTTERCREAM_TEXTURES, STANDARD_SIZE_OPTIONS, BENTO_SIZE_OPTIONS, PETITS_FOUR_SIZE_OPTIONS, SIZE_OPTIONS, CAKE_FORMAT_OPTIONS, CAKE_TYPE_OPTIONS, LAYER_OPTIONS, SHAPE_OPTIONS, getCakeFormat, isPetitsFourStructure, isBentoStructure, resolveStructureShape, FILLING_LAYER_OPTIONS, PIPING_TIPS, FILLING_PIPING_DESIGNS, SIZE_OPTIONS_CUSTOM, SUGAR_COLORS, SUGAR_COLOR_MODES, SURFACE_TREATMENT_MODES, GLAZE_PATTERNS, PETIT_FOURS_GLAZE_PATTERNS, CHECKERED_PATTERN_SETS, TRIANGLE_PATTERN_SETS, CENTER_ITEM_LIMITS, isLetterDesignId, getCenterItemLimit, getCenterItemCount, isCenterItemAtLimit, CENTER_ITEM_RADII, getCenterItemRadius, getItemFootprint, doFootprintsClash, isFootprintInBoundary, doItemsClash, CENTER_BOUNDARY_RATIO, CENTER_BOUNDARY_RESERVE, getCenterPlacementBoundaryRadius, EDIBLE_DELICATES_RIM_SPECS, getActiveEdgeDelicateTip, getEdgeDelicatesObstacles, getEdgeFerreroObstacles, getDelicatesAwareBoundaryRadius, getFerreroAwareBoundaryRadius, getTopTierRadiusFromConfig, pruneItemsCollidingWithEdgeDelicates, pruneItemsCollidingWithEdgeFerrero, CENTER_PLACEABLE_DESIGNS, STRAWBERRY_VARIATION_SETS, BENTO_STRAWBERRY_VARIATION_SETS, BLUEBERRY_VARIATION_SETS, BENTO_BLUEBERRY_VARIATION_SETS, MANGO_VARIATION_SETS, BENTO_MANGO_VARIATION_SETS, STRAWBERRY_AND_BLUEBERRY_VARIATION_SETS, BENTO_STRAWBERRY_AND_BLUEBERRY_VARIATION_SETS, BLUEBERRY_AND_MANGO_VARIATION_SETS, BENTO_BLUEBERRY_AND_MANGO_VARIATION_SETS, STRAWBERRY_AND_MANGO_VARIATION_SETS, BENTO_STRAWBERRY_AND_MANGO_VARIATION_SETS, STRAWBERRY_BLUEBERRY_AND_MANGO_VARIATION_SETS, BENTO_STRAWBERRY_BLUEBERRY_AND_MANGO_VARIATION_SETS, getPetitsFourVariationSets, PETITS_FOUR_STRAWBERRY_VARIATION_SETS, PETITS_FOUR_BLUEBERRY_VARIATION_SETS, PETITS_FOUR_MANGO_VARIATION_SETS, getCenterVariations, CENTER_VARIATIONS, BUTTERCREAM_LETTERS_UPPER, BUTTERCREAM_LETTERS_LOWER, BUTTERCREAM_LETTERS, BRACELET_BEADS_VARIATIONS, SCALLOPS_VARIATIONS, EDGE_DECORATION_SETS, PIPING_TIPS_DELUXE, BEADED_TRIM_VARIATIONS_DELUXE, BORDER_PIPING_SOLID_VARIATIONS, BORDER_PIPING_ALTERNATING_VARIATIONS, BORDER_PIPING_VARIATIONS_DELUXE, DOLLOPS_SOLID_VARIATIONS_DELUXE, DOLLOPS_SOLID_CHERRY_VARIATIONS_DELUXE, DOLLOPS_ALTERNATING_VARIATIONS_DELUXE, DOLLOPS_ALTERNATING_CHERRY_VARIATIONS_DELUXE, DOLLOPS_VARIATIONS_DELUXE, WHIPPED_CREAM_SOLID_VARIATIONS, WHIPPED_CREAM_ALTERNATING_VARIATIONS, WHIPPED_CREAM_CHERRY_VARIATIONS, WHIPPED_CREAM_VARIATIONS, FRUIT_CONFECTION_RIM_OPTIONS, WHIPPED_CREAM_AND_RIM_VARIATIONS_DELUXE, EDGE_PIPING_OPTIONS, CHEVRON_PATTERN_SETS, SCATTER_PEARLS_SETS, PIPING_SCROLLS_SETS, SUNSHINE_PLAY_SETS, VICTORIAN_LAMBETH_SETS, SIDE_TREATMENTS, SLOT_RINGS, TOP_SURFACE_SLOTS, PLACEABLE_DECORATIONS, PLACE_ITEM_RADII, getSlotById, computeSlotPosition };
+
+

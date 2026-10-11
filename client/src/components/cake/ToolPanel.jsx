@@ -252,17 +252,22 @@ export default function ToolPanel({
     }
 
     const tierCountChanged = newStructure.layers !== config.structure?.layers;
-    if (!tierCountChanged) {
+    const formatChanged = currentFormat !== nextFormat;
+    if (!tierCountChanged && !formatChanged) {
       onChange(nextConfig);
       return;
     }
 
-    const centerItems = (config.place?.items || []).filter(
-      (item) => !(typeof item.type === 'string' && item.type.startsWith('center-'))
-    );
-    const legacyPlacedItems = (config.placedItems || []).filter(
-      (item) => !(typeof item.type === 'string' && item.type.startsWith('center-'))
-    );
+    const centerItems = nextFormat === 'petitsFour'
+      ? []
+      : (config.place?.items || []).filter(
+          (item) => !(typeof item.type === 'string' && item.type.startsWith('center-'))
+        );
+    const legacyPlacedItems = nextFormat === 'petitsFour'
+      ? []
+      : (config.placedItems || []).filter(
+          (item) => !(typeof item.type === 'string' && item.type.startsWith('center-'))
+        );
 
     const baseConfig = {
       ...nextConfig,
