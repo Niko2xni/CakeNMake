@@ -4,6 +4,7 @@ import {
   Clock,
   LayoutTemplate,
   LogOut,
+  MessageSquare,
   Plus,
   Settings,
   Trash2,
@@ -84,6 +85,8 @@ export default function ClientNavbar() {
         ))}
 
         <div className="cn-nav-spacer" />
+
+        <NavItem to="/chats" icon={MessageSquare} label="Chats" currentPath={location.pathname} />
 
         <div className="cn-user-menu" ref={menuRef}>
           <button

@@ -27,7 +27,15 @@ describe('ClientNavbar', () => {
     expect(screen.getByRole('link', { name: /recents/i })).toHaveAttribute('href', '/client');
     expect(screen.getByRole('link', { name: /templates/i })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: /trash/i })).toHaveAttribute('href', '/trash');
-    expect(screen.queryByRole('link', { name: /chats/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /chats/i })).toHaveAttribute('href', '/chats');
+  });
+
+  it('marks the chats navigation item as active on /chats', () => {
+    renderNavbar('/chats');
+
+    const chatsLink = screen.getByRole('link', { name: /chats/i });
+    expect(chatsLink).toHaveAttribute('aria-current', 'page');
+    expect(chatsLink).toHaveClass('is-active');
   });
 
   it('opens an accessible account menu with profile and settings links', () => {

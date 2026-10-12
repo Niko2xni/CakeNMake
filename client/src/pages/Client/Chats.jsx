@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Image as ImageIcon,
   ThumbsUp,
@@ -305,8 +305,13 @@ function CustomScrollbar({ className = '', contentClassName = '', children }) {
 
 export default function Chats() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requestedConversation = searchParams.get('conversation');
+  const openedRequest = useRef(null);
   const {
     activeConversation,
+    conversations = [],
+    setActiveConversationId = () => {},
     error: chatError,
     hasMore,
     loading: chatLoading,
@@ -316,7 +321,18 @@ export default function Chats() {
     sendMessage,
     setMessages,
     restricted,
-  } = useChat({ autoCreate: true });
+  } = useChat({ autoCreate: true, initialConversationId: requestedConversation });
+
+  useEffect(() => {
+    if (
+      requestedConversation &&
+      openedRequest.current !== requestedConversation &&
+      conversations.some((item) => item.id === requestedConversation)
+    ) {
+      setActiveConversationId(requestedConversation);
+      openedRequest.current = requestedConversation;
+    }
+  }, [requestedConversation, conversations, setActiveConversationId]);
   const [inputText, setInputText] = useState('');
   const [uploadError, setUploadError] = useState(null);
   const [showInfo, setShowInfo] = useState(false);

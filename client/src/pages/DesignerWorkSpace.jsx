@@ -82,6 +82,7 @@ export default function DesignerWorkSpace() {
   const mainAreaRef = useRef(null);
   const blueprintViewsRef = useRef(null); // { hero, front, back, top, side } JPEG data URLs, set once on order complete
   const submittedBlueprintRef = useRef(null);
+  const activeOrderConvoIdRef = useRef(null);
 
   // Auto-save state
   const [designId, setDesignId] = useState(null);
@@ -480,6 +481,8 @@ export default function DesignerWorkSpace() {
       convoId = created?.conversation?.id;
     }
     if (!convoId) throw new Error('Your order was submitted, but the bakery chat could not be opened. Please try again.');
+    activeOrderConvoIdRef.current = convoId;
+    snapshot.convoId = convoId;
 
     const totalPesos = snapshot.quote ? snapshot.quote.totalMinor / 100 : 0;
     const downpayment = Math.ceil(totalPesos / 2);
@@ -507,12 +510,15 @@ export default function DesignerWorkSpace() {
 
   const handleOrderComplete = useCallback(async (selectedDate) => {
     setOrderComplete(true);
-    setMobileBakeryChatOpen(true);
     setBakeryOpen(false);
 
-    if (!account) return;
-
-  }, [account]);
+    const targetConvoId = activeOrderConvoIdRef.current || submittedBlueprintRef.current?.convoId;
+    if (targetConvoId) {
+      navigate(`/chats?conversation=${encodeURIComponent(targetConvoId)}`);
+    } else {
+      navigate('/chats');
+    }
+  }, [navigate]);
 
   const handleSaveDesign = async () => {
     if (!account) {
