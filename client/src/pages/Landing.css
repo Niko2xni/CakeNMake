@@ -1144,6 +1144,21 @@ html {
   color: var(--cream);
 }
 
+.footer-social-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.footer-social-link svg {
+  flex-shrink: 0;
+  transition: transform 140ms ease;
+}
+
+.footer-social-link:hover svg {
+  transform: translateY(-1px);
+}
+
 .footer-bottom {
   display: flex;
   justify-content: space-between;
