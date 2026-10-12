@@ -185,24 +185,30 @@ async function removeOwnedDesign(req, res, message) {
 exports.deleteDesign = (req, res) => removeOwnedDesign(req, res, 'Design deleted successfully');
 exports.permanentlyDelete = (req, res) => removeOwnedDesign(req, res, 'Design permanently deleted');
 
+const MAX_TRASH_CAPACITY = 20;
+
+exports.MAX_TRASH_CAPACITY = MAX_TRASH_CAPACITY;
+
 exports.moveToTrash = async (req, res) => {
   if (invalidDesignId(req, res)) return;
   try {
     const design = await Design.findOne(ownedDesignFilter(req));
     if (!design) return notFound(res);
     const filter = ownerFilter(req);
-    const trashedCount = await Design.countDocuments({ ...filter, isTrashed: true });
-    if (trashedCount >= 5) {
-      const oldest = await Design.findOneAndDelete({ ...filter, isTrashed: true }, { sort: { trashedAt: 1 } });
-      if (oldest) {
-        await deleteTrustedThumbnail({
-          asset: oldest.thumbnailAsset,
-          firebaseUid: req.auth.uid,
-          designId: oldest._id.toString(),
-        });
+    if (!design.isTrashed) {
+      const trashedCount = await Design.countDocuments({ ...filter, isTrashed: true });
+      if (trashedCount >= MAX_TRASH_CAPACITY) {
+        const oldest = await Design.findOneAndDelete({ ...filter, isTrashed: true }, { sort: { trashedAt: 1 } });
+        if (oldest) {
+          await deleteTrustedThumbnail({
+            asset: oldest.thumbnailAsset,
+            firebaseUid: req.auth.uid,
+            designId: oldest._id.toString(),
+          });
+        }
       }
+      design.isTrashed = true;
     }
-    design.isTrashed = true;
     design.trashedAt = new Date();
     return res.json(await design.save());
   } catch (error) {
