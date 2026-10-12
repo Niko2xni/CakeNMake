@@ -207,8 +207,8 @@ export default function BakeryReservations({ reservations, loading, selected, se
         </CustomScrollbar>
       </div>
 
-      {/* Detail panel - same floating-card pattern as Chats.jsx's Chat info panel, no animation */}
-      <div className={`cn-reservation-detail flex-shrink-0 overflow-hidden ${selected ? 'is-open w-[22rem] lg:w-[26rem] ml-4' : 'w-0 ml-0'}`}>
+      {/* Detail panel - unified cohesive layout with top action bar and unified financials */}
+      <div className={`cn-reservation-detail flex-shrink-0 overflow-hidden ${selected ? 'is-open w-[22rem] lg:w-[27rem] ml-4' : 'w-0 ml-0'}`}>
         {selected && (
           <div className="w-full h-full flex flex-col bg-white rounded-2xl border border-pink-100 shadow-xl overflow-hidden">
             <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-pink-100">
@@ -222,41 +222,70 @@ export default function BakeryReservations({ reservations, loading, selected, se
               </button>
             </div>
 
-            <CustomScrollbar className="flex-1" contentClassName="p-4 space-y-5">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                  <User className="w-6 h-6 text-gray-500" />
-                </div>
-                <div>
-                  <p className="font-semibold text-gray-900">{selected.user?.displayName || selected.user?.name || 'Unknown customer'}</p>
-                  <p className="text-xs text-gray-500">{selected.user?.email}</p>
+            <CustomScrollbar className="flex-1" contentClassName="p-4 space-y-3.5">
+              {/* Customer & Cake Header */}
+              <div className="flex items-start justify-between gap-3 pb-3 border-b border-pink-100">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-10 h-10 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center font-bold text-sm shrink-0">
+                    {(selected.user?.displayName || selected.user?.name || 'U').charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-900 text-sm truncate">
+                      {selected.user?.displayName || selected.user?.name || 'Unknown customer'}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate">{selected.user?.email}</p>
+                    <p className="text-xs font-semibold text-pink-600 truncate mt-0.5">
+                      {selected.designName || 'Custom cake'} <span className="text-gray-400 font-normal">· #{selected._id.slice(-6)}</span>
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                {selected.designName && <p className="text-sm font-semibold">{selected.designName}</p>}
-                {selected.checkoutMode === 'simulated' && <p className="text-xs text-amber-700">Simulated checkout · Payment requires staff verification</p>}
-                <div className="flex items-center gap-2 text-sm text-gray-700">
-                  <Calendar className="w-4 h-4 text-pink-500" />
-                  Pickup: {formatDate(selected.pickupDate)}
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-700">
-                  <Banknote className="w-4 h-4 text-pink-500" />
-                  Total: {formatPeso(selected.totalPrice)}
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-700">
-                  <Banknote className="w-4 h-4 text-pink-500" />
-                  Down payment: {formatPeso(selected.downPayment?.amount)} ·{' '}
-                  <span className={selected.downPayment?.isPaid ? 'text-green-600 font-medium' : 'text-yellow-600'}>
-                    {selected.downPayment?.isPaid ? 'Paid' : 'Unpaid'}
-                  </span>
-                </div>
+              {/* Top Quick Actions Bar (Chat & Blueprint accessible immediately) */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={openChat}
+                  disabled={openingChat}
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-pink-200 bg-pink-50/50 hover:bg-pink-100/60 px-2.5 py-2 text-xs font-semibold text-pink-700 transition-colors"
+                >
+                  <MessageCircle className="w-3.5 h-3.5 text-pink-600 shrink-0" />
+                  <span>Open chat with customer</span>
+                </button>
+
+                {selected.blueprint ? (
+                  <button
+                    type="button"
+                    onClick={openBlueprint}
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-pink-200 bg-white hover:bg-pink-50 px-2.5 py-2 text-xs font-semibold text-pink-700 transition-colors"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-pink-600 shrink-0" />
+                    <span>View blueprint PDF</span>
+                  </button>
+                ) : safeExternalUrl(selected.blueprintUrl) ? (
+                  <a
+                    href={safeExternalUrl(selected.blueprintUrl)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-pink-200 bg-white hover:bg-pink-50 px-2.5 py-2 text-xs font-semibold text-pink-700 transition-colors"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-pink-600 shrink-0" />
+                    <span>View blueprint PDF</span>
+                  </a>
+                ) : (
+                  <div className="flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50 px-2.5 py-2 text-xs font-medium text-gray-400 cursor-not-allowed">
+                    <FileText className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                    <span>Blueprint not ready yet</span>
+                  </div>
+                )}
               </div>
+              {blueprintError && <p role="alert" className="text-xs text-red-700">{blueprintError}</p>}
+              {chatError && <p role="alert" className="text-xs text-red-700">{chatError}</p>}
 
               {/* Fulfillment Logistics Card */}
-              <div className="rounded-xl border border-pink-100 bg-pink-50/40 p-3 space-y-2.5">
+              <div className="rounded-xl border border-pink-100 bg-pink-50/30 p-3 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-gray-900 flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
                     {selected.fulfillment?.type === 'delivery' ? (
                       <>
                         <Truck className="w-4 h-4 text-pink-600" />
@@ -269,92 +298,93 @@ export default function BakeryReservations({ reservations, loading, selected, se
                       </>
                     )}
                   </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-white border border-pink-200 font-medium text-pink-700">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-white border border-pink-200 font-semibold text-pink-700">
                     {selected.fulfillment?.type === 'delivery' ? 'Grab / Lalamove Car' : 'AH Tinaps Hub'}
                   </span>
                 </div>
 
-                {selected.fulfillment?.type === 'delivery' ? (
-                  <div className="space-y-1.5 text-xs text-gray-600">
-                    <div className="flex items-start gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <span className="font-medium text-gray-700">Destination: </span>
-                        <span>{selected.fulfillment.deliveryAddress || 'Address on file'}</span>
-                        {selected.fulfillment.deliveryLandmark && (
-                          <p className="text-[11px] text-gray-500 mt-0.5">Gate / Landmark: {selected.fulfillment.deliveryLandmark}</p>
-                        )}
-                      </div>
-                    </div>
-                    {selected.fulfillment.timeSlot && (
-                      <div className="flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                        <span>Dispatch window: <strong className="text-gray-700">{selected.fulfillment.timeSlot}</strong></span>
-                      </div>
-                    )}
-                    {selected.fulfillment.recipientPhone && (
-                      <div className="flex items-center gap-1.5">
-                        <Phone className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                        <span>Rider contact: <strong className="text-gray-700">{selected.fulfillment.recipientPhone}</strong></span>
-                      </div>
-                    )}
-                    <p className="text-[11px] text-amber-800 bg-amber-50 rounded p-1.5 border border-amber-200">
-                      Client books and pays for courier car when bakery confirms dispatch.
-                    </p>
+                <div className="text-xs text-gray-600 space-y-1.5">
+                  <div className="flex items-center gap-1.5 font-medium text-gray-800">
+                    <Calendar className="w-3.5 h-3.5 text-pink-500 shrink-0" />
+                    <span>{selected.fulfillment?.type === 'delivery' ? 'Delivery Date:' : 'Pickup Date:'} <strong>{formatDate(selected.pickupDate)}</strong></span>
                   </div>
-                ) : (
-                  <div className="space-y-1.5 text-xs text-gray-600">
-                    <div className="flex items-start gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <span className="font-medium text-gray-700">Location: </span>
-                        <span>AH Tinaps Bakeshop, Mandaluyong City</span>
-                        <p className="text-[11px] text-gray-500">Store Hours: 9:00 AM – 7:00 PM</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                      <span>
-                        Time slot: <strong className="text-gray-700">{selected.fulfillment?.timeSlot || '9:00 AM – 12:00 PM (Morning)'}</strong>
-                      </span>
-                    </div>
-                  </div>
-                )}
 
-                {selected.fulfillment?.notes && (
-                  <div className="pt-2 border-t border-pink-100 text-xs">
-                    <span className="text-gray-500 font-medium">Notes: </span>
-                    <span className="text-gray-700 italic">"{selected.fulfillment.notes}"</span>
-                  </div>
-                )}
+                  {selected.fulfillment?.type === 'delivery' ? (
+                    <>
+                      <div className="flex items-start gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-gray-400 mt-0.5 shrink-0" />
+                        <div>
+                          <span className="font-medium text-gray-700">Destination: </span>
+                          <span>{selected.fulfillment.deliveryAddress || 'Address on file'}</span>
+                          {selected.fulfillment.deliveryLandmark && (
+                            <p className="text-[11px] text-gray-500 mt-0.5">Gate / Landmark: {selected.fulfillment.deliveryLandmark}</p>
+                          )}
+                        </div>
+                      </div>
+                      {selected.fulfillment.timeSlot && (
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                          <span>Dispatch window: <strong className="text-gray-700">{selected.fulfillment.timeSlot}</strong></span>
+                        </div>
+                      )}
+                      {selected.fulfillment.recipientPhone && (
+                        <div className="flex items-center gap-1.5">
+                          <Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                          <span>Rider contact: <strong className="text-gray-700">{selected.fulfillment.recipientPhone}</strong></span>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-start gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-gray-400 mt-0.5 shrink-0" />
+                        <div>
+                          <span>AH Tinaps Bakeshop, Mandaluyong City</span>
+                          <span className="text-[11px] text-gray-500 block">Hours: 9:00 AM – 7:00 PM daily</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                        <span>Pickup slot: <strong className="text-gray-700">{selected.fulfillment?.timeSlot || '9:00 AM – 12:00 PM (Morning)'}</strong></span>
+                      </div>
+                    </>
+                  )}
+
+                  {selected.fulfillment?.notes && (
+                    <div className="pt-1.5 border-t border-pink-100 text-xs">
+                      <span className="text-gray-500 font-medium">Notes: </span>
+                      <span className="text-gray-700 italic">"{selected.fulfillment.notes}"</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Pay-to-Bake & Balance Card */}
-              <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-3 space-y-2">
+              {/* Unified Pay-to-Bake & Financial Breakdown Card */}
+              <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-3 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-gray-900 flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
                     <ShieldCheck className="w-4 h-4 text-pink-600" />
                     Pay-to-Bake Policy Status
                   </span>
-                  <span className="text-[10px] text-gray-500 font-medium">50% / 50% Schedule</span>
+                  <span className="text-xs font-extrabold text-gray-900">Total: {formatPeso(selected.totalPrice)}</span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="p-2 rounded-lg bg-white border border-gray-200">
-                    <p className="text-[11px] text-gray-500">1. Reservation Downpayment</p>
-                    <p className="font-bold text-gray-900 mt-0.5">
+                    <p className="text-[10px] text-gray-500 font-medium uppercase tracking-wide">1. Downpayment (50%)</p>
+                    <p className="font-bold text-gray-900 text-sm mt-0.5">
                       {formatPeso(selected.downPayment?.amount || Math.round(selected.totalPrice * 0.5))}
                     </p>
-                    <span className={`inline-block mt-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                    <span className={`inline-block mt-1 text-[10px] font-semibold px-1.5 py-0.5 rounded ${
                       selected.downPayment?.isPaid ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
                     }`}>
-                      {selected.downPayment?.isPaid ? '✓ Paid & Locked' : 'Awaiting Payment'}
+                      {selected.downPayment?.isPaid ? '✓ Verified & Locked' : 'Awaiting Payment'}
                     </span>
                   </div>
 
                   <div className="p-2 rounded-lg bg-white border border-gray-200">
-                    <p className="text-[11px] text-gray-500">2. Remaining 50% Balance</p>
-                    <p className="font-bold text-gray-900 mt-0.5">
+                    <p className="text-[10px] text-gray-500 font-medium uppercase tracking-wide">2. Remaining Balance</p>
+                    <p className="font-bold text-gray-900 text-sm mt-0.5">
                       {formatPeso(Math.max(0, (selected.totalPrice || 0) - (selected.downPayment?.amount || Math.round(selected.totalPrice * 0.5))))}
                     </p>
                     <span className="inline-block mt-1 text-[10px] text-gray-600">
@@ -363,67 +393,46 @@ export default function BakeryReservations({ reservations, loading, selected, se
                   </div>
                 </div>
 
-                <div className="text-[11px] text-gray-600 bg-white p-2 rounded border border-gray-200 flex items-start gap-1.5">
-                  <Info className="w-3.5 h-3.5 text-gray-400 mt-0.5 shrink-0" />
-                  <span>
-                    <strong>Pay-to-Bake Rule:</strong> Full balance settlement is required 48 hrs before {formatDate(selected.pickupDate)} before ingredients & baking proceed. Chiller storage up to 24 hrs for uncollected cakes.
-                  </span>
-                </div>
+                {selected.checkoutMode === 'simulated' && (
+                  <p className="text-[11px] text-amber-700 bg-amber-50 p-1.5 rounded border border-amber-200">
+                    Simulated checkout · Payment requires staff verification below
+                  </p>
+                )}
               </div>
 
-              {!selected.downPayment?.isPaid && onRecordPayment && <DownPaymentForm key={selected._id} order={selected} onRecordPayment={onRecordPayment} />}
-              {selected.downPayment?.isPaid && <p className="break-words text-xs text-gray-500">Payment recorded: {formatDate(selected.downPayment.paidAt)}{selected.downPayment.method && ` · ${selected.downPayment.method}`}{selected.downPayment.paymentReference && ` · Reference: ${selected.downPayment.paymentReference}`}</p>}
+              {/* Record Downpayment Form if unpaid */}
+              {!selected.downPayment?.isPaid && onRecordPayment && (
+                <DownPaymentForm key={selected._id} order={selected} onRecordPayment={onRecordPayment} />
+              )}
+              {selected.downPayment?.isPaid && (
+                <div className="p-2.5 rounded-xl border border-green-200 bg-green-50/50 text-xs text-green-800 space-y-0.5">
+                  <p className="font-semibold">✓ Down payment recorded ({formatPeso(selected.downPayment.amount)})</p>
+                  <p className="text-[11px] text-green-700">
+                    {formatDate(selected.downPayment.paidAt)}{selected.downPayment.method && ` · Method: ${selected.downPayment.method}`}{selected.downPayment.paymentReference && ` · Ref: ${selected.downPayment.paymentReference}`}
+                  </p>
+                </div>
+              )}
 
-              <div>
+              {/* Status Updater */}
+              <div className="pt-2 border-t border-pink-100">
                 {statusError && <p role="alert" className="mb-2 text-sm text-red-600">{statusError}</p>}
-                <p className="text-xs font-medium text-gray-500 mb-1.5">Update status</p>
+                <p className="text-xs font-semibold text-gray-700 mb-1.5">Order Stage</p>
                 <div className="flex flex-wrap gap-1.5">
                   {STATUS_TABS.filter((t) => t.key !== 'all').map((tab) => (
                     <button
                       key={tab.key}
                       disabled={updatingStatus}
                       onClick={() => onStatusChange(selected._id, tab.key)}
-                      className={`text-xs px-2.5 py-1.5 rounded-full border transition-colors ${
+                      className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
                         selected.status === tab.key
-                          ? 'bg-pink-500 text-white border-pink-500'
-                          : 'border-pink-100 text-gray-600 hover:bg-pink-50'
+                          ? 'bg-pink-500 text-white border-pink-500 shadow-sm'
+                          : 'border-pink-200 text-gray-600 hover:bg-pink-50'
                       }`}
                     >
                       {tab.label}
                     </button>
                   ))}
                 </div>
-              </div>
-
-              <div className="space-y-2 pt-2 border-t border-pink-100">
-                {selected.blueprint ? <button type="button" onClick={openBlueprint} className="flex w-full items-center gap-2 rounded-xl border border-pink-100 px-3 py-2.5 text-sm hover:bg-pink-50"><FileText className="h-4 w-4 text-pink-500" />View blueprint PDF</button> : safeExternalUrl(selected.blueprintUrl) ? (
-                  <a
-                    href={safeExternalUrl(selected.blueprintUrl)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-sm rounded-xl border border-pink-100 px-3 py-2.5 hover:bg-pink-50 transition-colors"
-                  >
-                    <FileText className="w-4 h-4 text-pink-500" />
-                    View blueprint PDF
-                  </a>
-                ) : (
-                  <div className="flex items-center gap-2 text-sm rounded-xl border border-pink-100 px-3 py-2.5 opacity-40 cursor-not-allowed">
-                    <FileText className="w-4 h-4 text-pink-500" />
-                    Blueprint not ready yet
-                  </div>
-                )}
-                {blueprintError && <p role="alert" className="text-xs text-red-700">{blueprintError}</p>}
-
-                <button
-                  type="button"
-                  onClick={openChat}
-                  disabled={openingChat}
-                  className="w-full flex items-center gap-2 text-sm rounded-xl border border-pink-100 px-3 py-2.5 hover:bg-pink-50 transition-colors text-left"
-                >
-                  <MessageCircle className="w-4 h-4 text-pink-500" />
-                  Open chat with customer
-                </button>
-                {chatError && <p role="alert" className="text-xs text-red-700">{chatError}</p>}
               </div>
             </CustomScrollbar>
           </div>

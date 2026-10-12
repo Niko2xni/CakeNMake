@@ -56,11 +56,11 @@ export default function SendBakeryModal({ config, total, onClose, onOrderComplet
         role="dialog"
         aria-modal="true"
         aria-label="Send to Bakery"
-        className="bg-card rounded-2xl shadow-2xl border border-border/40 w-full max-w-[460px] sm:max-w-[490px] max-h-[calc(100dvh-1rem)] sm:max-h-[min(720px,calc(100dvh-2rem))] flex flex-col overflow-hidden"
+        className="bg-card rounded-2xl shadow-2xl border border-border/40 w-full max-w-[480px] sm:max-w-[560px] max-h-[calc(100dvh-1rem)] sm:max-h-[min(740px,calc(100dvh-2rem))] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex shrink-0 items-center justify-between px-4 sm:px-5 pt-3.5 sm:pt-4 pb-3 border-b border-border/40">
+        <div className="flex shrink-0 items-center justify-between px-5 sm:px-6 pt-3.5 sm:pt-4 pb-3 border-b border-border/40">
           <div className="flex items-center gap-2.5">
             {step !== 'calendar' ? (
               <button
