@@ -10,8 +10,10 @@ function generateRef(amount) {
   return `DEMO-${amount}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 }
 
-export default function GCashPayment({ total, selectedDate, onPaid, onBack, onPaymentComplete, onBusyChange }) {
+export default function GCashPayment({ total, selectedDate, fulfillment, onPaid, onBack, onPaymentComplete, onBusyChange }) {
   const downpayment = Math.ceil(total / 2);
+  const remainingBalance = total - downpayment;
+  const isPickup = fulfillment?.type !== 'delivery';
   const [ref] = useState(() => generateRef(downpayment));
   const [paying, setPaying] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -26,7 +28,11 @@ export default function GCashPayment({ total, selectedDate, onPaid, onBack, onPa
     onBusyChange?.(true);
     setSubmissionError('');
     try {
-      await onPaymentComplete?.(selectedDate);
+      if (fulfillment !== undefined) {
+        await onPaymentComplete?.(selectedDate, fulfillment);
+      } else {
+        await onPaymentComplete?.(selectedDate);
+      }
       setSubmitted(true);
     } catch (error) {
       setSubmissionError(error.message || 'Could not send your order. Please retry.');
@@ -61,31 +67,52 @@ export default function GCashPayment({ total, selectedDate, onPaid, onBack, onPa
   return (
     <div>
       <button onClick={onBack} disabled={paying || done} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-4 transition-colors disabled:opacity-40">
-        <ChevronLeft className="w-3.5 h-3.5" /> Back to calendar
+        <ChevronLeft className="w-3.5 h-3.5" /> Back to fulfillment
       </button>
 
       <p className="font-heading font-bold text-base mb-1">Simulated GCash checkout</p>
       <p className="text-xs text-muted-foreground mb-4">
-        This demo does not charge money. Submit your order, then arrange the 50% down payment with the bakery. Staff will confirm it after verifying payment.
+        This demo does not charge money. Pay the 50% reservation down payment to lock your date. The remaining 50% balance is due 48 hours before baking.
       </p>
 
       {/* Order summary */}
       <div className="bg-muted/40 rounded-xl p-4 mb-4 space-y-2">
         <div className="flex justify-between text-xs">
-          <span className="text-muted-foreground">Delivery date</span>
-          <span className="font-medium">{selectedDate ? format(selectedDate, 'MMM d, yyyy') : '—'}</span>
+          <span className="text-muted-foreground">Fulfillment</span>
+          <span className="font-medium">
+            {isPickup ? 'Store Pickup' : 'Courier Delivery (Client-Booked)'}
+          </span>
         </div>
         <div className="flex justify-between text-xs">
+          <span className="text-muted-foreground">{isPickup ? 'Pickup date' : 'Delivery date'}</span>
+          <span className="font-medium">{selectedDate ? format(selectedDate, 'MMM d, yyyy') : '—'}</span>
+        </div>
+        {fulfillment?.timeWindow && (
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground">{isPickup ? 'Pickup window' : 'Dispatch window'}</span>
+            <span className="font-medium text-muted-foreground">{fulfillment.timeWindow}</span>
+          </div>
+        )}
+        {!isPickup && fulfillment?.address && (
+          <div className="flex justify-between text-xs gap-3">
+            <span className="text-muted-foreground shrink-0">Destination</span>
+            <span className="font-medium text-right line-clamp-1">{fulfillment.address}</span>
+          </div>
+        )}
+        <div className="flex justify-between text-xs pt-1 border-t border-border/40">
           <span className="text-muted-foreground">Total cake price</span>
           <span className="font-medium">₱{total}</span>
         </div>
         <div className="flex justify-between text-xs">
-          <span className="text-muted-foreground">Remaining balance</span>
-          <span className="font-medium text-muted-foreground">₱{total - downpayment}</span>
+          <span className="text-muted-foreground">Balance (due 48h before baking)</span>
+          <span className="font-medium text-muted-foreground">₱{remainingBalance}</span>
         </div>
         <Separator className="opacity-40" />
         <div className="flex justify-between gap-3 text-sm font-bold">
-          <span>Required down payment (50%)</span>
+          <div>
+            <span>Down payment (50%)</span>
+            <p className="text-[10px] text-muted-foreground font-normal">Locks calendar slot today</p>
+          </div>
           <span className="shrink-0 text-primary">₱{downpayment}</span>
         </div>
       </div>

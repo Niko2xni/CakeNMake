@@ -408,7 +408,7 @@ export default function DesignerWorkSpace() {
     };
   }, [account?._id, account?.id, captureThumbnail]);
 
-  const handlePaymentComplete = useCallback(async (selectedDate) => {
+  const handlePaymentComplete = useCallback(async (selectedDate, fulfillmentDetails) => {
     // Blueprint captures: Start Page hero + Angle Page (Front / Back / Top / Side). Taken exactly once, right
     // when Send to Bakery succeeds and before any awaits, so the scene is
     // still exactly what the customer ordered. Kept in a ref for the
@@ -430,6 +430,7 @@ export default function DesignerWorkSpace() {
         submissionId: crypto.randomUUID(),
         deliveryDate: `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`,
         customerName: account?.displayName || 'Guest',
+        fulfillment: fulfillmentDetails || null,
       };
       submittedBlueprintRef.current = snapshot;
       try {
@@ -484,10 +485,19 @@ export default function DesignerWorkSpace() {
     const downpayment = Math.ceil(totalPesos / 2);
     const remaining = totalPesos - downpayment;
     const formattedDate = selectedDate ? format(selectedDate, 'MMM d, yyyy') : 'Scheduled Date';
+    const fulfillment = snapshot.fulfillment || fulfillmentDetails;
+    const isPickup = fulfillment?.type !== 'delivery';
+    const fulfillmentLines = [
+      `• Fulfillment: ${isPickup ? 'Store Pickup (AH Tinaps Bakeshop)' : 'Courier Delivery (Client-Booked)'}`,
+      `• Date: ${formattedDate}${fulfillment?.timeWindow ? ` (${isPickup ? 'Pickup' : 'Dispatch'}: ${fulfillment.timeWindow})` : ''}`,
+      !isPickup && fulfillment?.address ? `• Destination: ${fulfillment.address}${fulfillment.landmarks ? ` (Landmark: ${fulfillment.landmarks})` : ''}` : null,
+      fulfillment?.notes ? `• Notes: ${fulfillment.notes}` : null,
+    ].filter(Boolean).join('\n');
+
     try {
       await chatApi.sendMessage(convoId, {
         clientMessageId: `order_${snapshot.submissionId}`,
-        text: `🎂 Cake Order Submitted!\n• Design: "${snapshot.designName}"\n• Delivery Date: ${formattedDate}\n• Required Down Payment: ₱${downpayment} (Awaiting staff verification)\n• Remaining Balance: ₱${remaining} (Due upon delivery/pickup)\n\nCheckout was simulated; no money was collected. Please contact the bakery to arrange payment.`,
+        text: `🎂 Cake Order Submitted!\n• Design: "${snapshot.designName}"\n${fulfillmentLines}\n• Required Down Payment (50%): ₱${downpayment} (Awaiting staff verification)\n• Remaining Balance (50%): ₱${remaining} (Due 48h before event to begin baking)\n\nCheckout was simulated; no money was collected. Please contact the bakery to verify payment.`,
       });
     } catch (err) {
       console.warn('Failed to send automated initial chat message:', err);

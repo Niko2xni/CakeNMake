@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Search, ChevronRight, X, Calendar, Banknote, FileText, MessageCircle, User } from 'lucide-react';
+import { Search, ChevronRight, X, Calendar, Banknote, FileText, MessageCircle, User, Store, Truck, Clock, ShieldCheck, MapPin, Phone, Info } from 'lucide-react';
 import CustomScrollbar from '@/components/shared/CustomScrollbar';
 import { AdminRowsSkeleton } from '@/components/shared/PageLoadingSkeleton';
 import { safeExternalUrl } from '@/lib/safe-url';
@@ -91,7 +91,16 @@ export default function BakeryReservations({ reservations, loading, selected, se
   const filtered = reservations.filter((r) => {
     if (activeTab !== 'all' && r.status !== activeTab) return false;
     if (!search.trim()) return true;
-    return [r.user?.displayName, r.user?.name, r.user?.email, r.designName, r._id].filter(Boolean).join(' ').toLowerCase().includes(search.trim().toLowerCase());
+    return [
+      r.user?.displayName,
+      r.user?.name,
+      r.user?.email,
+      r.designName,
+      r._id,
+      r.fulfillment?.type,
+      r.fulfillment?.deliveryAddress,
+      r.fulfillment?.timeSlot,
+    ].filter(Boolean).join(' ').toLowerCase().includes(search.trim().toLowerCase());
   });
 
   return (
@@ -165,10 +174,24 @@ export default function BakeryReservations({ reservations, loading, selected, se
                         {r.user?.displayName || r.user?.name || 'Unknown customer'}
                       </p>
                       <p className="mt-1 truncate text-xs text-gray-600">{r.designName || 'Custom cake'} · #{r._id.slice(-6)}</p>
+                      <div className="mt-1 flex items-center gap-1.5 flex-wrap text-xs text-gray-500">
+                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                          r.fulfillment?.type === 'delivery'
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                            : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        }`}>
+                          {r.fulfillment?.type === 'delivery' ? '🛵 Courier Delivery' : '🏪 Store Pickup'}
+                        </span>
+                        <span>Pickup {formatDate(r.pickupDate)} · {formatPeso(r.totalPrice)}</span>
+                      </div>
                       <p className="mt-1 text-xs text-gray-500">
-                        Pickup {formatDate(r.pickupDate)} · {formatPeso(r.totalPrice)}
+                        Down payment: {formatPeso(r.downPayment?.amount)} ·{' '}
+                        <span className={r.downPayment?.isPaid ? 'text-green-600 font-medium' : 'text-yellow-600'}>
+                          {r.downPayment?.isPaid ? 'Paid' : 'Unpaid'}
+                        </span>
+                        {' · '}
+                        Balance: {formatPeso(r.totalPrice ? Math.max(0, r.totalPrice - (r.downPayment?.amount || 0)) : 0)}
                       </p>
-                      <p className="text-xs text-gray-500">Down payment: {formatPeso(r.downPayment?.amount)} · {r.downPayment?.isPaid ? 'Paid' : 'Unpaid'}</p>
                     </div>
 
                     <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full border flex-shrink-0 ${meta.color}`}>
@@ -224,8 +247,126 @@ export default function BakeryReservations({ reservations, loading, selected, se
                 <div className="flex items-center gap-2 text-sm text-gray-700">
                   <Banknote className="w-4 h-4 text-pink-500" />
                   Down payment: {formatPeso(selected.downPayment?.amount)} ·{' '}
-                  <span className={selected.downPayment?.isPaid ? 'text-green-600' : 'text-yellow-600'}>
+                  <span className={selected.downPayment?.isPaid ? 'text-green-600 font-medium' : 'text-yellow-600'}>
                     {selected.downPayment?.isPaid ? 'Paid' : 'Unpaid'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Fulfillment Logistics Card */}
+              <div className="rounded-xl border border-pink-100 bg-pink-50/40 p-3 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-gray-900 flex items-center gap-1.5">
+                    {selected.fulfillment?.type === 'delivery' ? (
+                      <>
+                        <Truck className="w-4 h-4 text-pink-600" />
+                        Client-Booked Courier Delivery
+                      </>
+                    ) : (
+                      <>
+                        <Store className="w-4 h-4 text-pink-600" />
+                        Store Pickup
+                      </>
+                    )}
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-white border border-pink-200 font-medium text-pink-700">
+                    {selected.fulfillment?.type === 'delivery' ? 'Grab / Lalamove Car' : 'AH Tinaps Hub'}
+                  </span>
+                </div>
+
+                {selected.fulfillment?.type === 'delivery' ? (
+                  <div className="space-y-1.5 text-xs text-gray-600">
+                    <div className="flex items-start gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <span className="font-medium text-gray-700">Destination: </span>
+                        <span>{selected.fulfillment.deliveryAddress || 'Address on file'}</span>
+                        {selected.fulfillment.deliveryLandmark && (
+                          <p className="text-[11px] text-gray-500 mt-0.5">Gate / Landmark: {selected.fulfillment.deliveryLandmark}</p>
+                        )}
+                      </div>
+                    </div>
+                    {selected.fulfillment.timeSlot && (
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                        <span>Dispatch window: <strong className="text-gray-700">{selected.fulfillment.timeSlot}</strong></span>
+                      </div>
+                    )}
+                    {selected.fulfillment.recipientPhone && (
+                      <div className="flex items-center gap-1.5">
+                        <Phone className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                        <span>Rider contact: <strong className="text-gray-700">{selected.fulfillment.recipientPhone}</strong></span>
+                      </div>
+                    )}
+                    <p className="text-[11px] text-amber-800 bg-amber-50 rounded p-1.5 border border-amber-200">
+                      Client books and pays for courier car when bakery confirms dispatch.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5 text-xs text-gray-600">
+                    <div className="flex items-start gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <span className="font-medium text-gray-700">Location: </span>
+                        <span>AH Tinaps Bakeshop, Mandaluyong City</span>
+                        <p className="text-[11px] text-gray-500">Store Hours: 9:00 AM – 7:00 PM</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                      <span>
+                        Time slot: <strong className="text-gray-700">{selected.fulfillment?.timeSlot || '9:00 AM – 12:00 PM (Morning)'}</strong>
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {selected.fulfillment?.notes && (
+                  <div className="pt-2 border-t border-pink-100 text-xs">
+                    <span className="text-gray-500 font-medium">Notes: </span>
+                    <span className="text-gray-700 italic">"{selected.fulfillment.notes}"</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Pay-to-Bake & Balance Card */}
+              <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-gray-900 flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-pink-600" />
+                    Pay-to-Bake Policy Status
+                  </span>
+                  <span className="text-[10px] text-gray-500 font-medium">50% / 50% Schedule</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="p-2 rounded-lg bg-white border border-gray-200">
+                    <p className="text-[11px] text-gray-500">1. Reservation Downpayment</p>
+                    <p className="font-bold text-gray-900 mt-0.5">
+                      {formatPeso(selected.downPayment?.amount || Math.round(selected.totalPrice * 0.5))}
+                    </p>
+                    <span className={`inline-block mt-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                      selected.downPayment?.isPaid ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      {selected.downPayment?.isPaid ? '✓ Paid & Locked' : 'Awaiting Payment'}
+                    </span>
+                  </div>
+
+                  <div className="p-2 rounded-lg bg-white border border-gray-200">
+                    <p className="text-[11px] text-gray-500">2. Remaining 50% Balance</p>
+                    <p className="font-bold text-gray-900 mt-0.5">
+                      {formatPeso(Math.max(0, (selected.totalPrice || 0) - (selected.downPayment?.amount || Math.round(selected.totalPrice * 0.5))))}
+                    </p>
+                    <span className="inline-block mt-1 text-[10px] text-gray-600">
+                      Due 48h before baking
+                    </span>
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-gray-600 bg-white p-2 rounded border border-gray-200 flex items-start gap-1.5">
+                  <Info className="w-3.5 h-3.5 text-gray-400 mt-0.5 shrink-0" />
+                  <span>
+                    <strong>Pay-to-Bake Rule:</strong> Full balance settlement is required 48 hrs before {formatDate(selected.pickupDate)} before ingredients & baking proceed. Chiller storage up to 24 hrs for uncollected cakes.
                   </span>
                 </div>
               </div>

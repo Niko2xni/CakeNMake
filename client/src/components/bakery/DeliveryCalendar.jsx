@@ -99,15 +99,15 @@ export default function DeliveryCalendar({ config, selectedDate, onSelect }) {
 
   return (
     <div>
-      <p className="font-heading font-bold text-base mb-1">Choose day of delivery</p>
+      <p className="font-heading font-bold text-base mb-1">Select cake needed date</p>
       <p className="text-xs text-muted-foreground mb-4">
-        Time, transportation, and full-payment will be discussed with the bakery.
+        Choose when you need your cake ready. You will select Store Pickup or Courier Delivery next.
       </p>
 
       <div className="flex items-start gap-2 bg-primary/5 border border-primary/20 rounded-xl px-3 py-2.5 mb-4">
         <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
         <p className="text-xs text-foreground/70">
-          Your cake requires <span className="font-semibold text-foreground">{totalBuffer} days</span> to deliver. Earliest delivery: <span className="font-semibold text-foreground">{format(earliestDeliverable, 'MMM d, yyyy')}</span>.
+          Your custom cake requires <span className="font-semibold text-foreground">{totalBuffer} days</span> lead time. Earliest date ready: <span className="font-semibold text-foreground">{format(earliestDeliverable, 'MMM d, yyyy')}</span>.
         </p>
       </div>
 
