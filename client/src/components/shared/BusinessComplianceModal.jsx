@@ -83,7 +83,19 @@ export default function BusinessComplianceModal({ isOpen, onClose }) {
               </div>
             </dl>
 
-            <div className="compliance-action-row">
+            <div className="compliance-cert-card">
+              <div className="compliance-cert-header">
+                <div className="compliance-cert-badge">
+                  <CheckCircle2 size={13} aria-hidden="true" />
+                  <span>BNRS Public Registry</span>
+                </div>
+                <span className="compliance-cert-ref">BN No. 6752278</span>
+              </div>
+
+              <p className="compliance-cert-desc">
+                Official Business Name Registration Certificate is valid and active. Search by Business Name or Registration Number on the public DTI database to verify standing.
+              </p>
+
               <a
                 href="https://bnrs.dti.gov.ph"
                 target="_blank"
@@ -93,14 +105,6 @@ export default function BusinessComplianceModal({ isOpen, onClose }) {
                 <span>Verify on DTI BNRS Portal</span>
                 <ExternalLink size={14} aria-hidden="true" />
               </a>
-              <p className="compliance-hint">
-                Search &ldquo;AH TINAPS BAKESHOP&rdquo; or Business Name No. 6752278 on the public DTI database.
-              </p>
-            </div>
-
-            <div className="compliance-trust-note">
-              <CheckCircle2 size={15} aria-hidden="true" />
-              <span>Full compliance with the Philippine Internet Transactions Act of 2023 (RA 11967).</span>
             </div>
           </section>
 
