@@ -28,7 +28,7 @@ function NavItem({ to, icon: Icon, label, currentPath }) {
       aria-current={active ? 'page' : undefined}
       title={label}
     >
-      <Icon className="w-5 h-5" aria-hidden="true" />
+      <Icon className="w-6 h-6 stroke-[1.85]" aria-hidden="true" />
       <span>{label}</span>
     </Link>
   );
@@ -68,7 +68,7 @@ export default function ClientNavbar() {
 
       <div className="cn-sidebar-list">
         <Link to="/designer" className="cn-nav-item cn-create-item" title="Create a cake">
-          <Plus className="w-5 h-5" aria-hidden="true" />
+          <Plus className="w-6 h-6 stroke-[2.4]" aria-hidden="true" />
           <span>Create</span>
         </Link>
 
@@ -82,11 +82,13 @@ export default function ClientNavbar() {
           <button
             type="button"
             onClick={() => setUserDropdownOpen((open) => !open)}
-            className={`cn-nav-item ${['/profile', '/settings'].includes(location.pathname) ? 'is-active' : ''}`}
+            className={`cn-nav-item cn-account-item ${['/profile', '/settings'].includes(location.pathname) ? 'is-active' : ''}`}
             aria-expanded={userDropdownOpen}
             aria-haspopup="menu"
           >
-            <User className="w-5 h-5" aria-hidden="true" />
+            <div className="cn-avatar-badge" aria-hidden="true">
+              <User className="w-5 h-5 stroke-[2]" />
+            </div>
             <span>Account</span>
           </button>
 
