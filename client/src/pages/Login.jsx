@@ -7,8 +7,8 @@ import { CheckCircle2, Loader2, Mail, TimerReset } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
-import { auth, firebaseConfigured, googleProvider, missingFirebaseConfigMessage } from "@/lib/firebase";
-import { signInWithCustomToken, signInWithPopup } from "firebase/auth";
+import { auth, firebaseConfigured, getAuxiliaryAuth, googleProvider, missingFirebaseConfigMessage } from "@/lib/firebase";
+import { signInWithCustomToken, signInWithPopup, signOut } from "firebase/auth";
 import { authApi } from "@/services/api";
 import { useAuth } from '@/lib/AuthContext';
 
@@ -123,16 +123,16 @@ export default function Login() {
     setStatusMessage("");
     setOtpExpiredMessage("");
     setOtp("");
-    setOtpSent(false);
-    setOtpExpiresAt(null);
     setLoading(true);
 
     try {
-      const response = await authApi.requestEmailOtp(email.trim().toLowerCase());
+      const targetEmail = email.trim().toLowerCase();
+      if (!targetEmail) throw new Error("Email address is missing.");
+      const response = await authApi.requestEmailOtp(targetEmail);
       const expiresAt = response?.expiresAt || Date.now() + 3 * 60 * 1000;
       setOtpSent(true);
       setOtpExpiresAt(expiresAt);
-      setStatusMessage("A new 6-digit verification code was sent to your email.");
+      setStatusMessage(`A new 6-digit verification code was sent to ${targetEmail}.`);
     } catch (authError) {
       setError(authError.message || "Could not resend the verification code.");
     } finally {
@@ -152,11 +152,12 @@ export default function Login() {
 
       try {
         if (!email) throw new Error("Enter your email address.");
-        const response = await authApi.requestEmailOtp(email.trim().toLowerCase());
+        const targetEmail = email.trim().toLowerCase();
+        const response = await authApi.requestEmailOtp(targetEmail);
         const expiresAt = response?.expiresAt || Date.now() + 3 * 60 * 1000;
         setOtpSent(true);
         setOtpExpiresAt(expiresAt);
-        setStatusMessage("A 6-digit verification code was sent to your email.");
+        setStatusMessage(`A 6-digit verification code was sent to ${targetEmail}.`);
         setError("");
       } catch (authError) {
         setError(authError.message || "Authentication failed.");
@@ -171,11 +172,31 @@ export default function Login() {
 
   const handleProviderAuth = async () => {
     setError("");
+    setStatusMessage("");
+    setOtpExpiredMessage("");
     setLoading(true);
     try {
       if (!firebaseConfigured || !auth) throw new Error(missingFirebaseConfigMessage);
-      await signInWithPopup(auth, googleProvider);
-      navigate("/login-success");
+      const targetAuth = getAuxiliaryAuth ? getAuxiliaryAuth() : auth;
+      const userCredential = await signInWithPopup(targetAuth || auth, googleProvider);
+      const googleEmail = userCredential?.user?.email?.trim()?.toLowerCase();
+      if (!googleEmail) {
+        throw new Error("Could not retrieve email address from Google.");
+      }
+      if (targetAuth && targetAuth !== auth) {
+        try { await signOut(targetAuth); } catch {}
+      } else if (auth?.currentUser) {
+        try { await signOut(auth); } catch {}
+      }
+
+      const response = await authApi.requestEmailOtp(googleEmail);
+      const expiresAt = response?.expiresAt || Date.now() + 3 * 60 * 1000;
+      setEmail(googleEmail);
+      setOtp("");
+      setOtpSent(true);
+      setOtpExpiresAt(expiresAt);
+      setStatusMessage(`A 6-digit verification code was sent to ${googleEmail}.`);
+      setError("");
     } catch (authError) {
       setError(authError.code === "auth/popup-closed-by-user" ? "Sign-in was cancelled." : authError.message || "Provider sign-in failed.");
     } finally {
@@ -237,6 +258,7 @@ export default function Login() {
                 onClick={() => {
                   setOtpSent(false);
                   setOtp("");
+                  setEmail("");
                   setOtpExpiresAt(null);
                   setOtpTimeLeft(0);
                   setStatusMessage("");

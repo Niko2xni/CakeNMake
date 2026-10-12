@@ -1,4 +1,4 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps } from "firebase/app";
 import {
   getAuth,
   GoogleAuthProvider,
@@ -26,5 +26,14 @@ export const auth = firebaseApp ? getAuth(firebaseApp) : null;
 export const googleProvider = new GoogleAuthProvider();
 export const firebaseConfigured = isFirebaseConfigured;
 
+export const getAuxiliaryAuth = () => {
+  if (!isFirebaseConfigured) return null;
+  const helperAppName = "googleAuthHelper";
+  const existingApp = getApps().find((app) => app.name === helperAppName);
+  const helperApp = existingApp || initializeApp(firebaseConfig, helperAppName);
+  return getAuth(helperApp);
+};
+
 export const missingFirebaseConfigMessage =
   "Firebase is not configured. Add the VITE_FIREBASE_* values to the client environment.";
+
