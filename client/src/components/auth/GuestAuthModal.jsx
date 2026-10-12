@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CheckCircle2, Loader2, LogIn, Mail, Sparkles, TimerReset } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Loader2, LogIn, Mail, Sparkles, TimerReset } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import GoogleIcon from "@/components/GoogleIcon";
 import { auth, firebaseConfigured, getAuxiliaryAuth, googleProvider, missingFirebaseConfigMessage } from "@/lib/firebase";
@@ -290,11 +290,12 @@ export default function GuestAuthModal({
 
           {otpSent && (
             <div className="space-y-3">
-              <div className="flex justify-start">
+              <div className="flex justify-start -ml-2">
                 <Button
                   type="button"
                   variant="ghost"
-                  className="h-8 px-0 text-xs font-medium text-muted-foreground hover:text-foreground"
+                  size="sm"
+                  className="cn-auth-back-btn h-8 px-2.5 gap-1.5 text-xs font-semibold rounded-lg text-muted-foreground hover:text-foreground hover:bg-black/5"
                   onClick={() => {
                     setOtpSent(false);
                     setOtp("");
@@ -305,7 +306,8 @@ export default function GuestAuthModal({
                     setError("");
                   }}
                 >
-                  ← Back
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Back</span>
                 </Button>
               </div>
               <div className="flex items-center justify-between gap-3">

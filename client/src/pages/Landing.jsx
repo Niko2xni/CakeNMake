@@ -7,8 +7,10 @@ import {
   Menu,
   MousePointer2,
   Rotate3D,
+  ShieldCheck,
   X,
 } from 'lucide-react';
+import BusinessComplianceModal from '@/components/shared/BusinessComplianceModal';
 import cakePreview from '@/assets/cake-preview-new.png';
 import cakeChoiceOne from '@/assets/cake1-choice.png';
 import cakeChoiceTwo from '@/assets/cake2-choice.png';
@@ -69,6 +71,7 @@ export default function Landing() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('home');
   const [scrolled, setScrolled] = useState(false);
+  const [complianceModalOpen, setComplianceModalOpen] = useState(false);
 
   const scrollLockRef = useRef(false);
   const scrollAnimRef = useRef(null);
@@ -359,6 +362,17 @@ export default function Landing() {
                 <span>Our promise</span>
                 <strong>Your idea stays at the heart of the cake.</strong>
               </div>
+              <div className="craft-compliance-badge">
+                <ShieldCheck size={16} aria-hidden="true" />
+                <span>Operating as <strong>AH TINAPS BAKESHOP</strong> (DTI &amp; BIR Registered)</span>
+                <button
+                  type="button"
+                  onClick={() => setComplianceModalOpen(true)}
+                  className="craft-compliance-btn"
+                >
+                  View permits
+                </button>
+              </div>
             </div>
           </div>
         </section>
@@ -449,14 +463,36 @@ export default function Landing() {
           <div className="footer-links">
             <a href="#how-it-works" onClick={(e) => scrollToSection(e, 'how-it-works')}>How it works</a>
             <a href="#about" onClick={(e) => scrollToSection(e, 'about')}>About</a>
+            <button
+              type="button"
+              className="footer-link-btn"
+              onClick={() => setComplianceModalOpen(true)}
+            >
+              Business Registration
+            </button>
             <Link to="/login">Log in</Link>
           </div>
         </div>
         <div className="landing-container footer-bottom">
-          <span>© 2026 CakeNMake</span>
+          <div className="footer-legal-tag">
+            <span>© 2026 CakeNMake</span>
+            <span className="footer-dot" aria-hidden="true">·</span>
+            <button
+              type="button"
+              className="footer-cert-trigger"
+              onClick={() => setComplianceModalOpen(true)}
+            >
+              DTI &amp; BIR Registered (AH TINAPS BAKESHOP)
+            </button>
+          </div>
           <span>Made for celebrations big, small, and entirely your own.</span>
         </div>
       </footer>
+
+      <BusinessComplianceModal
+        isOpen={complianceModalOpen}
+        onClose={() => setComplianceModalOpen(false)}
+      />
     </div>
   );
 }

@@ -581,6 +581,14 @@
 .cn-auth-form button[class*='bg-primary'] { background: var(--cn-cherry) !important; color: var(--cn-ink) !important; }
 .cn-auth-form button[class*='bg-primary']:hover { background: var(--cn-cherry-dark) !important; color: var(--cn-cream) !important; transform: translateY(-1px); }
 
+.cn-auth-back-btn {
+  transition: all 140ms ease !important;
+}
+.cn-auth-back-btn:hover {
+  background: rgba(44, 23, 19, 0.07) !important;
+  color: var(--cn-ink) !important;
+}
+
 .cn-auth-otp-group {
   width: 100% !important;
   display: flex !important;

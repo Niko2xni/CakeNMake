@@ -33,7 +33,7 @@ describe('Landing page presentation', () => {
     const { container } = render(<MemoryRouter><Landing /></MemoryRouter>);
 
     const heroImage = container.querySelector('#home .hero-background');
-    const briefImage = screen.getByAltText(/cake shown inside the cakenmake design preview/i);
+    const briefImage = screen.getByAltText(/one-tier cake with ridged white-to-pink buttercream/i);
     expect(heroImage).toHaveAttribute('src', expect.stringContaining('landing-page-bg'));
     expect(heroImage.getAttribute('src')).not.toBe(briefImage.getAttribute('src'));
 
@@ -43,5 +43,12 @@ describe('Landing page presentation', () => {
     const firstQuestion = screen.getByText('Do I need design experience?').closest('details');
     expect(firstQuestion).toHaveAttribute('open');
     expect(screen.getByText(/a clear brief gives your baker a practical starting point/i)).toBeVisible();
+  });
+
+  it('provides accessible business registration and compliance details', () => {
+    render(<MemoryRouter><Landing /></MemoryRouter>);
+
+    expect(screen.getByRole('button', { name: /business registration/i })).toBeInTheDocument();
+    expect(screen.getAllByText(/AH TINAPS BAKESHOP/i).length).toBeGreaterThan(0);
   });
 });
