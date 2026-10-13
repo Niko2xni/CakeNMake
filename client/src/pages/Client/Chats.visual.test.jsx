@@ -17,7 +17,7 @@ vi.mock('@/hooks/useChat', () => ({
     activeConversation: {
       id: 'conversation-1',
       status: 'open',
-      platform: { name: 'Mamshie Bakery' },
+      platform: { name: 'AH TINAPS BAKESHOP' },
     },
     error: '',
     hasMore: false,
@@ -62,7 +62,7 @@ describe('Chats presentation', () => {
     expect(sendButton).toBeVisible();
     expect(sendButton).toBeDisabled();
 
-    fireEvent.change(screen.getByPlaceholderText(/message mamshie bakery/i), {
+    fireEvent.change(screen.getByPlaceholderText(/message ah tinaps bakeshop/i), {
       target: { value: 'Could you confirm the pickup time?' },
     });
 

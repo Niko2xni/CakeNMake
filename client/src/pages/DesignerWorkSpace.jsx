@@ -6,10 +6,9 @@ import PageLoadingSkeleton from '@/components/shared/PageLoadingSkeleton';
 import ToolPanel from '@/components/cake/ToolPanel';
 import PricingPanel from '@/components/cake/PricingPanel';
 import SendBakeryModal from '@/components/bakery/SendBakeryModal';
-import BakeryChatPanel from '@/components/bakery/BakeryChatPanel';
 import useDesignAiChat from '@/hooks/useDesignAiChat';
 import GuestAuthModal from '@/components/auth/GuestAuthModal';
-import { Home, X, Send, Cloud, CloudOff, Loader2, RotateCcw, SlidersHorizontal, MessageSquare } from 'lucide-react';
+import { Home, X, Send, Cloud, CloudOff, Loader2, RotateCcw, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { blueprintApi, designApi, pricingApi, templateApi } from '@/services/api';
@@ -48,7 +47,6 @@ export default function DesignerWorkSpace() {
   const [config, setConfig] = useState(INITIAL_CONFIG);
   const { quote, quotedConfig, loading: quoteLoading, error: quoteError, versionChanged, dismissVersionChanged } = useCakeQuote(config);
   const [panelOpen, setPanelOpen] = useState(false);
-  const [mobileBakeryChatOpen, setMobileBakeryChatOpen] = useState(false);
   const [isBreakdownOpen, setIsBreakdownOpen] = useState(false);
   const [activeTool, setActiveTool] = useState(null);
   const [selectedCenterItemId, setSelectedCenterItemId] = useState(null);
@@ -116,10 +114,8 @@ export default function DesignerWorkSpace() {
       setDesignId(design._id);
       if (design.sentToBakery) {
         setOrderComplete(true);
-        setMobileBakeryChatOpen(true);
       } else {
         setOrderComplete(false);
-        setMobileBakeryChatOpen(false);
       }
       setHasUnsavedChanges(false);
       setSaveStatus('saved');
@@ -907,20 +903,6 @@ export default function DesignerWorkSpace() {
               )}
             </div>
           )}
-          {orderComplete && (
-            <Button
-              type="button"
-              variant={mobileBakeryChatOpen ? 'default' : 'outline'}
-              size="icon"
-              onClick={() => setMobileBakeryChatOpen((open) => !open)}
-              aria-label={mobileBakeryChatOpen ? 'Close Bakery Chat' : 'Open Bakery Chat'}
-              aria-expanded={mobileBakeryChatOpen}
-              title={mobileBakeryChatOpen ? 'Close Bakery Chat' : 'Open Bakery Chat'}
-              className="md:hidden rounded-xl"
-            >
-              {mobileBakeryChatOpen ? <X className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
-            </Button>
-          )}
         </div>
       </header>
 
@@ -1028,12 +1010,8 @@ export default function DesignerWorkSpace() {
         </motion.div>
 
         {/* Desktop Panel */}
-        <div className={`hidden md:block w-[280px] lg:w-[320px] xl:w-[340px] max-w-[40vw] p-2 sm:p-3 shrink-0 ${isBreakdownOpen ? 'pointer-events-none opacity-50 select-none' : ''}`}>
-          {orderComplete ? (
-            <div className="h-full">
-              <BakeryChatPanel />
-            </div>
-          ) : (
+        {!orderComplete && (
+          <div className={`hidden md:block w-[280px] lg:w-[320px] xl:w-[340px] max-w-[40vw] p-2 sm:p-3 shrink-0 ${isBreakdownOpen ? 'pointer-events-none opacity-50 select-none' : ''}`}>
             <ToolPanel
               aiChatSession={aiChatSession}
               config={config}
@@ -1068,51 +1046,11 @@ export default function DesignerWorkSpace() {
               expandedSections={expandedSections}
               onExpandedSectionsChange={setExpandedSections}
             />
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Mobile Panel Overlay */}
-        {orderComplete ? (
-          <AnimatePresence>
-            {mobileBakeryChatOpen && (
-              <>
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="fixed inset-0 bg-black/40 backdrop-blur-sm z-30 md:hidden"
-                  onClick={() => setMobileBakeryChatOpen(false)}
-                />
-                <motion.div
-                  key="mobile-bakery-chat-panel"
-                  initial={{ x: '100%' }}
-                  animate={{ x: 0 }}
-                  exit={{ x: '100%' }}
-                  transition={{ type: 'spring', damping: 26, stiffness: 300 }}
-                  className="fixed inset-y-0 right-0 w-[340px] max-w-[88vw] z-40 p-2 sm:p-3 md:hidden flex flex-col"
-                >
-                  <div className="flex-1 min-h-0 bg-card rounded-2xl border border-border/70 overflow-hidden shadow-2xl flex flex-col">
-                    <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/60 bg-muted/40">
-                      <span className="text-sm font-semibold text-foreground">Bakery Chat</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 rounded-full"
-                        onClick={() => setMobileBakeryChatOpen(false)}
-                        aria-label="Close Bakery Chat"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <div className="flex-1 min-h-0">
-                      <BakeryChatPanel />
-                    </div>
-                  </div>
-                </motion.div>
-              </>
-            )}
-          </AnimatePresence>
-        ) : (
+        {!orderComplete && (
           <AnimatePresence>
             {panelOpen && !isBreakdownOpen && (
               <>

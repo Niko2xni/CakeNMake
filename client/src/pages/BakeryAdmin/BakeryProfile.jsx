@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import { Store, Clock, MapPin, Mail, Check, Pencil } from 'lucide-react';
 
 const initialProfile = {
-  name: 'Mamshie Bakery',
-  email: 'mamshiebakery@example.com',
+  name: 'AH TINAPS BAKESHOP',
+  email: 'ahtinapsbakeshop@example.com',
   address: 'Metro Manila, Philippines',
   hoursOfOperation: 'Monday – Saturday, 8:00 AM – 6:00 PM',
-  description: 'Home-based custom cake bakery specializing in personalized designs for any occasion.',
+  description: 'Specializing in personalized 3D custom cakes and pastries for any occasion.',
 };
 
 export default function BakeryProfile() {

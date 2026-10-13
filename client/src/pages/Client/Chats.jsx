@@ -84,7 +84,7 @@ function getFileKind(file) {
   return null;
 }
 
-const BAKERY_NAME = 'Mamshie Bakery';
+const BAKERY_NAME = 'AH TINAPS BAKESHOP';
 
 function formatFileSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
