@@ -3,11 +3,11 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CheckCircle2, Loader2, LogIn, Mail, Sparkles, TimerReset } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Loader2, LogIn, Mail, Sparkles, TimerReset } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import GoogleIcon from "@/components/GoogleIcon";
-import { auth, firebaseConfigured, googleProvider, missingFirebaseConfigMessage } from "@/lib/firebase";
-import { signInWithCustomToken, signInWithPopup } from "firebase/auth";
+import { auth, firebaseConfigured, getAuxiliaryAuth, googleProvider, missingFirebaseConfigMessage } from "@/lib/firebase";
+import { signInWithCustomToken, signInWithPopup, signOut } from "firebase/auth";
 import { authApi } from "@/services/api";
 import { useAuth } from '@/lib/AuthContext';
 
@@ -100,16 +100,16 @@ export default function GuestAuthModal({
     setStatusMessage("");
     setOtpExpiredMessage("");
     setOtp("");
-    setOtpSent(false);
-    setOtpExpiresAt(null);
     setLoading(true);
 
     try {
-      const response = await authApi.requestEmailOtp(email);
+      const targetEmail = email.trim().toLowerCase();
+      if (!targetEmail) throw new Error("Email address is missing.");
+      const response = await authApi.requestEmailOtp(targetEmail);
       const expiresAt = response?.expiresAt || Date.now() + 3 * 60 * 1000;
       setOtpSent(true);
       setOtpExpiresAt(expiresAt);
-      setStatusMessage("A new 6-digit verification code was sent to your email.");
+      setStatusMessage(`A new 6-digit verification code was sent to ${targetEmail}.`);
     } catch (authError) {
       setError(authError.message || "Could not resend the verification code.");
     } finally {
@@ -161,11 +161,31 @@ export default function GuestAuthModal({
 
   const handleProviderAuth = async () => {
     setError("");
+    setStatusMessage("");
+    setOtpExpiredMessage("");
     setLoading(true);
     try {
       if (!firebaseConfigured || !auth) throw new Error(missingFirebaseConfigMessage);
-      const userCredential = await signInWithPopup(auth, googleProvider);
-      setPendingUser(userCredential.user);
+      const targetAuth = getAuxiliaryAuth ? getAuxiliaryAuth() : auth;
+      const userCredential = await signInWithPopup(targetAuth || auth, googleProvider);
+      const googleEmail = userCredential?.user?.email?.trim()?.toLowerCase();
+      if (!googleEmail) {
+        throw new Error("Could not retrieve email address from Google.");
+      }
+      if (targetAuth && targetAuth !== auth) {
+        try { await signOut(targetAuth); } catch {}
+      } else if (auth?.currentUser) {
+        try { await signOut(auth); } catch {}
+      }
+
+      const response = await authApi.requestEmailOtp(googleEmail);
+      const expiresAt = response?.expiresAt || Date.now() + 3 * 60 * 1000;
+      setEmail(googleEmail);
+      setOtp("");
+      setOtpSent(true);
+      setOtpExpiresAt(expiresAt);
+      setStatusMessage(`A 6-digit verification code was sent to ${googleEmail}.`);
+      setError("");
     } catch (authError) {
       setError(authError.code === "auth/popup-closed-by-user" ? "Sign-in was cancelled." : authError.message || "Provider sign-in failed.");
     } finally {
@@ -270,21 +290,24 @@ export default function GuestAuthModal({
 
           {otpSent && (
             <div className="space-y-3">
-              <div className="flex justify-start">
+              <div className="flex justify-start -ml-2">
                 <Button
                   type="button"
                   variant="ghost"
-                  className="h-8 px-0 text-xs font-medium text-muted-foreground hover:text-foreground"
+                  size="sm"
+                  className="cn-auth-back-btn h-8 px-2.5 gap-1.5 text-xs font-semibold rounded-lg text-muted-foreground hover:text-foreground hover:bg-black/5"
                   onClick={() => {
                     setOtpSent(false);
                     setOtp("");
+                    setEmail("");
                     setOtpExpiresAt(null);
                     setOtpTimeLeft(0);
                     setStatusMessage("");
                     setError("");
                   }}
                 >
-                  ← Back to email
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Back</span>
                 </Button>
               </div>
               <div className="flex items-center justify-between gap-3">

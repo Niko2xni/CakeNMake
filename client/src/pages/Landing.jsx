@@ -7,8 +7,10 @@ import {
   Menu,
   MousePointer2,
   Rotate3D,
+  ShieldCheck,
   X,
 } from 'lucide-react';
+import BusinessComplianceModal from '@/components/shared/BusinessComplianceModal';
 import cakePreview from '@/assets/cake-preview-new.png';
 import cakeChoiceOne from '@/assets/cake1-choice.png';
 import cakeChoiceTwo from '@/assets/cake2-choice.png';
@@ -69,6 +71,7 @@ export default function Landing() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('home');
   const [scrolled, setScrolled] = useState(false);
+  const [complianceModalOpen, setComplianceModalOpen] = useState(false);
 
   const scrollLockRef = useRef(false);
   const scrollAnimRef = useRef(null);
@@ -359,6 +362,17 @@ export default function Landing() {
                 <span>Our promise</span>
                 <strong>Your idea stays at the heart of the cake.</strong>
               </div>
+              <div className="craft-compliance-badge">
+                <ShieldCheck size={16} aria-hidden="true" />
+                <span>Operating as <strong>AH TINAPS BAKESHOP</strong> (DTI &amp; BIR Registered)</span>
+                <button
+                  type="button"
+                  onClick={() => setComplianceModalOpen(true)}
+                  className="craft-compliance-btn"
+                >
+                  View permits
+                </button>
+              </div>
             </div>
           </div>
         </section>
@@ -449,14 +463,48 @@ export default function Landing() {
           <div className="footer-links">
             <a href="#how-it-works" onClick={(e) => scrollToSection(e, 'how-it-works')}>How it works</a>
             <a href="#about" onClick={(e) => scrollToSection(e, 'about')}>About</a>
+            <button
+              type="button"
+              className="footer-link-btn"
+              onClick={() => setComplianceModalOpen(true)}
+            >
+              Business Registration
+            </button>
+            <a
+              href="https://www.facebook.com/p/AH-Tinaps-Bakeshop-61562887522656/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="footer-social-link"
+              aria-label="AH Tinaps Bakeshop on Facebook (opens in new tab)"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+              </svg>
+              <span>Facebook</span>
+            </a>
             <Link to="/login">Log in</Link>
           </div>
         </div>
         <div className="landing-container footer-bottom">
-          <span>© 2026 CakeNMake</span>
+          <div className="footer-legal-tag">
+            <span>© 2026 CakeNMake</span>
+            <span className="footer-dot" aria-hidden="true">·</span>
+            <button
+              type="button"
+              className="footer-cert-trigger"
+              onClick={() => setComplianceModalOpen(true)}
+            >
+              DTI &amp; BIR Registered (AH TINAPS BAKESHOP)
+            </button>
+          </div>
           <span>Made for celebrations big, small, and entirely your own.</span>
         </div>
       </footer>
+
+      <BusinessComplianceModal
+        isOpen={complianceModalOpen}
+        onClose={() => setComplianceModalOpen(false)}
+      />
     </div>
   );
 }

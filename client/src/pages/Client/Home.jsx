@@ -381,7 +381,7 @@ export default function ClientHome() {
     <div className="cn-app-page cn-home-page min-h-screen">
       <ClientNavbar />
       <main className={`cn-home-shell ${selectedDesign ? 'has-details-open' : ''}`}>
-        <header className="cn-page-header cn-home-header max-w-3xl mx-auto text-center pt-6 pb-8">
+        <header className="cn-page-header cn-home-header max-w-3xl mx-auto text-center pt-2 pb-2">
           <div className="cn-home-heading">
             <Sparkles aria-hidden="true" />
             <h1 className="cn-home-title">Welcome to CakeNMake</h1>
@@ -389,14 +389,14 @@ export default function ClientHome() {
           </div>
           <p>Pick up where you left off, or begin a new cake for your next occasion.</p>
 
-          <div className="relative max-w-2xl mx-auto my-6">
+          <div className="relative max-w-xl mx-auto my-4">
             <Search className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search your designs"
-              className="w-full pl-11 pr-10 py-3 rounded-full border border-pink-100 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-pink-300 text-sm text-gray-700"
+              className="w-full pl-11 pr-10 py-2.5 rounded-full border border-pink-100 bg-white shadow-xs focus:outline-none focus:ring-2 focus:ring-pink-300 text-sm text-gray-700"
             />
             {searchQuery && (
               <button

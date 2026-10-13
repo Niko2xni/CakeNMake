@@ -6,8 +6,8 @@ import Login from './Login';
 import { authApi } from '@/services/api';
 const session = vi.hoisted(() => ({ account: null, isAuthenticated: false, isLoadingAuth: false, authError: null }));
 const firebase = vi.hoisted(() => ({ popup: vi.fn(), custom: vi.fn() }));
-vi.mock('@/lib/firebase', () => ({ auth: {}, firebaseConfigured: true, googleProvider: 'google' }));
-vi.mock('firebase/auth', () => ({ signInWithPopup: firebase.popup, signInWithCustomToken: firebase.custom }));
+vi.mock('@/lib/firebase', () => ({ auth: {}, firebaseConfigured: true, googleProvider: 'google', getAuxiliaryAuth: () => ({}) }));
+vi.mock('firebase/auth', () => ({ signInWithPopup: firebase.popup, signInWithCustomToken: firebase.custom, signOut: vi.fn() }));
 vi.mock('@/lib/AuthContext', () => ({ useAuth: () => session }));
 beforeEach(() => Object.assign(session, { account: null, isAuthenticated: false, isLoadingAuth: false, authError: null }));
 
@@ -19,12 +19,18 @@ vi.mock('@/services/api', () => ({
 }));
 
 describe('Login auth experience', () => {
-  it('passes Google sign-in to the correct provider and opens the completion page', async () => {
-    firebase.popup.mockResolvedValueOnce({ user: { uid: 'google-user' } });
+  it('passes Google sign-in to the provider and requires OTP verification before completing sign-in', async () => {
+    firebase.popup.mockResolvedValueOnce({ user: { uid: 'google-user', email: 'google@example.com' } });
+    authApi.verifyEmailOtp.mockResolvedValueOnce({ token: 'google-custom-token' });
+    firebase.custom.mockResolvedValueOnce({ user: { uid: 'google-user' } });
     render(<MemoryRouter initialEntries={['/login']}><Routes><Route path="/login" element={<Login />} /><Route path="/login-success" element={<div>Completing sign-in</div>} /></Routes></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: /Continue with Google/ }));
+    const input = await screen.findByLabelText('Verification code');
+    expect(authApi.requestEmailOtp).toHaveBeenCalledWith('google@example.com');
+    fireEvent.change(input, { target: { value: '654321' } });
     expect(await screen.findByText('Completing sign-in')).toBeInTheDocument();
-    expect(firebase.popup).toHaveBeenCalledWith({}, 'google');
+    expect(authApi.verifyEmailOtp).toHaveBeenCalledWith('google@example.com', '654321');
+    expect(firebase.custom).toHaveBeenCalledWith({}, 'google-custom-token');
   });
   it('exchanges the verified email OTP for a Firebase session', async () => {
     authApi.verifyEmailOtp.mockResolvedValueOnce({ token: 'custom-token' });

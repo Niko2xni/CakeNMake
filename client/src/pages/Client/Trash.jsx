@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Trash2, RotateCcw, Sparkles, Loader2, MoreVertical, Info, AlertCircle, ArrowRight, ChevronDown, CheckCircle2 } from 'lucide-react';
+import { Trash2, RotateCcw, Loader2, MoreVertical, Info, AlertCircle, ArrowRight, ArrowLeft, ChevronDown, CheckCircle2 } from 'lucide-react';
 import ClientNavbar from '@/components/client/ClientNavbar';
 import { designApi } from '@/services/api';
 import { useDragToScroll } from '@/hooks/useDragToScroll';
@@ -166,15 +166,11 @@ export default function Trash() {
     <div className="cn-app-page cn-trash-page min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-orange-50">
       <ClientNavbar />
       <div className="cn-trash-shell max-w-6xl mx-auto px-6 py-8">
-        <div className="cn-page-header cn-trash-header text-center mb-12">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <Trash2 className="w-8 h-8 text-pink-500" />
-            <h1 className="text-5xl font-bold bg-gradient-to-r from-pink-500 via-rose-500 to-orange-400 bg-clip-text text-transparent">
-              Trash
-            </h1>
-            <Sparkles className="w-8 h-8 text-orange-400" />
-          </div>
-          <p className="text-xl text-gray-600 font-light">
+        <div className="cn-page-header cn-trash-header text-center mb-8">
+          <h1 className="cn-trash-title">
+            Trash
+          </h1>
+          <p className="cn-trash-subtitle">
             Restore deleted work or remove it permanently.
           </p>
         </div>
@@ -237,10 +233,13 @@ export default function Trash() {
             </div>
           ) : trashedDesigns.length === 0 ? (
             <div className="cn-trash-empty text-center">
-              <span className="cn-trash-empty-icon"><Trash2 className="w-8 h-8" /></span>
+              <span className="cn-trash-empty-icon"><Trash2 className="w-6 h-6 stroke-[1.8]" /></span>
               <h2>Trash is empty</h2>
               <p>Deleted designs will appear here. Until then, you can return to creating something worth celebrating.</p>
               <div className="cn-trash-empty-actions">
+                <Link to="/client" className="cn-trash-secondary-action">
+                  <ArrowLeft className="w-3.5 h-3.5" /> Back to my designs
+                </Link>
                 <Link to="/designer" className="cn-trash-primary-action">
                   Create a design <ArrowRight className="w-4 h-4" />
                 </Link>
@@ -382,26 +381,33 @@ export default function Trash() {
       {/* Details Modal */}
       {detailsModal.open && detailsModal.design && (
         <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          className="cn-trash-dialog-backdrop fixed inset-0 flex items-center justify-center z-[120]"
           onMouseDown={(event) => event.target === event.currentTarget && setDetailsModal({ open: false, design: null })}
         >
-          <div role="dialog" aria-modal="true" aria-labelledby="design-details-title" className="bg-white rounded-xl p-6 w-full max-w-lg mx-4">
-            <h3 id="design-details-title" className="text-lg font-bold mb-4">Design Details</h3>
-            <div className="space-y-3 text-sm">
-              <p><span className="font-medium">Name:</span> {detailsModal.design.name}</p>
-              <p><span className="font-medium">Layers:</span> {detailsModal.design.config?.layers || 2}</p>
-              <p><span className="font-medium">Cake Flavor:</span> {detailsModal.design.config?.cakeColor || 'vanilla'}</p>
-              <p><span className="font-medium">Frosting:</span> {detailsModal.design.config?.frostingColor || 'vanilla'}</p>
-              <p><span className="font-medium">Toppings:</span> {(detailsModal.design.config?.toppings || []).join(', ') || 'None'}</p>
-              <p><span className="font-medium">Saved estimate:</span> {formatEstimate(detailsModal.design)}</p>
-              <p><span className="font-medium">Sent to Bakery:</span> {detailsModal.design.sentToBakery ? 'Yes' : 'No'}</p>
-              <p><span className="font-medium">Date Modified:</span> {formatDate(detailsModal.design.lastEdited)}</p>
-              <p><span className="font-medium">Date Created:</span> {formatDate(detailsModal.design.createdAt)}</p>
+          <div role="dialog" aria-modal="true" aria-labelledby="design-details-title" className="cn-trash-dialog cn-trash-details-dialog w-full max-w-lg mx-4 text-left">
+            <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[var(--cn-line)]">
+              <span className="cn-trash-details-icon"><Info className="w-5 h-5 text-[var(--cn-cherry)]" /></span>
+              <div>
+                <h3 id="design-details-title" className="text-xl font-bold font-serif text-[var(--cn-ink)] leading-snug">Design Details</h3>
+                <p className="text-xs text-[var(--cn-muted)]">Configuration & saved specs</p>
+              </div>
             </div>
-            <div className="flex justify-end mt-6">
+            <div className="cn-trash-details-list space-y-2.5 text-xs">
+              <div className="flex justify-between py-1 border-b border-[rgba(44,23,19,0.06)]"><span className="text-[var(--cn-muted)]">Name</span> <strong className="text-[var(--cn-ink)]">{detailsModal.design.name}</strong></div>
+              <div className="flex justify-between py-1 border-b border-[rgba(44,23,19,0.06)]"><span className="text-[var(--cn-muted)]">Layers</span> <strong className="text-[var(--cn-ink)]">{detailsModal.design.config?.layers || 2}</strong></div>
+              <div className="flex justify-between py-1 border-b border-[rgba(44,23,19,0.06)]"><span className="text-[var(--cn-muted)]">Cake Flavor</span> <strong className="text-[var(--cn-ink)] capitalize">{detailsModal.design.config?.cakeColor || 'vanilla'}</strong></div>
+              <div className="flex justify-between py-1 border-b border-[rgba(44,23,19,0.06)]"><span className="text-[var(--cn-muted)]">Frosting</span> <strong className="text-[var(--cn-ink)] capitalize">{detailsModal.design.config?.frostingColor || 'vanilla'}</strong></div>
+              <div className="flex justify-between py-1 border-b border-[rgba(44,23,19,0.06)]"><span className="text-[var(--cn-muted)]">Toppings</span> <strong className="text-[var(--cn-ink)]">{(detailsModal.design.config?.toppings || []).join(', ') || 'None'}</strong></div>
+              <div className="flex justify-between py-1 border-b border-[rgba(44,23,19,0.06)]"><span className="text-[var(--cn-muted)]">Saved estimate</span> <strong className="text-[var(--cn-ink)]">{formatEstimate(detailsModal.design)}</strong></div>
+              <div className="flex justify-between py-1 border-b border-[rgba(44,23,19,0.06)]"><span className="text-[var(--cn-muted)]">Sent to Bakery</span> <strong className="text-[var(--cn-ink)]">{detailsModal.design.sentToBakery ? 'Yes' : 'No'}</strong></div>
+              <div className="flex justify-between py-1 border-b border-[rgba(44,23,19,0.06)]"><span className="text-[var(--cn-muted)]">Date Modified</span> <strong className="text-[var(--cn-ink)]">{formatDate(detailsModal.design.lastEdited)}</strong></div>
+              <div className="flex justify-between py-1"><span className="text-[var(--cn-muted)]">Date Created</span> <strong className="text-[var(--cn-ink)]">{formatDate(detailsModal.design.createdAt)}</strong></div>
+            </div>
+            <div className="cn-trash-dialog-actions mt-5">
               <button
+                type="button"
                 onClick={() => setDetailsModal({ open: false, design: null })}
-                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
+                className="w-full justify-center"
               >
                 Close
               </button>

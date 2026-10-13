@@ -5,9 +5,9 @@ import GuestAuthModal from './GuestAuthModal';
 import { authApi } from '@/services/api';
 const session = vi.hoisted(() => ({ isAuthenticated: false, isLoadingAuth: false, authError: null }));
 vi.mock('@/lib/AuthContext', () => ({ useAuth: () => session }));
-const firebase = vi.hoisted(() => ({ popup: vi.fn() }));
-vi.mock('@/lib/firebase', () => ({ auth: {}, firebaseConfigured: true, googleProvider: 'google' }));
-vi.mock('firebase/auth', () => ({ signInWithPopup: firebase.popup, signInWithCustomToken: vi.fn() }));
+const firebase = vi.hoisted(() => ({ popup: vi.fn(), custom: vi.fn() }));
+vi.mock('@/lib/firebase', () => ({ auth: {}, firebaseConfigured: true, googleProvider: 'google', getAuxiliaryAuth: () => ({}) }));
+vi.mock('firebase/auth', () => ({ signInWithPopup: firebase.popup, signInWithCustomToken: firebase.custom, signOut: vi.fn() }));
 beforeEach(() => Object.assign(session, { isAuthenticated: false, isLoadingAuth: false, authError: null }));
 
 vi.mock('@/services/api', () => ({
@@ -18,16 +18,23 @@ vi.mock('@/services/api', () => ({
 }));
 
 describe('GuestAuthModal', () => {
-  it('waits for app account readiness before resuming a designer action', async () => {
-    const user = { uid: 'guest' };
+  it('waits for app account readiness after Google sign-in and OTP verification before resuming a designer action', async () => {
+    const user = { uid: 'guest', email: 'guest@google.com' };
     firebase.popup.mockResolvedValueOnce({ user });
+    authApi.verifyEmailOtp.mockResolvedValueOnce({ token: 'guest-custom-token' });
+    firebase.custom.mockResolvedValueOnce({ user });
     const onClose = vi.fn();
     const onSuccess = vi.fn();
     const { rerender } = render(<GuestAuthModal isOpen onClose={onClose} onSuccess={onSuccess} />);
     fireEvent.click(screen.getByRole('button', { name: /Continue with Google/ }));
+    const input = await screen.findByLabelText('Verification code');
+    expect(authApi.requestEmailOtp).toHaveBeenCalledWith('guest@google.com');
+    fireEvent.change(input, { target: { value: '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: /Verify/i }));
+    await vi.waitFor(() => expect(authApi.verifyEmailOtp).toHaveBeenCalledWith('guest@google.com', '123456'));
+    expect(firebase.custom).toHaveBeenCalledWith({}, 'guest-custom-token');
     await screen.findByText('Loading your account…');
     expect(onSuccess).not.toHaveBeenCalled();
-    expect(firebase.popup).toHaveBeenCalledWith({}, 'google');
     session.isAuthenticated = true;
     rerender(<GuestAuthModal isOpen onClose={onClose} onSuccess={onSuccess} />);
     expect(onClose).toHaveBeenCalledTimes(1);
