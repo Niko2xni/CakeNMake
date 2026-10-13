@@ -139,7 +139,6 @@ export default function DesignerWorkSpace() {
       isLoadingRef.current = true;
       setDesignId(null);
       setOrderComplete(false);
-      setMobileBakeryChatOpen(false);
       setSelectedCenterItemId(null);
       setActiveTool(null);
       placeUndoStackRef.current = [];
@@ -178,7 +177,6 @@ export default function DesignerWorkSpace() {
       setDesignId(null);
       setConfig(INITIAL_CONFIG);
       setOrderComplete(false);
-      setMobileBakeryChatOpen(false);
       setSelectedCenterItemId(null);
       setActiveTool(null);
       setHasUnsavedChanges(false);
