@@ -40,10 +40,10 @@ export default function EdgeSection({
 
   const activeSlot = Object.prototype.hasOwnProperty.call(edge, 'activeSlot')
     ? edge.activeSlot
-    : (edge.mode === 'both' ? 'both' : 'top');
+    : (edge.mode === 'both' ? 'both' : null);
   const mode = edge.mode; // 'topBottomSeparate' | 'both'
 
-  const effectiveActiveSlot = (activeSlot === 'both' || !activeSlot) ? 'top' : activeSlot;
+  const effectiveActiveSlot = activeSlot;
 
   const ensureSlotsMigrated = (baseEdge) => {
     const nextEdge = { ...baseEdge };
@@ -61,24 +61,24 @@ export default function EdgeSection({
   };
 
   const switchToTop = () => {
-    const nextSlot = 'top';
+    const nextSlot = activeSlot === 'top' ? null : 'top';
     const nextEdge = { ...ensureSlotsMigrated(edge), mode: 'topBottomSeparate', activeSlot: nextSlot };
     onChange(nextEdge);
-    if (nextSlot) onActiveSlotChange?.(nextSlot);
+    onActiveSlotChange?.(nextSlot);
   };
 
   const switchToMiddle = () => {
-    const nextSlot = 'middle';
+    const nextSlot = activeSlot === 'middle' ? null : 'middle';
     const nextEdge = { ...ensureSlotsMigrated(edge), mode: 'topBottomSeparate', activeSlot: nextSlot };
     onChange(nextEdge);
-    if (nextSlot) onActiveSlotChange?.(nextSlot);
+    onActiveSlotChange?.(nextSlot);
   };
 
   const switchToBottom = () => {
-    const nextSlot = 'bottom';
+    const nextSlot = activeSlot === 'bottom' ? null : 'bottom';
     const nextEdge = { ...ensureSlotsMigrated(edge), mode: 'topBottomSeparate', activeSlot: nextSlot };
     onChange(nextEdge);
-    if (nextSlot) onActiveSlotChange?.(nextSlot);
+    onActiveSlotChange?.(nextSlot);
   };
 
   // Both (1 tier) and All (2 tiers) are the exact same underlying data —
@@ -92,9 +92,9 @@ export default function EdgeSection({
   // inventing a second mode string.
   const isMiddleActive = hasMiddle && effectiveActiveSlot === 'middle';
   const isAllActive = hasMiddle && mode === 'both';
-  const hasSelectedSlot = ['top', 'middle', 'bottom'].includes(effectiveActiveSlot);
+  const hasSelectedSlot = Boolean(effectiveActiveSlot && ['top', 'middle', 'bottom'].includes(effectiveActiveSlot));
 
-  const currentSlotKey = mode === 'both' ? 'both' : (isMiddleActive ? 'middle' : effectiveActiveSlot);
+  const currentSlotKey = mode === 'both' ? 'both' : (isMiddleActive ? 'middle' : (effectiveActiveSlot || 'top'));
   const currentSlot = isMiddleActive
     ? (edge.middle || EMPTY_MIDDLE_SLOT())
     : (edge[currentSlotKey]?.piping?.tip || edge[currentSlotKey]?.decorations?.setId
@@ -107,9 +107,9 @@ export default function EdgeSection({
     let nextEdge = ensureSlotsMigrated({ ...edge });
     if (nextEdge.mode === 'both') {
       nextEdge.mode = 'topBottomSeparate';
-      nextEdge.activeSlot = effectiveActiveSlot;
+      nextEdge.activeSlot = effectiveActiveSlot || 'top';
     }
-    const targetKey = nextEdge.mode === 'both' ? 'both' : (isMiddleActive ? 'middle' : effectiveActiveSlot);
+    const targetKey = nextEdge.mode === 'both' ? 'both' : (isMiddleActive ? 'middle' : (effectiveActiveSlot || 'top'));
     const targetSlot = nextEdge[targetKey] || currentSlot;
     nextEdge[targetKey] = { ...targetSlot, ...changes };
     onChange(nextEdge);
@@ -121,9 +121,9 @@ export default function EdgeSection({
     let nextEdge = ensureSlotsMigrated({ ...edge });
     if (nextEdge.mode === 'both') {
       nextEdge.mode = 'topBottomSeparate';
-      nextEdge.activeSlot = effectiveActiveSlot;
+      nextEdge.activeSlot = effectiveActiveSlot || 'top';
     }
-    const targetKey = nextEdge.mode === 'both' ? 'both' : (isMiddleActive ? 'middle' : effectiveActiveSlot);
+    const targetKey = nextEdge.mode === 'both' ? 'both' : (isMiddleActive ? 'middle' : (effectiveActiveSlot || 'top'));
     const targetSlot = nextEdge[targetKey] || currentSlot;
     const nextSlot = { ...targetSlot, ...changes };
     if (isAllActive && changes.piping) {
@@ -144,9 +144,9 @@ export default function EdgeSection({
     let nextEdge = ensureSlotsMigrated({ ...edge });
     if (nextEdge.mode === 'both') {
       nextEdge.mode = 'topBottomSeparate';
-      nextEdge.activeSlot = effectiveActiveSlot;
+      nextEdge.activeSlot = effectiveActiveSlot || 'top';
     }
-    const targetKey = nextEdge.mode === 'both' ? 'both' : (isMiddleActive ? 'middle' : effectiveActiveSlot);
+    const targetKey = nextEdge.mode === 'both' ? 'both' : (isMiddleActive ? 'middle' : (effectiveActiveSlot || 'top'));
     const targetSlot = nextEdge[targetKey] || currentSlot;
     onChange({
       ...nextEdge,

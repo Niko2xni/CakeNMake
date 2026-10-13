@@ -16,7 +16,8 @@ import LogoutConfirmation from '@/components/shared/LogoutConfirmation';
 
 const primaryItems = [
   { to: '/client', icon: Clock, label: 'Recents' },
-  { to: '/templates', icon: LayoutTemplate, label: 'Templates' },
+  // Temporarily hidden:
+  // { to: '/templates', icon: LayoutTemplate, label: 'Templates' },
   { to: '/trash', icon: Trash2, label: 'Trash' },
 ];
 
@@ -42,7 +43,8 @@ export default function ClientNavbar() {
   const location = useLocation();
   const { user, account } = useAuth();
 
-  const photoURL = user?.photoURL || account?.photoURL || null;
+  const providerPhoto = (user?.providerData || []).find((p) => p?.photoURL)?.photoURL;
+  const photoURL = user?.photoURL || providerPhoto || account?.photoURL || null;
   const displayName = account?.displayName || user?.displayName || user?.email?.split('@')[0]?.replace(/[._-]/g, ' ') || 'Cake Lover';
   const userEmail = account?.email || user?.email || 'user@example.com';
   const initials = displayName
@@ -96,7 +98,16 @@ export default function ClientNavbar() {
             aria-expanded={userDropdownOpen}
             aria-haspopup="menu"
           >
-            <User className="w-6 h-6 stroke-[1.85]" aria-hidden="true" />
+            {photoURL ? (
+              <img
+                src={photoURL}
+                alt=""
+                referrerPolicy="no-referrer"
+                className="w-6 h-6 rounded-full object-cover"
+              />
+            ) : (
+              <User className="w-6 h-6 stroke-[1.85]" aria-hidden="true" />
+            )}
             <span>Account</span>
           </button>
 
@@ -105,7 +116,7 @@ export default function ClientNavbar() {
               <div className="cn-user-summary">
                 <div className="cn-user-summary-avatar" aria-hidden="true">
                   {photoURL ? (
-                    <img src={photoURL} alt="" className="w-full h-full rounded-full object-cover" />
+                    <img src={photoURL} alt="" referrerPolicy="no-referrer" className="w-full h-full rounded-full object-cover" />
                   ) : (
                     <span>{initials}</span>
                   )}

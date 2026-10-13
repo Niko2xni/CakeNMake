@@ -64,19 +64,20 @@ export function adaptConfigToLegacy(newConfig) {
   const isIndividual = structure.layerDesign === 'individual' && (structure.layers > 1 || isPetitsFour);
   const variationCount = isPetitsFour ? 4 : (structure.layers || 1);
   const resolveContextSugarColor = (context, index = null, allowDefault = false) => {
-    const value = sugarColorOverrides[index === null ? context : `${context}-${index}`] || sugarColorOverrides[context];
+    const value = sugarColorOverrides[index === null ? context : `${context}-${index}`]
+      || sugarColorOverrides[context]
+      || ((context === 'edgeTop' || context === 'edgeBottom') ? sugarColorOverrides.edgeBoth : null);
     if (allowDefault && value?.mode === 'default' && value.colorId) return resolveColor(value.colorId);
     return resolveSugarColorHex(value?.mode || 'default', value?.colorId);
   };
 
   const resolveContextSugarColorWithId = (context, index = null, allowDefault = false) => {
-    const value = sugarColorOverrides[index === null ? context : `${context}-${index}`] || sugarColorOverrides[context];
-    console.log('Resolving sugar color with ID - context:', context, 'index:', index, 'value:', value);
+    const value = sugarColorOverrides[index === null ? context : `${context}-${index}`]
+      || sugarColorOverrides[context]
+      || ((context === 'edgeTop' || context === 'edgeBottom') ? sugarColorOverrides.edgeBoth : null);
     if (allowDefault && value?.mode === 'default' && value.colorId) return resolveColorWithId(value.colorId);
     if (value?.mode === 'colorOverride' && value?.colorId) {
-      const result = resolveColorWithId(value.colorId);
-      console.log('Resolved color override:', result);
-      return result;
+      return resolveColorWithId(value.colorId);
     }
     return null;
   };
@@ -312,19 +313,21 @@ export function adaptConfigToLegacy(newConfig) {
   const resolveEdgeSlot = (slot, context) => {
     const pipingColorData = resolveContextSugarColorWithId(context, null, true);
     const secondaryColorData = resolveContextSugarColorWithId(`${context}Secondary`, null, true);
+    const decorationColorData = resolveContextSugarColorWithId(context, null, true);
     return {
-    decorationSetId: slot?.decorations?.setId || null,
-    decorationColor: resolveContextSugarColor(context, null, true) || resolveColor(slot?.decorations?.colorId),
-    pipingTip: slot?.piping?.tip || null,
-    pipingColor: pipingColorData?.hex || resolveColor(slot?.piping?.colorId),
-    pipingColorId: pipingColorData?.id || slot?.piping?.colorId || null,
-    // Deluxe's Alternating designs only — resolves the same way
-    // pipingColor does (a dedicated Sugar Color context first, falling
-    // back to the stored colorId), just off `${context}Secondary` and
-    // secondaryColorId instead. Harmless for Classic designs, which
-    // never read this field.
-    pipingSecondaryColor: secondaryColorData?.hex || resolveColor(slot?.piping?.secondaryColorId || 'red'),
-    pipingSecondaryColorId: secondaryColorData?.id || slot?.piping?.secondaryColorId || null,
+      decorationSetId: slot?.decorations?.setId || null,
+      decorationColor: resolveContextSugarColor(context, null, true) || resolveColor(slot?.decorations?.colorId),
+      decorationColorId: decorationColorData?.id || slot?.decorations?.colorId || null,
+      pipingTip: slot?.piping?.tip || null,
+      pipingColor: pipingColorData?.hex || resolveColor(slot?.piping?.colorId),
+      pipingColorId: pipingColorData?.id || slot?.piping?.colorId || null,
+      // Deluxe's Alternating designs only — resolves the same way
+      // pipingColor does (a dedicated Sugar Color context first, falling
+      // back to the stored colorId), just off `${context}Secondary` and
+      // secondaryColorId instead. Harmless for Classic designs, which
+      // never read this field.
+      pipingSecondaryColor: secondaryColorData?.hex || resolveColor(slot?.piping?.secondaryColorId || 'red'),
+      pipingSecondaryColorId: secondaryColorData?.id || slot?.piping?.secondaryColorId || null,
     };
   };
   const edgeTop = resolveEdgeSlot(edge.top, 'edgeTop');

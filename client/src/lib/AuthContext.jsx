@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect, useRef, useCallback } from 'react';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signOut, updateProfile } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { accountApi } from '@/services/api';
 import { getChatSocket, disconnectChatSocket } from '@/lib/chat-socket';
@@ -158,6 +158,16 @@ export const AuthProvider = ({ children }) => {
       try {
         const synchronizedAccount = await refreshAccount();
         if (!active || revision !== sessionRevision.current) return;
+
+        const providerPhoto = (nextUser.providerData || []).find((p) => p?.photoURL)?.photoURL;
+        const availablePhoto = nextUser.photoURL || providerPhoto || synchronizedAccount?.photoURL;
+        if (availablePhoto && !nextUser.photoURL) {
+          try {
+            await updateProfile(nextUser, { photoURL: availablePhoto });
+          } catch {
+            // Non-critical if Firebase auth profile update fails
+          }
+        }
 
         setUser(nextUser);
         setAccount(synchronizedAccount);

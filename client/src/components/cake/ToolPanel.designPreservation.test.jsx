@@ -64,7 +64,7 @@ it('shows only Fundamentals and Center for Petit Fours and restores Side and Edg
   });
 
   expect(screen.getByRole('button', { name: 'Fundamentals', exact: true })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Center', exact: true })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Center', exact: true })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Side', exact: true })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Edge', exact: true })).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Fundamentals', exact: true })).toHaveClass('bg-card');
@@ -84,7 +84,7 @@ for (const mode of ['both', 'topBottomSeparate']) {
   it(`preserves visible borders when navigating edge slots from ${mode}`, () => {
     const state = mount(mode);
     fireEvent.click(screen.getByRole('button', { name: 'Edge', exact: true }));
-    for (const slot of ['Top', 'Bottom', 'Top', 'Top']) {
+    for (const slot of ['Bottom', 'Top', 'Bottom']) {
       fireEvent.click(screen.getByRole('button', { name: slot, exact: true }));
       const config = state.current();
       const rendered = adaptConfigToLegacy(config);

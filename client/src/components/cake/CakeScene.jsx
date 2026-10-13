@@ -4247,7 +4247,12 @@ const CakeScene = React.forwardRef(function CakeScene({
         const edgeTrimY = computeEdgeTrimY(y, edgeRadius, decorationKind, exteriorFinishStyle, isBottom);
         const edgeTrimRadius = computeEdgeTrimRadius(edgeRadius, decorationKind, exteriorFinishStyle, isBottom);
         if (beadedTrimPattern) {
-          const trim = buildBeadedTrimRing(edgeTrimRadius, slot?.decorationColor || lastFrostColor, rand, { pattern: beadedTrimPattern });
+          const trim = buildBeadedTrimRing(
+            edgeTrimRadius,
+            slot?.pipingColor || slot?.decorationColor || lastFrostColor,
+            rand,
+            { pattern: beadedTrimPattern, colorId: slot?.pipingColorId || slot?.decorationColorId }
+          );
           trim.position.y = edgeTrimY;
           group.add(trim);
         } else if (fruitRimBuilder) {
@@ -4308,7 +4313,7 @@ const CakeScene = React.forwardRef(function CakeScene({
             middleRadius,
             activeMiddleSlot.pipingColor || lastFrostColor,
             rand,
-            { pattern: middleBeadedPattern },
+            { pattern: middleBeadedPattern, colorId: activeMiddleSlot.pipingColorId },
           );
           middleTrim.position.y = middleY;
           middleTrim.receiveShadow = true;

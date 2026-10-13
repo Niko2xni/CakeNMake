@@ -81,6 +81,85 @@ describe('Uniform and Individual tier state', () => {
     expect(legacy.edgeMiddle.pipingColorId).toBe('pink');
   });
 
+  it('resolves edgeTop sugar color overrides correctly across cake formats (standard round, square, rectangle, and bento)', () => {
+    const testCases = [
+      { format: 'standard', shape: 'round', size: '8x8' },
+      { format: 'standard', shape: 'square', size: '8x8' },
+      { format: 'standard', shape: 'rectangle', size: 'quarterSheet' },
+      { format: 'bento', shape: 'round', size: 'bentoRound4' },
+      { format: 'bento', shape: 'square', size: 'bentoSquare4' },
+    ];
+
+    for (const { format, shape, size } of testCases) {
+      // 1. Color override mode (Pick Color: pink)
+      const configWithOverride = {
+        structure: { cakeFormat: format, format, shape, size, layers: 1, layerDesign: 'uniform' },
+        sponge: { flavor: 'vanilla' },
+        exteriorFinish: { style: 'fullyFrosted', flavor: 'chocolate' },
+        edge: {
+          mode: 'topBottomSeparate',
+          activeSlot: 'top',
+          top: {
+            piping: { tip: 'beadedTrim', colorId: 'vanilla' },
+            decorations: { setId: null, colorId: 'vanilla' },
+          },
+        },
+        sugarColorOverrides: {
+          edgeTop: { mode: 'colorOverride', colorId: 'pink' },
+        },
+      };
+
+      const legacyOverride = adaptConfigToLegacy(configWithOverride);
+      expect(legacyOverride.edgeTop.pipingTip).toBe('beadedTrim');
+      expect(legacyOverride.edgeTop.pipingColor).toBe(colorHex('pink'));
+      expect(legacyOverride.edgeTop.pipingColorId).toBe('pink');
+
+      // 2. Default mode with flavor color (Match Flavor: strawberry)
+      const configWithDefaultColor = {
+        structure: { cakeFormat: format, format, shape, size, layers: 1, layerDesign: 'uniform' },
+        sponge: { flavor: 'vanilla' },
+        exteriorFinish: { style: 'fullyFrosted', flavor: 'vanilla' },
+        edge: {
+          mode: 'topBottomSeparate',
+          activeSlot: 'top',
+          top: {
+            piping: { tip: 'dollop', colorId: 'vanilla' },
+          },
+        },
+        sugarColorOverrides: {
+          edgeTop: { mode: 'default', colorId: 'strawberry' },
+        },
+      };
+
+      const legacyDefault = adaptConfigToLegacy(configWithDefaultColor);
+      expect(legacyDefault.edgeTop.pipingTip).toBe('dollop');
+      expect(legacyDefault.edgeTop.pipingColor).toBe(colorHex('strawberry'));
+      expect(legacyDefault.edgeTop.pipingColorId).toBe('strawberry');
+
+      // 3. Fallback to edgeBoth when edgeTop is not overridden individually
+      const configWithBothFallback = {
+        structure: { cakeFormat: format, format, shape, size, layers: 1, layerDesign: 'uniform' },
+        sponge: { flavor: 'vanilla' },
+        exteriorFinish: { style: 'fullyFrosted', flavor: 'vanilla' },
+        edge: {
+          mode: 'topBottomSeparate',
+          activeSlot: 'top',
+          top: {
+            piping: { tip: 'shell', colorId: 'vanilla' },
+          },
+        },
+        sugarColorOverrides: {
+          edgeBoth: { mode: 'colorOverride', colorId: 'mocha' },
+        },
+      };
+
+      const legacyBoth = adaptConfigToLegacy(configWithBothFallback);
+      expect(legacyBoth.edgeTop.pipingTip).toBe('shell');
+      expect(legacyBoth.edgeTop.pipingColor).toBe(colorHex('mocha'));
+      expect(legacyBoth.edgeTop.pipingColorId).toBe('mocha');
+    }
+  });
+
   it('stores Side choices on the active tier without changing other tiers', () => {
     const side = { mode: null, checkeredPattern: { setId: null } };
     const onChange = vi.fn();

@@ -20,13 +20,13 @@ function renderNavbar(route = '/client') {
 
 describe('ClientNavbar', () => {
   it('exposes every primary client destination and marks the current route', () => {
-    renderNavbar('/templates');
+    renderNavbar('/trash');
 
     expect(screen.getByRole('link', { name: /cakenmake dashboard/i })).toHaveTextContent('CNM');
     expect(screen.getByRole('link', { name: /create/i })).toHaveAttribute('href', '/designer');
     expect(screen.getByRole('link', { name: /recents/i })).toHaveAttribute('href', '/client');
-    expect(screen.getByRole('link', { name: /templates/i })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('link', { name: /trash/i })).toHaveAttribute('href', '/trash');
+    expect(screen.queryByRole('link', { name: /templates/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /trash/i })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: /chats/i })).toHaveAttribute('href', '/chats');
   });
 
@@ -50,5 +50,11 @@ describe('ClientNavbar', () => {
     expect(screen.getByRole('menuitem', { name: /settings/i })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('menuitem', { name: /profile/i })).not.toHaveAttribute('aria-current');
     expect(screen.queryByRole('menuitem', { name: /orders & support/i })).not.toBeInTheDocument();
+  });
+
+  it('renders profile picture in account button when available', () => {
+    renderNavbar('/client');
+    // Default mock has no photoURL, so it shows the User SVG icon
+    expect(screen.getByRole('button', { name: /account/i })).toBeInTheDocument();
   });
 });
