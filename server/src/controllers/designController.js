@@ -6,6 +6,9 @@ const {
   verifyThumbnailAsset,
 } = require('../config/cloudinary');
 
+const MAX_TRASH_CAPACITY = 20;
+exports.MAX_TRASH_CAPACITY = MAX_TRASH_CAPACITY;
+
 function legacyEmail(req) {
   if (!req.auth?.emailVerified) return '';
   return String(req.user?.email || req.auth?.email || '').trim().toLowerCase();
@@ -35,9 +38,10 @@ function notFound(res) {
 exports.getDesigns = async (req, res) => {
   try {
     const trashOnly = req.query.isTrashed === 'true';
+    const sort = trashOnly ? { trashedAt: -1, lastEdited: -1 } : { lastEdited: -1 };
     const designs = await Design.find({ ...ownerFilter(req), isTrashed: trashOnly })
-      .sort({ lastEdited: -1 })
-      .limit(trashOnly ? 5 : 20);
+      .sort(sort)
+      .limit(MAX_TRASH_CAPACITY);
     return res.json(designs);
   } catch (error) {
     console.error('Error fetching designs:', error);
@@ -184,10 +188,6 @@ async function removeOwnedDesign(req, res, message) {
 
 exports.deleteDesign = (req, res) => removeOwnedDesign(req, res, 'Design deleted successfully');
 exports.permanentlyDelete = (req, res) => removeOwnedDesign(req, res, 'Design permanently deleted');
-
-const MAX_TRASH_CAPACITY = 20;
-
-exports.MAX_TRASH_CAPACITY = MAX_TRASH_CAPACITY;
 
 exports.moveToTrash = async (req, res) => {
   if (invalidDesignId(req, res)) return;
