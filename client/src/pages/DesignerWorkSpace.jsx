@@ -500,7 +500,7 @@ export default function DesignerWorkSpace() {
     try {
       await chatApi.sendMessage(convoId, {
         clientMessageId: `order_${snapshot.submissionId}`,
-        text: `🎂 Cake Order Submitted!\n• Design: "${snapshot.designName}"\n${fulfillmentLines}\n• Required Down Payment (50%): ₱${downpayment} (Awaiting staff verification)\n• Remaining Balance (50%): ₱${remaining} (Due 48h before event to begin baking)\n\nCheckout was simulated; no money was collected. Please contact the bakery to verify payment.`,
+        text: `🎂 Cake Order Submitted!\n• Design: "${snapshot.designName}"\n${fulfillmentLines}\n• Down Payment (50%): ₱${downpayment} (Paid - Simulated checkout)\n• Remaining Balance (50%): ₱${remaining} (Due 48h before event to begin baking)\n\nSimulated down payment completed. The bakery will review your design and confirm production.`,
       });
     } catch (err) {
       console.warn('Failed to send automated initial chat message:', err);

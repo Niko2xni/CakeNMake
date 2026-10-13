@@ -33,7 +33,25 @@ test('buildEmailContent formats subject, text, and html with all reservation det
   assert.ok(content.html.includes('Maria Santos'));
   assert.ok(content.html.includes('Chocolate Velvet Dream'));
   assert.ok(content.html.includes('Mamshie Bakery'));
+  assert.ok(content.html.includes('Confirmed'));
+  assert.ok(content.html.includes('(Paid)'));
+});
+
+test('buildEmailContent supports unpaid reservations with pending status', () => {
+  const content = buildEmailContent({
+    customerName: 'Maria Santos',
+    designName: 'Chocolate Velvet Dream',
+    bakeryName: 'Mamshie Bakery',
+    deliveryDate: 'Oct 20, 2026',
+    totalPrice: '2,500.00',
+    downPayment: '1,250.00',
+    remainingBalance: '1,250.00',
+    isDownPaymentPaid: false,
+    status: 'Pending Down Payment',
+  });
+
   assert.ok(content.html.includes('Pending Down Payment'));
+  assert.ok(content.html.includes('(Pending verification)'));
 });
 
 test('buildEmailContent escapes dynamic HTML and removes header line breaks', () => {
