@@ -10,6 +10,7 @@ import { buildOreoMesh } from './toppings/oreo';
 import { buildCherryMesh } from './toppings/cherry';
 import { buildBasketballMesh } from './toppings/basketball';
 import { buildSoccerBallMesh } from './toppings/soccerBall';
+import { getBoxyRadius } from './cakeMath';
 
 // ─── Decoration Set Geometry — first working example per category ─────────
 // Per instruction: keep every placeholder Set button in the UI (don't
@@ -685,6 +686,11 @@ const CHECKER_STANDOFF = -0.06;   // negative standoff embeds the back face into
 const CHECKER_THICKNESS = 0.12;   // increased thickness offsets the embedding so the front face stays visible
 const CHECKER_GAP_RATIO = 0.9;    // slightly smaller than the grid cell, like stencil grout lines
 
+export function getCheckerSideLayoutRadius(radius, embedOverride) {
+  const embed = embedOverride ?? CHECKER_STANDOFF;
+  return radius + CHECKER_THICKNESS / 2 + embed;
+}
+
 // Was a plain THREE.MeshStandardMaterial({ color }) — a flat color only,
 // with no way to build the real pattern/gradient/metallic material for
 // Marble/Ombré/Rainbow Swirl/Gold Shimmer/Watercolor Pastel Mix/Red-White
@@ -773,24 +779,226 @@ function buildCheckerSquareMaterial(colorHex, colorId = null) {
 // cakeConfig.js) since this is pure row-index selection — identical math
 // regardless of whether the cell shape ends up a square or a triangle, so
 // it's reused rather than copy-pasted a second time.
-function selectParallelRows(pattern, rows) {
+function selectParallelRows(pattern, rows, structure = {}) {
   const selected = new Set();
+  const isBento = structure.cakeFormat === 'bento' || structure.format === 'bento';
+  
   if (pattern === 'parallelOuter') {
-    const bottomIdx = 0;
-    const topIdx = rows - 1;
-    if (bottomIdx >= 0 && bottomIdx < rows) selected.add(bottomIdx);
-    if (topIdx >= 0 && topIdx < rows) selected.add(topIdx);
+    if (isBento) {
+      // Bento: Bottom Pattern - only the bottom row
+      const bottomIdx = 0;
+      if (bottomIdx >= 0 && bottomIdx < rows) selected.add(bottomIdx);
+    } else {
+      // Standard: Parallel Lines — Outer - top and bottom rows
+      const bottomIdx = 0;
+      const topIdx = rows - 1;
+      if (bottomIdx >= 0 && bottomIdx < rows) selected.add(bottomIdx);
+      if (topIdx >= 0 && topIdx < rows) selected.add(topIdx);
+    }
   } else if (pattern === 'parallelInner') {
-    const secondIdx = 1;
-    const thirdIdx = rows - 2;
-    if (secondIdx >= 0 && secondIdx < rows) selected.add(secondIdx);
-    if (thirdIdx >= 0 && thirdIdx < rows) selected.add(thirdIdx);
+    if (isBento) {
+      // Bento: Top Pattern - only the top row
+      const topIdx = rows - 1;
+      if (topIdx >= 0 && topIdx < rows) selected.add(topIdx);
+    } else {
+      // Standard: Parallel Lines — Inner - 2nd and 3rd rows
+      const secondIdx = 1;
+      const thirdIdx = rows - 2;
+      if (secondIdx >= 0 && secondIdx < rows) selected.add(secondIdx);
+      if (thirdIdx >= 0 && thirdIdx < rows) selected.add(thirdIdx);
+    }
   }
   return selected;
 }
 // Shared by buildCheckerSideSquares below so the pattern-selection logic
 // (Full/Left Diagonal/Right Diagonal/Parallel Lines, gap dashing, etc.)
 // lives in exactly one place.
+function createRoundedRectanglePath(width, depth, cornerRadius) {
+  const radius = Math.max(0, Math.min(cornerRadius, width, depth));
+  const xExtent = width - radius;
+  const zExtent = depth - radius;
+  const segments = [];
+  let pathLength = 0;
+
+  const addLine = (x1, z1, x2, z2) => {
+    const dx = x2 - x1;
+    const dz = z2 - z1;
+    const length = Math.hypot(dx, dz);
+    if (length > 0) {
+      segments.push({ type: 'line', x1, z1, dx, dz, length, startDistance: pathLength });
+      pathLength += length;
+    }
+  };
+  const addArc = (cx, cz, start, end) => {
+    const length = Math.abs(end - start) * radius;
+    if (length > 0) {
+      segments.push({ type: 'arc', cx, cz, start, end, length, startDistance: pathLength });
+      pathLength += length;
+    }
+  };
+
+  addLine(-xExtent, depth, xExtent, depth);
+  addArc(xExtent, zExtent, Math.PI / 2, 0);
+  addLine(width, zExtent, width, -zExtent);
+  addArc(xExtent, -zExtent, 0, -Math.PI / 2);
+  addLine(xExtent, -depth, -xExtent, -depth);
+  addArc(-xExtent, -zExtent, -Math.PI / 2, -Math.PI);
+  addLine(-width, -zExtent, -width, zExtent);
+  addArc(-xExtent, zExtent, Math.PI, Math.PI / 2);
+
+  const perimeter = pathLength;
+  return {
+    width,
+    depth,
+    cornerRadius: radius,
+    perimeter,
+    sideLengths: [
+      2 * (width - radius) + Math.PI * radius / 2,
+      2 * (depth - radius) + Math.PI * radius / 2,
+      2 * (width - radius) + Math.PI * radius / 2,
+      2 * (depth - radius) + Math.PI * radius / 2,
+    ],
+    pointAtDistance(distance) {
+      let remaining = ((distance % perimeter) + perimeter) % perimeter;
+      for (const segment of segments) {
+        if (remaining <= segment.length) {
+          if (segment.type === 'line') {
+            const t = remaining / segment.length;
+            return {
+              x: segment.x1 + segment.dx * t,
+              z: segment.z1 + segment.dz * t,
+              tangentX: segment.dx / segment.length,
+              tangentZ: segment.dz / segment.length,
+            };
+          }
+
+          const direction = Math.sign(segment.end - segment.start);
+          const angle = segment.start + direction * remaining / radius;
+          return {
+            x: segment.cx + radius * Math.cos(angle),
+            z: segment.cz + radius * Math.sin(angle),
+            tangentX: -Math.sin(angle) * direction,
+            tangentZ: Math.cos(angle) * direction,
+          };
+        }
+        remaining -= segment.length;
+      }
+      return { x: 0, z: depth, tangentX: 1, tangentZ: 0 };
+    },
+    distanceAtPoint(x, z) {
+      let closestDistance = 0;
+      let closestDistanceSquared = Infinity;
+
+      const consider = (pointX, pointZ, distance) => {
+        const dx = x - pointX;
+        const dz = z - pointZ;
+        const distanceSquared = dx * dx + dz * dz;
+        if (distanceSquared < closestDistanceSquared) {
+          closestDistanceSquared = distanceSquared;
+          closestDistance = distance;
+        }
+      };
+
+      for (const segment of segments) {
+        if (segment.type === 'line') {
+          const t = Math.min(1, Math.max(0, (
+            (x - segment.x1) * segment.dx + (z - segment.z1) * segment.dz
+          ) / (segment.length * segment.length)));
+          consider(
+            segment.x1 + segment.dx * t,
+            segment.z1 + segment.dz * t,
+            segment.startDistance + t * segment.length
+          );
+          continue;
+        }
+
+        const direction = Math.sign(segment.end - segment.start);
+        let angle = Math.atan2(z - segment.cz, x - segment.cx);
+        let delta = direction > 0
+          ? (angle - segment.start + Math.PI * 2) % (Math.PI * 2)
+          : (segment.start - angle + Math.PI * 2) % (Math.PI * 2);
+        const arcLength = Math.abs(segment.end - segment.start) * radius;
+        if (delta * radius > arcLength) {
+          const startX = segment.cx + radius * Math.cos(segment.start);
+          const startZ = segment.cz + radius * Math.sin(segment.start);
+          const endX = segment.cx + radius * Math.cos(segment.end);
+          const endZ = segment.cz + radius * Math.sin(segment.end);
+          consider(startX, startZ, segment.startDistance);
+          consider(endX, endZ, segment.startDistance + arcLength);
+        } else {
+          angle = segment.start + direction * delta;
+          consider(
+            segment.cx + radius * Math.cos(angle),
+            segment.cz + radius * Math.sin(angle),
+            segment.startDistance + delta * radius
+          );
+        }
+      }
+      return closestDistance;
+    },
+  };
+}
+
+function computeBoxyColumns(path, size, unit) {
+  const counts = path.sideLengths.map((length) => (
+    Math.max(2, Math.round(length / size / 2) * 2)
+  ));
+  const adjustmentPair = path.sideLengths[0] >= path.sideLengths[1] ? [0, 2] : [1, 3];
+  while (counts.reduce((total, count) => total + count, 0) % unit !== 0) {
+    counts[adjustmentPair[0]] += 2;
+    counts[adjustmentPair[1]] += 2;
+  }
+
+  const columns = [];
+  let distance = 0;
+  for (let side = 0; side < counts.length; side++) {
+    const cellWidth = path.sideLengths[side] / counts[side];
+    for (let index = 0; index < counts[side]; index++) {
+      columns.push({
+        distance: path.columnStartOffset + distance + (index + 0.5) * cellWidth,
+        startOffset: distance + index * cellWidth,
+        cellWidth,
+      });
+    }
+    distance += path.sideLengths[side];
+  }
+  return { columns, count: counts.reduce((total, count) => total + count, 0) };
+}
+
+function getLayoutColumnPosition(angle, layout) {
+  if (!layout.boxyPath) {
+    const wrappedAngle = ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    const colF = wrappedAngle / layout.cellAngle;
+    return { col: Math.floor(colF), colF };
+  }
+
+  const theta = Math.PI / 2 - angle;
+  const pathRadius = getBoxyRadius(
+    theta,
+    layout.boxyPath.width,
+    layout.boxyPath.depth,
+    layout.boxyPath.cornerRadius
+  );
+  const x = Math.sin(angle) * pathRadius;
+  const z = Math.cos(angle) * pathRadius;
+  const pathDistance = layout.boxyPath.distanceAtPoint(x, z);
+  const relativeDistance = (
+    (pathDistance - layout.boxyPath.columnStartOffset + layout.boxyPath.perimeter)
+    % layout.boxyPath.perimeter
+  );
+
+  let col = 0;
+  while (
+    col < layout.boxyColumns.length - 1 &&
+    relativeDistance >= layout.boxyColumns[col].startOffset + layout.boxyColumns[col].cellWidth
+  ) {
+    col += 1;
+  }
+  const column = layout.boxyColumns[col];
+  const colF = col + (relativeDistance - column.startOffset) / column.cellWidth;
+  return { col, colF };
+}
+
 function computeCheckerLayout(radius, height, opts = {}) {
   const pattern = opts.pattern ?? 'full';
   const isDiagonalPattern = pattern === 'leftDiagonal' || pattern === 'rightDiagonal';
@@ -798,7 +1006,15 @@ function computeCheckerLayout(radius, height, opts = {}) {
   const diagonalBandWidth = opts.diagonalBandWidth ?? 1;
   const gapDashPeriod = opts.gapDashPeriod ?? 2; // 1 = no dashing (fully empty gap)
   const size = CHECKER_SQUARE_SIZE;
-  const circumference = radius * Math.PI * 2;
+  const shape = opts.shape || 'round';
+  const isBoxy = shape === 'rectangle' || shape === 'square';
+  const width = shape === 'square' ? radius : radius * 1.25;
+  const depth = shape === 'square' ? radius : radius * 0.85;
+  const cornerRadius = 0.35 * radius / (opts.baseRadius || radius);
+  const boxyPath = isBoxy
+    ? createRoundedRectanglePath(width, depth, cornerRadius)
+    : null;
+  const circumference = boxyPath?.perimeter ?? radius * Math.PI * 2;
 
   // Column count must wrap seamlessly around the cylinder. For the plain
   // checkerboard, that only requires an EVEN column count (so the color
@@ -815,8 +1031,17 @@ function computeCheckerLayout(radius, height, opts = {}) {
   // divides evenly by diagonalPeriod every time, so the loop always
   // closes exactly where it started, regardless of the cake's radius.
   const unit = isDiagonalPattern ? 2 * diagonalPeriod : 2;
-  const targetUnits = Math.max(3, Math.round(circumference / size / unit));
-  const cols = targetUnits * unit;
+  let boxyColumns = null;
+  let cols;
+  if (boxyPath) {
+    boxyPath.columnStartOffset = -Math.PI * cornerRadius / 4;
+    const boxyLayout = computeBoxyColumns(boxyPath, size, unit);
+    boxyColumns = boxyLayout.columns;
+    cols = boxyLayout.count;
+  } else {
+    const targetUnits = Math.max(3, Math.round(circumference / size / unit));
+    cols = targetUnits * unit;
+  }
 
   const isParallelPattern = pattern === 'parallelOuter' || pattern === 'parallelInner';
 
@@ -829,7 +1054,7 @@ function computeCheckerLayout(radius, height, opts = {}) {
   const cellAngle = (Math.PI * 2) / cols;
   const cellHeight = height / rows;
 
-  const parallelRows = isParallelPattern ? selectParallelRows(pattern, rows) : null;
+  const parallelRows = isParallelPattern ? selectParallelRows(pattern, rows, opts.structure) : null;
 
   const cells = [];
   for (let row = 0; row < rows; row++) {
@@ -864,7 +1089,16 @@ function computeCheckerLayout(radius, height, opts = {}) {
     }
   }
 
-  return { cells, cols, rows, cellAngle, cellHeight };
+  return {
+    cells,
+    cols,
+    rows,
+    cellAngle,
+    cellHeight,
+    boxyPath,
+    boxyColumns,
+    cellWidth: circumference / cols,
+  };
 }
 
 /**
@@ -897,7 +1131,8 @@ function computeCheckerLayout(radius, height, opts = {}) {
  * checkerCoverageFn adapter already does.
  */
 export function getCheckerCoverageFn(radius, height, opts = {}) {
-  const { cells, cols, rows, cellAngle, cellHeight } = computeCheckerLayout(radius, height, opts);
+  const layout = computeCheckerLayout(radius, height, opts);
+  const { cells, cols, rows, cellHeight } = layout;
   const covered = new Set(cells.map(({ row, col }) => row * cols + col));
 
   // Half-width (in the cell's own 0..1 local space) of the square's real
@@ -923,10 +1158,8 @@ export function getCheckerCoverageFn(radius, height, opts = {}) {
     const inner = half - ramp;
     const outer = half;
     return (angle, localY) => {
-      const wrappedAngle = ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-      const colF = wrappedAngle / cellAngle;
+      const { col, colF } = getLayoutColumnPosition(angle, layout);
       const rowF = (localY + height / 2) / cellHeight;
-      const col = Math.floor(colF);
       const row = Math.floor(rowF);
       if (row < 0 || row >= rows) return 0;
       if (!covered.has(row * cols + col)) return 0;
@@ -942,10 +1175,8 @@ export function getCheckerCoverageFn(radius, height, opts = {}) {
   }
 
   return (angle, localY) => {
-    const wrappedAngle = ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-    const colF = wrappedAngle / cellAngle;
+    const { col, colF } = getLayoutColumnPosition(angle, layout);
     const rowF = (localY + height / 2) / cellHeight;
-    const col = Math.floor(colF);
     const row = Math.floor(rowF);
     if (row < 0 || row >= rows) return 0;
     if (!covered.has(row * cols + col)) return 0;
@@ -966,7 +1197,8 @@ export function getGlazeCheckerCoverageFn(radius, height, opts = {}) {
 }
 
 export function buildCheckerSideSquares(radius, height, opts = {}) {
-  const { cells, cellAngle, cellHeight } = computeCheckerLayout(radius, height, opts);
+  const shape = opts.shape || 'round';
+  const isBoxy = shape === 'rectangle' || shape === 'square';
 
   // Curve the square's own geometry along the cylinder's arc instead of
   // using a flat chord — teammate's improvement (mirrors the standoffRadius
@@ -975,32 +1207,40 @@ export function buildCheckerSideSquares(radius, height, opts = {}) {
   // are plain flat/rigid boxes — no relationship to Filling's Piping
   // Design at all.
   //
-  // opts.embedOverride replaces CHECKER_STANDOFF's -0.06 embed on request
-  // (CakeScene.jsx passes it under Ridge Comb/Ribbon Wrap/Vertical
-  // Piping): -0.06 buries the box's back face 0.06 into the WALL radius
-  // it's placed at, which hides the seam nicely against a flat wall, but
-  // those three textures' wall isn't flat — their own ridge peaks reach
-  // well past that buried-back-face radius, so part of the ridge
-  // geometry ends up INSIDE the box's volume, poking through at the
-  // box's edges. `radius` here already carries enough total clearance
-  // from the bare tier (CakeScene's sideDecorStandoff) that the box just
-  // needs to stop embedding — see the per-texture override values where
-  // this is called from.
-  const embed = opts.embedOverride ?? CHECKER_STANDOFF;
-  const standoffRadius = radius + CHECKER_THICKNESS / 2 + embed;
+  // opts.embedOverride lets the caller control how far the backing meets
+  // the wall. Textured finishes pass a small positive value with a radius
+  // at the frosting's base; raised crests can overlap the box edge rather
+  // than leaving it suspended over the valleys.
+  const standoffRadius = getCheckerSideLayoutRadius(radius, opts.embedOverride);
+  const {
+    cells,
+    cellAngle,
+    cellHeight,
+    boxyPath,
+    boxyColumns,
+  } = computeCheckerLayout(isBoxy ? standoffRadius : radius, height, opts);
   const arcLength = standoffRadius * cellAngle * CHECKER_GAP_RATIO;
   const mat = buildCheckerSquareMaterial(opts.color, opts.colorId);
 
-  const geo = new THREE.BoxGeometry(arcLength, cellHeight * CHECKER_GAP_RATIO, CHECKER_THICKNESS, 4, 1, 1);
+  const geo = new THREE.BoxGeometry(
+    isBoxy ? CHECKER_SQUARE_SIZE * CHECKER_GAP_RATIO : arcLength,
+    cellHeight * CHECKER_GAP_RATIO,
+    CHECKER_THICKNESS,
+    isBoxy ? 1 : 4,
+    1,
+    1
+  );
   const posAttribute = geo.attributes.position;
   const v = new THREE.Vector3();
-  for (let i = 0; i < posAttribute.count; i++) {
-    v.fromBufferAttribute(posAttribute, i);
-    const theta = v.x / standoffRadius;
-    const r = standoffRadius + v.z;
-    const newX = r * Math.sin(theta);
-    const newZ = r * Math.cos(theta) - standoffRadius;
-    posAttribute.setXYZ(i, newX, v.y, newZ);
+  if (!isBoxy) {
+    for (let i = 0; i < posAttribute.count; i++) {
+      v.fromBufferAttribute(posAttribute, i);
+      const theta = v.x / standoffRadius;
+      const r = standoffRadius + v.z;
+      const newX = r * Math.sin(theta);
+      const newZ = r * Math.cos(theta) - standoffRadius;
+      posAttribute.setXYZ(i, newX, v.y, newZ);
+    }
   }
   geo.computeVertexNormals();
   // Checker Pattern's Pick Color never had this applied before, so the
@@ -1015,12 +1255,34 @@ export function buildCheckerSideSquares(radius, height, opts = {}) {
   cells.forEach(({ row, col }, i) => {
     const angle = (col + 0.5) * cellAngle;
     const y = -height / 2 + (row + 0.5) * cellHeight;
-    dummy.position.set(Math.sin(angle) * standoffRadius, y, Math.cos(angle) * standoffRadius);
-    dummy.rotation.set(0, angle, 0);
+
+    let positionX;
+    let positionZ;
+    let rotAngle;
+    let scaleX = 1;
+    if (isBoxy) {
+      const column = boxyColumns[col];
+      const point = boxyPath.pointAtDistance(column.distance);
+      positionX = point.x;
+      positionZ = point.z;
+      const normalX = -point.tangentZ;
+      const normalZ = point.tangentX;
+      rotAngle = Math.atan2(normalX, normalZ);
+      scaleX = column.cellWidth / CHECKER_SQUARE_SIZE;
+    } else {
+      positionX = Math.sin(angle) * standoffRadius;
+      positionZ = Math.cos(angle) * standoffRadius;
+      rotAngle = angle;
+    }
+
+    dummy.position.set(positionX, y, positionZ);
+    dummy.rotation.set(0, rotAngle, 0);
+    dummy.scale.set(scaleX, 1, 1);
     dummy.updateMatrix();
     mesh.setMatrixAt(i, dummy.matrix);
   });
   mesh.instanceMatrix.needsUpdate = true;
+  if (isBoxy) mesh.userData.isRigidDecor = true;
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   return mesh;
@@ -1050,6 +1312,11 @@ const TRIANGLE_SIZE = 1.22;     // same physical size convention as CHECKER_SQUA
 const TRIANGLE_STANDOFF = -0.06;
 const TRIANGLE_THICKNESS = 0.12;
 const TRIANGLE_GAP_RATIO = 0.9;
+
+export function getTriangleSideLayoutRadius(radius, embedOverride) {
+  const embed = embedOverride ?? TRIANGLE_STANDOFF;
+  return radius + TRIANGLE_THICKNESS / 2 + embed;
+}
 
 // Same fix as buildCheckerSquareMaterial above — was a plain
 // THREE.MeshStandardMaterial({ color }), no colorId, so all six pattern
@@ -1204,11 +1471,25 @@ function computeTriangleLayout(radius, height, opts = {}) {
   const diagonalBandWidth = opts.diagonalBandWidth ?? 1;
   const gapDashPeriod = opts.gapDashPeriod ?? 2;
   const size = TRIANGLE_SIZE;
-  const circumference = radius * Math.PI * 2;
-
   const unit = isDiagonalPattern ? 2 * diagonalPeriod : 2;
-  const targetUnits = Math.max(3, Math.round(circumference / size / unit));
-  const cols = targetUnits * unit;
+  const shape = opts.shape || 'round';
+  const isBoxy = shape === 'rectangle' || shape === 'square';
+  const width = shape === 'square' ? radius : radius * 1.25;
+  const depth = shape === 'square' ? radius : radius * 0.85;
+  const cornerRadius = 0.35 * radius / (opts.baseRadius || radius);
+  const boxyPath = isBoxy ? createRoundedRectanglePath(width, depth, cornerRadius) : null;
+  const circumference = boxyPath?.perimeter ?? radius * Math.PI * 2;
+  let boxyColumns = null;
+  let cols;
+  if (boxyPath) {
+    boxyPath.columnStartOffset = -Math.PI * cornerRadius / 4;
+    const boxyLayout = computeBoxyColumns(boxyPath, size, unit);
+    boxyColumns = boxyLayout.columns;
+    cols = boxyLayout.count;
+  } else {
+    const targetUnits = Math.max(3, Math.round(circumference / size / unit));
+    cols = targetUnits * unit;
+  }
 
   const isParallelPattern = pattern === 'parallelOuter' || pattern === 'parallelInner';
 
@@ -1216,7 +1497,7 @@ function computeTriangleLayout(radius, height, opts = {}) {
   const cellAngle = (Math.PI * 2) / cols;
   const cellHeight = height / rows;
 
-  const parallelRows = isParallelPattern ? selectParallelRows(pattern, rows) : null;
+  const parallelRows = isParallelPattern ? selectParallelRows(pattern, rows, opts.structure) : null;
 
   const cells = [];
   for (let row = 0; row < rows; row++) {
@@ -1239,7 +1520,16 @@ function computeTriangleLayout(radius, height, opts = {}) {
     }
   }
 
-  return { cells, cols, rows, cellAngle, cellHeight };
+  return {
+    cells,
+    cols,
+    rows,
+    cellAngle,
+    cellHeight,
+    boxyPath,
+    boxyColumns,
+    cellWidth: circumference / cols,
+  };
 }
 
 /**
@@ -1254,15 +1544,17 @@ function computeTriangleLayout(radius, height, opts = {}) {
  * for a flattening cue that's already invisible under an opaque shape.
  */
 export function getTriangleCoverageFn(radius, height, opts = {}) {
-  const { cells, cols, rows, cellAngle, cellHeight } = computeTriangleLayout(radius, height, opts);
+  if (opts.forGlaze) {
+    return getGlazeTriangleCoverageFn(radius, height, opts);
+  }
+  const layout = computeTriangleLayout(radius, height, opts);
+  const { cells, cols, rows, cellHeight } = layout;
   const covered = new Set(cells.map(({ row, col }) => row * cols + col));
   const half = TRIANGLE_GAP_RATIO / 2;
 
   return (angle, localY) => {
-    const wrappedAngle = ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-    const colF = wrappedAngle / cellAngle;
+    const { col, colF } = getLayoutColumnPosition(angle, layout);
     const rowF = (localY + height / 2) / cellHeight;
-    const col = Math.floor(colF);
     const row = Math.floor(rowF);
     if (row < 0 || row >= rows) return 0;
     if (!covered.has(row * cols + col)) return 0;
@@ -1293,7 +1585,8 @@ export function getTriangleCoverageFn(radius, height, opts = {}) {
  * `localY` is center-anchored, same convention as buildTriangleSideShapes.
  */
 export function getGlazeTriangleCoverageFn(radius, height, opts = {}) {
-  const { cells, cols, rows, cellAngle, cellHeight } = computeTriangleLayout(radius, height, opts);
+  const layout = computeTriangleLayout(radius, height, opts);
+  const { cells, cols, rows, cellHeight } = layout;
   const covered = new Set(cells.map(({ row, col }) => row * cols + col));
   const half = TRIANGLE_GAP_RATIO / 2;
   const ramp = Math.min(0.06, (1 - TRIANGLE_GAP_RATIO) * 0.5);
@@ -1303,10 +1596,8 @@ export function getGlazeTriangleCoverageFn(radius, height, opts = {}) {
   };
 
   return (angle, localY) => {
-    const wrappedAngle = ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-    const colF = wrappedAngle / cellAngle;
+    const { col, colF } = getLayoutColumnPosition(angle, layout);
     const rowF = (localY + height / 2) / cellHeight;
-    const col = Math.floor(colF);
     const row = Math.floor(rowF);
     if (row < 0 || row >= rows) return 0;
     if (!covered.has(row * cols + col)) return 0;
@@ -1338,26 +1629,37 @@ export function getGlazeTriangleCoverageFn(radius, height, opts = {}) {
  * (already width-subdivided) vertices instead of a box's.
  */
 export function buildTriangleSideShapes(radius, height, opts = {}) {
-  const { cells, cellAngle, cellHeight } = computeTriangleLayout(radius, height, opts);
+  const shape = opts.shape || 'round';
+  const isBoxy = shape === 'rectangle' || shape === 'square';
 
-  // Same opts.embedOverride escape hatch as buildCheckerSideSquares — see
-  // its own comment for why Ridge Comb/Ribbon Wrap/Vertical Piping need
-  // this box to stop embedding into a wall that isn't actually flat.
-  const embed = opts.embedOverride ?? TRIANGLE_STANDOFF;
-  const standoffRadius = radius + TRIANGLE_THICKNESS / 2 + embed;
+  // Same caller-controlled backing embed as buildCheckerSideSquares.
+  const standoffRadius = getTriangleSideLayoutRadius(radius, opts.embedOverride);
+  const {
+    cells,
+    cellAngle,
+    cellHeight,
+    boxyPath,
+    boxyColumns,
+  } = computeTriangleLayout(isBoxy ? standoffRadius : radius, height, opts);
   const arcLength = standoffRadius * cellAngle * TRIANGLE_GAP_RATIO;
-  const geo = buildTriangleCellGeometry(arcLength, cellHeight * TRIANGLE_GAP_RATIO, TRIANGLE_THICKNESS);
+  const geo = buildTriangleCellGeometry(
+    isBoxy ? TRIANGLE_SIZE * TRIANGLE_GAP_RATIO : arcLength,
+    cellHeight * TRIANGLE_GAP_RATIO,
+    TRIANGLE_THICKNESS
+  );
   // Same per-vertex arc-bend as Checkered's squares — identical formula,
   // just applied to the triangle's own (already subdivided) vertex set.
   const posAttribute = geo.attributes.position;
   const v = new THREE.Vector3();
-  for (let i = 0; i < posAttribute.count; i++) {
-    v.fromBufferAttribute(posAttribute, i);
-    const theta = v.x / standoffRadius;
-    const r = standoffRadius + v.z;
-    const newX = r * Math.sin(theta);
-    const newZ = r * Math.cos(theta) - standoffRadius;
-    posAttribute.setXYZ(i, newX, v.y, newZ);
+  if (!isBoxy) {
+    for (let i = 0; i < posAttribute.count; i++) {
+      v.fromBufferAttribute(posAttribute, i);
+      const theta = v.x / standoffRadius;
+      const r = standoffRadius + v.z;
+      const newX = r * Math.sin(theta);
+      const newZ = r * Math.cos(theta) - standoffRadius;
+      posAttribute.setXYZ(i, newX, v.y, newZ);
+    }
   }
   geo.computeVertexNormals();
 
@@ -1368,12 +1670,34 @@ export function buildTriangleSideShapes(radius, height, opts = {}) {
   cells.forEach(({ row, col }, i) => {
     const angle = (col + 0.5) * cellAngle;
     const y = -height / 2 + (row + 0.5) * cellHeight;
-    dummy.position.set(Math.sin(angle) * standoffRadius, y, Math.cos(angle) * standoffRadius);
-    dummy.rotation.set(0, angle, 0);
+
+    let positionX;
+    let positionZ;
+    let rotAngle;
+    let scaleX = 1;
+    if (isBoxy) {
+      const column = boxyColumns[col];
+      const point = boxyPath.pointAtDistance(column.distance);
+      positionX = point.x;
+      positionZ = point.z;
+      const normalX = -point.tangentZ;
+      const normalZ = point.tangentX;
+      rotAngle = Math.atan2(normalX, normalZ);
+      scaleX = column.cellWidth / TRIANGLE_SIZE;
+    } else {
+      positionX = Math.sin(angle) * standoffRadius;
+      positionZ = Math.cos(angle) * standoffRadius;
+      rotAngle = angle;
+    }
+
+    dummy.position.set(positionX, y, positionZ);
+    dummy.rotation.set(0, rotAngle, 0);
+    dummy.scale.set(scaleX, 1, 1);
     dummy.updateMatrix();
     mesh.setMatrixAt(i, dummy.matrix);
   });
   mesh.instanceMatrix.needsUpdate = true;
+  if (isBoxy) mesh.userData.isRigidDecor = true;
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   return mesh;
@@ -1480,7 +1804,15 @@ function scatterNonCollidingBigPearls(radius, height, targetCount, getScale) {
 }
 
 export function buildScatterPearlsRing(radius, height, colorHex, colorId, rand, opts = {}) {
-  const variant = opts.variant || 'randomScatter';
+  const options = typeof opts === 'boolean' ? { hasDrip: opts } : (opts || {});
+  const variant = options.variant || 'randomScatter';
+  const hasDrip = Boolean(options.hasDrip || options.atDrip);
+  const coatThickness = options.coatThickness ?? options.dripThickness ?? 0.06;
+  const dripOffset = options.dripOffset ?? coatThickness;
+  // When at the Drip, pearls sit on the Drip surface (radius + dripOffset)
+  // in 75/25 vision (75% visible, 25% buried in the Drip).
+  const surfaceRadius = radius + (hasDrip ? dripOffset : 0);
+
   // Was a dedicated glossy THREE.MeshPhysicalMaterial (clearcoat, low
   // roughness) — genuinely different from buttercream's matte procedural
   // look, and correct for real pearls. Switched to getFrostingMaterial
@@ -1507,17 +1839,14 @@ export function buildScatterPearlsRing(radius, height, colorHex, colorId, rand, 
       for (let c = 0; c < colsPerTier; c++) {
         const angle = (c / colsPerTier) * Math.PI * 2 + rowOffset;
         const scale = 0.16;
-        const standoffRadius = radius + scale * 0.3;
+        const standoffRadius = surfaceRadius + scale * 0.5;
         dummy.position.set(Math.sin(angle) * standoffRadius, y, Math.cos(angle) * standoffRadius);
         dummy.scale.setScalar(scale);
         dummy.updateMatrix();
         mesh.setMatrixAt(idx++, dummy.matrix);
       }
     }
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    return mesh;
+    return finalizeScatterPearls(mesh, radius, height, variant, options);
   }
 
   if (variant === 'diamondGridBorder') {
@@ -1543,17 +1872,14 @@ export function buildScatterPearlsRing(radius, height, colorHex, colorId, rand, 
       for (let c = 0; c < colsPerTier; c++) {
         const angle = (c / colsPerTier) * Math.PI * 2 + rowOffset;
         const scale = 0.16;
-        const standoffRadius = radius + scale * 0.3;
+        const standoffRadius = surfaceRadius + scale * 0.5;
         dummy.position.set(Math.sin(angle) * standoffRadius, y, Math.cos(angle) * standoffRadius);
         dummy.scale.setScalar(scale);
         dummy.updateMatrix();
         mesh.setMatrixAt(idx++, dummy.matrix);
       }
     }
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    return mesh;
+    return finalizeScatterPearls(mesh, radius, height, variant, options);
   }
 
   if (variant === 'horizontalRows') {
@@ -1569,17 +1895,14 @@ export function buildScatterPearlsRing(radius, height, colorHex, colorId, rand, 
       for (let c = 0; c < colsPerTier; c++) {
         const angle = (c / colsPerTier) * Math.PI * 2;
         const scale = (c % 2 === 0) ? 0.18 : 0.12;
-        const standoffRadius = radius + scale * 0.3;
+        const standoffRadius = surfaceRadius + scale * 0.5;
         dummy.position.set(Math.sin(angle) * standoffRadius, y, Math.cos(angle) * standoffRadius);
         dummy.scale.setScalar(scale);
         dummy.updateMatrix();
         mesh.setMatrixAt(idx++, dummy.matrix);
       }
     }
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    return mesh;
+    return finalizeScatterPearls(mesh, radius, height, variant, options);
   }
 
   if (variant === 'bigPearlsScatter') {
@@ -1605,21 +1928,14 @@ export function buildScatterPearlsRing(radius, height, colorHex, colorId, rand, 
 
     for (let i = 0; i < placed.length; i++) {
       const { angle, y, scale } = placed[i];
-      // Centered exactly on the wall surface (no outward offset) so the
-      // cut is right through the sphere's middle — half the pearl sits
-      // buried in the frosting, half pokes out, instead of the small
-      // 0.3×-scale outward nudge every other pearl variant uses (which
-      // only buries a little over a third of it).
-      const standoffRadius = radius;
+      // 75/25 vision: 75% visible, 25% buried in the glaze/wall
+      const standoffRadius = surfaceRadius + scale * 0.5;
       dummy.position.set(Math.sin(angle) * standoffRadius, y, Math.cos(angle) * standoffRadius);
       dummy.scale.setScalar(scale);
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
     }
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    return mesh;
+    return finalizeScatterPearls(mesh, radius, height, variant, options);
   }
 
   if (variant === 'smallPearlsScatter') {
@@ -1628,8 +1944,8 @@ export function buildScatterPearlsRing(radius, height, colorHex, colorId, rand, 
     // much closer together without visually merging, so this uses a
     // higher density (smaller areaPerPearl budget) to still read as fully
     // populated at their smaller size.
-    const areaPerPearl = 0.32;
-    const pearlCount = Math.max(130, Math.round((2 * Math.PI * radius * height) / areaPerPearl));
+    const areaPerPearl = 0.16;
+    const pearlCount = Math.max(260, Math.round((2 * Math.PI * radius * height) / areaPerPearl));
     const mesh = new THREE.InstancedMesh(geo, mat, pearlCount);
     const dummy = new THREE.Object3D();
 
@@ -1638,16 +1954,13 @@ export function buildScatterPearlsRing(radius, height, colorHex, colorId, rand, 
       const { angle, heightFrac, sizeFrac } = points[i];
       const y = -height / 2 + height * 0.05 + heightFrac * height * 0.9;
       const scale = 0.07 + sizeFrac * 0.04; // small pearls only: 0.07–0.11
-      const standoffRadius = radius + scale * 0.3;
+      const standoffRadius = surfaceRadius + scale * 0.5;
       dummy.position.set(Math.sin(angle) * standoffRadius, y, Math.cos(angle) * standoffRadius);
       dummy.scale.setScalar(scale);
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
     }
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    return mesh;
+    return finalizeScatterPearls(mesh, radius, height, variant, options);
   }
 
   // Default: 'randomScatter'. Fixed, not randomized — see
@@ -1656,8 +1969,8 @@ export function buildScatterPearlsRing(radius, height, colorHex, colorId, rand, 
   // intentionally lighter than the other scatter families: the pearls are
   // smaller and spread further apart so the pattern reads as "scattered"
   // instead of a dense cluster.
-  const areaPerPearl = 0.75;
-  const pearlCount = Math.max(70, Math.round((2 * Math.PI * radius * height) / areaPerPearl));
+  const areaPerPearl = 0.40;
+  const pearlCount = Math.max(140, Math.round((2 * Math.PI * radius * height) / areaPerPearl));
   const mesh = new THREE.InstancedMesh(geo, mat, pearlCount);
   const dummy = new THREE.Object3D();
 
@@ -1666,17 +1979,165 @@ export function buildScatterPearlsRing(radius, height, colorHex, colorId, rand, 
     const { angle, heightFrac, sizeFrac } = points[i];
     const y = -height / 2 + height * 0.05 + heightFrac * height * 0.9;
     const scale = 0.06 + sizeFrac * 0.10; // light scatter: small-to-medium pearls only
-    const standoffRadius = radius + scale * 0.3;
+    const standoffRadius = surfaceRadius + scale * 0.5;
     dummy.position.set(Math.sin(angle) * standoffRadius, y, Math.cos(angle) * standoffRadius);
     dummy.scale.setScalar(scale);
     dummy.updateMatrix();
     mesh.setMatrixAt(i, dummy.matrix);
   }
 
+  return finalizeScatterPearls(mesh, radius, height, variant, options);
+}
+
+function finalizeScatterPearls(mesh, radius, height, variant, options = {}) {
   mesh.instanceMatrix.needsUpdate = true;
   mesh.castShadow = true;
   mesh.receiveShadow = true;
+  mesh.userData.isScatterPearls = true;
+  mesh.userData.isRigidDecor = true;
+  mesh.userData.variant = variant;
+  mesh.userData.baseRadius = radius;
+  mesh.userData.height = height;
+
+  const shape = options.shape || options.cakeShape;
+  if (shape === 'rectangle' || shape === 'square' || options.customW !== undefined) {
+    spreadScatterPearls(mesh, radius, {
+      shape,
+      customW: options.customW,
+      customD: options.customD,
+      rc: options.rc,
+    });
+  }
+
   return mesh;
+}
+
+/**
+ * Spreads and conforms Scatter Pearls designs to rectangular and square cake walls,
+ * adapting each pearl's 3D position and orientation to the boxy perimeter just like
+ * Victorian Lambeth and Chevron Pattern do, while preserving perfectly spherical pearl geometry.
+ *
+ * @param {THREE.InstancedMesh|THREE.Group} pearls - The pearls mesh or group.
+ * @param {number} baseRadius - Base radius of the tier/cake.
+ * @param {string|number|object} [arg1] - Shape ('rectangle' | 'square'), custom width W, or options object { shape, customW, customD, rc }.
+ * @param {number} [customD] - Custom depth D if custom width was passed as arg1.
+ * @param {number} [customRc=0.35] - Corner radius rc.
+ * @returns {THREE.InstancedMesh|THREE.Group} The morphed pearls mesh or group.
+ */
+export function spreadScatterPearls(pearls, baseRadius, arg1 = null, customD = null, customRc = 0.35) {
+  if (!pearls) return pearls;
+
+  let W = null;
+  let D = null;
+  let rc = 0.35;
+
+  if (typeof arg1 === 'string') {
+    if (arg1 === 'square') {
+      W = baseRadius;
+      D = baseRadius;
+    } else {
+      W = baseRadius * 1.25;
+      D = baseRadius * 0.85;
+    }
+    rc = typeof customD === 'number' ? customD : 0.35;
+  } else if (typeof arg1 === 'object' && arg1 !== null) {
+    if (arg1.shape === 'square') {
+      W = arg1.customW ?? baseRadius;
+      D = arg1.customD ?? baseRadius;
+    } else {
+      W = arg1.customW ?? (baseRadius * 1.25);
+      D = arg1.customD ?? (baseRadius * 0.85);
+    }
+    rc = arg1.rc ?? arg1.cornerRadius ?? 0.35;
+  } else {
+    W = arg1 !== null ? arg1 : baseRadius * 1.25;
+    D = customD !== null ? customD : baseRadius * 0.85;
+    rc = typeof customRc === 'number' ? customRc : 0.35;
+  }
+
+  const effectiveBaseRadius = baseRadius || pearls.userData?.baseRadius || Math.max(W, D);
+
+  const spreadMesh = (mesh) => {
+    if (!mesh || !mesh.isInstancedMesh || !mesh.instanceMatrix) return;
+    if (mesh.userData?.morphedToBoxy) return;
+
+    const count = mesh.count;
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    const quaternion = new THREE.Quaternion();
+    const scale = new THREE.Vector3();
+
+    for (let i = 0; i < count; i++) {
+      mesh.getMatrixAt(i, matrix);
+      matrix.decompose(position, quaternion, scale);
+
+      const rx = position.x;
+      const rz = position.z;
+      const r = Math.sqrt(rx * rx + rz * rz);
+      if (r > 0.001) {
+        const phi = Math.atan2(rx, rz);
+        const theta = Math.atan2(rz, rx);
+        const targetR = getBoxyRadius(theta, W, D, rc);
+        const scaleFactor = targetR / effectiveBaseRadius;
+
+        position.x *= scaleFactor;
+        position.z *= scaleFactor;
+
+        // Re-align orientation to face outward normal of the boxy perimeter,
+        // matching the exact normal calculation used in morphGroupToBoxyRectangle for rigid decor
+        const dPhi = 0.002;
+        const phi1 = phi - dPhi;
+        const theta1 = Math.atan2(Math.cos(phi1), Math.sin(phi1));
+        const R1 = getBoxyRadius(theta1, W, D, rc);
+        const p1x = R1 * Math.sin(phi1);
+        const p1z = R1 * Math.cos(phi1);
+
+        const phi2 = phi + dPhi;
+        const theta2 = Math.atan2(Math.cos(phi2), Math.sin(phi2));
+        const R2 = getBoxyRadius(theta2, W, D, rc);
+        const p2x = R2 * Math.sin(phi2);
+        const p2z = R2 * Math.cos(phi2);
+
+        const tx = p2x - p1x;
+        const tz = p2z - p1z;
+        const nx = -tz;
+        const nz = tx;
+        if (Math.abs(nx) > 1e-6 || Math.abs(nz) > 1e-6) {
+          quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(nx, nz));
+        }
+
+        matrix.compose(position, quaternion, scale);
+        mesh.setMatrixAt(i, matrix);
+      }
+    }
+
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.userData.morphedToBoxy = true;
+    mesh.userData.isScatterPearls = true;
+  };
+
+  if (pearls.isInstancedMesh) {
+    spreadMesh(pearls);
+  } else if (pearls.traverse) {
+    pearls.traverse((child) => {
+      if (child.isInstancedMesh) {
+        spreadMesh(child);
+      } else if (child.isMesh && (child.userData?.isRigidDecor || child.userData?.isScatterPearls)) {
+        const rx = child.position.x;
+        const rz = child.position.z;
+        const r = Math.sqrt(rx * rx + rz * rz);
+        if (r > 0.001) {
+          const theta = Math.atan2(rz, rx);
+          const targetR = getBoxyRadius(theta, W, D, rc);
+          const scaleFactor = targetR / effectiveBaseRadius;
+          child.position.x *= scaleFactor;
+          child.position.z *= scaleFactor;
+        }
+      }
+    });
+  }
+
+  return pearls;
 }
 
 /**
@@ -1700,6 +2161,10 @@ export function buildScatterPearlsRing(radius, height, colorHex, colorId, rand, 
  * shapes already use.
  */
 export function getScatterPearlsCoverageFn(radius, height, opts = {}) {
+  // Scatter Pearls designs do not make empty spaces in the Glaze;
+  // pearls sit in 75/25 vision (75% visible, 25% buried in the Glaze).
+  if (opts.forGlaze) return () => 0;
+
   const variant = opts.variant || 'randomScatter';
   const pearls = []; // { angle, y, footprintR }
 
@@ -1734,16 +2199,16 @@ export function getScatterPearlsCoverageFn(radius, height, opts = {}) {
     const placed = scatterNonCollidingBigPearls(radius, height, targetCount, getScale);
     for (const p of placed) pearls.push({ angle: p.angle, y: p.y, footprintR: p.scale });
   } else if (variant === 'smallPearlsScatter') {
-    const areaPerPearl = 0.32;
-    const pearlCount = Math.max(130, Math.round((2 * Math.PI * radius * height) / areaPerPearl));
+    const areaPerPearl = 0.16;
+    const pearlCount = Math.max(260, Math.round((2 * Math.PI * radius * height) / areaPerPearl));
     for (const p of scatterPearlPositions(pearlCount)) {
       const y = -height / 2 + height * 0.05 + p.heightFrac * height * 0.9;
       pearls.push({ angle: p.angle, y, footprintR: 0.07 + p.sizeFrac * 0.04 });
     }
   } else {
     // 'randomScatter', the default.
-    const areaPerPearl = 0.75;
-    const pearlCount = Math.max(70, Math.round((2 * Math.PI * radius * height) / areaPerPearl));
+    const areaPerPearl = 0.40;
+    const pearlCount = Math.max(140, Math.round((2 * Math.PI * radius * height) / areaPerPearl));
     for (const p of scatterPearlPositions(pearlCount)) {
       const y = -height / 2 + height * 0.05 + p.heightFrac * height * 0.9;
       pearls.push({ angle: p.angle, y, footprintR: 0.06 + p.sizeFrac * 0.10 });
@@ -1786,29 +2251,17 @@ export function getScatterPearlsCoverageFn(radius, height, opts = {}) {
 }
 
 /**
- * Chevron Pattern (Multi-Color / Single Color / Two-Tone Zigzag Stripes)
+ * Chevron Pattern (Single Color / Two-Tone / Three-Tone Zigzag Stripes)
  * Real 3D extruded chevron ribbons wrapped cylindrically around the side wall.
  */
 const CHEVRON_THICKNESS = 0.10;
 const CHEVRON_STANDOFF = -0.04;
 
-const MULTI_COLOR_PALETTE = [
-  '#3B5FA0', // dark navy (row 0 - bottom)
-  '#7CC47A', // green (row 1)
-  '#E9BE6A', // gold/yellow (row 2)
-  '#6BA8D4', // sky blue (row 3)
-  '#E87B5E', // coral/orange (row 4 - top)
-];
-
 function buildChevronRowGeometry(radius, rowY, rowHeight, numTeeth, thickness, embedOverride) {
   const stepsPerTooth = 16;
   const totalSteps = numTeeth * stepsPerTooth;
-  // Same opts.embedOverride escape hatch as buildCheckerSideSquares/
-  // buildTriangleSideShapes — see buildCheckerSideSquares' comment.
-  // Chevron is a thick extruded ribbon (0.10) with its own -0.04 embed,
-  // so it has the exact same problem under Ridge Comb/Ribbon
-  // Wrap/Vertical Piping: verified, its back face was buried past those
-  // textures' own real ridge peaks by 0.02–0.03.
+  // Textured callers use a small positive embed so the ribbon meets the
+  // frosting base; raised crests may overlap the back edge.
   const embed = embedOverride ?? CHEVRON_STANDOFF;
   const standoffR = radius + thickness / 2 + embed;
   const rIn = standoffR - thickness / 2;
@@ -1891,7 +2344,7 @@ function buildChevronRowGeometry(radius, rowY, rowHeight, numTeeth, thickness, e
  * just the same tooth-wave Y envelope evaluated at the query's own angle.
  */
 export function getChevronCoverageFn(radius, height, opts = {}) {
-  const setId = opts.setId || 'multiColor';
+  const setId = opts.setId || 'singleColor';
   let numRows = 5;
   if (setId === 'wideZigzag') numRows = 3;
   else if (setId === 'tightZigzag') numRows = 7;
@@ -1954,7 +2407,7 @@ export function getChevronCoverageFn(radius, height, opts = {}) {
 
 export function buildChevronSideStripes(radius, height, opts = {}) {
   const group = new THREE.Group();
-  const setId = opts.setId || 'multiColor';
+  const setId = opts.setId || 'singleColor';
   const mainColor = opts.color || '#3B5FA0';
   const mainColorId = opts.colorId || null;
   const secondaryColor = opts.secondaryColor || '#D6293E';
@@ -1978,22 +2431,24 @@ export function buildChevronSideStripes(radius, height, opts = {}) {
 
     const rowY = -height / 2 + (r + 0.5) * rowHeight;
     // isMainColorRow tracks whether THIS row is actually the one driven
-    // by Sugar Color (mainColor/mainColorId) — 'multiColor' cycles its
-    // own fixed MULTI_COLOR_PALETTE regardless of Sugar Color (Color
-    // Override is already disabled for it in SideSection.jsx, so there's
-    // nothing to fix there). Two-Tone's alternate row uses its own
-    // secondary color. Only the rows that actually ARE mainColor need the
-    // primary colorId-aware material below.
+    // by Sugar Color (mainColor/mainColorId).
+    // Two-Tone alternates: even rows = 1st color, odd rows = 2nd color.
+    // Three-Tone (reverse Two-Tone logic): even rows = 2nd color, odd rows = 1st color.
     let hexColor;
     let isMainColorRow = false;
-    if (setId === 'multiColor') {
-      hexColor = MULTI_COLOR_PALETTE[r % MULTI_COLOR_PALETTE.length];
-    } else if (setId === 'twoTone') {
+    if (setId === 'twoTone') {
       if (r % 2 === 0) {
         hexColor = mainColor;
         isMainColorRow = true;
       } else {
         hexColor = secondaryColor;
+      }
+    } else if (setId === 'threeTone') {
+      if (r % 2 === 0) {
+        hexColor = secondaryColor;
+      } else {
+        hexColor = mainColor;
+        isMainColorRow = true;
       }
     } else {
       hexColor = mainColor;
@@ -2004,12 +2459,10 @@ export function buildChevronSideStripes(radius, height, opts = {}) {
     // above, but scoped to just the rows Sugar Color actually drives —
     // those get getFrostingMaterial so Marble/Ombré/Rainbow Swirl/Gold
     // Shimmer/Watercolor Pastel Mix/Red-White Gradient render correctly;
-    // multiColor's fixed palette and twoTone's white alternate keep their
-    // own plain flat material exactly as before, unaffected, since Sugar
-    // Color was never meant to apply to those rows at all.
+    // Two-Tone and Three-Tone secondary rows get their own secondary material.
     const mat = isMainColorRow
       ? getFrostingMaterial(hexColor, mainColorId)
-      : setId === 'twoTone'
+      : (setId === 'twoTone' || setId === 'threeTone')
         ? getFrostingMaterial(hexColor, secondaryColorId)
       : new THREE.MeshStandardMaterial({
           color: hexColor,

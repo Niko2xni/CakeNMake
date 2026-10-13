@@ -47,6 +47,27 @@ test('cake quote prices selected options and quantities from price book rates', 
   assert.deepEqual(quote.warnings, []);
 });
 
+test('square Bento sizes use their configured rates and show the correct dimensions', () => {
+  for (const [size, dimension, nakedPrice, frostedPrice] of [
+    ['squareBento2x2', '2x2', 40000, 50000],
+    ['squareBento3x3', '3x3', 50000, 65000],
+  ]) {
+    const naked = buildQuote({
+      structure: { cakeFormat: 'bento', format: 'bento', size, layers: 1, shape: 'square' },
+      exteriorFinish: { style: 'naked' },
+    });
+    assert.equal(naked.lineItems[0].label, `1 Tier Naked Cake (${dimension})`);
+    assert.equal(naked.lineItems[0].lineTotalMinor, nakedPrice);
+
+    const frosted = buildQuote({
+      structure: { cakeFormat: 'bento', format: 'bento', size, layers: 1, shape: 'square' },
+      exteriorFinish: { style: 'fullyFrosted' },
+    });
+    assert.equal(frosted.lineItems[0].label, `1 Tier Frosted Cake (${dimension})`);
+    assert.equal(frosted.lineItems[0].lineTotalMinor, frostedPrice);
+  }
+});
+
 test('cake quote prices textured buttercream finish for single and two-tier cakes', () => {
   const priceBook = {
     version: 5,

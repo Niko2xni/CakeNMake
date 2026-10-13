@@ -15,7 +15,7 @@ test('buildEmailContent formats subject, text, and html with all reservation det
   const content = buildEmailContent({
     customerName: 'Maria Santos',
     designName: 'Chocolate Velvet Dream',
-    bakeryName: 'Mamshie Bakery',
+    bakeryName: 'AH TINAPS BAKESHOP',
     deliveryDate: 'Oct 20, 2026',
     totalPrice: '2,500.00',
     downPayment: '1,250.00',
@@ -25,15 +25,51 @@ test('buildEmailContent formats subject, text, and html with all reservation det
   assert.equal(content.subject, 'Reservation Confirmation: Chocolate Velvet Dream - CakeNMake');
   assert.ok(content.text.includes('Hello Maria Santos,'));
   assert.ok(content.text.includes('Chocolate Velvet Dream'));
-  assert.ok(content.text.includes('Mamshie Bakery'));
+  assert.ok(content.text.includes('AH TINAPS BAKESHOP'));
   assert.ok(content.text.includes('Oct 20, 2026'));
   assert.ok(content.text.includes('₱2,500.00'));
   assert.ok(content.text.includes('₱1,250.00'));
+  assert.ok(content.text.includes('cake production will only begin once the whole payment for the cake is done'));
 
   assert.ok(content.html.includes('Maria Santos'));
   assert.ok(content.html.includes('Chocolate Velvet Dream'));
-  assert.ok(content.html.includes('Mamshie Bakery'));
+  assert.ok(content.html.includes('AH TINAPS BAKESHOP'));
+  assert.ok(content.html.includes('Confirmed'));
+  assert.ok(content.html.includes('(Paid)'));
+  assert.ok(content.html.includes('cake production will only begin once the whole payment for your cake is done'));
+});
+
+test('buildEmailContent normalizes legacy Mamshie Bakery to AH TINAPS BAKESHOP', () => {
+  const content = buildEmailContent({
+    customerName: 'Maria Santos',
+    designName: 'Chocolate Velvet Dream',
+    bakeryName: 'Mamshie Bakery',
+    deliveryDate: 'Oct 20, 2026',
+    totalPrice: '2,500.00',
+    downPayment: '1,250.00',
+    remainingBalance: '1,250.00',
+  });
+
+  assert.ok(content.text.includes('AH TINAPS BAKESHOP'));
+  assert.ok(content.html.includes('AH TINAPS BAKESHOP'));
+  assert.ok(!content.text.includes('Mamshie Bakery'));
+});
+
+test('buildEmailContent supports unpaid reservations with pending status', () => {
+  const content = buildEmailContent({
+    customerName: 'Maria Santos',
+    designName: 'Chocolate Velvet Dream',
+    bakeryName: 'AH TINAPS BAKESHOP',
+    deliveryDate: 'Oct 20, 2026',
+    totalPrice: '2,500.00',
+    downPayment: '1,250.00',
+    remainingBalance: '1,250.00',
+    isDownPaymentPaid: false,
+    status: 'Pending Down Payment',
+  });
+
   assert.ok(content.html.includes('Pending Down Payment'));
+  assert.ok(content.html.includes('(Pending verification)'));
 });
 
 test('buildEmailContent escapes dynamic HTML and removes header line breaks', () => {

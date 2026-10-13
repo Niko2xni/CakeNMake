@@ -19,6 +19,7 @@ import {
   STANDARD_SIZE_OPTIONS,
   PETITS_FOUR_SIZE_OPTIONS,
   BENTO_SIZE_OPTIONS,
+  BENTO_SQUARE_SIZE_OPTIONS,
   getCakeFormat,
   CHECKERED_PATTERN_SETS,
   TRIANGLE_PATTERN_SETS,
@@ -56,7 +57,7 @@ const sideSets = {
 // Size ids grouped by format — 'small'/'big' stay accepted as legacy aliases
 // of 6x6/8x8 so saved designs from before the Cake Format rework keep editing.
 const petitsFourSizeIds = PETITS_FOUR_SIZE_OPTIONS.map((option) => option.id);
-const bentoSizeIds = BENTO_SIZE_OPTIONS.map((option) => option.id);
+const bentoSizeIds = [...BENTO_SIZE_OPTIONS, ...BENTO_SQUARE_SIZE_OPTIONS].map((option) => option.id);
 const standardSizeIds = [...STANDARD_SIZE_OPTIONS.map((option) => option.id), 'small', 'big'];
 const formatForSize = (size) => (petitsFourSizeIds.includes(size) ? 'petitsFour' : bentoSizeIds.includes(size) ? 'bento' : 'standard');
 
@@ -180,9 +181,8 @@ export function applyCakeAiTool(name, input, ctx) {
       // Format resolution: an explicit cakeFormat wins; otherwise the final
       // size decides ('classicCube'/'largeCube' → Petit Fours, '*Bento' →
       // Bento). 'bento'/'petitsFour' on `shape` still acts as a format
-      // request for compatibility, but `shape` itself is purely visual now
-      // ('round' | 'rectangle') — picking a shape never resets the size or
-      // format, and Petit Fours keep honoring it like Bento does.
+      // request for compatibility. Square shapes are paired with their
+      // supported sizes below; other shape changes keep the current size.
       const requestedFormat = ['standard', 'bento', 'petitsFour'].includes(input.cakeFormat)
         ? input.cakeFormat
         : (input.shape === 'bento' || input.shape === 'petitsFour' ? input.shape : null);
@@ -196,8 +196,16 @@ export function applyCakeAiTool(name, input, ctx) {
         ? input.shape
         : (nextStructure.shape === 'rectangle' || nextStructure.shape === 'square' ? nextStructure.shape : 'round');
       
-      // If square shape is selected, ensure size is 6x6 or 8x8
-      if (nextStructure.shape === 'square' && nextStructure.size !== '6x6' && nextStructure.size !== '8x8') {
+      // Square Bentos and Standard cakes use different supported size sets.
+      const isSquareBentoSize = BENTO_SQUARE_SIZE_OPTIONS.some((option) => option.id === nextStructure.size);
+      if (format === 'bento' && isSquareBentoSize && input.shape !== 'round' && input.shape !== 'rectangle') {
+        nextStructure.shape = 'square';
+      } else if (nextStructure.shape === 'square' && format === 'bento' && !isSquareBentoSize) {
+        nextStructure.size = 'squareBento3x3';
+      } else if (format === 'bento' && isSquareBentoSize && (input.shape === 'round' || input.shape === 'rectangle')) {
+        nextStructure.size = 'standardBento';
+      } else if (nextStructure.shape === 'square' && format === 'standard'
+        && nextStructure.size !== '6x6' && nextStructure.size !== '8x8') {
         nextStructure.size = '8x8';
       }
       const isPetitsFour = format === 'petitsFour';

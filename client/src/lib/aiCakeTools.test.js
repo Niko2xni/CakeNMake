@@ -149,7 +149,7 @@ describe('Cake AI edits without a provider', () => {
     expect(execute('set_structure', { size: '10x10', layers: 2 }).response.error).toBe('All cakes are limited to 1 tier only.');
   });
 
-  it('restricts square shape to 6x6 and 8x8 sizes only', () => {
+  it('restricts square shape to supported Standard sizes and selects Bento square sizes', () => {
     // Setting square shape with a non-allowed size should force size to 8x8
     const config = structuredClone(DEFAULT_CONFIG);
     config.structure.size = '10x10';
@@ -164,6 +164,13 @@ describe('Cake AI edits without a provider', () => {
     // Square shape with 8x8 should work fine
     const { next: next8x8 } = execute('set_structure', { size: '8x8', shape: 'square' });
     expect(next8x8.structure).toMatchObject({ size: '8x8', shape: 'square' });
+
+    const bentoSquare = execute('set_structure', { cakeFormat: 'bento', shape: 'square' }).next;
+    expect(bentoSquare.structure).toMatchObject({ cakeFormat: 'bento', size: 'squareBento3x3', shape: 'square' });
+    expect(bentoSquare.realSize).toEqual({ diameter: 3, height: 3 });
+
+    const inferredSquare = execute('set_structure', { size: 'squareBento2x2' }).next;
+    expect(inferredSquare.structure).toMatchObject({ cakeFormat: 'bento', size: 'squareBento2x2', shape: 'square' });
   });
 
   it('fills all four Petit Fours variant slots for per-piece edits', () => {

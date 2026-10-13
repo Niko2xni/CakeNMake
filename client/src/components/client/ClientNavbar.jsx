@@ -4,6 +4,7 @@ import {
   Clock,
   LayoutTemplate,
   LogOut,
+  MessageSquare,
   Plus,
   Settings,
   Trash2,
@@ -28,7 +29,7 @@ function NavItem({ to, icon: Icon, label, currentPath }) {
       aria-current={active ? 'page' : undefined}
       title={label}
     >
-      <Icon className="w-5 h-5" aria-hidden="true" />
+      <Icon className="w-6 h-6 stroke-[1.85]" aria-hidden="true" />
       <span>{label}</span>
     </Link>
   );
@@ -39,10 +40,17 @@ export default function ClientNavbar() {
   const menuRef = useRef(null);
   const { handleLogout, requestLogout, isLoggingOut, logoutConfirmationOpen, changeLogoutConfirmation } = useLogout();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, account } = useAuth();
 
-  const displayName = user?.displayName || user?.email?.split('@')[0]?.replace(/[._-]/g, ' ') || 'Cake Lover';
-  const userEmail = user?.email || 'user@example.com';
+  const photoURL = user?.photoURL || account?.photoURL || null;
+  const displayName = account?.displayName || user?.displayName || user?.email?.split('@')[0]?.replace(/[._-]/g, ' ') || 'Cake Lover';
+  const userEmail = account?.email || user?.email || 'user@example.com';
+  const initials = displayName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0]?.toUpperCase())
+    .join('') || 'C';
 
   useEffect(() => {
     const closeMenu = (event) => {
@@ -68,7 +76,7 @@ export default function ClientNavbar() {
 
       <div className="cn-sidebar-list">
         <Link to="/designer" className="cn-nav-item cn-create-item" title="Create a cake">
-          <Plus className="w-5 h-5" aria-hidden="true" />
+          <Plus className="w-6 h-6 stroke-[2.4]" aria-hidden="true" />
           <span>Create</span>
         </Link>
 
@@ -78,45 +86,66 @@ export default function ClientNavbar() {
 
         <div className="cn-nav-spacer" />
 
+        <NavItem to="/chats" icon={MessageSquare} label="Chats" currentPath={location.pathname} />
+
         <div className="cn-user-menu" ref={menuRef}>
           <button
             type="button"
             onClick={() => setUserDropdownOpen((open) => !open)}
-            className={`cn-nav-item ${['/profile', '/settings'].includes(location.pathname) ? 'is-active' : ''}`}
+            className={`cn-nav-item cn-account-item ${['/profile', '/settings'].includes(location.pathname) ? 'is-active' : ''}`}
             aria-expanded={userDropdownOpen}
             aria-haspopup="menu"
           >
-            <User className="w-5 h-5" aria-hidden="true" />
+            <User className="w-6 h-6 stroke-[1.85]" aria-hidden="true" />
             <span>Account</span>
           </button>
 
           {userDropdownOpen && (
             <div className="cn-user-popover" role="menu">
               <div className="cn-user-summary">
-                <p>{displayName}</p>
-                <span>{userEmail}</span>
+                <div className="cn-user-summary-avatar" aria-hidden="true">
+                  {photoURL ? (
+                    <img src={photoURL} alt="" className="w-full h-full rounded-full object-cover" />
+                  ) : (
+                    <span>{initials}</span>
+                  )}
+                </div>
+                <div className="cn-user-summary-text">
+                  <p>{displayName}</p>
+                  <span>{userEmail}</span>
+                </div>
               </div>
-              <Link
-                to="/profile"
-                role="menuitem"
-                aria-current={location.pathname === '/profile' ? 'page' : undefined}
-                className={location.pathname === '/profile' ? 'is-current' : undefined}
-                onClick={() => setUserDropdownOpen(false)}
-              >
-                <User className="w-4 h-4" /> Profile
-              </Link>
-              <Link
-                to="/settings"
-                role="menuitem"
-                aria-current={location.pathname === '/settings' ? 'page' : undefined}
-                className={location.pathname === '/settings' ? 'is-current' : undefined}
-                onClick={() => setUserDropdownOpen(false)}
-              >
-                <Settings className="w-4 h-4" /> Settings
-              </Link>
-              <button type="button" role="menuitem" onClick={() => { setUserDropdownOpen(false); requestLogout(); }} disabled={isLoggingOut}>
-                <LogOut className="w-4 h-4" /> Log out
-              </button>
+              <div className="cn-user-popover-links">
+                <Link
+                  to="/profile"
+                  role="menuitem"
+                  aria-current={location.pathname === '/profile' ? 'page' : undefined}
+                  className={location.pathname === '/profile' ? 'is-current' : undefined}
+                  onClick={() => setUserDropdownOpen(false)}
+                >
+                  <User className="w-4 h-4" /> Profile
+                </Link>
+                <Link
+                  to="/settings"
+                  role="menuitem"
+                  aria-current={location.pathname === '/settings' ? 'page' : undefined}
+                  className={location.pathname === '/settings' ? 'is-current' : undefined}
+                  onClick={() => setUserDropdownOpen(false)}
+                >
+                  <Settings className="w-4 h-4" /> Settings
+                </Link>
+              </div>
+              <div className="cn-user-popover-footer">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="cn-logout-btn"
+                  onClick={() => { setUserDropdownOpen(false); requestLogout(); }}
+                  disabled={isLoggingOut}
+                >
+                  <LogOut className="w-4 h-4" /> Log out
+                </button>
+              </div>
             </div>
           )}
         </div>

@@ -41,10 +41,10 @@ function clientMessageId() {
   return `msg_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 }
 
-export function useChat({ autoCreate = false } = {}) {
+export function useChat({ autoCreate = false, initialConversationId = null } = {}) {
   const { account } = useAuth();
   const [conversations, setConversations] = useState([]);
-  const [activeConversationId, setActiveConversationId] = useState(null);
+  const [activeConversationId, setActiveConversationId] = useState(initialConversationId);
   const [messages, setMessages] = useState([]);
   const [nextCursor, setNextCursor] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -64,9 +64,15 @@ export function useChat({ autoCreate = false } = {}) {
     }
     list = sortConversationsByActivity(list);
     setConversations(list);
-    if (autoCreate && list.length > 0) setActiveConversationId((current) => current || list[0].id);
+    if (autoCreate && list.length > 0) {
+      setActiveConversationId((current) => {
+        if (current && list.some((item) => item.id === current)) return current;
+        if (initialConversationId && list.some((item) => item.id === initialConversationId)) return initialConversationId;
+        return list[0].id;
+      });
+    }
     return list;
-  }, [account?.role, autoCreate]);
+  }, [account?.role, autoCreate, initialConversationId]);
 
   const loadMessages = useCallback(async (conversationId) => {
     if (!conversationId) return;

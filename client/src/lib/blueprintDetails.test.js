@@ -7,14 +7,14 @@ describe('internal blueprint', () => {
   it('preserves quote charges and total without assigning invented decoration prices', () => {
     const config = structuredClone(DEFAULT_CONFIG);
     config.side.mode = 'sunshinePlay';
-    config.side.sunshinePlay.setId = 'starryRainbow';
+    config.side.sunshinePlay.setId = 'skyChumps';
     config.center.mode = 'text';
     config.center.text.top = 'Legacy invisible text';
     config.place.items = [{ type: 'center-letterUpperH-default', x: 0, z: 0 }];
     const quote = { pricingVersion: 3, currency: 'PHP', totalMinor: 195000, lineItems: [{ componentKey: 'base.standard', label: 'Standard Base Cake', quantity: 1, lineTotalMinor: 195000 }] };
     const details = buildBlueprintDetails(config, quote, 'Actual design');
     expect(details.totalMinor).toBe(195000);
-    expect(details.sections.find((s) => s.title === 'Side').items[0].detail).toContain('Starry Rainbow');
+    expect(details.sections.find((s) => s.title === 'Side').items[0].detail).toContain('Sky Chumps');
     expect(details.sections.find((s) => s.title === 'Center').items[0].detail).toContain('letter Upper H');
     expect(details.sections[0].items[0].priceMinor).toBe(195000);
     expect(details.sections.some((s) => s.title.startsWith('Pricing quote'))).toBe(false);
@@ -43,7 +43,7 @@ describe('internal blueprint', () => {
     config.structure.layers = 2;
     config.structure.layerDesign = 'individual';
     config.sponge.layerFlavors = ['chocolate', 'ube'];
-    config.side.layerTreatments = [{ mode: null }, { mode: 'sunshinePlay', sunshinePlay: { setId: 'starryRainbow', colorId: 'vanilla' } }];
+    config.side.layerTreatments = [{ mode: null }, { mode: 'sunshinePlay', sunshinePlay: { setId: 'skyChumps', colorId: 'vanilla' } }];
     const details = buildBlueprintDetails(config, null);
     expect(details.totalMinor).toBeNull();
     const rows = details.sections[0].items;

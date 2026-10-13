@@ -13,15 +13,18 @@ const response = () => ({ status(code) { this.code = code; return this; }, json(
 const request = (body) => ({ params: { id: orderId }, platformId: platform, user: { _id: staff, role: 'bakery_staff' }, body });
 const order = () => ({ _id: orderId, user: customer, platform, status: 'pending_payment', downPayment: { amount: 975, isPaid: false } });
 
-test('checkout creates one unpaid reservation from the trusted stored price snapshot', async () => {
+test('checkout creates one confirmed reservation with paid down payment from the trusted stored price snapshot', async () => {
   mock.method(Reservation, 'findOne', async () => null);
   const upsert = mock.method(Reservation, 'findOneAndUpdate', async () => ({}));
   await ensureCheckoutReservation({ _id: orderId, customer, platform, status: 'ready', designName: 'Cake', deliveryDate: '2026-10-10', orderPricingSnapshot: { totalMinor: 195000, pricingVersion: 1, calculatedAt: new Date(), lineItems: [] } }, { emailSender: null });
   const [key, update] = upsert.mock.calls[0].arguments;
   assert.deepEqual(key, { blueprint: orderId });
   assert.equal(update.$setOnInsert.totalPrice, 1950);
-  assert.equal(update.$setOnInsert.status, 'pending_payment');
-  assert.deepEqual(update.$setOnInsert.downPayment, { amount: 975, isPaid: false });
+  assert.equal(update.$setOnInsert.status, 'confirmed');
+  assert.equal(update.$setOnInsert.downPayment.amount, 975);
+  assert.equal(update.$setOnInsert.downPayment.isPaid, true);
+  assert.equal(update.$setOnInsert.downPayment.method, 'gcash');
+  assert.equal(update.$setOnInsert.downPayment.paymentReference, 'simulated_checkout');
 });
 test('checkout retry preserves an existing reservation and payment', async () => {
   const existing = { ...order(), downPayment: { isPaid: true } };

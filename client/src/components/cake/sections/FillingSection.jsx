@@ -50,6 +50,16 @@ export default function FillingSection({ filling, structure, exteriorFinish, int
   const activeLayers = getActiveLayers();
   const activePiping = getActivePiping();
 
+  // The picker's selected option follows the EFFECTIVE piping tip, not
+  // the stored one: Full Frosting / Textured Buttercream cover the
+  // filling edge, so the piping renders as None for those finishes —
+  // the same regionsHidden derivation configAdapter.js applies to the
+  // render-facing tip (CakeScene relies on it too). Driving selection
+  // from it keeps "None" showing as selected whenever the finish hides
+  // the piping, even when a stale tip survives in the stored config
+  // (AI-driven finish changes, designs reloaded from storage).
+  const activePipingTip = isFrostedOrTextured ? null : activePiping.tip;
+
   const updateLayers = (layers) => {
     const isEnabled = layers > 0;
     const layerVal = layers > 0 ? layers : 1;
@@ -176,7 +186,7 @@ export default function FillingSection({ filling, structure, exteriorFinish, int
           <SetPicker
             label="Piping Design"
             sets={FILLING_PIPING_DESIGNS}
-            activeSetId={activePiping.tip}
+            activeSetId={activePipingTip}
             onSelectSet={(tip) => updatePiping({ tip })}
             disabledItemIds={isFrostedOrTextured ? ['mashedCircles', 'mashedSwirls'] : []}
             numberFromNone

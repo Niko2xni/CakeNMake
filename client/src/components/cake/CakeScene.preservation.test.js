@@ -21,19 +21,121 @@ vi.mock('./cakeFonts', () => ({
 
 import {
   getCakeGlazeCarve,
+  getCakeGlazeCarveForShape,
   getEdgeSlotsToRender,
   getMiddlePipingRadius,
   getTierGlazeProfileOptions,
   makeFillingBandHugFn,
 } from './CakeScene';
-import { getNaturalTearGlazeCarve, getPetitFoursGlazeCarve, GLAZE_PATTERN_CARVES } from './cakeConstants';
+import {
+  getNaturalTearGlazeCarve,
+  getPetitFoursGlazeCarve,
+  getSixBySixRectangleLongDripsCarve,
+  getSquareLongDripsCarve,
+  getRenderDimensions,
+  GLAZE_PATTERN_CARVES,
+} from './cakeConstants';
 import { buildGlazeGeometry } from './frostingGeometry';
+import { getBoxyRadius } from './cakeMath';
 
 describe('CakeScene edge and Glaze helpers', () => {
   it('uses GLAZE_PATTERN_CARVES for Standard and Bento designs', () => {
     expect(getCakeGlazeCarve('longGaps')).toEqual(GLAZE_PATTERN_CARVES.longGaps);
     expect(getCakeGlazeCarve('shortDrips')).toEqual(GLAZE_PATTERN_CARVES.shortDrips);
     expect(getCakeGlazeCarve('longWave')).toEqual(GLAZE_PATTERN_CARVES.longWave);
+  });
+
+  it('uses three long-side and two short-side Long Drips per side for rectangles', () => {
+    const carve = getSixBySixRectangleLongDripsCarve();
+    expect(carve.dripCenters).toHaveLength(10);
+    const mappedDrips = carve.dripCenters.map((angle) => {
+      const radius = getBoxyRadius(angle, 1.25, 0.85, 0.35);
+      return {
+        x: radius * Math.cos(angle),
+        z: radius * Math.sin(angle),
+      };
+    });
+
+    expect(mappedDrips.filter(({ z }) => Math.abs(Math.abs(z) - 0.85) < 0.001)).toHaveLength(6);
+    expect(mappedDrips.filter(({ x }) => Math.abs(Math.abs(x) - 1.25) < 0.001)).toHaveLength(4);
+    for (const angle of carve.dripCenters) {
+      expect(carve.customProfileFn(angle)).toBeGreaterThan(0.8);
+    }
+    expect(getCakeGlazeCarveForShape('longGaps', 'rectangle', '6x6').dripCenters).toHaveLength(10);
+    expect(getCakeGlazeCarveForShape('longGaps', 'round', '6x6')).toEqual(GLAZE_PATTERN_CARVES.longGaps);
+    expect(getCakeGlazeCarveForShape('longGaps', 'rectangle', '8x8').dripCenters).toHaveLength(10);
+    expect(getCakeGlazeCarveForShape('midWave', 'rectangle', '6x6')).toEqual(GLAZE_PATTERN_CARVES.midWave);
+  });
+
+  it('keeps each Rectangle Long Drip full-depth with smooth transitions between drips', () => {
+    const carve = getSixBySixRectangleLongDripsCarve();
+    for (const angle of carve.dripCenters) {
+      expect(carve.customProfileFn(angle)).toBeGreaterThan(0.99);
+    }
+  });
+
+  it('connects Rectangle Long Drips continuously across the perimeter seam', () => {
+    const carve = getSixBySixRectangleLongDripsCarve();
+    const seamValue = carve.customProfileFn(0);
+    const nearSeamValue = carve.customProfileFn(2 * Math.PI - 1e-7);
+
+    expect(seamValue).toBeCloseTo(nearSeamValue, 5);
+
+    const samples = Array.from({ length: 721 }, (_, index) => (
+      carve.customProfileFn((index / 720) * Math.PI * 2)
+    ));
+    expect(samples.every((value) => Number.isFinite(value) && value >= 0.179 && value <= 1)).toBe(true);
+    const largestStep = Math.max(...samples.slice(1).map((value, index) => Math.abs(value - samples[index])));
+    expect(largestStep).toBeLessThan(0.06);
+  });
+
+  it('renders square Bento sizes at their actual dimensions and applies square Long Drips', () => {
+    expect(getRenderDimensions('squareBento2x2')).toEqual({ diameter: 2, height: 2 });
+    expect(getRenderDimensions('squareBento3x3')).toEqual({ diameter: 3, height: 3 });
+
+    for (const size of ['squareBento2x2', 'squareBento3x3']) {
+      const carve = getCakeGlazeCarveForShape('longGaps', 'square', size);
+      expect(carve.dripCenters).toHaveLength(8);
+      expect(carve.dripCenters.every((angle) => carve.customProfileFn(angle) > 0.8)).toBe(true);
+    }
+    for (const size of ['6x6', '8x8', '10x10', '12x12']) {
+      const { diameter } = getRenderDimensions(size);
+      const radius = diameter / 2;
+      const carve = getCakeGlazeCarveForShape('longGaps', 'square', size);
+      expect(carve.dripCenters).toHaveLength(12);
+      for (const angle of carve.dripCenters) {
+        const dripRadius = getBoxyRadius(angle, radius, radius, 0.35);
+        expect(carve.customProfileFn(angle)).toBeGreaterThan(0.8);
+        expect(dripRadius).toBeGreaterThan(size === '10x10' ? 4 : size === '12x12' ? 5 : 0);
+      }
+    }
+
+    for (const size of ['6x6', '8x8', '10x10', '12x12']) {
+      const carve = getSquareLongDripsCarve(size);
+      expect(carve.dripCenters).toHaveLength(12);
+      expect(carve.dripCenters.every((angle) => carve.customProfileFn(angle) > 0.8)).toBe(true);
+    }
+  });
+
+  it('matches Rectangle Long Drips to each Standard size perimeter', () => {
+    for (const size of ['6x6', '8x8', '10x10', '12x12']) {
+      const { diameter } = getRenderDimensions(size);
+      const baseRadius = diameter / 2;
+      const width = baseRadius * 1.25;
+      const depth = baseRadius * 0.85;
+      const carve = getCakeGlazeCarveForShape('longGaps', 'rectangle', size);
+      expect(carve.dripCenters).toHaveLength(10);
+      let longFaceDrips = 0;
+      for (const angle of carve.dripCenters) {
+        const dripRadius = getBoxyRadius(angle, width, depth, 0.35);
+        const x = dripRadius * Math.cos(angle);
+        const z = dripRadius * Math.sin(angle);
+        expect(carve.customProfileFn(angle)).toBeGreaterThan(0.99);
+        if (Math.abs(Math.abs(z) - depth) < 0.001) longFaceDrips += 1;
+        else expect(Math.abs(Math.abs(x) - width)).toBeLessThan(0.001);
+      }
+      expect(longFaceDrips).toBe(6);
+    }
   });
 
   it('keeps the Petit Fours Natural Tear profile for both Standard pattern ids', () => {
@@ -142,6 +244,28 @@ describe('CakeScene edge and Glaze helpers', () => {
     expect(minSideInnerRadius).toBeCloseTo(1.002, 2);
   });
 
+  it('scales the same drip pattern across standard cake sizes without adding extra drips', () => {
+    const build = (radius) => buildGlazeGeometry(radius, 1, 0, () => 0.5, {
+      carve: GLAZE_PATTERN_CARVES.longGaps,
+      lobeCountRadius: 3,
+      sideSamples: 8,
+    });
+    const reference = build(3);
+    const larger = build(6);
+    const referencePositions = reference.getAttribute('position');
+    const largerPositions = larger.getAttribute('position');
+
+    expect(largerPositions.count).toBe(referencePositions.count);
+
+    // With the same angular profile, the same contour point is twice as far
+    // around the larger cake while keeping its relative height unchanged.
+    const sampleIndex = 17 * (11 + 8) + 12;
+    expect(referencePositions.getY(sampleIndex)).toBeLessThan(0.9);
+    expect(largerPositions.getY(sampleIndex)).toBeCloseTo(referencePositions.getY(sampleIndex));
+    expect(Math.hypot(largerPositions.getX(sampleIndex), largerPositions.getZ(sampleIndex)))
+      .toBeGreaterThan(Math.hypot(referencePositions.getX(sampleIndex), referencePositions.getZ(sampleIndex)));
+  });
+
   it('builds smooth normals along a Natural Tear drip', () => {
     const carve = getNaturalTearGlazeCarve('naturalTear');
     const geo = buildGlazeGeometry(3, 5, 0.25, () => 0.5, {
@@ -187,6 +311,37 @@ describe('CakeScene edge and Glaze helpers', () => {
     }
     // Glaze top outer surface must remain strictly higher than the sponge dome shoulder (1.00)
     expect(minTopOuterY).toBeGreaterThanOrEqual(1.04);
+  });
+
+  it('honors the bevelSize option so Petit Fours tops keep a crisp flat edge', () => {
+    const buildWith = (bevelSize) => buildGlazeGeometry(0.5, 1.0, 0.05, () => 0.5, {
+      coatThickness: 0.045,
+      wallThickness: 0.045,
+      capLift: 0.045,
+      ...(bevelSize == null ? {} : { bevelSize }),
+    });
+    // Column 0's rows are laid out contiguously from vertex 0; with a
+    // dome, row 20 is the dome/bevel junction B = (capRadius - bevelSize,
+    // H) and row 30 is the shoulder's outer end A = (capRadius,
+    // H - bevelSize) — the two points that define how much of the top the
+    // rounded shoulder swallows. Both must track the requested bevel
+    // width instead of silently falling back to the 0.15 standard-tier
+    // default, which covers ~30% of a 0.5-radius piece's top and reads
+    // as a hill bump around the perimeter.
+    const point = (geo, row) => {
+      const pos = geo.getAttribute('position');
+      return { r: Math.hypot(pos.getX(row), pos.getZ(row)), y: pos.getY(row) };
+    };
+    const crisp = buildWith(0.06);
+    expect(point(crisp, 20).r).toBeCloseTo(0.545 - 0.06, 3);
+    expect(point(crisp, 20).y).toBeCloseTo(1.045, 3);
+    expect(point(crisp, 30).r).toBeCloseTo(0.545, 3);
+    expect(point(crisp, 30).y).toBeCloseTo(1.045 - 0.06, 3);
+
+    // Omitting the option keeps the standard-tier default untouched.
+    const standard = buildWith(null);
+    expect(point(standard, 20).r).toBeCloseTo(0.545 - 0.15, 3);
+    expect(point(standard, 30).y).toBeCloseTo(1.045 - 0.15, 3);
   });
 
   it('Petit Fours glaze carve seamlessly blends mantle and adds connected circular beads to drip ends', () => {

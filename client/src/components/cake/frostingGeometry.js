@@ -130,9 +130,23 @@ export function buildGlazeGeometry(radius, height, topDomeHeight, rand, opts = {
     coatThickness = 0.16,
     ridgeProfileFn = null,
     capLift = 0.05,
+    // Width of the rounded shoulder joining the top cap (dome or flat)
+    // down to the outer wall — the profile runs (capRadius - bevelSize,
+    // H) -> (capRadius, H - bevelSize) via a quadratic curl. The 0.15
+    // default is tuned for standard tiers, where it is a subtle
+    // ~4%-of-radius edge roll, but Petit Fours pieces are only ~0.5 in
+    // radius: the same absolute width swallows nearly a third of their
+    // top and reads as an obvious hill bump around the perimeter instead
+    // of a flat top like a standard cake's, so CakeScene's Petit Fours
+    // path passes a small pfBevel (~0.04-0.08) scaled to the piece.
+    bevelSize = 0.15,
     sideSamples = 48,
     ridgeHugStrength = 1,
     edgeFadeDist = 0.4,
+    // Keeps the angular drip pattern anchored to a reference cake size.
+    // Larger cakes retain the same count, so each drip scales up with the
+    // circumference instead of adding more, narrower drips.
+    lobeCountRadius = null,
     // How much of that gap is actually solid glaze, measured in from the
     // outer surface. Previously buildGlazeGeometry only ever built the
     // outer surface (a single, zero-thickness lathed membrane): fine where
@@ -177,7 +191,6 @@ export function buildGlazeGeometry(radius, height, topDomeHeight, rand, opts = {
     coverageFn = null,
   } = opts;
 
-  const bevelSize = 0.15;
   const H = height + capLift;
 
   const capRadius = radius + coatThickness;
@@ -204,7 +217,10 @@ export function buildGlazeGeometry(radius, height, topDomeHeight, rand, opts = {
   const carve = opts.carve || {};
   let carveYFracAt;
   let angularCycles;
-  if (carve.wave) {
+  if (typeof carve.customProfileFn === 'function') {
+    carveYFracAt = carve.customProfileFn;
+    angularCycles = carve.angularCycles ?? 24;
+  } else if (carve.wave) {
     const baseFrac = carve.baseFrac ?? 0.5;
     const ampFrac = carve.ampFrac ?? 0.05;
     const waveCount = carve.lobeCount ?? (10 + Math.floor(rand() * 3));
@@ -216,7 +232,8 @@ export function buildGlazeGeometry(radius, height, topDomeHeight, rand, opts = {
     const shortFrac = carve.shortFrac ?? 0.25;
     const cyclePattern = carve.cyclePattern || [deepFrac, shortFrac];
     const lobeSpacing = carve.lobeSpacing || 1.0;
-    const approxLobeCount = (2 * Math.PI * radius) / lobeSpacing;
+    const countRadius = lobeCountRadius == null ? radius : Math.min(radius, lobeCountRadius);
+    const approxLobeCount = (2 * Math.PI * countRadius) / lobeSpacing;
     const stepCount = cyclePattern.length;
     const fullCycles = Math.max(1, Math.round(approxLobeCount / stepCount));
     const totalLobes = fullCycles * stepCount;

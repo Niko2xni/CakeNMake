@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import OptionButtonContent from '../OptionButtonContent';
 
 const PIPING_PATTERNS = [
   { id: 'shell', label: 'Shell', emoji: '🌀' },
@@ -164,14 +165,16 @@ export default function PlaceSection({
                     : 'bg-card border-border hover:border-primary/50 hover:bg-muted/50 text-foreground'
                 )}
               >
-                <span className="text-2xl mb-1">{dec.emoji}</span>
-                <span className="text-xs font-semibold leading-tight">{dec.label}</span>
-                <span className={cn(
-                  'text-[10px] mt-0.5',
-                  isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'
-                )}>
-                  +${dec.price}
-                </span>
+                <OptionButtonContent selected={isSelected} canDeselect label={`${dec.label}, +$${dec.price}`}>
+                  <span className="text-2xl mb-1">{dec.emoji}</span>
+                  <span className="text-xs font-semibold leading-tight">{dec.label}</span>
+                  <span className={cn(
+                    'text-[10px] mt-0.5',
+                    isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'
+                  )}>
+                    +${dec.price}
+                  </span>
+                </OptionButtonContent>
 
                 {placedCount > 0 && (
                   <span className={cn(

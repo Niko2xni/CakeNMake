@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { buildVictorianLambeth } from './sets/victorianLambethHelpers';
+import { buildVictorianLambeth, getVictorianLambethCoverageFn, getVictorianLambethGlazeCoverageFn } from './sets/victorianLambethHelpers';
 import { getBoxyRadius } from './cakeMath';
 
 function isRigidDecorNode(obj) {
@@ -175,5 +175,89 @@ describe('Victorian Lambeth on square and rectangle cakes', () => {
         expect(Math.abs(node.rotation.y)).toBeLessThan(0.05);
       }
     }
+  });
+
+  describe('Victorian Lambeth Glaze / Drip empty spaces and rosette/leaf shaping', () => {
+    it('caps Victorian Lambeth Drip carve depth to 0.50 so drip is reduced but never completely removed', () => {
+      const radius = 2.0;
+      const height = 2.5;
+      const glazeCovFn = getVictorianLambethGlazeCoverageFn(radius, height, {
+        variant: 'classic',
+        forGlaze: true,
+      });
+
+      let maxCoverage = 0;
+      for (let angle = 0; angle < Math.PI * 2; angle += 0.05) {
+        for (let y = -height / 2; y <= height / 2; y += 0.05) {
+          const c = glazeCovFn(angle, y);
+          if (c > maxCoverage) maxCoverage = c;
+        }
+      }
+
+      // Coverage must not exceed 0.50 (reduces drip to 50% thickness, never removes it completely)
+      expect(maxCoverage).toBeGreaterThan(0.35);
+      expect(maxCoverage).toBeLessThanOrEqual(0.5001);
+    });
+
+    it('accurately shapes empty space around the top swirl rosette and side leaves', () => {
+      const radius = 2.0;
+      const height = 2.5;
+      const H = height;
+      const glazeCovFn = getVictorianLambethGlazeCoverageFn(radius, height, {
+        variant: 'classic',
+        forGlaze: true,
+      });
+
+      // Anchor 0 is at angle = 0, y = 0.42 * H - 0.05 * H = 0.37 * H
+      const anchorY = 0.37 * H;
+
+      // Center of swirl rosette: covered at 50%
+      const centerCov = glazeCovFn(0, anchorY);
+      expect(centerCov).toBeCloseTo(0.50, 2);
+
+      // Top of swirl rosette: smooth curve around the swirl (R ~ 0.37), falls to 0 past ~0.42
+      expect(glazeCovFn(0, anchorY + 0.35)).toBeGreaterThan(0.35);
+      expect(glazeCovFn(0, anchorY + 0.45)).toBe(0);
+
+      // Side leaf: at lx = +0.50 (angle = 0.50 / radius = 0.25 rad), leaf wing is covered
+      const leafAngle = 0.50 / radius;
+      expect(glazeCovFn(leafAngle, anchorY)).toBeGreaterThan(0.35);
+
+      // Beyond the leaf tip (lx = +0.75, angle = 0.75 / radius = 0.375 rad), coverage falls to 0
+      const outsideAngle = 0.75 / radius;
+      expect(glazeCovFn(outsideAngle, anchorY)).toBe(0);
+    });
+
+    it('offsets Victorian Lambeth decoration when Drip is present to sit flush on the reduced drip surface', () => {
+      const radius = 2.0;
+      const height = 2.5;
+      const lambethNoDrip = buildVictorianLambeth(radius, height, '#FFFFFF', '#FFFFFF', 'classic');
+      const lambethWithDrip = buildVictorianLambeth(radius, height, '#FFFFFF', '#FFFFFF', 'classic', null, {
+        hasDrip: true,
+        coatThickness: 0.06,
+        maxCarveDepth: 0.50,
+      });
+
+      // Check anchor mesh or curtain mesh distance from origin
+      let anchorNoDripZ = 0;
+      let anchorWithDripZ = 0;
+
+      lambethNoDrip.traverse((child) => {
+        if (child.userData?.isRigidDecor && anchorNoDripZ === 0) {
+          anchorNoDripZ = Math.hypot(child.position.x, child.position.z);
+        }
+      });
+
+      lambethWithDrip.traverse((child) => {
+        if (child.userData?.isRigidDecor && anchorWithDripZ === 0) {
+          anchorWithDripZ = Math.hypot(child.position.x, child.position.z);
+        }
+      });
+
+      expect(anchorNoDripZ).toBeGreaterThan(0);
+      expect(anchorWithDripZ).toBeGreaterThan(0);
+      // With drip at 50% carve depth, surface is offset by 0.06 * (1 - 0.5) = 0.03
+      expect(anchorWithDripZ - anchorNoDripZ).toBeCloseTo(0.03, 3);
+    });
   });
 });

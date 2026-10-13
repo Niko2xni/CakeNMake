@@ -376,7 +376,7 @@ export function adaptConfigToLegacy(newConfig) {
     const sideTriangleColorId = sideSugarColorData?.id || targetSide.trianglePattern?.colorId || null;
 
     const sideChevronPatternSetId = sideMode === 'chevronPattern'
-      ? (targetSide.chevronPattern?.setId || 'multiColor')
+      ? (targetSide.chevronPattern?.setId || 'singleColor')
       : null;
     const sideChevronColor = sideSugarColorHex || resolveColor(targetSide.chevronPattern?.colorId);
     const sideChevronColorId = sideSugarColorData?.id || targetSide.chevronPattern?.colorId || null;

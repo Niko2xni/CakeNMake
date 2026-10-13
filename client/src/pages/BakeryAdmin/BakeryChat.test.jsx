@@ -8,7 +8,7 @@ const conversations = [
   {
     id: 'older',
     customer: { displayName: 'Ana Cruz', email: 'ana@example.com' },
-    platform: { name: 'Mamshie Bakery' },
+    platform: { name: 'AH TINAPS BAKESHOP' },
     status: 'open',
     lastMessageAt: '2026-09-28T08:00:00.000Z',
     lastMessagePreview: 'Older message',
@@ -17,7 +17,7 @@ const conversations = [
   {
     id: 'newer',
     customer: { displayName: 'Nikolai Ng', email: 'nikolai@example.com' },
-    platform: { name: 'Mamshie Bakery' },
+    platform: { name: 'AH TINAPS BAKESHOP' },
     status: 'open',
     lastMessageAt: '2026-09-28T09:00:00.000Z',
     lastMessagePreview: 'Newest message',

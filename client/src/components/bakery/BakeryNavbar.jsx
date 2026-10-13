@@ -59,7 +59,7 @@ export default function BakeryNavbar() {
     <>
     <nav className="cn-bakery-nav" aria-label="Bakery navigation">
       {/* Brand */}
-      <div className="relative mb-6 flex-shrink-0" title="Mamshie Bakery">
+      <div className="relative mb-6 flex-shrink-0" title="AH TINAPS BAKESHOP">
         <div className="w-11 h-11 rounded-full bg-gradient-to-br from-pink-500 via-rose-500 to-orange-400 flex items-center justify-center">
           <Cake className="w-6 h-6 text-white" />
         </div>

@@ -44,7 +44,7 @@ const DEFAULT_CONFIG = {
   structure: {
     cakeFormat: 'standard', // 'standard' | 'bento' | 'petitsFour'
     format: 'standard',
-    size: '8x8', // '6x6' | '8x8' | '10x10' | '12x12' | 'miniBento' | 'standardBento' | 'largeBento' | 'classicCube' | 'largeCube'
+    size: '8x8', // Includes Standard, Bento, square Bento, and Petit Four size ids.
     layers: 1, // 1 or 2
     shape: 'round', // 'round' | 'rectangle' | 'square'
     layerDesign: 'uniform', // 'uniform' | 'individual'
@@ -205,7 +205,7 @@ const DEFAULT_CONFIG = {
     pipingScrolls: { setId: 'waveRope', colorId: 'vanilla' },
     sunshinePlay: { setId: 'rainbowArc', colorId: 'vanilla', flavorId: 'vanilla' }, // setId from SUNSHINE_PLAY_SETS, flavorId for rainbow arc customization
     victorianLambeth: { setId: 'classic', colorId: 'vanilla' }, // setId from VICTORIAN_LAMBETH_SETS (4 variants)
-    chevronPattern: { setId: 'multiColor', colorId: 'vanilla' },
+    chevronPattern: { setId: 'singleColor', colorId: 'vanilla' },
   },
 
   // 8. Place — empty bucket for now. Old manualPlacement click-and-drop
@@ -251,10 +251,10 @@ const BUTTERCREAM_TEXTURES = [
 
 // Size options
 const STANDARD_SIZE_OPTIONS = [
-  { id: '6x6', label: '6×6', dimensions: { diameter: 6, height: 4 } },
-  { id: '8x8', label: '8×8', dimensions: { diameter: 8, height: 6 } },
-  { id: '10x10', label: '10×10', dimensions: { diameter: 10, height: 8 } },
-  { id: '12x12', label: '12×12', dimensions: { diameter: 12, height: 10 } },
+  { id: '6x6', label: '6×6', dimensions: { diameter: 6, height: 6 } },
+  { id: '8x8', label: '8×8', dimensions: { diameter: 8, height: 8 } },
+  { id: '10x10', label: '10×10', dimensions: { diameter: 10, height: 10 } },
+  { id: '12x12', label: '12×12', dimensions: { diameter: 12, height: 12 } },
 ];
 
 // Bento size options (single tier only)
@@ -262,6 +262,12 @@ const BENTO_SIZE_OPTIONS = [
   { id: 'miniBento', label: '3.5x2', dimensions: { diameter: 3.5, height: 2 } },
   { id: 'standardBento', label: '4x2', dimensions: { diameter: 4, height: 2 } },
   { id: 'largeBento', label: '5x3', dimensions: { diameter: 5, height: 3 } },
+];
+
+// Bento Square size options (single tier only)
+const BENTO_SQUARE_SIZE_OPTIONS = [
+  { id: 'squareBento2x2', label: '2x2', dimensions: { diameter: 2, height: 2 } },
+  { id: 'squareBento3x3', label: '3x3', dimensions: { diameter: 3, height: 3 } },
 ];
 
 // Petits Four size options (single tier 4-pack)
@@ -273,6 +279,7 @@ const PETITS_FOUR_SIZE_OPTIONS = [
 const SIZE_OPTIONS = [
   ...STANDARD_SIZE_OPTIONS,
   ...BENTO_SIZE_OPTIONS,
+  ...BENTO_SQUARE_SIZE_OPTIONS,
   ...PETITS_FOUR_SIZE_OPTIONS,
 ];
 
@@ -299,7 +306,7 @@ const SHAPE_OPTIONS = [
 ];
 
 const PETITS_FOUR_SIZE_IDS = PETITS_FOUR_SIZE_OPTIONS.map((option) => option.id);
-const BENTO_SIZE_IDS = BENTO_SIZE_OPTIONS.map((option) => option.id);
+const BENTO_SIZE_IDS = [...BENTO_SIZE_OPTIONS.map((option) => option.id), ...BENTO_SQUARE_SIZE_OPTIONS.map((option) => option.id)];
 
 function getCakeFormat(structure = {}) {
   const explicit = structure.cakeFormat || structure.format;
@@ -1129,6 +1136,8 @@ function getTopTierRadiusFromConfig(config) {
   if (size === 'miniBento') return 1.75;
   if (size === 'standardBento') return 2.0;
   if (size === 'largeBento') return 2.5;
+  if (size === 'squareBento2x2') return 1.0;
+  if (size === 'squareBento3x3') return 1.5;
   if (size === '12x12') {
     return layers >= 2 ? 5.0 : 6.0;
   }
@@ -2616,9 +2625,9 @@ const EDGE_PIPING_OPTIONS = [...EDGE_DECORATION_SETS, ...PIPING_TIPS]
 // merged into one roster since all seven now compete for the same "one
 // treatment active at a time" slot.
 const CHEVRON_PATTERN_SETS = [
-  { id: 'multiColor', label: 'Multi-Color', price: 125 },
   { id: 'singleColor', label: 'Single Color', price: 105 },
   { id: 'twoTone', label: 'Two-Tone', price: 115 },
+  { id: 'threeTone', label: 'Three-Tone', price: 115 },
   { id: 'wideZigzag', label: 'Wide Zigzag', price: 120 },
   { id: 'tightZigzag', label: 'Tight Zigzag', price: 130 },
   { id: 'singleColorGapped', label: 'Single Color, Gapped', price: 95 }, // Single Color's own 5-row layout with rows 2 & 4 removed — see buildChevronSideStripes in DecorationSets.jsx
@@ -2654,9 +2663,9 @@ const SUNSHINE_PLAY_SETS = [
   { id: 'rainbowArc', label: 'Rainbow Arc', price: 140 }, // hardened buttercream rainbow with cloud puffs at its feet
   { id: 'cloudyChump', label: 'Cloudy Champ', price: 130 }, // randomized clouds only
   { id: 'starBurst', label: 'Star Burst', price: 125 }, // scattered buttercream stars hugging the cake side
-  { id: 'assortedStarBurst', label: 'Assorted Star Burst', price: 135 }, // scattered buttercream stars in assorted colors
-  { id: 'starryRainbow', label: 'Starry Rainbow', price: 170 }, // combination of Rainbow Arc, Cloudy Champ, and Star Burst
-  { id: 'assortedStarryRainbow', label: 'Assorted Starry Rainbow', price: 180 }, // Starry Rainbow with assorted star colors
+  { id: 'skyChumps', label: 'Sky Chumps', price: 145 }, // combination of stars and clouds only
+  { id: 'sunshineStars', label: 'Sunshine Stars', price: 155 }, // combination of rainbow and stars only
+  { id: 'starrySunshinePlay', label: 'Starry Sunshine Play', price: 180 }, // Starry Sunshine Play with assorted star colors
 ];
 
 const VICTORIAN_LAMBETH_SETS = [
@@ -2750,6 +2759,5 @@ function computeSlotPosition(slot, topRadius) {
   };
 }
 
-module.exports = { DEFAULT_CONFIG, FINISH_STYLES, BUTTERCREAM_TEXTURES, STANDARD_SIZE_OPTIONS, BENTO_SIZE_OPTIONS, PETITS_FOUR_SIZE_OPTIONS, SIZE_OPTIONS, CAKE_FORMAT_OPTIONS, CAKE_TYPE_OPTIONS, LAYER_OPTIONS, SHAPE_OPTIONS, getCakeFormat, isPetitsFourStructure, isBentoStructure, resolveStructureShape, FILLING_LAYER_OPTIONS, PIPING_TIPS, FILLING_PIPING_DESIGNS, SIZE_OPTIONS_CUSTOM, SUGAR_COLORS, SUGAR_COLOR_MODES, SURFACE_TREATMENT_MODES, GLAZE_PATTERNS, PETIT_FOURS_GLAZE_PATTERNS, CHECKERED_PATTERN_SETS, TRIANGLE_PATTERN_SETS, CENTER_ITEM_LIMITS, isLetterDesignId, getCenterItemLimit, getCenterItemCount, isCenterItemAtLimit, CENTER_ITEM_RADII, getCenterItemRadius, getItemFootprint, doFootprintsClash, isFootprintInBoundary, doItemsClash, CENTER_BOUNDARY_RATIO, CENTER_BOUNDARY_RESERVE, getCenterPlacementBoundaryRadius, EDIBLE_DELICATES_RIM_SPECS, getActiveEdgeDelicateTip, getEdgeDelicatesObstacles, getEdgeFerreroObstacles, getDelicatesAwareBoundaryRadius, getFerreroAwareBoundaryRadius, getTopTierRadiusFromConfig, pruneItemsCollidingWithEdgeDelicates, pruneItemsCollidingWithEdgeFerrero, CENTER_PLACEABLE_DESIGNS, STRAWBERRY_VARIATION_SETS, BENTO_STRAWBERRY_VARIATION_SETS, BLUEBERRY_VARIATION_SETS, BENTO_BLUEBERRY_VARIATION_SETS, MANGO_VARIATION_SETS, BENTO_MANGO_VARIATION_SETS, STRAWBERRY_AND_BLUEBERRY_VARIATION_SETS, BENTO_STRAWBERRY_AND_BLUEBERRY_VARIATION_SETS, BLUEBERRY_AND_MANGO_VARIATION_SETS, BENTO_BLUEBERRY_AND_MANGO_VARIATION_SETS, STRAWBERRY_AND_MANGO_VARIATION_SETS, BENTO_STRAWBERRY_AND_MANGO_VARIATION_SETS, STRAWBERRY_BLUEBERRY_AND_MANGO_VARIATION_SETS, BENTO_STRAWBERRY_BLUEBERRY_AND_MANGO_VARIATION_SETS, getPetitsFourVariationSets, PETITS_FOUR_STRAWBERRY_VARIATION_SETS, PETITS_FOUR_BLUEBERRY_VARIATION_SETS, PETITS_FOUR_MANGO_VARIATION_SETS, getCenterVariations, CENTER_VARIATIONS, BUTTERCREAM_LETTERS_UPPER, BUTTERCREAM_LETTERS_LOWER, BUTTERCREAM_LETTERS, BRACELET_BEADS_VARIATIONS, SCALLOPS_VARIATIONS, EDGE_DECORATION_SETS, PIPING_TIPS_DELUXE, BEADED_TRIM_VARIATIONS_DELUXE, BORDER_PIPING_SOLID_VARIATIONS, BORDER_PIPING_ALTERNATING_VARIATIONS, BORDER_PIPING_VARIATIONS_DELUXE, DOLLOPS_SOLID_VARIATIONS_DELUXE, DOLLOPS_SOLID_CHERRY_VARIATIONS_DELUXE, DOLLOPS_ALTERNATING_VARIATIONS_DELUXE, DOLLOPS_ALTERNATING_CHERRY_VARIATIONS_DELUXE, DOLLOPS_VARIATIONS_DELUXE, WHIPPED_CREAM_SOLID_VARIATIONS, WHIPPED_CREAM_ALTERNATING_VARIATIONS, WHIPPED_CREAM_CHERRY_VARIATIONS, WHIPPED_CREAM_VARIATIONS, FRUIT_CONFECTION_RIM_OPTIONS, WHIPPED_CREAM_AND_RIM_VARIATIONS_DELUXE, EDGE_PIPING_OPTIONS, CHEVRON_PATTERN_SETS, SCATTER_PEARLS_SETS, PIPING_SCROLLS_SETS, SUNSHINE_PLAY_SETS, VICTORIAN_LAMBETH_SETS, SIDE_TREATMENTS, SLOT_RINGS, TOP_SURFACE_SLOTS, PLACEABLE_DECORATIONS, PLACE_ITEM_RADII, getSlotById, computeSlotPosition };
-
+module.exports = { DEFAULT_CONFIG, FINISH_STYLES, BUTTERCREAM_TEXTURES, STANDARD_SIZE_OPTIONS, BENTO_SIZE_OPTIONS, BENTO_SQUARE_SIZE_OPTIONS, PETITS_FOUR_SIZE_OPTIONS, SIZE_OPTIONS, CAKE_FORMAT_OPTIONS, CAKE_TYPE_OPTIONS, LAYER_OPTIONS, SHAPE_OPTIONS, getCakeFormat, isPetitsFourStructure, isBentoStructure, resolveStructureShape, FILLING_LAYER_OPTIONS, PIPING_TIPS, FILLING_PIPING_DESIGNS, SIZE_OPTIONS_CUSTOM, SUGAR_COLORS, SUGAR_COLOR_MODES, SURFACE_TREATMENT_MODES, GLAZE_PATTERNS, PETIT_FOURS_GLAZE_PATTERNS, CHECKERED_PATTERN_SETS, TRIANGLE_PATTERN_SETS, CENTER_ITEM_LIMITS, isLetterDesignId, getCenterItemLimit, getCenterItemCount, isCenterItemAtLimit, CENTER_ITEM_RADII, getCenterItemRadius, getItemFootprint, doFootprintsClash, isFootprintInBoundary, doItemsClash, CENTER_BOUNDARY_RATIO, CENTER_BOUNDARY_RESERVE, getCenterPlacementBoundaryRadius, EDIBLE_DELICATES_RIM_SPECS, getActiveEdgeDelicateTip, getEdgeDelicatesObstacles, getEdgeFerreroObstacles, getDelicatesAwareBoundaryRadius, getFerreroAwareBoundaryRadius, getTopTierRadiusFromConfig, pruneItemsCollidingWithEdgeDelicates, pruneItemsCollidingWithEdgeFerrero, CENTER_PLACEABLE_DESIGNS, STRAWBERRY_VARIATION_SETS, BENTO_STRAWBERRY_VARIATION_SETS, BLUEBERRY_VARIATION_SETS, BENTO_BLUEBERRY_VARIATION_SETS, MANGO_VARIATION_SETS, BENTO_MANGO_VARIATION_SETS, STRAWBERRY_AND_BLUEBERRY_VARIATION_SETS, BENTO_STRAWBERRY_AND_BLUEBERRY_VARIATION_SETS, BLUEBERRY_AND_MANGO_VARIATION_SETS, BENTO_BLUEBERRY_AND_MANGO_VARIATION_SETS, STRAWBERRY_AND_MANGO_VARIATION_SETS, BENTO_STRAWBERRY_AND_MANGO_VARIATION_SETS, STRAWBERRY_BLUEBERRY_AND_MANGO_VARIATION_SETS, BENTO_STRAWBERRY_BLUEBERRY_AND_MANGO_VARIATION_SETS, getPetitsFourVariationSets, PETITS_FOUR_STRAWBERRY_VARIATION_SETS, PETITS_FOUR_BLUEBERRY_VARIATION_SETS, PETITS_FOUR_MANGO_VARIATION_SETS, getCenterVariations, CENTER_VARIATIONS, BUTTERCREAM_LETTERS_UPPER, BUTTERCREAM_LETTERS_LOWER, BUTTERCREAM_LETTERS, BRACELET_BEADS_VARIATIONS, SCALLOPS_VARIATIONS, EDGE_DECORATION_SETS, PIPING_TIPS_DELUXE, BEADED_TRIM_VARIATIONS_DELUXE, BORDER_PIPING_SOLID_VARIATIONS, BORDER_PIPING_ALTERNATING_VARIATIONS, BORDER_PIPING_VARIATIONS_DELUXE, DOLLOPS_SOLID_VARIATIONS_DELUXE, DOLLOPS_SOLID_CHERRY_VARIATIONS_DELUXE, DOLLOPS_ALTERNATING_VARIATIONS_DELUXE, DOLLOPS_ALTERNATING_CHERRY_VARIATIONS_DELUXE, DOLLOPS_VARIATIONS_DELUXE, WHIPPED_CREAM_SOLID_VARIATIONS, WHIPPED_CREAM_ALTERNATING_VARIATIONS, WHIPPED_CREAM_CHERRY_VARIATIONS, WHIPPED_CREAM_VARIATIONS, FRUIT_CONFECTION_RIM_OPTIONS, WHIPPED_CREAM_AND_RIM_VARIATIONS_DELUXE, EDGE_PIPING_OPTIONS, CHEVRON_PATTERN_SETS, SCATTER_PEARLS_SETS, PIPING_SCROLLS_SETS, SUNSHINE_PLAY_SETS, VICTORIAN_LAMBETH_SETS, SIDE_TREATMENTS, SLOT_RINGS, TOP_SURFACE_SLOTS, PLACEABLE_DECORATIONS, PLACE_ITEM_RADII, getSlotById, computeSlotPosition };
 

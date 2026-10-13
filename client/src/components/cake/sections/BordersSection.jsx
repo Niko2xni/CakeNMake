@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { FLAVORS, FLAVOR_ORDER } from '@/lib/cakeFlavors';
 import { SIZE_OPTIONS_CUSTOM } from '@/lib/cakeConfig';
+import OptionButtonContent from '../OptionButtonContent';
 
 // Border set definitions
 const BORDER_SETS = {
@@ -132,14 +133,16 @@ function BorderCategory({ sets, config, onChange }) {
               <button
                 key={set.id}
                 onClick={() => updateSet(set.id)}
-                className={`flex flex-col items-center gap-1.5 rounded-xl p-3 text-left transition-all duration-200 border-2 ${
+                className={`relative flex flex-col items-center gap-1.5 rounded-xl p-3 text-left transition-all duration-200 border-2 ${
                   active
                     ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-[1.02]'
                     : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
                 }`}
               >
-                <span className="text-2xl">{set.emoji}</span>
-                <span className="text-xs font-semibold">{set.label}</span>
+                <OptionButtonContent selected={active} canDeselect label={set.label}>
+                  <span className="text-2xl">{set.emoji}</span>
+                  <span className="text-xs font-semibold">{set.label}</span>
+                </OptionButtonContent>
               </button>
             );
           })}

@@ -12,6 +12,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import OptionButtonContent from '../OptionButtonContent';
 import {
   CENTER_PLACEABLE_DESIGNS,
   CENTER_VARIATIONS,
@@ -933,6 +934,7 @@ export default function CenterSection({
                       <Circle
                         key={variant.id}
                         active={isActive}
+                        canDeselect
                         onClick={() => handleSelectVariation(decoration, variant.id)}
                         title={isActive ? `Remove ${variant.label}` : variant.label}
                       >
@@ -960,19 +962,21 @@ function OptionRow({ label, children }) {
   );
 }
 
-function Circle({ active, onClick, title, children }) {
+function Circle({ active, canDeselect = false, onClick, title, children }) {
   return (
     <button
       type="button"
       onClick={onClick}
       title={title}
-      className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
+      className={`relative w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
         active
           ? 'bg-primary text-primary-foreground border-primary shadow-md'
           : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
       }`}
     >
-      {children}
+      <OptionButtonContent selected={active} canDeselect={canDeselect} label={title}>
+        {children}
+      </OptionButtonContent>
     </button>
   );
 }

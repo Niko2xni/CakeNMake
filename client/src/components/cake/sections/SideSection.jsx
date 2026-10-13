@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Droplet } from 'lucide-react';
 import {
   SIDE_TREATMENTS,
   CHECKERED_PATTERN_SETS,
@@ -10,13 +9,16 @@ import {
   SUNSHINE_PLAY_SETS,
   VICTORIAN_LAMBETH_SETS,
   isPetitsFourStructure,
+  isBentoStructure,
 } from '@/lib/cakeConfig';
+import OptionButtonContent from '../OptionButtonContent';
 import SugarColorSection from './SugarColorSection';
 import { flatTreatment } from '@/lib/treatmentConfig';
 
 export default function SideSection({ side, structure, activeLayer = 0, onChange, sugarColor, onSugarColorChange }) {
   const [activeChevronColorSlot, setActiveChevronColorSlot] = useState('primary');
   const isPetitsFour = isPetitsFourStructure(structure);
+  const isBento = isBentoStructure(structure);
   const isIndividual = structure?.layerDesign === 'individual' && (structure?.layers > 1 || isPetitsFour);
   const tierCount = isPetitsFour ? 4 : (structure?.layers || 2);
   const tierLabel = (label) => (isIndividual ? (isPetitsFour ? `Variation ${activeLayer + 1} ${label}` : `Tier ${activeLayer + 1} ${label}`) : label);
@@ -42,28 +44,41 @@ export default function SideSection({ side, structure, activeLayer = 0, onChange
     onChange({ ...side, layerTreatments });
   };
 
-  const selectTreatment = (key) => updateSide({ ...activeSide, mode: key });
+  const selectTreatment = (key) =>
+    updateSide({ ...activeSide, mode: activeSide.mode === key ? null : key });
+
+  const selectVariant = (mode, stateKey, setId, defaultSetId) => {
+    const currentSetId = activeSide[stateKey]?.setId;
+    const isSelected = activeSide.mode === mode &&
+      (currentSetId === setId || (!currentSetId && defaultSetId === setId));
+
+    updateSide({
+      ...activeSide,
+      mode: isSelected ? null : mode,
+      [stateKey]: { ...activeSide[stateKey], setId },
+    });
+  };
 
   const selectCheckeredVariant = (setId) =>
-    updateSide({ ...activeSide, mode: 'checkeredPattern', checkeredPattern: { ...activeSide.checkeredPattern, setId } });
+    selectVariant('checkeredPattern', 'checkeredPattern', setId, CHECKERED_PATTERN_SETS[0]?.id);
 
   const selectTriangleVariant = (setId) =>
-    updateSide({ ...activeSide, mode: 'trianglePattern', trianglePattern: { ...activeSide.trianglePattern, setId } });
+    selectVariant('trianglePattern', 'trianglePattern', setId, TRIANGLE_PATTERN_SETS[0]?.id);
 
   const selectChevronVariant = (setId) =>
-    updateSide({ ...activeSide, mode: 'chevronPattern', chevronPattern: { ...activeSide.chevronPattern, setId } });
+    selectVariant('chevronPattern', 'chevronPattern', setId, CHEVRON_PATTERN_SETS[0]?.id);
 
   const selectScatterPearlsVariant = (setId) =>
-    updateSide({ ...activeSide, mode: 'scatterPearls', scatterPearls: { ...activeSide.scatterPearls, setId } });
+    selectVariant('scatterPearls', 'scatterPearls', setId, SCATTER_PEARLS_SETS[0]?.id);
 
   const selectPipingScrollsVariant = (setId) =>
-    updateSide({ ...activeSide, mode: 'pipingScrolls', pipingScrolls: { ...activeSide.pipingScrolls, setId } });
+    selectVariant('pipingScrolls', 'pipingScrolls', setId, PIPING_SCROLLS_SETS[0]?.id);
 
   const selectSunshinePlayVariant = (setId) =>
-    updateSide({ ...activeSide, mode: 'sunshinePlay', sunshinePlay: { ...activeSide.sunshinePlay, setId } });
+    selectVariant('sunshinePlay', 'sunshinePlay', setId, SUNSHINE_PLAY_SETS[0]?.id);
 
   const selectVictorianLambethVariant = (setId) =>
-    updateSide({ ...activeSide, mode: 'victorianLambeth', victorianLambeth: { ...activeSide.victorianLambeth, setId } });
+    selectVariant('victorianLambeth', 'victorianLambeth', setId, VICTORIAN_LAMBETH_SETS[0]?.id);
 
   const MULTI_VARIANT_MAP = {
     checkeredPattern: { sets: CHECKERED_PATTERN_SETS, select: selectCheckeredVariant, stateKey: 'checkeredPattern' },
@@ -86,24 +101,25 @@ export default function SideSection({ side, structure, activeLayer = 0, onChange
               const currentSetId = activeSide[multiVariant.stateKey]?.setId;
               return (
                 <React.Fragment key={t.id}>
-                  <OptionRow label={tierLabel(t.label)}>
+                  <OptionRow label={tierLabel(isBento && t.bentoLabel ? t.bentoLabel : t.label)}>
                     {multiVariant.sets.map((variant, i) => (
                       <Circle
                         key={variant.id}
                         active={activeSide.mode === t.id && (currentSetId === variant.id || (!currentSetId && i === 0))}
+                        canDeselect
                         onClick={() => multiVariant.select(variant.id)}
-                        title={variant.label}
+                        title={
+                          activeSide.mode === t.id && (currentSetId === variant.id || (!currentSetId && i === 0))
+                            ? `Remove ${isBento && variant.bentoLabel ? variant.bentoLabel : variant.label}`
+                            : isBento && variant.bentoLabel ? variant.bentoLabel : variant.label
+                        }
                       >
                         {i + 1}
                       </Circle>
                     ))}
                   </OptionRow>
                   {activeSide.mode === t.id && currentSetId && (
-                    t.id === 'chevronPattern' && currentSetId === 'multiColor' ? (
-                      <AssortedColorSection />
-                    ) : t.id === 'sunshinePlay' && (currentSetId === 'assortedStarBurst' || currentSetId === 'assortedStarryRainbow') ? (
-                      <AssortedColorSection />
-                    ) : t.id === 'chevronPattern' && currentSetId === 'twoTone' ? (
+                    t.id === 'chevronPattern' && (currentSetId === 'twoTone' || currentSetId === 'threeTone') ? (
                       <ChevronTwoToneColorSection
                         activeSlot={activeChevronColorSlot}
                         onSlotChange={setActiveChevronColorSlot}
@@ -129,15 +145,6 @@ export default function SideSection({ side, structure, activeLayer = 0, onChange
                         sugarColor={sugarColor}
                         onChange={onSugarColorChange}
                         showDefaultColorPicker
-                        // Pick Color stays disabled (silently — Sugar
-                        // Color no longer renders an explanatory paragraph
-                        // for this, so Match Flavor's own content shows
-                        // normally instead of a warning) only for Sunshine
-                        // Play's Assorted Star Burst, whose colors are still
-                        // hard-coded rather than threaded through.
-                        colorOverrideDisabled={
-                          t.id === 'sunshinePlay' && currentSetId === 'assortedStarBurst'
-                        }
                       />
                     )
                   )}
@@ -145,29 +152,31 @@ export default function SideSection({ side, structure, activeLayer = 0, onChange
               );
             }
 
-
-function AssortedColorSection() {
-  return (
-    <div className="space-y-4">
-      <div>
-        <span className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
-          <Droplet className="w-3.5 h-3.5 text-primary/60" />
-          Assorted Color
-        </span>
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            aria-pressed="true"
-            className="flex flex-col items-center gap-1.5 rounded-xl p-3 text-left border-2 bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-[1.02]"
-          >
-            <span
-              className="w-8 h-8 rounded-full border-2 border-black/10"
-              style={{ background: 'linear-gradient(90deg, #D6293E 0 25%, #2C3E5C 25% 50%, #C9A24B 50% 75%, #2D7A45 75% 100%)' }}
-            />
-            <span className="text-xs font-semibold">Plains</span>
-          </button>
+            return (
+              <React.Fragment key={t.id}>
+                <OptionRow label={tierLabel(t.label)}>
+                  <Circle
+                    active={activeSide.mode === t.id}
+                    canDeselect
+                    onClick={() => selectTreatment(t.id)}
+                    title={activeSide.mode === t.id ? `Remove ${t.label}` : t.label}
+                  >
+                    1
+                  </Circle>
+                </OptionRow>
+                {activeSide.mode === t.id && (
+                  <SugarColorSection
+                    sugarColor={sugarColor}
+                    onChange={onSugarColorChange}
+                    showDefaultColorPicker
+                  />
+                )}
+              </React.Fragment>
+            );
+          })}
         </div>
       </div>
+
     </div>
   );
 }
@@ -207,29 +216,6 @@ function ChevronTwoToneColorSection({ activeSlot, onSlotChange, sugarColor, onCh
     </div>
   );
 }
-            return (
-              <React.Fragment key={t.id}>
-                <OptionRow label={tierLabel(t.label)}>
-                  <Circle active={activeSide.mode === t.id} onClick={() => selectTreatment(t.id)} title={t.label}>
-                    1
-                  </Circle>
-                </OptionRow>
-                {activeSide.mode === t.id && (
-                  <SugarColorSection
-                    sugarColor={sugarColor}
-                    onChange={onSugarColorChange}
-                    showDefaultColorPicker
-                  />
-                )}
-              </React.Fragment>
-            );
-          })}
-        </div>
-      </div>
-
-    </div>
-  );
-}
 
 // Name above its circle(s) — matches the sketch's "label, then a row of
 // circles beneath it" shape, whether that row has one circle or several.
@@ -242,19 +228,21 @@ function OptionRow({ label, children }) {
   );
 }
 
-function Circle({ active, onClick, title, children }) {
+function Circle({ active, canDeselect = false, onClick, title, children }) {
   return (
     <button
       type="button"
       onClick={onClick}
       title={title}
-      className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
+      className={`relative w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
         active
           ? 'bg-primary text-primary-foreground border-primary shadow-md'
           : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
       }`}
     >
-      {children}
+      <OptionButtonContent selected={active} canDeselect={canDeselect} label={title}>
+        {children}
+      </OptionButtonContent>
     </button>
   );
 }

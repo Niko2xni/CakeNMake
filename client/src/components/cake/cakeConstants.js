@@ -52,6 +52,16 @@ export const REAL_DIMENSIONS = {
       { diameter: 5, height: 3 },
     ],
   },
+  squareBento2x2: {
+    tiers: [
+      { diameter: 2, height: 2 },
+    ],
+  },
+  squareBento3x3: {
+    tiers: [
+      { diameter: 3, height: 3 },
+    ],
+  },
   // Petits Four cake sizes (single tier 4-pack)
   classicCube: {
     tiers: [
@@ -419,6 +429,213 @@ function buildCrookedMantleCarve(dripCenters, baseDepths, leftLevels, rightLevel
   };
 
   return { customProfileFn, thicknessMulFn, angularCycles };
+}
+
+/**
+ * Standard Rectangle 6x6 Long Drips.
+ *
+ * Same smooth, constant rhythm AND depth as the Standard Round Long Drips: every drip
+ * is identical (same length, same width), every cake arch between them is
+ * identical, and the edge between them is one continuous rounded wave --
+ * no spikes, no crooked mantle, no per-drip randomness.
+ *
+ * The carve is a function of polar angle, but the rectangle's perimeter is
+ * not evenly spread over angle (the long faces take far less angle per inch
+ * than the corners). So the wave is defined along the PERIMETER ARC LENGTH
+ * of the morphed rounded rectangle and mapped back to angle, which keeps
+ * drip centers are positioned per face so the long sides keep four drips
+ * each and the short sides keep two.
+ *
+ * Layout (6x6: half-width 3.75, half-depth 2.55, corner radius 0.35, the
+ * exact numbers morphGroupToBoxyRectangle uses): 10 mirror-symmetric drips,
+ * with three on each long face and two on each short face.
+ */
+export function getSixBySixRectangleLongDripsCarve() {
+  return getRectangleLongDripsCarve('6x6');
+}
+
+/**
+ * Square Long Drips — for all Standard square sizes and 2x2/3x3 square Bentos.
+ * Standard squares get 3 large drips per face (12 total); square Bentos get
+ * 2 per face (8 total) to match their smaller faces.
+ * Dimensions and corner radius match CakeScene's shape morph.
+ * 
+ * @param {string} size - The cake size ('6x6', '8x8', '10x10', '12x12', 'squareBento2x2', or 'squareBento3x3')
+ * @returns {Object} Carve configuration with customProfileFn, angularCycles, and dripCenters
+ */
+export function getSquareLongDripsCarve(size = '6x6') {
+  const TAU = Math.PI * 2;
+  const { diameter } = getRenderDimensions(size);
+  const W = diameter / 2;
+  const D = diameter / 2;
+  const RC = 0.35;
+  const DRIP_COUNT = size === 'squareBento2x2' || size === 'squareBento3x3' ? 8 : 12;
+  
+  // Depth values copied from the Standard Round Long Drips
+  const DEEP_FRAC = GLAZE_PATTERN_CARVES.longGaps.deepFrac;
+  const ARCH_FRAC = GLAZE_PATTERN_CARVES.longGaps.shortFrac;
+
+  // Radius of the rounded rectangle along direction `theta`
+  const sdf = (x, z) => {
+    const qx = Math.max(Math.abs(x) - (W - RC), 0);
+    const qz = Math.max(Math.abs(z) - (D - RC), 0);
+    return Math.hypot(qx, qz) - RC;
+  };
+  const radiusAt = (theta) => {
+    const c = Math.cos(theta);
+    const s = Math.sin(theta);
+    let lo = 0;
+    let hi = 2 * (W + D);
+    for (let i = 0; i < 40; i++) {
+      const mid = (lo + hi) / 2;
+      if (sdf(c * mid, s * mid) < 0) lo = mid; else hi = mid;
+    }
+    return lo;
+  };
+
+  // Cumulative perimeter length by angle
+  const STEPS = 2048;
+  const FRONT = Math.PI / 2;
+  const cumulative = new Float64Array(STEPS + 1);
+  let prev = [radiusAt(FRONT) * Math.cos(FRONT), radiusAt(FRONT) * Math.sin(FRONT)];
+  for (let i = 1; i <= STEPS; i++) {
+    const t = FRONT + (i / STEPS) * TAU;
+    const r = radiusAt(t);
+    const p = [r * Math.cos(t), r * Math.sin(t)];
+    cumulative[i] = cumulative[i - 1] + Math.hypot(p[0] - prev[0], p[1] - prev[1]);
+    prev = p;
+  }
+  const perimeter = cumulative[STEPS];
+  const spacing = perimeter / DRIP_COUNT;
+
+  const arcAt = (angle) => {
+    const u = ((((angle - FRONT) % TAU) + TAU) % TAU) / TAU * STEPS;
+    const i0 = Math.min(STEPS - 1, Math.floor(u));
+    const f = u - i0;
+    return cumulative[i0] + (cumulative[i0 + 1] - cumulative[i0]) * f;
+  };
+
+  const smoothstep01 = (t) => t * t * (3 - 2 * t);
+  const customProfileFn = (angle) => {
+    const u = arcAt(angle) / (spacing / 2);
+    const i0 = Math.floor(u);
+    const blend = smoothstep01(u - i0);
+    const d0 = i0 % 2 === 0 ? ARCH_FRAC : DEEP_FRAC;
+    const d1 = i0 % 2 === 0 ? DEEP_FRAC : ARCH_FRAC;
+    return d0 + (d1 - d0) * blend;
+  };
+
+  // Drip centers as polar angles
+  const dripCenters = [];
+  for (let k = 0; k < DRIP_COUNT; k++) {
+    const target = (k + 0.5) * spacing;
+    let lo = 0;
+    let hi = STEPS;
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >> 1;
+      if (cumulative[mid] < target) lo = mid; else hi = mid;
+    }
+    dripCenters.push((FRONT + (hi / STEPS) * TAU) % TAU);
+  }
+
+  return { customProfileFn, angularCycles: 16, dripCenters };
+}
+
+/**
+ * Rectangle Long Drips — places three drips on each long face and two on
+ * each short face, with the same pattern scaled proportionally by size.
+ * Its dimensions and fixed corner radius match CakeScene's shape morph.
+ * 
+ * @param {string} size - The cake size (e.g., '6x6', '8x8', '10x10', '12x12')
+ * @returns {Object} Carve configuration with customProfileFn, angularCycles, and dripCenters
+ */
+export function getRectangleLongDripsCarve(size = '6x6') {
+  const TAU = Math.PI * 2;
+  const { diameter } = getRenderDimensions(size);
+  const radius = diameter / 2;
+  const W = radius * 1.25;
+  const D = radius * 0.85;
+  const RC = 0.35;
+  // Depth values copied from the Standard Round Long Drips
+  // (GLAZE_PATTERN_CARVES.longGaps): drip tips reach the plate (1.0) and the
+  // cake arches between them rise almost to the top (0.18).
+  const DEEP_FRAC = GLAZE_PATTERN_CARVES.longGaps.deepFrac;
+  const ARCH_FRAC = GLAZE_PATTERN_CARVES.longGaps.shortFrac;
+
+  // Radius of the rounded rectangle along direction `theta` (bisection on
+  // its signed distance field -- exact, and independent of other helpers).
+  const sdf = (x, z) => {
+    const qx = Math.max(Math.abs(x) - (W - RC), 0);
+    const qz = Math.max(Math.abs(z) - (D - RC), 0);
+    return Math.hypot(qx, qz) - RC;
+  };
+  const radiusAt = (theta) => {
+    const c = Math.cos(theta);
+    const s = Math.sin(theta);
+    let lo = 0;
+    let hi = 2 * (W + D);
+    for (let i = 0; i < 40; i++) {
+      const mid = (lo + hi) / 2;
+      if (sdf(c * mid, s * mid) < 0) lo = mid; else hi = mid;
+    }
+    return lo;
+  };
+
+  // Cumulative perimeter length by angle. Arc length is measured from the
+  // middle of the front face (+z, i.e. theta = PI/2), where an arch sits.
+  const STEPS = 2048;
+  const FRONT = Math.PI / 2;
+  const cumulative = new Float64Array(STEPS + 1);
+  let prev = [radiusAt(FRONT) * Math.cos(FRONT), radiusAt(FRONT) * Math.sin(FRONT)];
+  for (let i = 1; i <= STEPS; i++) {
+    const t = FRONT + (i / STEPS) * TAU;
+    const r = radiusAt(t);
+    const p = [r * Math.cos(t), r * Math.sin(t)];
+    cumulative[i] = cumulative[i - 1] + Math.hypot(p[0] - prev[0], p[1] - prev[1]);
+    prev = p;
+  }
+  const perimeter = cumulative[STEPS];
+
+  const arcAt = (angle) => {
+    const u = ((((angle - FRONT) % TAU) + TAU) % TAU) / TAU * STEPS;
+    const i0 = Math.min(STEPS - 1, Math.floor(u));
+    const f = u - i0;
+    return cumulative[i0] + (cumulative[i0 + 1] - cumulative[i0]) * f;
+  };
+
+  const smoothstep01 = (t) => t * t * (3 - 2 * t);
+  const longFaceOffsets = [-2, 0, 2].map((step) => step * (W - RC) / 3);
+  const shortFaceOffsets = [-(D - RC) / 2, (D - RC) / 2];
+  const dripCenters = [
+    ...[-1, 1].flatMap((side) => longFaceOffsets.map((x) => Math.atan2(side * D, x))),
+    ...[-1, 1].flatMap((side) => shortFaceOffsets.map((z) => Math.atan2(z, side * W))),
+  ];
+  const dripArcs = dripCenters
+    .map((angle) => arcAt(angle))
+    .sort((a, b) => a - b);
+
+  const customProfileFn = (angle) => {
+    const position = arcAt(angle);
+    for (let i = 0; i < dripArcs.length; i++) {
+      const start = dripArcs[i];
+      const end = i === dripArcs.length - 1
+        ? dripArcs[0] + perimeter
+        : dripArcs[i + 1];
+      const candidate = position < start ? position + perimeter : position;
+      if (candidate <= end) {
+        const gapProgress = (candidate - start) / (end - start);
+        if (gapProgress <= 0.5) {
+          const blend = smoothstep01(gapProgress * 2);
+          return DEEP_FRAC + (ARCH_FRAC - DEEP_FRAC) * blend;
+        }
+        const blend = smoothstep01((gapProgress - 0.5) * 2);
+        return ARCH_FRAC + (DEEP_FRAC - ARCH_FRAC) * blend;
+      }
+    }
+    return DEEP_FRAC;
+  };
+
+  return { customProfileFn, angularCycles: 32, dripCenters };
 }
 
 function buildNaturalTearGlazeCarve(seed = 0, crookedness = 1) {

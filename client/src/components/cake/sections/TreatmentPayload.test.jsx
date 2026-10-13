@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render } from '@testing-library/react';
 import SideSection from './SideSection';
 import SurfaceTreatmentSection from './SurfaceTreatmentSection';
+import CollectionSection from './CollectionSection';
 import { DEFAULT_CONFIG, GLAZE_PATTERNS, PETIT_FOURS_GLAZE_PATTERNS, getSurfaceTreatmentPattern } from '@/lib/cakeConfig';
 import { adaptConfigFromLegacy, adaptConfigToLegacy } from '@/lib/configAdapter';
 
@@ -110,6 +111,58 @@ describe('treatment payload growth', () => {
     expect(selectedButton('Wave Curve').className).toContain('border-primary');
     expect(getSurfaceTreatmentPattern(section, structure)).toBe('tinyTip');
     expect(adaptConfigToLegacy({ ...DEFAULT_CONFIG, structure, surfaceTreatment: section }).surfaceTreatmentPattern).toBe('tinyTip');
+    view.unmount();
+  });
+
+  it('shows a centered X only for a selected option that can be deselected', () => {
+    const view = render(<CollectionSection collection="elegant" onChange={() => {}} />);
+    const selectedButton = [...view.container.querySelectorAll('button')]
+      .find(button => button.textContent.includes('Elegant Collection'));
+
+    expect(selectedButton.querySelector('svg')).not.toBeNull();
+    expect(selectedButton.querySelector('svg').parentElement.className).toContain('absolute inset-0 flex items-center justify-center');
+    expect(selectedButton.textContent).toContain('Elegant Collection');
+    view.unmount();
+  });
+
+  it('shows an X on selected Side variants and clicking it deselects the treatment', () => {
+    let side = {
+      ...DEFAULT_CONFIG.side,
+      mode: 'checkeredPattern',
+      checkeredPattern: { ...DEFAULT_CONFIG.side.checkeredPattern, setId: 'wholeCake' },
+    };
+    const props = () => ({
+      side,
+      structure: { layers: 1, layerDesign: 'uniform' },
+      onChange: (next) => { side = next; },
+    });
+    const view = render(<SideSection {...props()} />);
+    const selectedButton = () => view.container.querySelector('button[title="Remove Full Pattern"]');
+
+    expect(selectedButton()?.querySelector('svg')).not.toBeNull();
+    fireEvent.click(selectedButton());
+    view.rerender(<SideSection {...props()} />);
+
+    expect(side.mode).toBeNull();
+    expect(view.container.querySelector('button[title="Full Pattern"]')?.querySelector('svg')).toBeNull();
+    view.unmount();
+  });
+
+  it('shows the X for the default Side variant when no variant is stored', () => {
+    let side = { ...DEFAULT_CONFIG.side, mode: 'checkeredPattern' };
+    const props = () => ({
+      side,
+      structure: { layers: 1, layerDesign: 'uniform' },
+      onChange: (next) => { side = next; },
+    });
+    const view = render(<SideSection {...props()} />);
+    const selectedButton = view.container.querySelector('button[title="Remove Full Pattern"]');
+
+    expect(selectedButton?.querySelector('svg')).not.toBeNull();
+    fireEvent.click(selectedButton);
+    view.rerender(<SideSection {...props()} />);
+
+    expect(side.mode).toBeNull();
     view.unmount();
   });
 

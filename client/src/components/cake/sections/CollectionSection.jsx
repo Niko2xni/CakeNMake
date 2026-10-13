@@ -1,4 +1,5 @@
 import React from 'react';
+import OptionButtonContent from '../OptionButtonContent';
 
 // Collection set definitions - complete coordinated cake styles
 const COLLECTION_SETS = [
@@ -112,17 +113,19 @@ export default function CollectionSection({ collection, onChange }) {
             <button
               key={col.id}
               onClick={() => selectCollection(col.id)}
-              className={`flex flex-col items-start gap-1.5 rounded-xl p-3 text-left transition-all duration-200 border-2 ${
+              className={`relative flex flex-col items-start gap-1.5 rounded-xl p-3 text-left transition-all duration-200 border-2 ${
                 active
                   ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-[1.02]'
                   : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
               }`}
             >
-              <span className="text-2xl">{col.emoji}</span>
-              <span className="text-xs font-semibold leading-tight">{col.label}</span>
-              <span className={`text-[10px] leading-tight ${active ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
-                {col.description}
-              </span>
+              <OptionButtonContent selected={active} canDeselect label={`${col.label}. ${col.description}`}>
+                <span className="text-2xl">{col.emoji}</span>
+                <span className="text-xs font-semibold leading-tight">{col.label}</span>
+                <span className={`text-[10px] leading-tight ${active ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                  {col.description}
+                </span>
+              </OptionButtonContent>
             </button>
           );
         })}

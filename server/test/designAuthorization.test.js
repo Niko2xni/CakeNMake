@@ -5,9 +5,12 @@ const mongoose = require('mongoose');
 const Design = require('../src/models/Design');
 const {
   createDesign,
+  getDesigns,
   getDesignById,
   ownerFilter,
   updateDesign,
+  moveToTrash,
+  MAX_TRASH_CAPACITY,
 } = require('../src/controllers/designController');
 
 const ownerId = new mongoose.Types.ObjectId();
@@ -156,5 +159,56 @@ test('auto-naming assigns Unnamed 1 initially, increments, and reclaims lowest u
   await createDesign(request({ body: { config: { layers: 1 } } }), res4);
   assert.equal(res4.statusCode, 201);
   assert.equal(res4.body.name, 'Unnamed 2');
+});
+
+test('moveToTrash respects maximum trash capacity of 20 designs', async () => {
+  assert.equal(MAX_TRASH_CAPACITY, 20);
+
+  let findOneAndDeleteCalled = false;
+  mock.method(Design, 'findOne', async () => ({
+    _id: designId,
+    isTrashed: false,
+    save: async function () { return this; },
+  }));
+  mock.method(Design, 'countDocuments', async () => 19);
+  mock.method(Design, 'findOneAndDelete', async () => {
+    findOneAndDeleteCalled = true;
+    return null;
+  });
+
+  const res1 = response();
+  await moveToTrash(request(), res1);
+  assert.equal(res1.statusCode, 200);
+  assert.equal(findOneAndDeleteCalled, false, 'Should not delete oldest design when under 20 trashed designs');
+
+  // When capacity reaches 20, moving an additional design triggers deletion of the oldest
+  mock.method(Design, 'countDocuments', async () => 20);
+  const res2 = response();
+  await moveToTrash(request(), res2);
+  assert.equal(res2.statusCode, 200);
+  assert.equal(findOneAndDeleteCalled, true, 'Should delete oldest design when trash capacity reaches 20');
+});
+
+test('getDesigns allows fetching up to 20 trashed designs', async () => {
+  let capturedLimit = 0;
+  let capturedSort = null;
+  mock.method(Design, 'find', () => ({
+    sort(sortObj) {
+      capturedSort = sortObj;
+      return {
+        limit(num) {
+          capturedLimit = num;
+          return Array.from({ length: 15 }, (_, i) => ({ name: `Trashed ${i}` }));
+        },
+      };
+    },
+  }));
+
+  const res = response();
+  await getDesigns(request({ query: { isTrashed: 'true' } }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(capturedLimit, 20);
+  assert.deepEqual(capturedSort, { trashedAt: -1, lastEdited: -1 });
+  assert.equal(res.body.length, 15);
 });
 

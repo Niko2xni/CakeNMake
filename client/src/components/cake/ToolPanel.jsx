@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { DEFAULT_CONFIG, getSurfaceTreatmentPattern, pruneItemsCollidingWithEdgeDelicates, getTopTierRadiusFromConfig, isPetitsFourStructure, getCakeFormat } from '@/lib/cakeConfig';
+import { DEFAULT_CONFIG, getSurfaceTreatmentPattern, pruneItemsCollidingWithEdgeDelicates, getTopTierRadiusFromConfig, isPetitsFourStructure, isBentoStructure, getCakeFormat } from '@/lib/cakeConfig';
 import CakeStructureSection from './sections/CakeStructureSection';
 import SpongeFlavorSection from './sections/SpongeFlavorSection';
 import FillingSection from './sections/FillingSection';
@@ -113,11 +113,16 @@ export default function ToolPanel({
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   const isPetitsFour = isPetitsFourStructure(config.structure);
+  const isBento = isBentoStructure(config.structure);
   const isIndividual = config.structure?.layerDesign === 'individual' && (config.structure?.layers > 1 || isPetitsFour);
   const tabs = isPetitsFour
-    ? TABS.filter(({ id }) => id !== 'side' && id !== 'edge')
+    ? TABS.filter(({ id }) => id !== 'side' && id !== 'edge' && id !== 'center')
+    : isBento
+    ? TABS.filter(({ id }) => id !== 'side')
     : TABS;
-  const activeTab = isPetitsFour && (tab === 'side' || tab === 'edge')
+  const activeTab = isPetitsFour && (tab === 'side' || tab === 'edge' || tab === 'center')
+    ? 'fundamentals'
+    : isBento && tab === 'side'
     ? 'fundamentals'
     : tab;
 
@@ -160,6 +165,53 @@ export default function ToolPanel({
       setActiveLayer(0);
     }
   }, [config.structure?.layers, isPetitsFour, activeLayer]);
+
+  // Store and restore side designs when switching between Standard and Bento/Petit Fours
+  const savedSideConfigRef = useRef(null);
+  const previousFormatRef = useRef(null);
+  
+  useEffect(() => {
+    const currentFormat = getCakeFormat(config.structure);
+    const previousFormat = previousFormatRef.current;
+    
+    // Detect format change
+    if (previousFormat !== currentFormat) {
+      if (currentFormat === 'standard' && previousFormat && previousFormat !== 'standard') {
+        // Switching to Standard: restore saved side config
+        if (savedSideConfigRef.current) {
+          onChange({
+            ...config,
+            side: savedSideConfigRef.current,
+          });
+          savedSideConfigRef.current = null;
+        }
+      } else if (currentFormat !== 'standard' && previousFormat === 'standard') {
+        // Switching from Standard to Bento/Petit Fours: save and clear side config
+        if (!savedSideConfigRef.current && config.side) {
+          savedSideConfigRef.current = config.side;
+        }
+        onChange({
+          ...config,
+          side: DEFAULT_CONFIG.side,
+        });
+      }
+      previousFormatRef.current = currentFormat;
+    }
+
+    // Bento has no Side designs at all. The transition handling above only runs
+    // on a Standard -> Bento switch, so a Side design could still ride along when
+    // coming from Petit Fours, from a loaded/saved config, or from any edit made
+    // while Bento is active. Whenever Bento is active and a Side design is
+    // present, stash it (so it returns on Standard) and reset Side to default.
+    if (currentFormat === 'bento') {
+      const sideHasDesign = Boolean(config.side?.mode)
+        || (config.side?.layerTreatments || []).some((t) => t?.mode);
+      if (sideHasDesign) {
+        if (!savedSideConfigRef.current) savedSideConfigRef.current = config.side;
+        onChange({ ...config, side: DEFAULT_CONFIG.side });
+      }
+    }
+  }, [config.structure?.cakeFormat, config.structure?.format, config.structure?.size, config.structure?.shape, onChange, config.side]);
 
   // Refs to each collapsible section's own wrapper, keyed by section id —
   // used to scroll a section into view right after IT opens, so expanding
@@ -764,23 +816,42 @@ export default function ToolPanel({
                         onChange={(newExteriorFinish) => {
                           const newStyle = newExteriorFinish?.style;
                           const newLayerStyles = newExteriorFinish?.layerStyles || [];
-                          const isFrostedOrTextured = newStyle === 'fullyFrosted' || newStyle === 'texturedButtercream' || newLayerStyles.some(s => s === 'fullyFrosted' || s === 'texturedButtercream');
 
                           let nextConfig = {
                             ...config,
                             exteriorFinish: newExteriorFinish,
                           };
 
-                          const currentTip = config.filling?.piping?.tip;
-                          const hasMashedPiping = currentTip === 'mashedCircles' || currentTip === 'mashedSwirls' || Boolean(currentTip);
+                          // Frosted/Textured finishes cover the filling
+                          // edge, so a Mashed piping design hidden by the
+                          // new finish resets to None (FillingSection's
+                          // picker shows None as selected for those finishes
+                          // either way — this keeps the STORED config in
+                          // sync with that display). In individual design
+                          // the reset must reach layerPipings too, since
+                          // the picker reads the active tier's entry there
+                          // rather than the piping mirror, and only tiers
+                          // whose own finish hides piping are reset so
+                          // Naked tiers keep their designs. The mirror
+                          // follows the active tier, matching the shape
+                          // FillingSection's updatePiping writes.
+                          const finishHidesPiping = (style) => style === 'fullyFrosted' || style === 'texturedButtercream';
+                          const currentFilling = config.filling || DEFAULT_CONFIG.filling;
+                          const currentPiping = currentFilling.piping || {};
+                          const currentLayerPipings = currentFilling.layerPipings || [];
+                          const activeNewStyle = newLayerStyles[activeLayer] ?? newStyle;
+                          const resetMirror = finishHidesPiping(activeNewStyle) && Boolean(currentPiping.tip);
+                          const resetLayer = currentLayerPipings.map((layerPiping, i) => (
+                            Boolean(layerPiping?.tip) && finishHidesPiping(newLayerStyles[i] ?? newStyle)
+                          ));
 
-                          if (isFrostedOrTextured && hasMashedPiping) {
+                          if (resetMirror || resetLayer.some(Boolean)) {
                             nextConfig.filling = {
-                              ...config.filling,
-                              piping: {
-                                ...config.filling?.piping,
-                                tip: null,
-                              },
+                              ...currentFilling,
+                              piping: resetMirror ? { ...currentPiping, tip: null } : currentPiping,
+                              layerPipings: currentLayerPipings.map((layerPiping, i) => (
+                                resetLayer[i] ? { ...layerPiping, tip: null } : layerPiping
+                              )),
                             };
                           }
 

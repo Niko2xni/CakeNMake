@@ -28,8 +28,14 @@ async function ensureCheckoutReservation(blueprint, { emailSender = processReser
       designName: blueprint.designName, checkoutMode: 'simulated',
       pickupDate: blueprint.deliveryDate, totalPrice: snapshot.totalMinor / 100,
       pricingSnapshot: { ...snapshot, lineItems: snapshot.lineItems.map((item) => ({ ...item, unit: item.unit || 'item' })) },
-      downPayment: { amount: Math.ceil(snapshot.totalMinor / 200), isPaid: false },
-      status: 'pending_payment',
+      downPayment: {
+        amount: Math.ceil(snapshot.totalMinor / 200),
+        isPaid: true,
+        paidAt: confirmationCreatedAt,
+        method: 'gcash',
+        paymentReference: 'simulated_checkout',
+      },
+      status: 'confirmed',
       confirmationEmail: { status: 'pending', attempts: 0, nextAttemptAt: confirmationCreatedAt },
     } }, { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true });
 

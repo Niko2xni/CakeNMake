@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { getFrostingMaterial, applyVerticalGradientUV } from '../frostingMaterial';
+import { getBoxyRadius } from '../cakeMath';
 
 // ─── Bezier path definitions (tile space: u ∈ [0,1], v ∈ [-1,1]) ─────────────
 // Each sub-array is one cubic Bezier segment: [p0, cp1, cp2, p3].
@@ -62,9 +63,26 @@ const LAYER_DROP   = 0.006;
 const LAYER_DOT    = 0.009;
 
 // ─── Physical size calibration (R3) ──────────────────────────────────────────
-const MIN_R = 0.039;  // ≈ 2 mm effective diameter
-const MAX_R = 0.098;  // ≈ 5 mm effective diameter
-const DOT_R = 0.110;  // hemisphere dot radius
+// Bumped ~40% from the original 0.039 / 0.098 for a bolder piped line. The
+// coverage window (getPipingScrollsCoverageFn) reads these same values via
+// SCROLL_TUBE / TEARDROP_TUBE, so the empty space scales with the piping.
+const MIN_R = 0.055;
+const MAX_R = 0.138;
+export const DOT_R = 0.110;  // hemisphere dot radius
+
+// Tube profile parameters — MUST match the VariableRadiusTubeGeometry calls
+// in buildPipingScrolls (addScroll / addTeardrop). getPipingScrollsCoverageFn
+// reads these to size the empty space to the real piping width.
+const SCROLL_TUBE = {
+  minR: MIN_R, maxR: MAX_R,
+  taperPower: 0.7, taperZone: 0.10,
+  curvatureSensitivity: 0.8, kRef: 0.05,
+};
+const TEARDROP_TUBE = {
+  minR: MIN_R * 0.4, maxR: MAX_R * 0.85,
+  taperPower: 2.5, taperZone: 0.22,
+  curvatureSensitivity: 0.15, kRef: 0.05,
+};
 
 function taperEnvelope(t, power = 0.7, fadeZone = 0.10) {
   const fadeIn  = t < fadeZone     ? (1 - Math.cos(Math.PI * t            / fadeZone)) * 0.5 : 1;
@@ -185,51 +203,41 @@ class VariableRadiusTubeGeometry extends THREE.BufferGeometry {
       // its own local radius keeps the tube's inner wall flush with the
       // surface everywhere, taper and all, so it always reads as sitting on
       // top of the cake instead of intersecting it.
-      const radialX = center.x, radialZ = center.z;
-      const radialLen = Math.sqrt(radialX * radialX + radialZ * radialZ);
-      if (radialLen > 1e-6) {
-        const pushScale = (radialLen + radius) / radialLen;
-        center.x = radialX * pushScale;
-        center.z = radialZ * pushScale;
+      let normalDir;
+      if (curve.getNormal) {
+        normalDir = curve.getNormal(t);
+      } else {
+        const radialX = center.x, radialZ = center.z;
+        const radialLen = Math.sqrt(radialX * radialX + radialZ * radialZ);
+        normalDir = radialLen > 1e-6
+          ? new THREE.Vector3(radialX / radialLen, 0, radialZ / radialLen)
+          : new THREE.Vector3(1, 0, 0);
       }
+      center.addScaledVector(normalDir, radius);
       centers.push(center);
       tangents.push(tangent);
       radii.push(radius);
     }
 
-    // ── Pass 2: build an exact cylindrical cross-section frame ─────────────
-    // These curves (MappedCurvePathCylinder / TeardropCurve) never move
-    // radially — every point they produce sits via sin(theta)/cos(theta)
-    // at a purely circumferential + vertical offset. That means the
-    // tangent is ALWAYS perpendicular to the true horizontal radial
-    // direction, with no exceptions and nothing that can go near-parallel.
-    // So instead of a generic 3D frame (Frenet, or the rotation-minimizing
-    // frame this used before) that has no notion of "the cylinder" and can
-    // tilt away from flush as the curve climbs, use `radialDir` itself as
-    // one cross-section axis:
-    //   • it's still a true perpendicular tube cross-section, since
-    //     tangent × radialDir is automatically ⊥ to both, and
-    //   • the ring's innermost point (cos(a) = -1) lands at EXACTLY
-    //     surfaceR — algebraically, not just "usually" — because the
-    //     radialDir contribution is the only thing that can move a vertex
-    //     closer to the axis, and radialDir is exactly the direction the
-    //     centerline was already pushed out along in pass 1.
-    // This is what a rotation-minimizing frame can't guarantee (RMF avoids
-    // unnecessary twist, not tilt-away-from-the-cylinder), and why the
-    // steep "going up" flank kept dipping in no matter how the frame was
-    // patched — the frame itself needed to know it was on a cylinder.
+    // ── Pass 2: build an exact surface-aligned cross-section frame ───────────
     const normals   = new Array(centers.length);
     const binormals = new Array(centers.length);
 
     for (let i = 0; i < centers.length; i++) {
-      const c = centers[i];
-      const radialLen = Math.sqrt(c.x * c.x + c.z * c.z);
-      const radialDir = radialLen > 1e-6
-        ? new THREE.Vector3(c.x / radialLen, 0, c.z / radialLen)
-        : new THREE.Vector3(1, 0, 0);
+      const t = i / segments;
+      let normalDir;
+      if (curve.getNormal) {
+        normalDir = curve.getNormal(t);
+      } else {
+        const c = centers[i];
+        const radialLen = Math.sqrt(c.x * c.x + c.z * c.z);
+        normalDir = radialLen > 1e-6
+          ? new THREE.Vector3(c.x / radialLen, 0, c.z / radialLen)
+          : new THREE.Vector3(1, 0, 0);
+      }
 
-      normals[i]   = radialDir;
-      binormals[i] = new THREE.Vector3().crossVectors(tangents[i], radialDir).normalize();
+      normals[i]   = normalDir;
+      binormals[i] = new THREE.Vector3().crossVectors(tangents[i], normalDir).normalize();
     }
 
     // ── Pass 3: emit the ring vertices ──────────────────────────────────────
@@ -270,7 +278,7 @@ class VariableRadiusTubeGeometry extends THREE.BufferGeometry {
   }
 }
 
-function buildFlushHemisphereDot(theta, y, cylinderRadius, dotRadius = DOT_R) {
+export function buildFlushHemisphereDot(theta, y, cylinderRadius, dotRadius = DOT_R) {
   const geo = new THREE.SphereGeometry(dotRadius, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.5);
   const outward = new THREE.Vector3(Math.sin(theta), 0, Math.cos(theta));
   const q = new THREE.Quaternion().setFromUnitVectors(
@@ -284,6 +292,30 @@ function buildFlushHemisphereDot(theta, y, cylinderRadius, dotRadius = DOT_R) {
     cylinderRadius * Math.cos(theta),
   );
   return geo;
+}
+
+/**
+ * Builds a pearl dot for Piping Scrolls. When at the Drip, the pearl is lifted
+ * to 75/25 vision (75% visible, 25% buried in the Drip) using a full spherical geometry,
+ * matching how Pearls are positioned on the Frosted / Textured finish.
+ */
+export function buildPearlDot(theta, y, surfaceRadius, dotRadius = DOT_R, opts = {}) {
+  const isDrip = Boolean(typeof opts === 'boolean' ? opts : (opts.atDrip || opts.hasDrip));
+  if (isDrip) {
+    // 75/25 vision on Drip: 75% visible, 25% buried in the Drip.
+    // Center is lifted to surfaceRadius + 0.5 * dotRadius so that:
+    // Outer tip = surfaceRadius + 1.5 * dotRadius (protruding 1.5 * R / (2 * R) = 75%)
+    // Inner tip = surfaceRadius - 0.5 * dotRadius (buried 0.5 * R / (2 * R) = 25%)
+    const geo = new THREE.SphereGeometry(dotRadius, 16, 16);
+    const centerRadius = surfaceRadius + dotRadius * 0.5;
+    geo.translate(
+      centerRadius * Math.sin(theta),
+      y,
+      centerRadius * Math.cos(theta),
+    );
+    return geo;
+  }
+  return buildFlushHemisphereDot(theta, y, surfaceRadius, dotRadius);
 }
 
 function localMerge(geos) {
@@ -336,15 +368,21 @@ function localMerge(geos) {
  * accurate enough at 16-24 samples per curve given how gentle these
  * particular curves are (no sharp corners) and cheap enough to run per
  * Filling vertex.
- *
  * Every element's own real radius (MIN_R..MAX_R taper for scrolls, the
  * teardrops' own smaller taper, DOT_R for dots) is used as a flat radius
- * rather than reproducing the taper exactly — MAX_R (or the teardrop
- * equivalent) is a reasonable, mildly generous approximation, same
- * flat-footprint tradeoff Scatter Pearls' own coverage function makes.
+ * rather than reproducing the taper exactly.
  */
 export function getPipingScrollsCoverageFn(radius, height, opts = {}) {
+  const isBoxy = opts.shape === 'rectangle' || opts.shape === 'square' || opts.cakeShape === 'rectangle' || opts.cakeShape === 'square';
+  if (isBoxy) {
+    return getBoxyPipingScrollsCoverageFn(radius, height, opts);
+  }
+
   const variant = opts.variant || 'waveRope';
+  const forGlaze = !!opts.forGlaze;
+  // For Glaze / Drip empty spaces: ensure carve depth isn't so deep that the Drip from that
+  // emptied area is gone — preserve a visible Drip layer (default max carve depth 0.50).
+  const maxDepth = forGlaze ? (opts.maxCarveDepth ?? 0.50) : (opts.maxCarveDepth ?? 1.0);
 
   const targetHeightScale = height / 1.6;
   const idealTileCount = (3.826 * radius) / targetHeightScale;
@@ -352,47 +390,57 @@ export function getPipingScrollsCoverageFn(radius, height, opts = {}) {
   const heightScale = (3.826 * radius) / tileCount;
   const arcWidth = (Math.PI * 2) / tileCount;
 
-  const sampleCubic = (bezier, steps = 24) => {
-    const [p0, p1, p2, p3] = bezier;
-    const pts = [];
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      const mt = 1 - t;
-      const u = mt * mt * mt * p0[0] + 3 * mt * mt * t * p1[0] + 3 * mt * t * t * p2[0] + t * t * t * p3[0];
-      const v = mt * mt * mt * p0[1] + 3 * mt * mt * t * p1[1] + 3 * mt * t * t * p2[1] + t * t * t * p3[1];
-      pts.push([u, v]);
-    }
-    return pts;
-  };
-
-  const sampleTeardrop = (td, steps = 16) => {
-    const [p0u, p0v, p1u, p1v, p2u, p2v] = td;
-    const pts = [];
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      const s = 1 - t;
-      const u = s * s * p0u + 2 * s * t * p1u + t * t * p2u;
-      const v = s * s * p0v + 2 * s * t * p1v + t * t * p2v;
-      pts.push([u, v]);
-    }
-    return pts;
-  };
-
-  // Each element: { points: [[u,v], ...], radius }.
+  // Each element: { points: [{ arc, y, r }, ...] } in the tile's own
+  // arc-length / Y units. `r` is the tube's REAL local radius at that
+  // point — the exact taper + curvature formula VariableRadiusTubeGeometry
+  // uses — instead of the flat MAX_R/teardrop approximation this used to
+  // use. Scrolls pinch to ~0 at each end of their path and shrink at
+  // tight curves; teardrops taper hard toward their tip. A flat MAX_R
+  // window kept the empty space at full width through all of that, which
+  // is why the carved gap "kept going" past where any piping was visible.
   const elements = [];
-  const addScrollElement = (beziers, radiusApprox = MAX_R) => {
-    for (const bez of beziers) elements.push({ points: sampleCubic(bez), radius: radiusApprox });
+
+  const addTubeElement = (curve, tube, steps) => {
+    const eps = 1 / (tube.segments * 8);
+    const pts = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const center = curve.getPoint(t);
+      const tgA = new THREE.Vector3().subVectors(center, curve.getPoint(Math.max(0, t - 2 * eps))).normalize();
+      const tgB = new THREE.Vector3().subVectors(curve.getPoint(Math.min(1, t + 2 * eps)), center).normalize();
+      const kappa = tgA.distanceTo(tgB) / (2 * eps);
+      const kNorm = Math.min(1, kappa / tube.kRef);
+      const r = taperEnvelope(t, tube.taperPower, tube.taperZone)
+        * THREE.MathUtils.lerp(tube.maxR, tube.minR, kNorm * tube.curvatureSensitivity);
+      pts.push({ arc: radius * Math.atan2(center.x, center.z), y: center.y, r });
+    }
+    elements.push({ points: pts });
   };
-  const addTeardropElement = (td, radiusApprox = MAX_R * 0.85) => {
-    elements.push({ points: sampleTeardrop(td), radius: radiusApprox });
+  // A scroll's beziers form ONE tube in the mesh (taper runs over the whole
+  // path, not per segment), so they are sampled together as one curve.
+  const addWholeScrollElement = (beziers, segments = 90) => {
+    addTubeElement(
+      new MappedCurvePathCylinder(radius, 0, arcWidth, beziers, heightScale),
+      { ...SCROLL_TUBE, segments },
+      96,
+    );
+  };
+  const addTeardropElement = (td) => {
+    addTubeElement(
+      new TeardropCurve(radius, 0, arcWidth, [td[0], td[1]], [td[2], td[3]], [td[4], td[5]], heightScale),
+      { ...TEARDROP_TUBE, segments: 24 },
+      28,
+    );
   };
   const addDotElement = (u, v) => {
-    elements.push({ points: [[u, v]], radius: DOT_R });
+    elements.push({ points: [{ arc: radius * u * arcWidth, y: v * heightScale, r: DOT_R }] });
   };
 
+  // Each tube is built from the same geometry the mesh uses (see
+  // buildPipingScrolls), so the window follows the real piping.
   if (variant === 'pairedScrolls') {
-    addScrollElement(PAIRED_LEFT_C_SCROLL_BEZIERS);
-    addScrollElement(PAIRED_RIGHT_C_SCROLL_BEZIERS);
+    addWholeScrollElement(PAIRED_LEFT_C_SCROLL_BEZIERS);
+    addWholeScrollElement(PAIRED_RIGHT_C_SCROLL_BEZIERS);
     addDotElement(0.32, -0.40);
     addDotElement(0.38, 0.38);
     addDotElement(0.68, -0.40);
@@ -404,17 +452,17 @@ export function getPipingScrollsCoverageFn(radius, height, opts = {}) {
     for (const td of SHELL_BORDER_TEARDROPS) addTeardropElement(td);
     addDotElement(0.50, -0.38);
   } else if (variant === 'vineAndTendrils') {
-    addScrollElement(VINE_SPINE_BEZIERS);
-    addScrollElement(VINE_TENDRIL_LEFT);
-    addScrollElement(VINE_TENDRIL_RIGHT);
+    addWholeScrollElement(VINE_SPINE_BEZIERS, 90);
+    addWholeScrollElement(VINE_TENDRIL_LEFT, 50);
+    addWholeScrollElement(VINE_TENDRIL_RIGHT, 50);
     addDotElement(0.32, 0.08);
     addDotElement(0.68, -0.08);
   } else if (variant === 'loopChain') {
-    addScrollElement(LOOP_CHAIN_BEZIERS);
+    addWholeScrollElement(LOOP_CHAIN_BEZIERS, 100);
     addDotElement(0.50, 0.00);
   } else {
     // Default: 'waveRope'
-    addScrollElement(WAVE_ROPE_BEZIERS);
+    addWholeScrollElement(WAVE_ROPE_BEZIERS, 90);
     addDotElement(0.25, 0.45);
     addDotElement(0.75, -0.45);
   }
@@ -424,11 +472,20 @@ export function getPipingScrollsCoverageFn(radius, height, opts = {}) {
     return c * c * (3 - 2 * c);
   };
 
+  // Window = the tube's real radius + a small margin. Glaze only: the
+  // middle of the window (under the tube itself, where the piping hides
+  // whatever is carved) is cut deeper than the edge, so the remaining glaze
+  // under/around a thin part of the tube can't sit higher than the piping
+  // and bury it. The edge keeps the shallower maxDepth so the drip is
+  // still visible right around the piping.
+  const margin = 0.02;
+  const coreDepth = forGlaze ? (opts.coreCarveDepth ?? maxDepth) : maxDepth;
+
   return (angle, localY) => {
     const wrappedAngle = ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
     const tileIndex = Math.floor(wrappedAngle / arcWidth);
 
-    let coverage = 0;
+    let depth = 0;
     // Also check the tile immediately before/after — a shape sitting near
     // u≈0 or u≈1 in one tile can be nearer to the ADJACENT tile's own
     // copy of that same shape (tiles repeat seamlessly around the whole
@@ -437,32 +494,470 @@ export function getPipingScrollsCoverageFn(radius, height, opts = {}) {
       const tileStartAngle = (tileIndex + dTile) * arcWidth;
       const localArc = radius * (wrappedAngle - tileStartAngle);
       for (const el of elements) {
-        for (const [u, v] of el.points) {
-          const dArc = localArc - radius * u * arcWidth;
-          const dY = localY - v * heightScale;
+        for (const p of el.points) {
+          const reach = p.r + margin;
+          const dArc = localArc - p.arc;
+          if (dArc > reach || dArc < -reach) continue;
+          const dY = localY - p.y;
+          if (dY > reach || dY < -reach) continue;
           const dist = Math.sqrt(dArc * dArc + dY * dY);
-          const distInsideEdge = el.radius - dist;
+          const distInsideEdge = reach - dist;
           if (distInsideEdge <= 0) continue;
-          const smoothWidth = Math.max(0.015, el.radius * 0.3);
-          coverage = Math.max(coverage, smoothstep(distInsideEdge / smoothWidth));
-          if (coverage >= 1) return 1;
+          const smoothWidth = Math.max(0.015, reach * 0.3);
+          const edgeWeight = smoothstep(distInsideEdge / smoothWidth);
+          let d = edgeWeight * maxDepth;
+          if (coreDepth > maxDepth) {
+            const coreR = p.r * 0.7;
+            const coreWeight = smoothstep((coreR - dist) / Math.max(0.015, coreR * 0.5));
+            d = edgeWeight * (maxDepth + (coreDepth - maxDepth) * coreWeight);
+          }
+          if (d > depth) depth = d;
+          if (depth >= coreDepth) return coreDepth;
         }
       }
     }
-    return coverage;
+    return depth;
   };
+}
+
+export function createBoxyPerimeter(W, D, rc = 0.35) {
+  const safeRc = Math.min(rc, Math.min(W, D) * 0.45);
+  const xc = Math.max(0.1, W - safeRc);
+  const zc = Math.max(0.1, D - safeRc);
+
+  // Each face is a distinct panel:
+  // Face 0 (Front, +Z): X goes from -xc to +xc, Z = D, normal = (0, 0, 1)
+  // Face 1 (Right, +X): Z goes from +zc to -zc, X = W, normal = (1, 0, 0)
+  // Face 2 (Back, -Z):  X goes from +xc to -xc, Z = -D, normal = (0, 0, -1)
+  // Face 3 (Left, -X):  Z goes from -zc to +zc, X = -W, normal = (-1, 0, 0)
+  const faceLengths = [
+    2 * xc,
+    2 * zc,
+    2 * xc,
+    2 * zc,
+  ];
+
+  function getFacePoint(faceIdx, u) {
+    const safeU = Math.max(0, Math.min(1, u));
+    if (faceIdx === 0) {
+      return {
+        x: -xc + safeU * (2 * xc),
+        z: D,
+        nx: 0,
+        nz: 1,
+      };
+    } else if (faceIdx === 1) {
+      return {
+        x: W,
+        z: zc - safeU * (2 * zc),
+        nx: 1,
+        nz: 0,
+      };
+    } else if (faceIdx === 2) {
+      return {
+        x: xc - safeU * (2 * xc),
+        z: -D,
+        nx: 0,
+        nz: -1,
+      };
+    } else {
+      return {
+        x: -W,
+        z: -zc + safeU * (2 * zc),
+        nx: -1,
+        nz: 0,
+      };
+    }
+  }
+
+  return {
+    faceLengths,
+    getFacePoint,
+    W, D, safeRc, xc, zc,
+  };
+}
+
+export function buildBoxyDot(x, y, z, normal, dotRadius = DOT_R, opts = {}) {
+  const isDrip = Boolean(typeof opts === 'boolean' ? opts : (opts.atDrip || opts.hasDrip));
+  const norm = (normal instanceof THREE.Vector3 ? normal.clone() : new THREE.Vector3(normal.nx ?? normal.x, 0, normal.nz ?? normal.z)).normalize();
+  if (isDrip) {
+    const geo = new THREE.SphereGeometry(dotRadius, 16, 16);
+    // Lift so 75% is visible and 25% is embedded in the drip
+    const center = new THREE.Vector3(x, y, z).addScaledVector(norm, dotRadius * 0.5);
+    geo.translate(center.x, center.y, center.z);
+    return geo;
+  }
+  const geo = new THREE.SphereGeometry(dotRadius, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.5);
+  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), norm);
+  geo.applyQuaternion(q);
+  geo.translate(x, y, z);
+  return geo;
+}
+
+class MappedCurvePathBoxy extends THREE.Curve {
+  constructor(perim, faceIdx, uStart, uSpan, baseY, beziers, heightScale, layerOffset = 0) {
+    super();
+    this.perim = perim;
+    this.faceIdx = faceIdx;
+    this.uStart = uStart;
+    this.uSpan = uSpan;
+    this.baseY = baseY;
+    this.layerOffset = layerOffset;
+    this.path = new THREE.CurvePath();
+    for (const b of beziers) {
+      this.path.add(new THREE.CubicBezierCurve3(
+        new THREE.Vector3(b[0][0], b[0][1] * heightScale, 0),
+        new THREE.Vector3(b[1][0], b[1][1] * heightScale, 0),
+        new THREE.Vector3(b[2][0], b[2][1] * heightScale, 0),
+        new THREE.Vector3(b[3][0], b[3][1] * heightScale, 0),
+      ));
+    }
+  }
+
+  getPoint(t, target = new THREE.Vector3()) {
+    const pt2d = this.path.getPoint(t);
+    const uFace = this.uStart + pt2d.x * this.uSpan;
+    const pt = this.perim.getFacePoint(this.faceIdx, uFace);
+    return target.set(
+      pt.x + pt.nx * this.layerOffset,
+      this.baseY + pt2d.y,
+      pt.z + pt.nz * this.layerOffset,
+    );
+  }
+
+  getNormal(t, target = new THREE.Vector3()) {
+    const pt2d = this.path.getPoint(t);
+    const uFace = this.uStart + pt2d.x * this.uSpan;
+    const pt = this.perim.getFacePoint(this.faceIdx, uFace);
+    return target.set(pt.nx, 0, pt.nz).normalize();
+  }
+}
+
+class TeardropCurveBoxy extends THREE.Curve {
+  constructor(perim, faceIdx, uStart, uSpan, baseY, start2D, ctrl2D, end2D, heightScale, layerOffset = 0) {
+    super();
+    this.perim = perim;
+    this.faceIdx = faceIdx;
+    this.uStart = uStart;
+    this.uSpan = uSpan;
+    this.baseY = baseY;
+    this.layerOffset = layerOffset;
+    this.p0 = new THREE.Vector3(start2D[0], start2D[1] * heightScale, 0);
+    this.p1 = new THREE.Vector3( ctrl2D[0],  ctrl2D[1] * heightScale, 0);
+    this.p2 = new THREE.Vector3(  end2D[0],   end2D[1] * heightScale, 0);
+  }
+
+  getPoint(t, target = new THREE.Vector3()) {
+    const s = 1 - t;
+    const pt2d = new THREE.Vector3()
+      .addScaledVector(this.p0, s * s)
+      .addScaledVector(this.p1, 2 * s * t)
+      .addScaledVector(this.p2, t * t);
+    const uFace = this.uStart + pt2d.x * this.uSpan;
+    const pt = this.perim.getFacePoint(this.faceIdx, uFace);
+    return target.set(
+      pt.x + pt.nx * this.layerOffset,
+      this.baseY + pt2d.y,
+      pt.z + pt.nz * this.layerOffset,
+    );
+  }
+
+  getNormal(t, target = new THREE.Vector3()) {
+    const s = 1 - t;
+    const pt2d = new THREE.Vector3()
+      .addScaledVector(this.p0, s * s)
+      .addScaledVector(this.p1, 2 * s * t)
+      .addScaledVector(this.p2, t * t);
+    const uFace = this.uStart + pt2d.x * this.uSpan;
+    const pt = this.perim.getFacePoint(this.faceIdx, uFace);
+    return target.set(pt.nx, 0, pt.nz).normalize();
+  }
+}
+
+export function getBoxyPipingScrollsCoverageFn(radius, height, opts = {}) {
+  const variant = opts.variant || 'waveRope';
+  const forGlaze = !!opts.forGlaze;
+  const maxDepth = forGlaze ? (opts.maxCarveDepth ?? 0.50) : (opts.maxCarveDepth ?? 1.0);
+
+  const isSquare = opts.shape === 'square' || opts.cakeShape === 'square';
+  const W = opts.customW !== undefined && opts.customW !== null ? opts.customW : (isSquare ? radius : radius * 1.25);
+  const D = opts.customD !== undefined && opts.customD !== null ? opts.customD : (isSquare ? radius : radius * 0.85);
+  const rc = opts.rc ?? 0.35;
+  const perim = createBoxyPerimeter(W, D, rc);
+
+  const targetHeightScale = height / 1.6;
+  const heightScale = targetHeightScale;
+  const baseY = 0;
+
+  const targetTileWidth = Math.max(1.8, Math.min(2.8, targetHeightScale * 1.4));
+  const frontTileCount = Math.max(1, Math.round(perim.faceLengths[0] / targetTileWidth));
+  const sideTileCount = isSquare
+    ? frontTileCount
+    : Math.max(1, Math.round(perim.faceLengths[1] / targetTileWidth));
+  const secTileCounts = [frontTileCount, sideTileCount, frontTileCount, sideTileCount];
+
+  // Pre-sample 3D points per face
+  const faceElements = [[], [], [], []];
+
+  for (let faceIdx = 0; faceIdx < 4; faceIdx++) {
+    const tileCount = secTileCounts[faceIdx];
+    const tileSpan = 1 / tileCount;
+
+    for (let tIdx = 0; tIdx < tileCount; tIdx++) {
+      const uStart = tIdx * tileSpan;
+
+      const addTubeElement = (beziers, tube, steps = 24) => {
+        const curve = new MappedCurvePathBoxy(
+          perim, faceIdx, uStart, tileSpan, baseY, beziers, heightScale, 0
+        );
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          const p = curve.getPoint(t);
+          const r = taperEnvelope(t, tube.taperPower, tube.taperZone) * tube.maxR;
+          faceElements[faceIdx].push({ x: p.x, y: p.y, z: p.z, r });
+        }
+      };
+
+      const addTeardropElement = (td, steps = 16) => {
+        const curve = new TeardropCurveBoxy(
+          perim, faceIdx, uStart, tileSpan, baseY,
+          [td[0], td[1]], [td[2], td[3]], [td[4], td[5]], heightScale, 0
+        );
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          const p = curve.getPoint(t);
+          const r = taperEnvelope(t, TEARDROP_TUBE.taperPower, TEARDROP_TUBE.taperZone) * TEARDROP_TUBE.maxR;
+          faceElements[faceIdx].push({ x: p.x, y: p.y, z: p.z, r });
+        }
+      };
+
+      const addDotElement = (u, v) => {
+        const uFace = uStart + u * tileSpan;
+        const pt = perim.getFacePoint(faceIdx, uFace);
+        faceElements[faceIdx].push({
+          x: pt.x,
+          y: baseY + v * heightScale,
+          z: pt.z,
+          r: DOT_R,
+        });
+      };
+
+      if (variant === 'pairedScrolls') {
+        addTubeElement(PAIRED_LEFT_C_SCROLL_BEZIERS, SCROLL_TUBE, 24);
+        addTubeElement(PAIRED_RIGHT_C_SCROLL_BEZIERS, SCROLL_TUBE, 24);
+        addDotElement(0.32, -0.40);
+        addDotElement(0.38, 0.38);
+        addDotElement(0.68, -0.40);
+        addDotElement(0.62, 0.38);
+      } else if (variant === 'fleurDeLisRow') {
+        for (const td of FLEUR_DE_LIS_TEARDROPS) addTeardropElement(td, 16);
+        addDotElement(0.50, -0.42);
+      } else if (variant === 'shellBorderRow') {
+        for (const td of SHELL_BORDER_TEARDROPS) addTeardropElement(td, 16);
+        addDotElement(0.50, -0.38);
+      } else if (variant === 'vineAndTendrils') {
+        addTubeElement(VINE_SPINE_BEZIERS, SCROLL_TUBE, 24);
+        addTubeElement(VINE_TENDRIL_LEFT, SCROLL_TUBE, 16);
+        addTubeElement(VINE_TENDRIL_RIGHT, SCROLL_TUBE, 16);
+        addDotElement(0.32, 0.08);
+        addDotElement(0.68, -0.08);
+      } else if (variant === 'loopChain') {
+        addTubeElement(LOOP_CHAIN_BEZIERS, SCROLL_TUBE, 24);
+        addDotElement(0.50, 0.00);
+      } else {
+        // Default: 'waveRope'
+        addTubeElement(WAVE_ROPE_BEZIERS, SCROLL_TUBE, 28);
+        addDotElement(0.25, 0.45);
+        addDotElement(0.75, -0.45);
+      }
+    }
+  }
+
+  const margin = 0.035;
+  const smoothstep = (t) => {
+    const c = Math.min(1, Math.max(0, t));
+    return c * c * (3 - 2 * c);
+  };
+
+  return (glazeArg, localY) => {
+    // Project cylindrical glaze query angle into boxy coordinates
+    const thetaMesh = Math.atan2(Math.cos(glazeArg), Math.sin(glazeArg));
+    const boxR = getBoxyRadius(thetaMesh, W, D, rc);
+    const qx = boxR * Math.sin(glazeArg);
+    const qz = boxR * Math.cos(glazeArg);
+    const qy = localY;
+
+    let depth = 0;
+    for (let f = 0; f < 4; f++) {
+      if (f === 0 && qz < -0.2) continue;
+      if (f === 1 && qx < -0.2) continue;
+      if (f === 2 && qz > 0.2) continue;
+      if (f === 3 && qx > 0.2) continue;
+
+      const pts = faceElements[f];
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i];
+        const reach = p.r + margin;
+        const dy = qy - p.y;
+        if (dy > reach || dy < -reach) continue;
+        const dx = qx - p.x;
+        if (dx > reach || dx < -reach) continue;
+        const dz = qz - p.z;
+        if (dz > reach || dz < -reach) continue;
+
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        const distInside = reach - dist;
+        if (distInside <= 0) continue;
+
+        const smoothWidth = Math.max(0.02, reach * 0.4);
+        const edgeWeight = smoothstep(distInside / smoothWidth);
+        const d = edgeWeight * maxDepth;
+        if (d > depth) depth = d;
+        if (depth >= maxDepth) return maxDepth;
+      }
+    }
+    return depth;
+  };
+}
+
+export function buildBoxyPipingScrolls(radius, height, colorHex, colorId, variant = 'waveRope', opts = {}) {
+  const options = typeof opts === 'boolean' ? { hasDrip: opts } : (opts || {});
+  const hasDrip = Boolean(options.hasDrip || options.atDrip);
+  const coatThickness = options.coatThickness ?? options.dripThickness ?? 0.06;
+  const maxGlazeCarveDepth = options.maxCarveDepth ?? 0.50;
+  // In the carved drip empty space, the remaining drip surface sits at
+  // coatThickness * (1 - maxGlazeCarveDepth). The piping scroll sits slightly
+  // proud of that surface (+0.015) so it is fully visible without clipping.
+  const surfaceOffset = hasDrip ? (coatThickness * (1 - maxGlazeCarveDepth) + 0.015) : 0;
+
+  const isSquare = options.shape === 'square' || options.cakeShape === 'square';
+  const W = options.customW !== undefined && options.customW !== null ? options.customW : (isSquare ? radius : radius * 1.25);
+  const D = options.customD !== undefined && options.customD !== null ? options.customD : (isSquare ? radius : radius * 0.85);
+  const rc = options.rc ?? 0.35;
+  const perim = createBoxyPerimeter(W, D, rc);
+
+  const material = getFrostingMaterial(colorHex, colorId);
+  const targetHeightScale = height / 1.6;
+  const heightScale = targetHeightScale;
+  const baseY = 0;
+
+  // Align complete wave tiles evenly across each face as distinct panels.
+  // The wave starts and ends cleanly at the corners of each face.
+  const targetTileWidth = Math.max(1.8, Math.min(2.8, targetHeightScale * 1.4));
+  const frontTileCount = Math.max(1, Math.round(perim.faceLengths[0] / targetTileWidth));
+  const sideTileCount = isSquare
+    ? frontTileCount
+    : Math.max(1, Math.round(perim.faceLengths[1] / targetTileWidth));
+  const secTileCounts = [frontTileCount, sideTileCount, frontTileCount, sideTileCount];
+
+  const allGeos = [];
+
+  for (let faceIdx = 0; faceIdx < 4; faceIdx++) {
+    const tileCount = secTileCounts[faceIdx];
+    const tileSpan = 1 / tileCount;
+
+    for (let tIdx = 0; tIdx < tileCount; tIdx++) {
+      const uStart = tIdx * tileSpan;
+
+      const addScroll = (beziers, layerOffset = LAYER_MAIN, segments = 90) => {
+        const curve = new MappedCurvePathBoxy(
+          perim, faceIdx, uStart, tileSpan, baseY, beziers, heightScale, surfaceOffset + layerOffset
+        );
+        allGeos.push(new VariableRadiusTubeGeometry(curve, {
+          segments,
+          profileSegments: 12,
+          minR: MIN_R,
+          maxR: MAX_R,
+          taperPower: 0.7,
+          taperZone: 0.10,
+          curvatureSensitivity: 0.8,
+          kRef: 0.05,
+        }));
+      };
+
+      const addTeardrop = (td, layerOffset = LAYER_DROP) => {
+        const curve = new TeardropCurveBoxy(
+          perim, faceIdx, uStart, tileSpan, baseY,
+          [td[0], td[1]], [td[2], td[3]], [td[4], td[5]], heightScale, surfaceOffset + layerOffset
+        );
+        allGeos.push(new VariableRadiusTubeGeometry(curve, {
+          segments: 24,
+          profileSegments: 10,
+          minR: MIN_R * 0.4,
+          maxR: MAX_R * 0.85,
+          taperPower: 2.5,
+          taperZone: 0.22,
+          curvatureSensitivity: 0.15,
+          kRef: 0.05,
+        }));
+      };
+
+      const addDot = (u, v, layerOffset = LAYER_DOT) => {
+        const uFace = uStart + u * tileSpan;
+        const pt = perim.getFacePoint(faceIdx, uFace);
+        const norm = new THREE.Vector3(pt.nx, 0, pt.nz).normalize();
+        const y = baseY + v * heightScale;
+        const x = pt.x + norm.x * (surfaceOffset + layerOffset);
+        const z = pt.z + norm.z * (surfaceOffset + layerOffset);
+        allGeos.push(buildBoxyDot(x, y, z, norm, DOT_R, { atDrip: hasDrip }));
+      };
+
+      if (variant === 'pairedScrolls') {
+        addScroll(PAIRED_LEFT_C_SCROLL_BEZIERS, LAYER_MAIN, 90);
+        addScroll(PAIRED_RIGHT_C_SCROLL_BEZIERS, LAYER_MAIN, 90);
+        addDot(0.32, -0.40);
+        addDot(0.38, 0.38);
+        addDot(0.68, -0.40);
+        addDot(0.62, 0.38);
+      } else if (variant === 'fleurDeLisRow') {
+        for (const td of FLEUR_DE_LIS_TEARDROPS) addTeardrop(td, LAYER_DROP);
+        addDot(0.50, -0.42);
+      } else if (variant === 'shellBorderRow') {
+        for (const td of SHELL_BORDER_TEARDROPS) addTeardrop(td, LAYER_DROP);
+        addDot(0.50, -0.38);
+      } else if (variant === 'vineAndTendrils') {
+        addScroll(VINE_SPINE_BEZIERS, LAYER_MAIN, 90);
+        addScroll(VINE_TENDRIL_LEFT, LAYER_BRANCH, 50);
+        addScroll(VINE_TENDRIL_RIGHT, LAYER_BRANCH, 50);
+        addDot(0.32, 0.08);
+        addDot(0.68, -0.08);
+      } else if (variant === 'loopChain') {
+        addScroll(LOOP_CHAIN_BEZIERS, LAYER_MAIN, 100);
+        addDot(0.50, 0.00);
+      } else {
+        // Default: 'waveRope' (Option B — Continuous Wave Rope)
+        // Retains the exact original design: 1 wave with peak dot and valley dot per tile
+        addScroll(WAVE_ROPE_BEZIERS, LAYER_MAIN, 90);
+        addDot(0.25, 0.45);
+        addDot(0.75, -0.45);
+      }
+    }
+  }
+
+  const merged = localMerge(allGeos);
+  applyVerticalGradientUV(merged);
+  const mesh = new THREE.Mesh(merged, material);
+  mesh.userData.isBoxyPipingScrolls = true;
+  mesh.userData.morphedToBoxy = true;
+  return mesh;
 }
 
 /**
  * Builds piping-scroll side decoration as a SINGLE Mesh for the requested cake radius / height / color.
  */
-export function buildPipingScrolls(radius, height, colorHex, colorId, variant = 'waveRope') {
-  // Same fix as Checkered/Triangle/Chevron in DecorationSets.jsx — was a
-  // plain THREE.MeshStandardMaterial({ color }), no colorId, so all six
-  // pattern colors (Marble/Ombré/Rainbow Swirl/Gold Shimmer/Watercolor
-  // Pastel Mix/Red-White Gradient) rendered as a flat swatch. Piped
-  // scrolls are meant to look like actual piped buttercream anyway, so
-  // getFrostingMaterial is the right fit here, same as those three.
+export function buildPipingScrolls(radius, height, colorHex, colorId, variant = 'waveRope', opts = {}) {
+  const options = typeof opts === 'boolean' ? { hasDrip: opts } : (opts || {});
+  const shape = options.shape || options.cakeShape || 'cylinder';
+  if (shape === 'rectangle' || shape === 'square') {
+    return buildBoxyPipingScrolls(radius, height, colorHex, colorId, variant, options);
+  }
+
+  const hasDrip = Boolean(options.hasDrip || options.atDrip);
+  const coatThickness = options.coatThickness ?? options.dripThickness ?? 0.06;
+  const maxGlazeCarveDepth = options.maxCarveDepth ?? 0.50;
+  const dripCarvedThickness = coatThickness * (1 - maxGlazeCarveDepth);
+  const dripOffset = options.dripOffset ?? dripCarvedThickness;
+
   const material = getFrostingMaterial(colorHex, colorId);
 
   const targetHeightScale = height / 1.6;
@@ -511,7 +1006,14 @@ export function buildPipingScrolls(radius, height, colorHex, colorId, variant = 
   function addDot(u, v, layerOffset = LAYER_DOT) {
     const theta = u * arcWidth;
     const y     = baseY + v * heightScale;
-    tileGeos.push(buildFlushHemisphereDot(theta, y, radius + layerOffset));
+    if (hasDrip) {
+      // 75/25 vision on Drip: lifted so 75% is visible and 25% is buried in the Drip.
+      // Drip surface sits at radius + dripOffset in the carved area.
+      const surfaceRadius = radius + dripOffset;
+      tileGeos.push(buildPearlDot(theta, y, surfaceRadius, DOT_R, { atDrip: true }));
+    } else {
+      tileGeos.push(buildFlushHemisphereDot(theta, y, radius + layerOffset));
+    }
   }
 
   if (variant === 'pairedScrolls') {

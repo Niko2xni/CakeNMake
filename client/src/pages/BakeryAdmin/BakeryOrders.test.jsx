@@ -184,4 +184,30 @@ describe('Orders', () => {
     expect(await within(screen.getByRole('tabpanel', { name: 'Reservations' })).findByText('Ana Cruz')).toBeVisible();
     expect(transactionApi.getTransactions).toHaveBeenCalledTimes(1);
   });
+
+  it('displays fulfillment details and pay-to-bake payment schedule in reservation details', async () => {
+    const deliveryOrder = {
+      ...order,
+      _id: 'order-delivery',
+      user: { displayName: 'Carla Gomez', email: 'carla@example.com' },
+      fulfillment: {
+        type: 'delivery',
+        deliveryAddress: 'Unit 402, Pioneer Woodlands, Mandaluyong',
+        deliveryLandmark: 'Tower 2 Lobby',
+        timeSlot: '2:00 PM – 4:00 PM',
+        recipientPhone: '09171234567',
+        notes: 'Please keep refrigerated until rider pickup',
+      },
+    };
+    bakeryApi.getReservations.mockResolvedValue([deliveryOrder]);
+    setup();
+    const row = await within(screen.getByRole('tabpanel', { name: 'Reservations' })).findByText('Carla Gomez');
+    expect(within(row.closest('button')).getByText('🛵 Courier Delivery')).toBeVisible();
+    fireEvent.click(row);
+    expect(screen.getByText('Client-Booked Courier Delivery')).toBeVisible();
+    expect(screen.getByText('Unit 402, Pioneer Woodlands, Mandaluyong')).toBeVisible();
+    expect(screen.getByText(/Tower 2 Lobby/)).toBeVisible();
+    expect(screen.getByText('2:00 PM – 4:00 PM')).toBeVisible();
+    expect(screen.getByText('Pay-to-Bake Policy Status')).toBeVisible();
+  });
 });

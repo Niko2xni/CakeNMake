@@ -32,28 +32,54 @@ function safeHeader(value) {
   return String(value ?? '').replace(/[\r\n]+/g, ' ').trim();
 }
 
-function buildEmailContent({ customerName, designName, bakeryName, deliveryDate, totalPrice, downPayment, remainingBalance }) {
+function buildEmailContent({
+  customerName,
+  designName,
+  bakeryName = 'AH TINAPS BAKESHOP',
+  deliveryDate,
+  totalPrice,
+  downPayment,
+  remainingBalance,
+  isDownPaymentPaid = true,
+  status = 'Confirmed',
+}) {
+  const displayBakeryName = (!bakeryName || bakeryName === 'Mamshie Bakery')
+    ? 'AH TINAPS BAKESHOP'
+    : bakeryName;
   const subject = `Reservation Confirmation: ${safeHeader(designName)} - CakeNMake`;
+  const downPaymentNote = isDownPaymentPaid ? '(Paid)' : '(Pending verification)';
+  const balanceNote = '(Due 48h before baking)';
+  const statusDisplay = isDownPaymentPaid ? 'Confirmed' : (status || 'Pending Down Payment');
+
   const text = `Hello ${customerName},
 
-Thank you for sending your cake design to ${bakeryName}! We have received your reservation request.
+Thank you for sending your cake design to ${displayBakeryName}! We have received your reservation request and recorded your order specifications.
 
 Reservation Details:
 • Design: "${designName}"
-• Bakery: ${bakeryName}
+• Bakery: ${displayBakeryName}
 • Delivery/Pickup Date: ${deliveryDate}
 • Total Estimated Price: ₱${totalPrice}
-• Required Down Payment: ₱${downPayment} (Awaiting staff verification)
-• Remaining Balance: ₱${remainingBalance} (Due upon delivery/pickup)
-• Status: Pending Down Payment
+• ${isDownPaymentPaid ? 'Down Payment (50%):' : 'Required Down Payment:'} ₱${downPayment} ${downPaymentNote}
+• Remaining Balance: ₱${remainingBalance} ${balanceNote}
+• Status: ${statusDisplay}
 
-Your reservation has been created in CakeNMake. You can chat directly with the bakery staff in your dashboard to arrange payment, discuss details, and coordinate delivery.
+Important Note:
+Please note that while your reservation is confirmed, cake production will only begin once the whole payment for the cake is done.
+
+${isDownPaymentPaid
+    ? 'Your reservation has been confirmed with your 50% down payment. You can chat directly with the bakery staff in your CakeNMake dashboard to discuss custom cake details, settle the remaining balance prior to baking, and coordinate fulfillment.'
+    : 'Your reservation has been created in CakeNMake. You can chat directly with the bakery staff in your dashboard to arrange payment, discuss details, and coordinate delivery.'}
 
 Thank you,
 The CakeNMake Team`;
+
   const values = Object.fromEntries(Object.entries({
-    subject, customerName, designName, bakeryName, deliveryDate, totalPrice, downPayment, remainingBalance,
+    subject, customerName, designName, bakeryName: displayBakeryName, deliveryDate, totalPrice, downPayment, remainingBalance, statusDisplay, downPaymentNote, balanceNote,
   }).map(([key, value]) => [key, escapeHtml(value)]));
+
+  const statusColor = isDownPaymentPaid ? '#16a34a' : '#ea580c';
+  const downPaymentColor = isDownPaymentPaid ? '#16a34a' : '#e11d48';
 
   const html = `
 <!DOCTYPE html>
@@ -72,12 +98,29 @@ The CakeNMake Team`;
           <tr><td style="color: #6b7280;">Bakery:</td><td style="color: #111827; font-weight: 600;">${values.bakeryName}</td></tr>
           <tr><td style="color: #6b7280;">Delivery / Pickup:</td><td style="color: #111827; font-weight: 600;">${values.deliveryDate}</td></tr>
           <tr><td style="color: #6b7280;">Total Estimated Price:</td><td style="color: #111827; font-weight: 600;">₱${values.totalPrice}</td></tr>
-          <tr><td style="color: #6b7280;">Required Down Payment:</td><td style="color: #e11d48; font-weight: 700;">₱${values.downPayment} <span style="font-size: 11px; font-weight: normal; color: #6b7280;">(Pending verification)</span></td></tr>
-          <tr><td style="color: #6b7280;">Remaining Balance:</td><td style="color: #111827; font-weight: 600;">₱${values.remainingBalance} <span style="font-size: 11px; font-weight: normal; color: #6b7280;">(Due upon pickup/delivery)</span></td></tr>
-          <tr><td style="color: #6b7280;">Status:</td><td style="color: #ea580c; font-weight: 600;">Pending Down Payment</td></tr>
+          <tr><td style="color: #6b7280;">${isDownPaymentPaid ? 'Down Payment (50%):' : 'Required Down Payment:'}</td><td style="color: ${downPaymentColor}; font-weight: 700;">₱${values.downPayment} <span style="font-size: 11px; font-weight: normal; color: ${isDownPaymentPaid ? '#16a34a' : '#6b7280'};">${values.downPaymentNote}</span></td></tr>
+          <tr><td style="color: #6b7280;">Remaining Balance:</td><td style="color: #111827; font-weight: 600;">₱${values.remainingBalance} <span style="font-size: 11px; font-weight: normal; color: #6b7280;">${values.balanceNote}</span></td></tr>
+          <tr><td style="color: #6b7280;">Status:</td><td style="color: ${statusColor}; font-weight: 600;">${values.statusDisplay}</td></tr>
         </table>
       </td></tr></table>
-      <div style="background-color: #f9fafb; border-radius: 12px; padding: 18px 20px; margin-bottom: 24px; border: 1px solid #f3f4f6;"><h3 style="font-size: 13px; color: #374151; margin: 0 0 8px;">Next Steps</h3><p style="font-size: 13px; color: #6b7280; line-height: 1.5; margin: 0;">The bakery staff will review your 3D cake design specifications. You can message the bakery directly through your <strong>CakeNMake Chats</strong> to coordinate down payment options and finalize delivery arrangements.</p></div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #fffbeb; border: 1px solid #fef3c7; border-left: 4px solid #f59e0b; border-radius: 8px; margin-bottom: 24px;">
+        <tr><td style="padding: 14px 16px;">
+          <p style="margin: 0 0 4px; font-size: 13px; font-weight: 700; color: #92400e;">
+            ⚠️ Important Production Policy
+          </p>
+          <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #78350f;">
+            While your reservation is confirmed, please note that <strong>cake production will only begin once the whole payment for your cake is done</strong>.
+          </p>
+        </td></tr>
+      </table>
+      <div style="background-color: #f9fafb; border-radius: 12px; padding: 18px 20px; margin-bottom: 24px; border: 1px solid #f3f4f6;">
+        <h3 style="font-size: 13px; color: #374151; margin: 0 0 8px;">Next Steps</h3>
+        <p style="font-size: 13px; color: #6b7280; line-height: 1.5; margin: 0;">
+          ${isDownPaymentPaid
+    ? 'The bakery staff will review your 3D cake design specifications. Remember that cake production will begin once full payment is completed. You can message the bakery directly through your <strong>CakeNMake Chats</strong> to coordinate remaining balance details and finalize fulfillment arrangements.'
+    : 'The bakery staff will review your 3D cake design specifications. You can message the bakery directly through your <strong>CakeNMake Chats</strong> to coordinate down payment options and finalize delivery arrangements.'}
+        </p>
+      </div>
       <p style="font-size: 13px; color: #9ca3af; line-height: 1.5; margin: 0;">If you have any questions, please reach out directly through the CakeNMake chat.</p>
     </td></tr>
     <tr><td style="background-color: #f9fafb; padding: 20px 32px; text-align: center; border-top: 1px solid #f3f4f6; font-size: 12px; color: #9ca3af;"><p style="margin: 0;">CakeNMake &bull; Your 3D Custom Cake Design Platform</p></td></tr>
@@ -115,18 +158,23 @@ function createReservationEmailService({
     } catch {
       return { sent: false, error: 'Bakery lookup failed.' };
     }
-    if (!platform?.name) return { sent: false, error: 'Bakery details are unavailable.' };
+    const resolvedBakeryName = (platform?.name && platform.name !== 'Mamshie Bakery')
+      ? platform.name
+      : 'AH TINAPS BAKESHOP';
 
     const totalNum = Number(reservation.totalPrice || 0);
     const downNum = Number(reservation.downPayment?.amount || Math.ceil(totalNum / 2));
+    const isPaid = reservation.downPayment?.isPaid !== false;
     const message = buildEmailContent({
       customerName: user.displayName || user.email.split('@')[0] || 'Valued Customer',
       designName: reservation.designName || 'Custom Cake',
-      bakeryName: platform.name,
+      bakeryName: resolvedBakeryName,
       deliveryDate: formatDate(reservation.pickupDate),
       totalPrice: formatPesos(totalNum),
       downPayment: formatPesos(downNum),
       remainingBalance: formatPesos(Math.max(0, totalNum - downNum)),
+      isDownPaymentPaid: isPaid,
+      status: isPaid ? 'Confirmed' : (reservation.status === 'confirmed' ? 'Confirmed' : 'Pending Down Payment'),
     });
     if (!mailDelivery.configured) return { sent: false, reason: 'NOT_CONFIGURED', error: 'Email delivery is not configured.' };
     try {

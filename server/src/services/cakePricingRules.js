@@ -61,9 +61,9 @@ const SIDE_SECTIONS = [
     title: 'Chevron Pattern',
     description: 'Dynamic chevron and zigzag stripe wraps',
     items: [
-      { id: 'multiColor', key: 'chevronPattern.multiColor', label: 'Multi-Color', defaultPrice: 125 },
       { id: 'singleColor', key: 'chevronPattern.singleColor', label: 'Single Color', defaultPrice: 105 },
       { id: 'twoTone', key: 'chevronPattern.twoTone', label: 'Two-Tone', defaultPrice: 115 },
+      { id: 'threeTone', key: 'chevronPattern.threeTone', label: 'Three-Tone', defaultPrice: 115 },
       { id: 'wideZigzag', key: 'chevronPattern.wideZigzag', label: 'Wide Zigzag', defaultPrice: 120 },
       { id: 'tightZigzag', key: 'chevronPattern.tightZigzag', label: 'Tight Zigzag', defaultPrice: 130 },
       { id: 'singleColorGapped', key: 'chevronPattern.singleColorGapped', label: 'Single Color, Gapped', defaultPrice: 95 },
@@ -103,9 +103,10 @@ const SIDE_SECTIONS = [
       { id: 'rainbowArc', key: 'sunshinePlay.rainbowArc', label: 'Rainbow Arc', defaultPrice: 140 },
       { id: 'cloudyChump', key: 'sunshinePlay.cloudyChump', label: 'Cloudy Champ', defaultPrice: 130 },
       { id: 'starBurst', key: 'sunshinePlay.starBurst', label: 'Star Burst', defaultPrice: 125 },
-      { id: 'assortedStarBurst', key: 'sunshinePlay.assortedStarBurst', label: 'Assorted Star Burst', defaultPrice: 135 },
-      { id: 'starryRainbow', key: 'sunshinePlay.starryRainbow', label: 'Starry Rainbow', defaultPrice: 170 },
-      { id: 'assortedStarryRainbow', key: 'sunshinePlay.assortedStarryRainbow', label: 'Assorted Starry Rainbow', defaultPrice: 180 },
+      { id: 'skyChumps', key: 'sunshinePlay.skyChumps', label: 'Sky Chumps', defaultPrice: 145 },
+      { id: 'sunshineStars', key: 'sunshinePlay.sunshineStars', label: 'Sunshine Stars', defaultPrice: 155 },
+      { id: 'starrySunshinePlay', key: 'sunshinePlay.starrySunshinePlay', label: 'Starry Sunshine Play', defaultPrice: 180 },
+      { id: 'assortedStarryRainbow', key: 'sunshinePlay.assortedStarryRainbow', label: 'Starry Sunshine Play', defaultPrice: 180 },
     ],
   },
   {
@@ -249,9 +250,9 @@ const DEFAULT_RATES = {
   // One tier on its own. Filling is part of the sponge price (no charge).
   // Any flavor costs the same.
   sponge: {
-    naked: { classicCube: 400, largeCube: 600, miniBento: 350, standardBento: 450, largeBento: 550, '6x6': 700, '8x8': 1500, '10x10': 2200, '12x12': 3000, big: 1500, small: 700 }, // Petits Four, Bento, 6x6, 8x8, 10x10, 12x12
-    frosted: { classicCube: 500, largeCube: 800, miniBento: 500, standardBento: 600, largeBento: 750, '6x6': 1000, '8x8': 1700, '10x10': 2500, '12x12': 3400, big: 1700, small: 1000 }, // Frosted
-    textured: { classicCube: 500, largeCube: 800, miniBento: 500, standardBento: 600, largeBento: 750, '6x6': 1000, '8x8': 1700, '10x10': 2500, '12x12': 3400, big: 1700, small: 1000 }, // Textured
+    naked: { classicCube: 400, largeCube: 600, miniBento: 350, standardBento: 450, largeBento: 550, squareBento2x2: 400, squareBento3x3: 500, '6x6': 700, '8x8': 1500, '10x10': 2200, '12x12': 3000, big: 1500, small: 700 }, // Petits Four, Bento, Square Bento, 6x6, 8x8, 10x10, 12x12
+    frosted: { classicCube: 500, largeCube: 800, miniBento: 500, standardBento: 600, largeBento: 750, squareBento2x2: 500, squareBento3x3: 650, '6x6': 1000, '8x8': 1700, '10x10': 2500, '12x12': 3400, big: 1700, small: 1000 }, // Frosted
+    textured: { classicCube: 500, largeCube: 800, miniBento: 500, standardBento: 600, largeBento: 750, squareBento2x2: 500, squareBento3x3: 650, '6x6': 1000, '8x8': 1700, '10x10': 2500, '12x12': 3400, big: 1700, small: 1000 }, // Textured
   },
   // Two tiers: 8x5 bottom + 6x4 top, priced as a set.
   // Naked: 1500 + 700 = 2200. Frosted / Textured: 1700 + 1000 = 2700.
@@ -285,9 +286,9 @@ const DEFAULT_RATES = {
     'trianglePattern.rightDiagonal': 'small',
     'trianglePattern.parallelOuter': 'small',
     'trianglePattern.parallelInner': 'small',
-    'chevronPattern.multiColor': 'big',
     'chevronPattern.singleColor': 'big',
     'chevronPattern.twoTone': 'big',
+    'chevronPattern.threeTone': 'big',
     'chevronPattern.wideZigzag': 'big',
     'chevronPattern.tightZigzag': 'big',
     'chevronPattern.singleColorGapped': 'small',
@@ -306,8 +307,9 @@ const DEFAULT_RATES = {
     'sunshinePlay.rainbowArc': 'small',
     'sunshinePlay.cloudyChump': 'small',
     'sunshinePlay.starBurst': 'big',
-    'sunshinePlay.assortedStarBurst': 'big',
-    'sunshinePlay.starryRainbow': 'big',
+    'sunshinePlay.skyChumps': 'big',
+    'sunshinePlay.sunshineStars': 'big',
+    'sunshinePlay.starrySunshinePlay': 'big',
     'sunshinePlay.assortedStarryRainbow': 'big',
     'victorianLambeth.classic': 'big',
     'victorianLambeth.noRosette': 'big',
@@ -428,7 +430,7 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
   };
 
   const getTierSpecs = (tierIndex = 0, sizeClass = '8x8', tierLabel = '1 Tier', finishCls = 'naked') => {
-    const dims = sizeClass === 'classicCube' ? '1x1' : sizeClass === 'largeCube' ? '2x2' : sizeClass === 'miniBento' ? '3.5x2' : sizeClass === 'standardBento' ? '4x2' : sizeClass === 'largeBento' ? '5x3' : sizeClass === '12x12' ? '12x10' : sizeClass === '10x10' ? '10x8' : sizeClass === '6x6' || sizeClass === 'small' ? '6x4' : sizeClass === '4x4' ? '4x3' : sizeClass === '4x3' ? '4x3' : sizeClass === '6x4' ? '6x4' : sizeClass === '8x6' ? '8x6' : sizeClass === '10x8' ? '10x8' : '8x6';
+    const dims = sizeClass === 'classicCube' ? '1x1' : sizeClass === 'largeCube' ? '2x2' : sizeClass === 'miniBento' ? '3.5x2' : sizeClass === 'standardBento' ? '4x2' : sizeClass === 'largeBento' ? '5x3' : sizeClass === 'squareBento2x2' ? '2x2' : sizeClass === 'squareBento3x3' ? '3x3' : sizeClass === '12x12' ? '12x10' : sizeClass === '10x10' ? '10x8' : sizeClass === '6x6' || sizeClass === 'small' ? '6x4' : sizeClass === '4x4' ? '4x3' : sizeClass === '4x3' ? '4x3' : sizeClass === '6x4' ? '6x4' : sizeClass === '8x6' ? '8x6' : sizeClass === '10x8' ? '10x8' : '8x6';
     let finish = `${finishLabel(finishCls)} Finish`;
     if (finishCls === 'textured') {
       const textureId = isIndividual
@@ -515,7 +517,7 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
     const cls = frostClass(styleOfTier(0));
     const size = structure.size || '8x8';
     const price = rates.sponge?.[cls]?.[size] ?? rates.sponge?.[cls]?.[size === '6x6' || size === 'small' ? 'small' : 'big'] ?? (cls === 'textured' ? (rates.sponge?.frosted?.[size] ?? rates.sponge?.frosted?.[size === '6x6' || size === 'small' ? 'small' : 'big']) : undefined);
-    const dims = size === 'miniBento' ? '3.5x2' : size === 'standardBento' ? '4x2' : size === 'largeBento' ? '5x3' : size === '12x12' ? '12x10' : size === '10x10' ? '10x8' : size === '6x6' || size === 'small' ? '6x4' : '8x6';
+    const dims = size === 'miniBento' ? '3.5x2' : size === 'standardBento' ? '4x2' : size === 'largeBento' ? '5x3' : size === 'squareBento2x2' ? '2x2' : size === 'squareBento3x3' ? '3x3' : size === '12x12' ? '12x10' : size === '10x10' ? '10x8' : size === '6x6' || size === 'small' ? '6x4' : '8x6';
     const specs = getTierSpecs(0, size, '1 Tier', cls);
     if (price == null) missing(`1 tier ${cls} sponge ${dims}`, 'no price configured');
     else add('sponge', `1 Tier ${finishLabel(cls)} Cake (${dims})`, price, 1, specs);

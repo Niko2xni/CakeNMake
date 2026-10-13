@@ -277,6 +277,7 @@ export function getVictorianLambethGlazeCoverageFn(radius, height, opts = {}) {
   const variant = opts.variant || 'classic';
   const H = height;
   const verticalScale = H / 5.0;
+  const maxDepth = opts.maxCarveDepth ?? 0.50;
 
   const isDoubleBand = variant === 'doubleBand';
   const isTripleBand = variant === 'tripleBand';
@@ -322,10 +323,10 @@ export function getVictorianLambethGlazeCoverageFn(radius, height, opts = {}) {
   const TOP_LIFT = 0.05;
 
   // ── Region list ─────────────────────────────────────────────────────
+  // 'rosette': { angle, y, hasPearl, pearlYOffset, pearlRadius }
   // 'ellipse': { angle, y, rx, ry, rot }   (rx/ry = fully-open half-axes)
   // 'capsule': { pts: [[angle, y], ...], r }
   // 'curtain': { mid, halfArc, cy, ch, sag }
-  // 'leaf':    { angle, y, side, base, len, half, margin }  (pointed lens)
   const regions = [];
   const OPEN_MARGIN = 1.25;
 
@@ -334,25 +335,14 @@ export function getVictorianLambethGlazeCoverageFn(radius, height, opts = {}) {
   const addEllipse = (angle, y, rx, ry, rot = 0) =>
     regions.push({ type: 'ellipse', angle, y, rx, ry, rot, margin: OPEN_MARGIN });
 
-  // Rosette side leaf. Mirrors createLeafGeometry in buildVictorianLambeth:
-  // silhouette half-width = (maxW/2) * sin(PI * u^0.55), u = 0 at the base,
-  // 1 at the tip, so it is widest near the rosette and tapers to a point.
-  // The real leaf is scaled 1.6 with the swirl disc: length 0.45*1.6, max
-  // width 0.48*1.6, base tucked 0.04*1.6 toward the rosette centre. `side`
-  // (+1/-1) is which way it points; both leaves lie horizontal.
-  const LEAF_SCALE = 1.6;
-  const LEAF_MARGIN = 0.07;
-  const addLeaf = (angle, y, side) =>
-    regions.push({
-      type: 'leaf',
-      angle,
-      y,
-      side,
-      base: -0.04 * LEAF_SCALE,
-      len: 0.45 * LEAF_SCALE,
-      half: 0.48 * 0.5 * LEAF_SCALE,
-      margin: LEAF_MARGIN,
-    });
+  // Rosette & side leaves exact geometry parameters (scaled 1.6 matching 3D mesh)
+  const R_SWIRL = 0.368;
+  const LEAF_BASE_X = -0.064;
+  const LEAF_TIP_X = 0.656;
+  const LEAF_TOTAL_LEN = 0.720;
+  const LEAF_MAX_HALFW = 0.384;
+  const ROSETTE_MARGIN = 0.035;
+  const ROSETTE_SMOOTH_W = 0.025;
 
   const addRope = (startAngle, endAngle, startY, endY, sag) => {
     const pts = [];
@@ -400,13 +390,16 @@ export function getVictorianLambethGlazeCoverageFn(radius, height, opts = {}) {
       if (flags.rosette || flags.anchorPearl) {
         const anchorY = 0.42 * H + bandY + (flags.topRopes ? -ROPES_ONLY_EXTRA_DROP * H : 0);
         if (flags.rosette) {
-          // Swirl disc (petals, scaled 1.6) + two pointed side leaves.
-          // The leaves get leaf-shaped windows (not ellipses, which read
-          // as a cloud blob once unioned with the disc's circle).
-          addCircle(currentAngle, anchorY, 0.42);
-          for (const side of [-1, 1]) addLeaf(currentAngle, anchorY, side);
-        }
-        if (flags.anchorPearl) {
+          // Rosette swirl + side leaves with exact shape matching 3D geometry
+          regions.push({
+            type: 'rosette',
+            angle: currentAngle,
+            y: anchorY,
+            hasPearl: !!flags.anchorPearl,
+            pearlYOffset: -0.08 * H,
+            pearlRadius: ANCHOR_PEARL_RADIUS,
+          });
+        } else if (flags.anchorPearl) {
           addCircle(currentAngle, anchorY - 0.08 * H, ANCHOR_PEARL_RADIUS);
         }
       }
@@ -450,8 +443,6 @@ export function getVictorianLambethGlazeCoverageFn(radius, height, opts = {}) {
   // horizontal (around-the-cake) axis compressed by ROPE_KX, which widens
   // the window sideways ~1/KX while leaving it tight where the rope runs
   // flat (vertical sampling is fine there).
-  //   fully open within the tube's true reach + ROPE_CORE_PAD,
-  //   closed ROPE_RAMP further out (measured in the compressed space).
   const ROPE_KX = 0.6;
   const ROPE_CORE_PAD = 0.012;
   const ROPE_RAMP = 0.05;
@@ -479,15 +470,13 @@ export function getVictorianLambethGlazeCoverageFn(radius, height, opts = {}) {
       aMax = el.angle + reach / radius;
       yMin = el.y - reach;
       yMax = el.y + reach;
-    } else if (el.type === 'leaf') {
-      const near = el.base - el.margin;
-      const far = el.base + el.len + el.margin;
-      const x0 = el.side > 0 ? near : -far;
-      const x1 = el.side > 0 ? far : -near;
-      aMin = el.angle + x0 / radius - 0.02;
-      aMax = el.angle + x1 / radius + 0.02;
-      yMin = el.y - el.half - el.margin - 0.02;
-      yMax = el.y + el.half + el.margin + 0.02;
+    } else if (el.type === 'rosette') {
+      const reachX = LEAF_TIP_X + ROSETTE_MARGIN + ROSETTE_SMOOTH_W + 0.05;
+      const reachY = Math.max(R_SWIRL, LEAF_MAX_HALFW, el.hasPearl ? Math.abs(el.pearlYOffset) + el.pearlRadius : 0) + ROSETTE_MARGIN + ROSETTE_SMOOTH_W + 0.05;
+      aMin = el.angle - reachX / radius;
+      aMax = el.angle + reachX / radius;
+      yMin = el.y - reachY;
+      yMax = el.y + reachY;
     } else if (el.type === 'capsule') {
       // Horizontal reach is the widest (rope window is stretched across
       // the arc, see capsuleCoverage), vertical the narrowest.
@@ -520,6 +509,45 @@ export function getVictorianLambethGlazeCoverageFn(radius, height, opts = {}) {
     return c * c * (3 - 2 * c);
   };
 
+  const rosetteCoverage = (el, angle, localY) => {
+    const lx = radius * wrapSigned(angle - el.angle);
+    const ly = localY - el.y;
+
+    // 1. Central rosette swirl (round circular disc matching petal geometry)
+    const distSwirl = R_SWIRL - Math.hypot(lx, ly);
+
+    // 2. Symmetrical horizontal side leaves (matching createLeafGeometry silhouette)
+    const d = Math.abs(lx);
+    let distLeaf = -999;
+    if (d <= LEAF_TIP_X + ROSETTE_MARGIN + ROSETTE_SMOOTH_W) {
+      const u = Math.min(1, Math.max(0, (d - LEAF_BASE_X) / LEAF_TOTAL_LEN));
+      const leafHalfW = LEAF_MAX_HALFW * Math.sin(Math.PI * Math.pow(u, 0.55));
+      const dy = leafHalfW - Math.abs(ly);
+      const dx = LEAF_TIP_X - d;
+      if (dy >= 0 && dx >= 0) {
+        distLeaf = Math.min(dy, dx);
+      } else if (dy < 0 && dx >= 0) {
+        distLeaf = dy;
+      } else if (dy >= 0 && dx < 0) {
+        distLeaf = dx;
+      } else {
+        distLeaf = -Math.hypot(dx, dy);
+      }
+    }
+
+    let maxDist = Math.max(distSwirl, distLeaf);
+
+    // 3. Anchor pearl sitting right below the swirl
+    if (el.hasPearl) {
+      const distPearl = el.pearlRadius - Math.hypot(lx, ly - el.pearlYOffset);
+      if (distPearl > maxDist) maxDist = distPearl;
+    }
+
+    const distInside = maxDist + ROSETTE_MARGIN;
+    if (distInside <= 0) return 0;
+    return smoothstep(distInside / ROSETTE_SMOOTH_W);
+  };
+
   const ellipseCoverage = (el, angle, localY) => {
     const dx = radius * wrapSigned(angle - el.angle);
     const dy = localY - el.y;
@@ -536,20 +564,6 @@ export function getVictorianLambethGlazeCoverageFn(radius, height, opts = {}) {
     // Full strength once we are inside the element's own true size.
     const ramp = Math.max(0.012, minAxis - Math.min(el.rx, el.ry));
     return smoothstep(inside / ramp);
-  };
-
-  // Pointed-lens window: fully open inside the leaf's true silhouette,
-  // ramping to closed over `margin` outside it (sides and both ends).
-  const leafCoverage = (el, angle, localY) => {
-    const m = el.margin;
-    const s = el.side * radius * wrapSigned(angle - el.angle);
-    const a = s - el.base; // distance along the leaf from its base
-    if (a < -m || a > el.len + m) return 0;
-    const u = Math.min(1, Math.max(0, a / el.len));
-    const trueHalf = el.half * Math.sin(Math.PI * Math.pow(u, 0.55));
-    const across = (trueHalf + m - Math.abs(localY - el.y)) / m;
-    const along = a < 0 ? 1 + a / m : a > el.len ? 1 - (a - el.len) / m : 1;
-    return smoothstep(Math.min(across, along));
   };
 
   const capsuleCoverage = (el, angle, localY) => {
@@ -595,19 +609,22 @@ export function getVictorianLambethGlazeCoverageFn(radius, height, opts = {}) {
     let coverage = 0;
     for (const el of bucket) {
       if (localY < el.yMin || localY > el.yMax) continue;
-      const c = el.type === 'ellipse'
+      const c = el.type === 'rosette'
+        ? rosetteCoverage(el, wrapped, localY)
+        : el.type === 'ellipse'
         ? ellipseCoverage(el, wrapped, localY)
-        : el.type === 'leaf'
-        ? leafCoverage(el, wrapped, localY)
         : el.type === 'capsule'
         ? capsuleCoverage(el, wrapped, localY)
         : curtainCoverage(el, wrapped, localY);
       if (c > coverage) {
         coverage = c;
-        if (coverage >= 1) return 1;
+        if (coverage >= 1) {
+          coverage = 1;
+          break;
+        }
       }
     }
-    return coverage;
+    return coverage * maxDepth;
   };
 }
 
@@ -690,7 +707,15 @@ function localMerge(geos) {
   return out;
 }
 
-export function buildVictorianLambeth(radius, height, icingColorHex, pearlColorHex = '#ffffff', variant = 'classic', icingColorId = null) {
+export function buildVictorianLambeth(radius, height, icingColorHex, pearlColorHex = '#ffffff', variant = 'classic', icingColorId = null, opts = {}) {
+  const options = typeof opts === 'boolean' ? { hasDrip: opts } : (opts || {});
+  const hasDrip = Boolean(options.hasDrip || options.atDrip);
+  const coatThickness = options.coatThickness ?? options.dripThickness ?? 0.06;
+  const maxGlazeCarveDepth = options.maxCarveDepth ?? 0.50;
+  const dripCarvedThickness = coatThickness * (1 - maxGlazeCarveDepth);
+  const dripOffset = options.dripOffset ?? (hasDrip ? dripCarvedThickness : 0);
+  const surfaceRadius = radius + dripOffset;
+
   const masterGroup = new THREE.Group();
 
   // 1. Procedural GPU Buttercream Material
@@ -708,7 +733,7 @@ export function buildVictorianLambeth(radius, height, icingColorHex, pearlColorH
   });
 
   // 3. Flush Standoff Hierarchy
-  const R_cake = radius;
+  const R_cake = surfaceRadius;
   const R_curtain = R_cake + 0.020;
   const R_rope1 = R_cake + 0.015; // Top border rope
   const R_rope2 = R_cake + 0.015; // Middle border rope riding on front curtain surface

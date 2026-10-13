@@ -6,6 +6,9 @@ const {
   verifyThumbnailAsset,
 } = require('../config/cloudinary');
 
+const MAX_TRASH_CAPACITY = 20;
+exports.MAX_TRASH_CAPACITY = MAX_TRASH_CAPACITY;
+
 function legacyEmail(req) {
   if (!req.auth?.emailVerified) return '';
   return String(req.user?.email || req.auth?.email || '').trim().toLowerCase();
@@ -35,9 +38,10 @@ function notFound(res) {
 exports.getDesigns = async (req, res) => {
   try {
     const trashOnly = req.query.isTrashed === 'true';
+    const sort = trashOnly ? { trashedAt: -1, lastEdited: -1 } : { lastEdited: -1 };
     const designs = await Design.find({ ...ownerFilter(req), isTrashed: trashOnly })
-      .sort({ lastEdited: -1 })
-      .limit(trashOnly ? 5 : 20);
+      .sort(sort)
+      .limit(MAX_TRASH_CAPACITY);
     return res.json(designs);
   } catch (error) {
     console.error('Error fetching designs:', error);
@@ -191,18 +195,20 @@ exports.moveToTrash = async (req, res) => {
     const design = await Design.findOne(ownedDesignFilter(req));
     if (!design) return notFound(res);
     const filter = ownerFilter(req);
-    const trashedCount = await Design.countDocuments({ ...filter, isTrashed: true });
-    if (trashedCount >= 5) {
-      const oldest = await Design.findOneAndDelete({ ...filter, isTrashed: true }, { sort: { trashedAt: 1 } });
-      if (oldest) {
-        await deleteTrustedThumbnail({
-          asset: oldest.thumbnailAsset,
-          firebaseUid: req.auth.uid,
-          designId: oldest._id.toString(),
-        });
+    if (!design.isTrashed) {
+      const trashedCount = await Design.countDocuments({ ...filter, isTrashed: true });
+      if (trashedCount >= MAX_TRASH_CAPACITY) {
+        const oldest = await Design.findOneAndDelete({ ...filter, isTrashed: true }, { sort: { trashedAt: 1 } });
+        if (oldest) {
+          await deleteTrustedThumbnail({
+            asset: oldest.thumbnailAsset,
+            firebaseUid: req.auth.uid,
+            designId: oldest._id.toString(),
+          });
+        }
       }
+      design.isTrashed = true;
     }
-    design.isTrashed = true;
     design.trashedAt = new Date();
     return res.json(await design.save());
   } catch (error) {

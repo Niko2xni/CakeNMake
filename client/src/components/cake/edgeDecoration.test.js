@@ -104,26 +104,8 @@ describe('Uniform and Individual tier state', () => {
     expect(nextSide.layerTreatments[1]).toEqual(side);
   });
 
-  it('shows Assorted Color Plains for Chevron Multi-Color', () => {
-    render(React.createElement(SideSection, {
-      side: {
-        mode: 'chevronPattern',
-        chevronPattern: { setId: 'multiColor' },
-      },
-      structure: { layers: 1, layerDesign: 'uniform' },
-      onChange: () => {},
-      sugarColor: {},
-      onSugarColorChange: () => {},
-    }));
-
-    expect(screen.getByText('Assorted Color')).toBeInTheDocument();
-    expect(screen.getByText('Plains')).toBeInTheDocument();
-    expect(screen.queryByText('Match Flavor')).not.toBeInTheDocument();
-    expect(screen.queryByText('Pick Color')).not.toBeInTheDocument();
-  });
-
-  it('shows Assorted Color for both assorted Sunshine Play variants', () => {
-    for (const setId of ['assortedStarBurst', 'assortedStarryRainbow']) {
+  it('shows default Sugar Color picker for starrySunshinePlay', () => {
+    for (const setId of ['starrySunshinePlay']) {
       const { unmount } = render(React.createElement(SideSection, {
         side: {
           mode: 'sunshinePlay',
@@ -135,29 +117,32 @@ describe('Uniform and Individual tier state', () => {
         onSugarColorChange: () => {},
       }));
 
-      expect(screen.getByText('Assorted Color')).toBeInTheDocument();
-      expect(screen.getByText('Plains')).toBeInTheDocument();
-      expect(screen.queryByText('Match Flavor')).not.toBeInTheDocument();
-      expect(screen.queryByText('Pick Color')).not.toBeInTheDocument();
+      expect(screen.queryByText('Assorted Color')).not.toBeInTheDocument();
+      expect(screen.queryByText('Plains')).not.toBeInTheDocument();
+      expect(screen.getByText('Match Flavor')).toBeInTheDocument();
+      expect(screen.getByText('Pick Color')).toBeInTheDocument();
       unmount();
     }
   });
 
-  it('shows 1st and 2nd Color toggles for Chevron Two-Tone', () => {
-    render(React.createElement(SideSection, {
-      side: {
-        mode: 'chevronPattern',
-        chevronPattern: { setId: 'twoTone' },
-      },
-      structure: { layers: 1, layerDesign: 'uniform' },
-      onChange: () => {},
-      sugarColor: { mode: 'colorOverride', colorId: 'red' },
-      onSugarColorChange: () => {},
-    }));
+  it('shows 1st and 2nd Color toggles for Chevron Two-Tone and Three-Tone', () => {
+    for (const setId of ['twoTone', 'threeTone']) {
+      const { unmount } = render(React.createElement(SideSection, {
+        side: {
+          mode: 'chevronPattern',
+          chevronPattern: { setId },
+        },
+        structure: { layers: 1, layerDesign: 'uniform' },
+        onChange: () => {},
+        sugarColor: { mode: 'colorOverride', colorId: 'red' },
+        onSugarColorChange: () => {},
+      }));
 
-    expect(screen.getByRole('button', { name: '1st Color', exact: true })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '2nd Color', exact: true })).toBeInTheDocument();
-    expect(screen.getByText('Pick Color')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '1st Color', exact: true })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '2nd Color', exact: true })).toBeInTheDocument();
+      expect(screen.getByText('Pick Color')).toBeInTheDocument();
+      unmount();
+    }
   });
 });
 

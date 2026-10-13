@@ -4,6 +4,7 @@ import {
   SIZE_OPTIONS,
   STANDARD_SIZE_OPTIONS,
   BENTO_SIZE_OPTIONS,
+  BENTO_SQUARE_SIZE_OPTIONS,
   PETITS_FOUR_SIZE_OPTIONS,
   LAYER_OPTIONS,
   SHAPE_OPTIONS,
@@ -26,10 +27,17 @@ export default function CakeStructureSection({ structure, realSize, onChange }) 
   const activeSizeOptions = isPetitsFour
     ? PETITS_FOUR_SIZE_OPTIONS
     : isBento
-    ? BENTO_SIZE_OPTIONS
+    ? visualShape === 'square' ? BENTO_SQUARE_SIZE_OPTIONS : BENTO_SIZE_OPTIONS
     : STANDARD_SIZE_OPTIONS;
 
   // Filter out 10x10 and 12x12 when square shape is active
+  // Same idea for size: if the stored size isn't one of this format's options
+  // (e.g. switching to Petit Fours while an old size id is stored), the first
+  // option is what actually renders, so show it as selected.
+  const effectiveSize = activeSizeOptions.some((o) => o.id === structure.size)
+    ? structure.size
+    : activeSizeOptions[0]?.id;
+
   const filteredSizeOptions = visualShape === 'square' && !isPetitsFour && !isBento
     ? activeSizeOptions.filter(opt => opt.id === '6x6' || opt.id === '8x8')
     : activeSizeOptions;
@@ -55,9 +63,13 @@ export default function CakeStructureSection({ structure, realSize, onChange }) 
         selectedOption ? selectedOption.dimensions : realSize
       );
     } else if (nextFormat === 'bento') {
-      const isCurrentBentoSize = BENTO_SIZE_OPTIONS.some((o) => o.id === structure.size);
-      const nextSize = isCurrentBentoSize ? structure.size : 'standardBento';
-      const selectedOption = BENTO_SIZE_OPTIONS.find((o) => o.id === nextSize);
+      const currentBentoSizes = [...BENTO_SIZE_OPTIONS, ...BENTO_SQUARE_SIZE_OPTIONS];
+      const isCurrentBentoSize = currentBentoSizes.some((o) => o.id === structure.size);
+      let nextSize = isCurrentBentoSize ? structure.size : 'standardBento';
+      if (nextVisualShape(structure) === 'square' && !BENTO_SQUARE_SIZE_OPTIONS.some((o) => o.id === nextSize)) {
+        nextSize = 'squareBento3x3';
+      }
+      const selectedOption = currentBentoSizes.find((o) => o.id === nextSize);
       onChange(
         {
           ...structure,
@@ -71,7 +83,9 @@ export default function CakeStructureSection({ structure, realSize, onChange }) 
         selectedOption ? selectedOption.dimensions : realSize
       );
     } else {
-      const isSpecialSize = BENTO_SIZE_OPTIONS.some((o) => o.id === structure.size) || PETITS_FOUR_SIZE_OPTIONS.some((o) => o.id === structure.size);
+      const isSpecialSize = BENTO_SIZE_OPTIONS.some((o) => o.id === structure.size)
+        || BENTO_SQUARE_SIZE_OPTIONS.some((o) => o.id === structure.size)
+        || PETITS_FOUR_SIZE_OPTIONS.some((o) => o.id === structure.size);
       const nextSize = isSpecialSize ? '8x8' : structure.size;
       const selectedOption = STANDARD_SIZE_OPTIONS.find((o) => o.id === nextSize);
       // Always force 1 tier
@@ -100,8 +114,10 @@ export default function CakeStructureSection({ structure, realSize, onChange }) 
     // Always force single tier
     const nextLayers = 1;
     const nextLayerDesign = 'uniform';
-    // If square shape is selected but size isn't 6x6 or 8x8, reset to round
-    const nextShape = structure.shape === 'square' && size !== '6x6' && size !== '8x8'
+    const isSquareSize = cakeFormat === 'bento'
+      ? BENTO_SQUARE_SIZE_OPTIONS.some((option) => option.id === size)
+      : size === '6x6' || size === '8x8';
+    const nextShape = structure.shape === 'square' && !isSquareSize
       ? 'round'
       : structure.shape;
     onChange(
@@ -129,7 +145,18 @@ export default function CakeStructureSection({ structure, realSize, onChange }) 
   };
 
   const updateShape = (shape) => {
-    onChange({ ...structure, cakeFormat, format: cakeFormat, shape }, realSize);
+    const validSquareSizes = isBento ? BENTO_SQUARE_SIZE_OPTIONS : STANDARD_SIZE_OPTIONS.filter((option) => option.id === '6x6' || option.id === '8x8');
+    const isAllowedSquareSize = validSquareSizes.some((option) => option.id === structure.size);
+    const nextSize = shape === 'square' && !isAllowedSquareSize
+      ? (isBento ? 'squareBento3x3' : '8x8')
+      : shape !== 'square' && isBento && BENTO_SQUARE_SIZE_OPTIONS.some((option) => option.id === structure.size)
+      ? 'standardBento'
+      : structure.size;
+    const selectedOption = SIZE_OPTIONS.find((option) => option.id === nextSize);
+    onChange(
+      { ...structure, cakeFormat, format: cakeFormat, shape, size: nextSize },
+      selectedOption ? selectedOption.dimensions : realSize
+    );
   };
 
   return (
@@ -157,13 +184,13 @@ export default function CakeStructureSection({ structure, realSize, onChange }) 
       {/* 2. Cake Size */}
       <div>
         <span className="text-xs text-muted-foreground mb-2 block font-medium">Cake Size</span>
-        <div className={`grid ${isBento ? 'grid-cols-3' : isPetitsFour ? 'grid-cols-2' : visualShape === 'square' ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-4'} gap-2`}>
+        <div className={`grid ${isBento && visualShape !== 'square' ? 'grid-cols-3' : isPetitsFour ? 'grid-cols-2' : visualShape === 'square' ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-4'} gap-2`}>
           {filteredSizeOptions.map((option) => (
             <button
               key={option.id}
               onClick={() => updateSize(option.id)}
               className={`py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 ${
-                structure.size === option.id
+                effectiveSize === option.id
                   ? 'bg-primary text-primary-foreground shadow-md'
                   : 'bg-muted text-muted-foreground hover:bg-muted/80'
               }`}
@@ -204,9 +231,11 @@ export default function CakeStructureSection({ structure, realSize, onChange }) 
               return null;
             }
             
-            // Square shape is only available for 6x6 and 8x8 standard sizes
-            const isSquareRestricted = option.id === 'square' && 
-              (cakeFormat !== 'standard' || (structure.size !== '6x6' && structure.size !== '8x8'));
+            // Square Bentos have dedicated 2x2 and 3x3 size options.
+            const isSquareRestricted = option.id === 'square' && (
+              isPetitsFour
+              || (!isBento && structure.size !== '6x6' && structure.size !== '8x8')
+            );
             
             return (
               <button

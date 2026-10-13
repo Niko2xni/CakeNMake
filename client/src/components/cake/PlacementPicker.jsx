@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import { MapPin, Trash2, Pipette } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import OptionButtonContent from './OptionButtonContent';
 
 const PLACEABLE_ITEMS = [
   { key: 'cherry', emoji: '🍒', label: 'Cherry' },
@@ -93,14 +94,16 @@ export default function PlacementPicker({ activeTool, onSelectTool, onClearAll, 
               onClick={() => handleItemClick(key)}
               title={label}
               className={cn(
-                'flex flex-col items-center justify-center gap-1 rounded-xl p-2 text-xs font-medium transition-all duration-200 border-2',
+                'relative flex flex-col items-center justify-center gap-1 rounded-xl p-2 text-xs font-medium transition-all duration-200 border-2',
                 activeTool === key
                   ? 'bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20 scale-105'
                   : 'bg-muted border-transparent hover:border-primary/30 text-foreground/60 hover:text-foreground'
               )}
             >
-              <span className="text-xl">{emoji}</span>
-              <span className="text-[10px] leading-none">{label}</span>
+              <OptionButtonContent selected={activeTool === key} canDeselect label={label}>
+                <span className="text-xl">{emoji}</span>
+                <span className="text-[10px] leading-none">{label}</span>
+              </OptionButtonContent>
             </button>
           ))}
         </div>
@@ -143,14 +146,16 @@ export default function PlacementPicker({ activeTool, onSelectTool, onClearAll, 
               onClick={() => handlePatternClick(key)}
               title={label}
               className={cn(
-                'flex flex-col items-center justify-center gap-1 rounded-xl p-2 text-xs font-medium transition-all duration-200 border-2',
+                'relative flex flex-col items-center justify-center gap-1 rounded-xl p-2 text-xs font-medium transition-all duration-200 border-2',
                 pipePattern === key
                   ? 'bg-accent text-accent-foreground border-accent shadow-md scale-105'
                   : 'bg-muted border-transparent hover:border-accent/40 text-foreground/60 hover:text-foreground'
               )}
             >
-              <span className="text-lg">{emoji}</span>
-              <span className="text-[10px] leading-none">{label}</span>
+              <OptionButtonContent selected={pipePattern === key} canDeselect label={label}>
+                <span className="text-lg">{emoji}</span>
+                <span className="text-[10px] leading-none">{label}</span>
+              </OptionButtonContent>
             </button>
           ))}
         </div>
@@ -164,17 +169,24 @@ export default function PlacementPicker({ activeTool, onSelectTool, onClearAll, 
               onClick={() => handleFlavorClick(key)}
               title={label}
               className={cn(
-                'flex flex-col items-center justify-center gap-1 rounded-xl p-2 text-xs font-medium transition-all duration-200 border-2',
+                'relative flex flex-col items-center justify-center gap-1 rounded-xl p-2 text-xs font-medium transition-all duration-200 border-2',
                 pipeFlavor === key
                   ? 'border-foreground shadow-md scale-105 bg-card'
                   : 'bg-muted border-transparent hover:border-foreground/30 text-foreground/60 hover:text-foreground'
               )}
             >
-              <div
-                className="w-5 h-5 rounded-full border border-border/50 shadow-inner"
-                style={{ backgroundColor: color }}
-              />
-              <span className="text-[10px] leading-none">{label}</span>
+              <OptionButtonContent
+                selected={pipeFlavor === key}
+                canDeselect
+                label={label}
+                iconClassName="h-3 w-3 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]"
+              >
+                <div
+                  className="w-5 h-5 rounded-full border border-border/50 shadow-inner"
+                  style={{ backgroundColor: color }}
+                />
+                <span className="text-[10px] leading-none">{label}</span>
+              </OptionButtonContent>
             </button>
           ))}
         </div>

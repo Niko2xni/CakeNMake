@@ -38,7 +38,14 @@ export default function SurfaceTreatmentSection({ surfaceTreatment, onChange, is
   const patternSet = isPetitsFour ? 'petitsFour' : 'standard';
   const otherPatternSet = isPetitsFour ? 'standard' : 'petitsFour';
   const patternOptions = isPetitsFour ? PETIT_FOURS_GLAZE_PATTERNS : GLAZE_PATTERNS;
-  const selectedPattern = getSurfaceTreatmentPattern(activeTreatment, structure);
+  const resolvedPattern = getSurfaceTreatmentPattern(activeTreatment, structure);
+  // The scene falls back to a default pattern when the stored one doesn't belong
+  // to this format's list (e.g. Petit Fours reading a standard-cake pattern id
+  // such as 'longGaps'). Mirror that here so the default button shows as
+  // selected instead of every button looking unselected.
+  const selectedPattern = patternOptions.some((o) => o.id === resolvedPattern)
+    ? resolvedPattern
+    : patternOptions[0]?.id;
 
   const toggleGlaze = () => {
     const nextTreatment = { ...activeTreatment, mode: active ? null : 'glaze' };
