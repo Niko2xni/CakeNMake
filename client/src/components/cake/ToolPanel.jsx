@@ -118,13 +118,13 @@ export default function ToolPanel({
   const tabs = isPetitsFour
     ? TABS.filter(({ id }) => id !== 'side' && id !== 'edge' && id !== 'center')
     : isBento
-    ? TABS.filter(({ id }) => id !== 'side')
-    : TABS;
+      ? TABS.filter(({ id }) => id !== 'side')
+      : TABS;
   const activeTab = isPetitsFour && (tab === 'side' || tab === 'edge' || tab === 'center')
     ? 'fundamentals'
     : isBento && tab === 'side'
-    ? 'fundamentals'
-    : tab;
+      ? 'fundamentals'
+      : tab;
 
   useEffect(() => {
     if (activeTab !== tab) {
@@ -169,11 +169,11 @@ export default function ToolPanel({
   // Store and restore side designs when switching between Standard and Bento/Petit Fours
   const savedSideConfigRef = useRef(null);
   const previousFormatRef = useRef(null);
-  
+
   useEffect(() => {
     const currentFormat = getCakeFormat(config.structure);
     const previousFormat = previousFormatRef.current;
-    
+
     // Detect format change
     if (previousFormat !== currentFormat) {
       if (currentFormat === 'standard' && previousFormat && previousFormat !== 'standard') {
@@ -427,19 +427,19 @@ export default function ToolPanel({
       : config.sugarColorOverrides?.[context]) || DEFAULT_CONFIG.sugarColor;
 
     return (
-    <SugarColorSection
-      sugarColor={activeColor}
-      onChange={(newSugarColor) => updateContextSugarColor(context, newSugarColor)}
-      showDefaultColorPicker
-      // Glaze ('surface') is a thin poured coat, not a full buttercream
-      // build, so the six Pattern/multi-tone colors don't apply the way
-      // they do on Filling/Exterior Finish — see excludePatternColors'
-      // doc comment in SugarColorSection.jsx. Scoped to just this
-      // context rather than passed unconditionally, so if this same
-      // helper gets reused for Center/Edge/Side later, they aren't
-      // silently opted into the same restriction without being asked.
-      excludePatternColors={context === 'surface'}
-    />
+      <SugarColorSection
+        sugarColor={activeColor}
+        onChange={(newSugarColor) => updateContextSugarColor(context, newSugarColor)}
+        showDefaultColorPicker
+        // Glaze ('surface') is a thin poured coat, not a full buttercream
+        // build, so the six Pattern/multi-tone colors don't apply the way
+        // they do on Filling/Exterior Finish — see excludePatternColors'
+        // doc comment in SugarColorSection.jsx. Scoped to just this
+        // context rather than passed unconditionally, so if this same
+        // helper gets reused for Center/Edge/Side later, they aren't
+        // silently opted into the same restriction without being asked.
+        excludePatternColors={context === 'surface'}
+      />
     );
   };
   const fillingSugarColor = (isIndividual
@@ -456,7 +456,7 @@ export default function ToolPanel({
     : (config.surfaceTreatment || DEFAULT_CONFIG.surfaceTreatment);
 
   return (
-    <div className="cn-designer-tool-panel relative flex flex-col h-full bg-card rounded-2xl shadow-xl border border-border/50 overflow-hidden select-none">
+    <div data-tutorial="toolpanel" className="cn-designer-tool-panel relative flex flex-col h-full bg-card rounded-2xl shadow-xl border border-border/50 overflow-hidden select-none">
       {/* "Applied — hidden under frosting" confirmation. Sponge Flavor and
           Filling changes have no visible effect once Fully Frosted or
           Textured Buttercream covers them (see isFrostedExterior above),
@@ -496,33 +496,33 @@ export default function ToolPanel({
       {/* Mode switcher header */}
       <div className="px-3 pt-2 pb-2 md:px-4 md:pt-4 md:pb-3 flex items-center gap-2">
         <button
+          data-tutorial="mode-design"
           onClick={() => {
             if (isAiBusy) return;
             setModeUi('design');
           }}
           disabled={isAiBusy}
           title={isAiBusy ? 'AI is editing the cake. Switching to manual design is locked until it finishes.' : undefined}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
-            isAiBusy
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-sm font-semibold transition-all duration-200 ${isAiBusy
               ? 'opacity-40 cursor-not-allowed bg-muted/40 text-muted-foreground'
               : modeUi === 'design'
                 ? 'bg-primary text-primary-foreground shadow-md'
                 : 'bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted'
-          }`}
+            }`}
         >
           <Cake className="w-4 h-4" />
           Design
         </button>
         <button
+          data-tutorial="mode-ai"
           onClick={() => {
             onSelectTool?.(null);
             setModeUi('ai');
           }}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
-            modeUi === 'ai'
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-sm font-semibold transition-all duration-200 ${modeUi === 'ai'
               ? 'bg-primary text-primary-foreground shadow-md'
               : 'bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted'
-          }`}
+            }`}
         >
           <Bot className="w-4 h-4" />
           AI
@@ -534,11 +534,9 @@ export default function ToolPanel({
           variant="ghost"
           size="icon"
           disabled={isAiBusy}
-          className={`rounded-full shrink-0 h-9 w-9 ${
-            isAiBusy ? 'opacity-40 cursor-not-allowed' : ''
-          } ${
-            config.interiorPreview ? 'text-amber-600' : 'text-muted-foreground hover:text-foreground'
-          }`}
+          className={`rounded-full shrink-0 h-9 w-9 ${isAiBusy ? 'opacity-40 cursor-not-allowed' : ''
+            } ${config.interiorPreview ? 'text-amber-600' : 'text-muted-foreground hover:text-foreground'
+            }`}
           onClick={toggleInteriorPreview}
           title={
             isAiBusy
@@ -552,9 +550,8 @@ export default function ToolPanel({
           variant="ghost"
           size="icon"
           disabled={isAiBusy}
-          className={`rounded-full text-muted-foreground hover:text-foreground shrink-0 h-9 w-9 ${
-            isAiBusy ? 'opacity-40 cursor-not-allowed' : ''
-          }`}
+          className={`rounded-full text-muted-foreground hover:text-foreground shrink-0 h-9 w-9 ${isAiBusy ? 'opacity-40 cursor-not-allowed' : ''
+            }`}
           onClick={() => {
             if (isAiBusy) return;
             setShowResetConfirm(true);
@@ -588,28 +585,27 @@ export default function ToolPanel({
           small inline banner this replaces). */}
       <div className="relative flex-1 flex flex-col min-h-0">
         <div
-          className={`flex-1 flex flex-col min-h-0 transition-all duration-300 ${
-            config.interiorPreview
+          className={`flex-1 flex flex-col min-h-0 transition-all duration-300 ${config.interiorPreview
               ? 'blur-[3px] opacity-30 pointer-events-none select-none'
               : ''
-          }`}
+            }`}
           aria-hidden={config.interiorPreview}
         >
           {/* Keep the conversation mounted when switching to manual design. */}
-            <div className={`flex-1 p-3 md:p-4 min-h-0 flex-col ${modeUi === 'ai' ? 'flex' : 'hidden'}`} aria-hidden={modeUi !== 'ai'}>
-              <AIChatPanel
-                config={config}
-                onChange={onChange}
-                quote={quote}
-                session={aiChatSession}
-                active={modeUi === 'ai'}
-                onThinkingChange={setInternalAiThinking}
-              />
-            </div>
+          <div className={`flex-1 p-3 md:p-4 min-h-0 flex-col ${modeUi === 'ai' ? 'flex' : 'hidden'}`} aria-hidden={modeUi !== 'ai'}>
+            <AIChatPanel
+              config={config}
+              onChange={onChange}
+              quote={quote}
+              session={aiChatSession}
+              active={modeUi === 'ai'}
+              onThinkingChange={setInternalAiThinking}
+            />
+          </div>
           {modeUi !== 'ai' && (
             <>
-{/* Tab switcher — balanced 2x2 layout for the four remaining sections */}
-              <div className="grid grid-cols-2 gap-2 px-4 py-2 bg-muted/30">
+              {/* Tab switcher — balanced 2x2 layout for the four remaining sections */}
+              <div data-tutorial="tabs-surface" className="grid grid-cols-2 gap-2 px-4 py-2 bg-muted/30">
                 {tabs.map(({ id, label, icon: Icon, zIndex }) => (
                   <button
                     key={id}
@@ -618,11 +614,10 @@ export default function ToolPanel({
                       setTab(id);
                     }}
                     style={{ zIndex }}
-                    className={`relative flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-lg text-xs font-semibold transition-all duration-200 ${
-                      activeTab === id
+                    className={`relative flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-lg text-xs font-semibold transition-all duration-200 ${activeTab === id
                         ? 'bg-card shadow text-foreground'
                         : 'text-muted-foreground hover:text-foreground'
-                    }`}
+                      }`}
                   >
                     <Icon className="w-3.5 h-3.5" />
                     {label}
@@ -636,235 +631,235 @@ export default function ToolPanel({
                 onPointerDown={handlePointerDownScroll}
                 onClickCapture={handleClickCapture}
               >
-            <motion.div
-              className="p-4 space-y-4"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.2 }}
-            >
-              {(config.structure?.layers > 1 || isPetitsFour) && activeTab !== 'center' && activeTab !== 'edge' && (
-                <>
-                  <TierDesignControl
-                    structure={config.structure}
-                    onChange={(newStructure) => {
-                      if (newStructure.layerDesign !== config.structure?.layerDesign) {
-                        handleTierDesignToggle(newStructure.layerDesign);
-                      } else {
-                        onChange({ ...config, structure: newStructure });
-                      }
-                    }}
-                    onToggle={handleTierDesignToggle}
-                  />
-                  {showLayerStrip && (
-                    <LayerTabStrip
-                      layers={isPetitsFour ? 4 : config.structure.layers}
-                      isPetitsFour={isPetitsFour}
-                      activeLayer={activeLayer}
-                      onLayerChange={setActiveLayer}
-                    />
-                  )}
-                </>
-              )}
-
-              {activeTab === 'fundamentals' && (
-                <>
-                  {/* 1. Cake Structure */}
-                  <div ref={registerSectionRef('structure')} className="scroll-mt-4">
-                  <Collapsible
-                    open={expandedSections.structure}
-                    onOpenChange={() => toggleSection('structure')}
-                  >
-                    <CollapsibleTrigger className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-2">
-                        <Building2 className="w-4 h-4 text-primary/60" />
-                        <span className="text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">
-                          Cake Structure
-                        </span>
-                      </div>
-                      {expandedSections.structure ? (
-                        <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                      )}
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="mt-3">
-                      <CakeStructureSection
-                        structure={config.structure || DEFAULT_CONFIG.structure}
-                        realSize={config.realSize}
-                        onChange={handleStructureChange}
-                      />
-                    </CollapsibleContent>
-                  </Collapsible>
-                  </div>
-
-                  <Separator className="opacity-50" />
-
-                  {/* 2. Sponge Flavor */}
-                  <div ref={registerSectionRef('sponge')} className="scroll-mt-4">
-                  <Collapsible
-                    open={expandedSections.sponge}
-                    onOpenChange={() => toggleSection('sponge')}
-                  >
-                    <CollapsibleTrigger className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-2">
-                        <Cake className="w-4 h-4 text-primary/60" />
-                        <span className="text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">
-                          Sponge Flavor
-                        </span>
-                      </div>
-                      {expandedSections.sponge ? (
-                        <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                      )}
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="mt-3">
-                      <SpongeFlavorSection
-                        sponge={config.sponge || DEFAULT_CONFIG.sponge}
-                        structure={config.structure || DEFAULT_CONFIG.structure}
-                        activeLayer={activeLayer}
-                        sugarColor={fillingSugarColor}
-                        onSugarColorChange={(newSugarColor) => onChange({
-                          ...config,
-                          sugarColorOverrides: {
-                            ...(config.sugarColorOverrides || {}),
-                            [isIndividual ? `filling-${activeLayer}` : 'filling']: newSugarColor,
-                          },
-                        })}
-                        onChange={(newSponge) => {
-                          onChange({
-                            ...config,
-                            sponge: newSponge
-                          });
-                          if (isFrostedExterior) notifyFrostedChange('Sponge Flavor updated');
-                        }}
-                      />
-                    </CollapsibleContent>
-                  </Collapsible>
-                  </div>
-
-                  <Separator className="opacity-50" />
-
-                  {/* 3. Filling */}
-                  <div ref={registerSectionRef('filling')} className="scroll-mt-4">
-                  <Collapsible
-                    open={expandedSections.filling}
-                    onOpenChange={() => toggleSection('filling')}
-                  >
-                    <CollapsibleTrigger className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-primary/60" />
-                        <span className="text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">
-                          Filling
-                        </span>
-                      </div>
-                      {expandedSections.filling ? (
-                        <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                      )}
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="mt-3">
-                      <FillingSection
-                        filling={config.filling || DEFAULT_CONFIG.filling}
-                        structure={config.structure || DEFAULT_CONFIG.structure}
-                        exteriorFinish={config.exteriorFinish || DEFAULT_CONFIG.exteriorFinish}
-                        interiorPreview={config.interiorPreview}
-                        activeLayer={activeLayer}
-                        sugarColor={fillingSugarColor}
-                        onSugarColorChange={(newSugarColor) => updateContextSugarColor('filling', newSugarColor)}
-                        onChange={(newFilling) => {
-                          onChange({
-                            ...config,
-                            filling: newFilling
-                          });
-                          if (isFrostedExterior) notifyFrostedChange('Filling updated');
-                        }}
-                      />
-                    </CollapsibleContent>
-                  </Collapsible>
-                  </div>
-
-                  <Separator className="opacity-50" />
-
-                  {/* 4. Exterior Finish */}
-                  <div ref={registerSectionRef('exteriorFinish')} className="scroll-mt-4">
-                  <Collapsible
-                    open={expandedSections.exteriorFinish}
-                    onOpenChange={() => toggleSection('exteriorFinish')}
-                  >
-                    <CollapsibleTrigger className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-2">
-                        <Palette className="w-4 h-4 text-primary/60" />
-                        <span className="text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">
-                          Exterior Finish
-                        </span>
-                      </div>
-                      {expandedSections.exteriorFinish ? (
-                        <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                      )}
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="mt-3">
-                      <ExteriorFinishSection
-                        exterior={config.exteriorFinish || DEFAULT_CONFIG.exteriorFinish}
-                        structure={config.structure || DEFAULT_CONFIG.structure}
-                        activeLayer={activeLayer}
-                        sugarColor={exteriorSugarColor}
-                        onSugarColorChange={(newSugarColor) => updateContextSugarColor('exterior', newSugarColor)}
-                        onChange={(newExteriorFinish) => {
-                          const newStyle = newExteriorFinish?.style;
-                          const newLayerStyles = newExteriorFinish?.layerStyles || [];
-
-                          let nextConfig = {
-                            ...config,
-                            exteriorFinish: newExteriorFinish,
-                          };
-
-                          // Frosted/Textured finishes cover the filling
-                          // edge, so a Mashed piping design hidden by the
-                          // new finish resets to None (FillingSection's
-                          // picker shows None as selected for those finishes
-                          // either way — this keeps the STORED config in
-                          // sync with that display). In individual design
-                          // the reset must reach layerPipings too, since
-                          // the picker reads the active tier's entry there
-                          // rather than the piping mirror, and only tiers
-                          // whose own finish hides piping are reset so
-                          // Naked tiers keep their designs. The mirror
-                          // follows the active tier, matching the shape
-                          // FillingSection's updatePiping writes.
-                          const finishHidesPiping = (style) => style === 'fullyFrosted' || style === 'texturedButtercream';
-                          const currentFilling = config.filling || DEFAULT_CONFIG.filling;
-                          const currentPiping = currentFilling.piping || {};
-                          const currentLayerPipings = currentFilling.layerPipings || [];
-                          const activeNewStyle = newLayerStyles[activeLayer] ?? newStyle;
-                          const resetMirror = finishHidesPiping(activeNewStyle) && Boolean(currentPiping.tip);
-                          const resetLayer = currentLayerPipings.map((layerPiping, i) => (
-                            Boolean(layerPiping?.tip) && finishHidesPiping(newLayerStyles[i] ?? newStyle)
-                          ));
-
-                          if (resetMirror || resetLayer.some(Boolean)) {
-                            nextConfig.filling = {
-                              ...currentFilling,
-                              piping: resetMirror ? { ...currentPiping, tip: null } : currentPiping,
-                              layerPipings: currentLayerPipings.map((layerPiping, i) => (
-                                resetLayer[i] ? { ...layerPiping, tip: null } : layerPiping
-                              )),
-                            };
+                <motion.div
+                  className="p-4 space-y-4"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {(config.structure?.layers > 1 || isPetitsFour) && activeTab !== 'center' && activeTab !== 'edge' && (
+                    <>
+                      <TierDesignControl
+                        structure={config.structure}
+                        onChange={(newStructure) => {
+                          if (newStructure.layerDesign !== config.structure?.layerDesign) {
+                            handleTierDesignToggle(newStructure.layerDesign);
+                          } else {
+                            onChange({ ...config, structure: newStructure });
                           }
-
-                          onChange(nextConfig);
                         }}
+                        onToggle={handleTierDesignToggle}
                       />
-                    </CollapsibleContent>
-                  </Collapsible>
-                  </div>
+                      {showLayerStrip && (
+                        <LayerTabStrip
+                          layers={isPetitsFour ? 4 : config.structure.layers}
+                          isPetitsFour={isPetitsFour}
+                          activeLayer={activeLayer}
+                          onLayerChange={setActiveLayer}
+                        />
+                      )}
+                    </>
+                  )}
 
-                  <Separator className="opacity-50" />
+                  {activeTab === 'fundamentals' && (
+                    <>
+                      {/* 1. Cake Structure */}
+                      <div ref={registerSectionRef('structure')} className="scroll-mt-4">
+                        <Collapsible
+                          open={expandedSections.structure}
+                          onOpenChange={() => toggleSection('structure')}
+                        >
+                          <CollapsibleTrigger className="flex items-center justify-between w-full">
+                            <div className="flex items-center gap-2">
+                              <Building2 className="w-4 h-4 text-primary/60" />
+                              <span className="text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">
+                                Cake Structure
+                              </span>
+                            </div>
+                            {expandedSections.structure ? (
+                              <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                            )}
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="mt-3">
+                            <CakeStructureSection
+                              structure={config.structure || DEFAULT_CONFIG.structure}
+                              realSize={config.realSize}
+                              onChange={handleStructureChange}
+                            />
+                          </CollapsibleContent>
+                        </Collapsible>
+                      </div>
 
-                  {/* 6. Surface Treatment — Glaze / Textured Buttercream,
+                      <Separator className="opacity-50" />
+
+                      {/* 2. Sponge Flavor */}
+                      <div ref={registerSectionRef('sponge')} className="scroll-mt-4">
+                        <Collapsible
+                          open={expandedSections.sponge}
+                          onOpenChange={() => toggleSection('sponge')}
+                        >
+                          <CollapsibleTrigger className="flex items-center justify-between w-full">
+                            <div className="flex items-center gap-2">
+                              <Cake className="w-4 h-4 text-primary/60" />
+                              <span className="text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">
+                                Sponge Flavor
+                              </span>
+                            </div>
+                            {expandedSections.sponge ? (
+                              <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                            )}
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="mt-3">
+                            <SpongeFlavorSection
+                              sponge={config.sponge || DEFAULT_CONFIG.sponge}
+                              structure={config.structure || DEFAULT_CONFIG.structure}
+                              activeLayer={activeLayer}
+                              sugarColor={fillingSugarColor}
+                              onSugarColorChange={(newSugarColor) => onChange({
+                                ...config,
+                                sugarColorOverrides: {
+                                  ...(config.sugarColorOverrides || {}),
+                                  [isIndividual ? `filling-${activeLayer}` : 'filling']: newSugarColor,
+                                },
+                              })}
+                              onChange={(newSponge) => {
+                                onChange({
+                                  ...config,
+                                  sponge: newSponge
+                                });
+                                if (isFrostedExterior) notifyFrostedChange('Sponge Flavor updated');
+                              }}
+                            />
+                          </CollapsibleContent>
+                        </Collapsible>
+                      </div>
+
+                      <Separator className="opacity-50" />
+
+                      {/* 3. Filling */}
+                      <div ref={registerSectionRef('filling')} className="scroll-mt-4">
+                        <Collapsible
+                          open={expandedSections.filling}
+                          onOpenChange={() => toggleSection('filling')}
+                        >
+                          <CollapsibleTrigger className="flex items-center justify-between w-full">
+                            <div className="flex items-center gap-2">
+                              <Sparkles className="w-4 h-4 text-primary/60" />
+                              <span className="text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">
+                                Filling
+                              </span>
+                            </div>
+                            {expandedSections.filling ? (
+                              <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                            )}
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="mt-3">
+                            <FillingSection
+                              filling={config.filling || DEFAULT_CONFIG.filling}
+                              structure={config.structure || DEFAULT_CONFIG.structure}
+                              exteriorFinish={config.exteriorFinish || DEFAULT_CONFIG.exteriorFinish}
+                              interiorPreview={config.interiorPreview}
+                              activeLayer={activeLayer}
+                              sugarColor={fillingSugarColor}
+                              onSugarColorChange={(newSugarColor) => updateContextSugarColor('filling', newSugarColor)}
+                              onChange={(newFilling) => {
+                                onChange({
+                                  ...config,
+                                  filling: newFilling
+                                });
+                                if (isFrostedExterior) notifyFrostedChange('Filling updated');
+                              }}
+                            />
+                          </CollapsibleContent>
+                        </Collapsible>
+                      </div>
+
+                      <Separator className="opacity-50" />
+
+                      {/* 4. Exterior Finish */}
+                      <div ref={registerSectionRef('exteriorFinish')} className="scroll-mt-4">
+                        <Collapsible
+                          open={expandedSections.exteriorFinish}
+                          onOpenChange={() => toggleSection('exteriorFinish')}
+                        >
+                          <CollapsibleTrigger className="flex items-center justify-between w-full">
+                            <div className="flex items-center gap-2">
+                              <Palette className="w-4 h-4 text-primary/60" />
+                              <span className="text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">
+                                Exterior Finish
+                              </span>
+                            </div>
+                            {expandedSections.exteriorFinish ? (
+                              <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                            )}
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="mt-3">
+                            <ExteriorFinishSection
+                              exterior={config.exteriorFinish || DEFAULT_CONFIG.exteriorFinish}
+                              structure={config.structure || DEFAULT_CONFIG.structure}
+                              activeLayer={activeLayer}
+                              sugarColor={exteriorSugarColor}
+                              onSugarColorChange={(newSugarColor) => updateContextSugarColor('exterior', newSugarColor)}
+                              onChange={(newExteriorFinish) => {
+                                const newStyle = newExteriorFinish?.style;
+                                const newLayerStyles = newExteriorFinish?.layerStyles || [];
+
+                                let nextConfig = {
+                                  ...config,
+                                  exteriorFinish: newExteriorFinish,
+                                };
+
+                                // Frosted/Textured finishes cover the filling
+                                // edge, so a Mashed piping design hidden by the
+                                // new finish resets to None (FillingSection's
+                                // picker shows None as selected for those finishes
+                                // either way — this keeps the STORED config in
+                                // sync with that display). In individual design
+                                // the reset must reach layerPipings too, since
+                                // the picker reads the active tier's entry there
+                                // rather than the piping mirror, and only tiers
+                                // whose own finish hides piping are reset so
+                                // Naked tiers keep their designs. The mirror
+                                // follows the active tier, matching the shape
+                                // FillingSection's updatePiping writes.
+                                const finishHidesPiping = (style) => style === 'fullyFrosted' || style === 'texturedButtercream';
+                                const currentFilling = config.filling || DEFAULT_CONFIG.filling;
+                                const currentPiping = currentFilling.piping || {};
+                                const currentLayerPipings = currentFilling.layerPipings || [];
+                                const activeNewStyle = newLayerStyles[activeLayer] ?? newStyle;
+                                const resetMirror = finishHidesPiping(activeNewStyle) && Boolean(currentPiping.tip);
+                                const resetLayer = currentLayerPipings.map((layerPiping, i) => (
+                                  Boolean(layerPiping?.tip) && finishHidesPiping(newLayerStyles[i] ?? newStyle)
+                                ));
+
+                                if (resetMirror || resetLayer.some(Boolean)) {
+                                  nextConfig.filling = {
+                                    ...currentFilling,
+                                    piping: resetMirror ? { ...currentPiping, tip: null } : currentPiping,
+                                    layerPipings: currentLayerPipings.map((layerPiping, i) => (
+                                      resetLayer[i] ? { ...layerPiping, tip: null } : layerPiping
+                                    )),
+                                  };
+                                }
+
+                                onChange(nextConfig);
+                              }}
+                            />
+                          </CollapsibleContent>
+                        </Collapsible>
+                      </div>
+
+                      <Separator className="opacity-50" />
+
+                      {/* 6. Surface Treatment — Glaze / Textured Buttercream,
                       split out of Sugar Color (see cakeConfig.js's
                       nav-structure comment): a coating TECHNIQUE, not a
                       color, so it gets its own section rather than living
@@ -874,26 +869,26 @@ export default function ToolPanel({
                       together with Surface Treatment rather than lingering
                       on screen as its own standalone block when this
                       section is closed. */}
-                  <div ref={registerSectionRef('surfaceTreatment')} className="scroll-mt-4">
-                  <Collapsible
-                    open={expandedSections.surfaceTreatment}
-                    onOpenChange={() => toggleSection('surfaceTreatment')}
-                  >
-                    <CollapsibleTrigger className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-primary/60" />
-                        <span className="text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">
-                          Surface Treatment
-                        </span>
-                      </div>
-                      {expandedSections.surfaceTreatment ? (
-                        <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                      )}
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="mt-3">
-                      {/* Wrapped in the same space-y-4 container Filling/
+                      <div ref={registerSectionRef('surfaceTreatment')} data-tutorial="section-surface-treatment" className="scroll-mt-4">
+                        <Collapsible
+                          open={expandedSections.surfaceTreatment}
+                          onOpenChange={() => toggleSection('surfaceTreatment')}
+                        >
+                          <CollapsibleTrigger className="flex items-center justify-between w-full">
+                            <div className="flex items-center gap-2">
+                              <Sparkles className="w-4 h-4 text-primary/60" />
+                              <span className="text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">
+                                Surface Treatment
+                              </span>
+                            </div>
+                            {expandedSections.surfaceTreatment ? (
+                              <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                            )}
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="mt-3">
+                            {/* Wrapped in the same space-y-4 container Filling/
                           Exterior Finish use around their own SugarColorSection
                           sibling — SurfaceTreatmentSection's own space-y-4
                           only spaces ITS internal elements, it doesn't add
@@ -901,115 +896,119 @@ export default function ToolPanel({
                           Sugar Color sat flush against Pattern's last row
                           instead of matching the spacing every other
                           section's Sugar Color gets. */}
-                      <div className="space-y-4">
-                        <SurfaceTreatmentSection
-                          surfaceTreatment={config.surfaceTreatment || DEFAULT_CONFIG.surfaceTreatment}
-                          isIndividual={isIndividual}
-                          activeLayer={activeLayer}
-                          structure={config.structure}
-                          onChange={(newSurfaceTreatment) => {
-                            onChange({
-                              ...config,
-                              surfaceTreatment: newSurfaceTreatment
-                            });
-                          }}
-                        />
-                        {activeSurfaceTreatment.mode === 'glaze' && renderSugarColor('surface')}
+                            <div className="space-y-4">
+                              <SurfaceTreatmentSection
+                                surfaceTreatment={config.surfaceTreatment || DEFAULT_CONFIG.surfaceTreatment}
+                                isIndividual={isIndividual}
+                                activeLayer={activeLayer}
+                                structure={config.structure}
+                                onChange={(newSurfaceTreatment) => {
+                                  onChange({
+                                    ...config,
+                                    surfaceTreatment: newSurfaceTreatment
+                                  });
+                                }}
+                              />
+                              {(activeSurfaceTreatment?.mode === 'glaze' || config.surfaceTreatment?.mode === 'glaze') && (
+                                <div data-tutorial="surface-sugar-color">
+                                  {renderSugarColor('surface')}
+                                </div>
+                              )}
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
                       </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-                  </div>
-                </>
-              )}
+                    </>
+                  )}
 
-              {activeTab === 'center' && (
-                <>
-                  <CenterSection
-                    center={config.center || DEFAULT_CONFIG.center}
-                    structure={config.structure || DEFAULT_CONFIG.structure}
-                    onChange={(newCenter) => onChange({ ...config, center: newCenter })}
-                    activeTool={activeTool}
-                    onSelectTool={onSelectTool}
-                    placedItems={config.place?.items || []}
-                    onPlacedItemsChange={onPlaceChange}
-                    selectedItemId={selectedCenterItemId}
-                    onItemSelect={onCenterItemSelect}
-                    onDeleteSelectedItem={onDeleteSelectedCenterItem}
-                    onTextColorModeChange={onCenterTextColorModeChange}
-                    sugarColor={config.sugarColorOverrides?.center || DEFAULT_CONFIG.sugarColor}
-                    onSugarColorChange={(newSugarColor) => onChange({
-                      ...config,
-                      sugarColorOverrides: { ...(config.sugarColorOverrides || {}), center: newSugarColor },
-                    })}
-                  />
-                </>
-              )}
+                  {activeTab === 'center' && (
+                    <>
+                      <CenterSection
+                        center={config.center || DEFAULT_CONFIG.center}
+                        structure={config.structure || DEFAULT_CONFIG.structure}
+                        onChange={(newCenter) => onChange({ ...config, center: newCenter })}
+                        activeTool={activeTool}
+                        onSelectTool={onSelectTool}
+                        placedItems={config.place?.items || []}
+                        onPlacedItemsChange={onPlaceChange}
+                        selectedItemId={selectedCenterItemId}
+                        onItemSelect={onCenterItemSelect}
+                        onDeleteSelectedItem={onDeleteSelectedCenterItem}
+                        onTextColorModeChange={onCenterTextColorModeChange}
+                        sugarColor={config.sugarColorOverrides?.center || DEFAULT_CONFIG.sugarColor}
+                        onSugarColorChange={(newSugarColor) => onChange({
+                          ...config,
+                          sugarColorOverrides: { ...(config.sugarColorOverrides || {}), center: newSugarColor },
+                        })}
+                      />
+                    </>
+                  )}
 
-              {activeTab === 'edge' && (() => {
-                const currentSlot = config.edge?.mode === 'both' ? 'both' : (config.edge?.activeSlot || activeEdgeSlot || 'top');
-                const edgeContext = currentSlot === 'both' ? 'edgeBoth' : `edge${currentSlot.charAt(0).toUpperCase()}${currentSlot.slice(1)}`;
-                return (
-                  <EdgeSection
-                    edge={config.edge || DEFAULT_CONFIG.edge}
-                    structure={config.structure || DEFAULT_CONFIG.structure}
-                    onChange={(newEdge) => {
-                      const topRadius = getTopTierRadiusFromConfig(config);
-                      const centerDecorScale = config.center?.scale ?? 1;
-                      const exteriorFinishStyle = config.exteriorFinish?.style || 'fullyFrosted';
-                      const currentItems = config.place?.items || [];
-                      const prunedItems = pruneItemsCollidingWithEdgeDelicates(
-                        currentItems,
-                        newEdge,
-                        topRadius,
-                        centerDecorScale,
-                        exteriorFinishStyle
-                      );
-                      onChange({
-                        ...config,
-                        edge: newEdge,
-                        place: {
-                          ...(config.place || {}),
-                          items: prunedItems,
-                        },
-                      });
-                    }}
-                    onActiveSlotChange={setActiveEdgeSlot}
-                    sugarColor={config.sugarColorOverrides?.[edgeContext] || (currentSlot !== 'both' ? config.sugarColorOverrides?.edgeBoth : null) || DEFAULT_CONFIG.sugarColor}
-                    onSugarColorChange={(newSugarColor) => {
-                      const nextOverrides = { ...(config.sugarColorOverrides || {}), [edgeContext]: newSugarColor };
-                      if (edgeContext === 'edgeBoth') {
-                        nextOverrides.edgeTop = newSugarColor;
-                        nextOverrides.edgeBottom = newSugarColor;
-                        nextOverrides.edgeMiddle = newSugarColor;
-                      }
-                      onChange({ ...config, sugarColorOverrides: nextOverrides });
-                    }}
-                  />
-                );
-              })()}
+                  {activeTab === 'edge' && (() => {
+                    const currentSlot = config.edge?.mode === 'both' ? 'both' : (config.edge?.activeSlot || activeEdgeSlot || 'top');
+                    const edgeContext = currentSlot === 'both' ? 'edgeBoth' : `edge${currentSlot.charAt(0).toUpperCase()}${currentSlot.slice(1)}`;
+                    return (
+                      <EdgeSection
+                        edge={config.edge || DEFAULT_CONFIG.edge}
+                        structure={config.structure || DEFAULT_CONFIG.structure}
+                        onChange={(newEdge) => {
+                          const topRadius = getTopTierRadiusFromConfig(config);
+                          const centerDecorScale = config.center?.scale ?? 1;
+                          const exteriorFinishStyle = config.exteriorFinish?.style || 'fullyFrosted';
+                          const currentItems = config.place?.items || [];
+                          const prunedItems = pruneItemsCollidingWithEdgeDelicates(
+                            currentItems,
+                            newEdge,
+                            topRadius,
+                            centerDecorScale,
+                            exteriorFinishStyle
+                          );
+                          onChange({
+                            ...config,
+                            edge: newEdge,
+                            place: {
+                              ...(config.place || {}),
+                              items: prunedItems,
+                            },
+                          });
+                        }}
+                        onActiveSlotChange={setActiveEdgeSlot}
+                        sugarColor={config.sugarColorOverrides?.[edgeContext] || (currentSlot !== 'both' ? config.sugarColorOverrides?.edgeBoth : null) || DEFAULT_CONFIG.sugarColor}
+                        onSugarColorChange={(newSugarColor) => {
+                          const nextOverrides = { ...(config.sugarColorOverrides || {}), [edgeContext]: newSugarColor };
+                          if (edgeContext === 'edgeBoth') {
+                            nextOverrides.edgeTop = newSugarColor;
+                            nextOverrides.edgeBottom = newSugarColor;
+                            nextOverrides.edgeMiddle = newSugarColor;
+                          }
+                          onChange({ ...config, sugarColorOverrides: nextOverrides });
+                        }}
+                      />
+                    );
+                  })()}
 
-              {activeTab === 'side' && (
-                <>
-                  <SideSection
-                    side={config.side || DEFAULT_CONFIG.side}
-                    structure={config.structure || DEFAULT_CONFIG.structure}
-                    activeLayer={activeLayer}
-                    onChange={(newSide) => onChange({ ...config, side: newSide })}
-                    sugarColor={sideSugarColor}
-                    onSugarColorChange={(newSugarColor) => updateContextSugarColor('side', newSugarColor)}
-                  />
-                </>
-              )}
+                  {activeTab === 'side' && (
+                    <>
+                      <SideSection
+                        side={config.side || DEFAULT_CONFIG.side}
+                        structure={config.structure || DEFAULT_CONFIG.structure}
+                        activeLayer={activeLayer}
+                        onChange={(newSide) => onChange({ ...config, side: newSide })}
+                        sugarColor={sideSugarColor}
+                        onSugarColorChange={(newSugarColor) => updateContextSugarColor('side', newSugarColor)}
+                      />
+                    </>
+                  )}
 
-            </motion.div>
-          </ScrollArea>
+                </motion.div>
+              </ScrollArea>
 
-          {/* Footer hint */}
-          <div className="px-5 py-3 border-t border-border/50 bg-muted/30 select-none">
-            <p className="text-[11px] text-muted-foreground text-center flex items-center justify-center gap-1.5">
-              Drag to rotate • Scroll to zoom
-            </p>
-          </div>
+              {/* Footer hint */}
+              <div className="px-5 py-3 border-t border-border/50 bg-muted/30 select-none">
+                <p className="text-[11px] text-muted-foreground text-center flex items-center justify-center gap-1.5">
+                  Drag to rotate • Scroll to zoom
+                </p>
+              </div>
             </>
           )}
         </div>

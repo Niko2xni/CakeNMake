@@ -1059,6 +1059,7 @@ const CakeScene = React.forwardRef(function CakeScene({
   thumbnailMode = false,
   disabled = false,
   readOnly = false,
+  lockCameraAngle = false,
 }, ref) {
   const mountRef = useRef(null);
   const sceneRef = useRef(null);
@@ -1106,6 +1107,39 @@ const CakeScene = React.forwardRef(function CakeScene({
   const refreshGhostRef = useRef(null);
   const topMetricsRef = useRef({ baseY: 0, domeHeight: 0, topY: 0, radius: 4 });
   const handleResizeRef = useRef(null);
+  // Lock camera to top-down placement angle and disable rotation/zoom when requested (Tutorial Step 7)
+  useEffect(() => {
+    const controls = controlsRef.current;
+    const camera = cameraRef.current;
+    const mount = mountRef.current;
+    if (!controls || !camera) return;
+
+    if (lockCameraAngle) {
+      camera.position.set(0, 13.5, 20.5);
+      controls.target.set(0, 4, 0);
+      if (mount && mount.clientWidth && mount.clientHeight) {
+        const aspect = mount.clientWidth / mount.clientHeight;
+        const baseFov = 40;
+        const baseAspect = 1.6;
+        if (aspect < baseAspect) {
+          const fovRad = 2 * Math.atan(Math.tan((baseFov * Math.PI) / 360) * (baseAspect / aspect));
+          camera.fov = Math.min(62, Math.max(35, (fovRad * 180) / Math.PI));
+        } else {
+          camera.fov = baseFov;
+        }
+        camera.aspect = aspect;
+        camera.updateProjectionMatrix();
+      }
+      controls.update();
+      controls.enableRotate = false;
+      controls.enableZoom = false;
+      controls.enablePan = false;
+    } else {
+      controls.enableRotate = true;
+      controls.enableZoom = true;
+      controls.enablePan = true;
+    }
+  }, [lockCameraAngle]);
 
   // Update visual slot markers and ghost preview
   const updateSlotVisuals = useCallback(() => {

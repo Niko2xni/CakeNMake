@@ -8,7 +8,8 @@ import PricingPanel from '@/components/cake/PricingPanel';
 import SendBakeryModal from '@/components/bakery/SendBakeryModal';
 import useDesignAiChat from '@/hooks/useDesignAiChat';
 import GuestAuthModal from '@/components/auth/GuestAuthModal';
-import { Home, X, Send, Cloud, CloudOff, Loader2, RotateCcw, SlidersHorizontal } from 'lucide-react';
+import DesignerTutorial from '@/components/tutorial/DesignerTutorial';
+import { Home, X, Send, Cloud, CloudOff, Loader2, RotateCcw, SlidersHorizontal, HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { blueprintApi, designApi, pricingApi, templateApi } from '@/services/api';
@@ -94,6 +95,240 @@ export default function DesignerWorkSpace() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const isInitialMountRef = useRef(true);
   const isLoadingRef = useRef(false);
+
+  // Designer Tutorial state
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [tutorialStepIndex, setTutorialStepIndex] = useState(0);
+  const [tutorialActionActive, setTutorialActionActive] = useState(false);
+  const [tutorialActionPerformed, setTutorialActionPerformed] = useState(false);
+  const preTutorialStateRef = useRef(null);
+
+  const restorePreTutorialState = useCallback(() => {
+    if (preTutorialStateRef.current) {
+      const backup = preTutorialStateRef.current;
+      preTutorialStateRef.current = null;
+
+      setConfig(backup.config);
+      setTitle(backup.title);
+      setActiveTab(backup.activeTab);
+      setActiveLayer(backup.activeLayer);
+      setActiveEdgeSlot(backup.activeEdgeSlot);
+      setToolPanelModeUi(backup.toolPanelModeUi);
+      setExpandedSections(backup.expandedSections);
+      setActiveTool(backup.activeTool);
+      setSelectedCenterItemId(backup.selectedCenterItemId);
+      placeUndoStackRef.current = backup.placeUndoStack;
+      placeRedoStackRef.current = backup.placeRedoStack;
+      setSaveStatus(backup.saveStatus);
+      setHasUnsavedChanges(backup.hasUnsavedChanges);
+      setPlaceHistoryVersion((v) => v + 1);
+    }
+  }, []);
+
+  const syncWorkspaceForTutorialStep = useCallback((stepIndex) => {
+    if (stepIndex <= 2) {
+      setActiveTab('fundamentals');
+      setToolPanelModeUi('design');
+      setPanelOpen(true);
+      // All collapsible sections closed during initial mode intros
+      setExpandedSections({
+        structure: false,
+        sponge: false,
+        filling: false,
+        exteriorFinish: false,
+        surfaceTreatment: false,
+      });
+      setTimeout(() => {
+        const viewport = document.querySelector('[data-tutorial="toolpanel"] [data-radix-scroll-area-viewport]');
+        if (viewport) viewport.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 50);
+    } else if (stepIndex === 3) {
+      // Step 4 in display: "Cake Fundamentals & Defaults" (2nd image)
+      // Open all fundamentals collapse sections
+      setActiveTab('fundamentals');
+      setToolPanelModeUi('design');
+      setPanelOpen(true);
+      setExpandedSections({
+        structure: true,
+        sponge: true,
+        filling: true,
+        exteriorFinish: true,
+        surfaceTreatment: true,
+      });
+      setTimeout(() => {
+        const viewport = document.querySelector('[data-tutorial="toolpanel"] [data-radix-scroll-area-viewport]');
+        if (viewport) viewport.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 50);
+    } else if (stepIndex === 4) {
+      // Step "Deselecting Options" (3rd image)
+      setActiveTab('fundamentals');
+      setToolPanelModeUi('design');
+      setPanelOpen(true);
+      // Show Surface Treatment expanded, other sections closed
+      setExpandedSections({
+        structure: false,
+        sponge: false,
+        filling: false,
+        exteriorFinish: false,
+        surfaceTreatment: true,
+      });
+      // Ensure glaze option is active on the tutorial cake to show the "X" and patterns
+      setConfig((prev) => {
+        return {
+          ...prev,
+          surfaceTreatment: {
+            mode: 'glaze',
+            pattern: prev.surfaceTreatment?.pattern || 'longGaps',
+            layerTreatments: [
+              { mode: 'glaze', pattern: 'longGaps' },
+              { mode: 'glaze', pattern: 'longGaps' },
+            ],
+          },
+        };
+      });
+      // Scroll directly to Surface Treatment so it sits right under the tabs (matching 3rd image)
+      setTimeout(() => {
+        const target = document.querySelector('[data-tutorial="section-surface-treatment"]');
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 60);
+    } else if (stepIndex === 5) {
+      // Step 5 in display: "Surface Sugar Color" (1st image)
+      setActiveTab('fundamentals');
+      setToolPanelModeUi('design');
+      setPanelOpen(true);
+      setExpandedSections({
+        structure: false,
+        sponge: false,
+        filling: false,
+        exteriorFinish: false,
+        surfaceTreatment: true,
+      });
+      setConfig((prev) => {
+        return {
+          ...prev,
+          surfaceTreatment: {
+            mode: 'glaze',
+            pattern: prev.surfaceTreatment?.pattern || 'longGaps',
+            layerTreatments: [
+              { mode: 'glaze', pattern: 'longGaps' },
+              { mode: 'glaze', pattern: 'longGaps' },
+            ],
+          },
+        };
+      });
+      // Scroll to the Sugar Color section so it is visible!
+      setTimeout(() => {
+        const sugarColorEl = document.querySelector('[data-tutorial="surface-sugar-color"]');
+        if (sugarColorEl) {
+          sugarColorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+          const target = document.querySelector('[data-tutorial="section-surface-treatment"]');
+          if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'end' });
+          }
+        }
+      }, 80);
+    } else if (stepIndex === 6) {
+      setActiveTab('fundamentals');
+      setToolPanelModeUi('design');
+      setPanelOpen(true);
+      setTimeout(() => {
+        const tabsEl = document.querySelector('[data-tutorial="tabs-surface"]');
+        if (tabsEl) tabsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 50);
+    } else if (stepIndex === 7) {
+      setActiveTab('center');
+      setToolPanelModeUi('design');
+      setPanelOpen(true);
+      setTimeout(() => {
+        const strawberryEl = document.querySelector('[data-tutorial="center-strawberry"]');
+        if (strawberryEl) strawberryEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 50);
+    }
+  }, []);
+
+  const handleStartTutorial = useCallback(() => {
+    // 1. Back up existing user design & UI state
+    preTutorialStateRef.current = {
+      config: structuredClone(config),
+      title,
+      activeTab,
+      activeLayer,
+      activeEdgeSlot,
+      toolPanelModeUi,
+      expandedSections: { ...expandedSections },
+      activeTool,
+      selectedCenterItemId,
+      placeUndoStack: [...placeUndoStackRef.current],
+      placeRedoStack: [...placeRedoStackRef.current],
+      saveStatus,
+      hasUnsavedChanges,
+    };
+
+    // 2. Set tutorial active flags
+    setTutorialStepIndex(0);
+    setTutorialActionActive(false);
+    setTutorialActionPerformed(false);
+
+    // 3. Clear undo/redo stacks & active tool for clean tutorial cake
+    placeUndoStackRef.current = [];
+    placeRedoStackRef.current = [];
+    setActiveTool(null);
+    setSelectedCenterItemId(null);
+    setPlaceHistoryVersion((v) => v + 1);
+
+    // 4. Initialize fresh clean default cake for the tutorial
+    setConfig(structuredClone(INITIAL_CONFIG));
+
+    // 5. ToolPanel: first step has everything closed from its collapse
+    syncWorkspaceForTutorialStep(0);
+
+    // 6. Suppress unsaved changes flag while in tutorial
+    setSaveStatus('saved');
+    setHasUnsavedChanges(false);
+
+    setTutorialOpen(true);
+  }, [
+    config,
+    title,
+    activeTab,
+    activeLayer,
+    activeEdgeSlot,
+    toolPanelModeUi,
+    expandedSections,
+    activeTool,
+    selectedCenterItemId,
+    saveStatus,
+    hasUnsavedChanges,
+    syncWorkspaceForTutorialStep,
+  ]);
+
+  const handleTutorialStepChange = useCallback((nextIndex) => {
+    setTutorialStepIndex(nextIndex);
+    setTutorialActionActive(false);
+    setTutorialActionPerformed(false);
+    syncWorkspaceForTutorialStep(nextIndex);
+  }, [syncWorkspaceForTutorialStep]);
+
+  const handleTutorialComplete = useCallback(() => {
+    setTutorialOpen(false);
+    setTutorialActionActive(false);
+    restorePreTutorialState();
+    try {
+      localStorage.setItem('cakenmake_has_completed_tutorial', 'true');
+    } catch (e) {}
+  }, [restorePreTutorialState]);
+
+  const handleTutorialSkip = useCallback(() => {
+    setTutorialOpen(false);
+    setTutorialActionActive(false);
+    restorePreTutorialState();
+    try {
+      localStorage.setItem('cakenmake_has_completed_tutorial', 'true');
+    } catch (e) {}
+  }, [restorePreTutorialState]);
 
   const handleModeUiChange = useCallback((next) => {
     if (aiChatSession?.thinking && next === 'design') {
@@ -185,7 +420,7 @@ export default function DesignerWorkSpace() {
       placeRedoStackRef.current = [];
       try {
         localStorage.removeItem('cakenmake_draft_design');
-      } catch (e) {}
+      } catch (e) { }
 
       let isMounted = true;
       const initNewDesign = async () => {
@@ -261,6 +496,7 @@ export default function DesignerWorkSpace() {
   }, [config, captureThumbnail]);
 
   const saveDesign = useCallback(async ({ skipThumbnail = false, sentToBakery = false } = {}) => {
+    if (tutorialOpen) return null;
     if (!account) {
       try {
         localStorage.setItem('cakenmake_draft_design', JSON.stringify({
@@ -270,7 +506,7 @@ export default function DesignerWorkSpace() {
         }));
         setSaveStatus('saved');
         setHasUnsavedChanges(false);
-      } catch (e) {}
+      } catch (e) { }
       return null;
     }
 
@@ -318,7 +554,7 @@ export default function DesignerWorkSpace() {
 
   // Auto-save effect with 600ms debounce
   useEffect(() => {
-    if (orderComplete || !hasUnsavedChanges) return;
+    if (orderComplete || !hasUnsavedChanges || tutorialOpen) return;
 
     const saveTimer = setTimeout(async () => {
       const snapshot = captureThumbnail();
@@ -327,11 +563,11 @@ export default function DesignerWorkSpace() {
     }, 600); // Fast auto-save after 600ms of inactivity
 
     return () => clearTimeout(saveTimer);
-  }, [hasUnsavedChanges, saveDesign, saveThumbnail, captureThumbnail, orderComplete]);
+  }, [hasUnsavedChanges, saveDesign, saveThumbnail, captureThumbnail, orderComplete, tutorialOpen]);
 
   // Mark as having unsaved changes when config or title changes (skipping initial mount, design loading, and completed orders)
   useEffect(() => {
-    if (orderComplete) return;
+    if (orderComplete || tutorialOpen) return;
     if (isInitialMountRef.current) {
       isInitialMountRef.current = false;
       return;
@@ -342,7 +578,7 @@ export default function DesignerWorkSpace() {
     }
     setHasUnsavedChanges(true);
     setSaveStatus('unsaved');
-  }, [config, title, orderComplete]);
+  }, [config, title, orderComplete, tutorialOpen]);
 
   const handleCategoryChange = useCallback((category) => {
     setActiveCategory(category);
@@ -365,7 +601,7 @@ export default function DesignerWorkSpace() {
   // Layout cleanup captures before the scene is disposed. No delayed capture on exit.
   useLayoutEffect(() => {
     const handleExitFlush = () => {
-      if (!account) return;
+      if (!account || tutorialOpen) return;
       const snapshot = captureThumbnail();
       const existingId = latestDesignIdRef.current;
       if (existingId && snapshot) void designApi.uploadImage(existingId, snapshot);
@@ -385,12 +621,12 @@ export default function DesignerWorkSpace() {
         };
 
         if (targetId) {
-          designApi.updateDesign(targetId, designData).catch(() => {});
+          designApi.updateDesign(targetId, designData).catch(() => { });
 
         } else {
           designApi.createDesign(designData).then(saved => {
             if (snapshot) return designApi.uploadImage(saved._id, snapshot);
-          }).catch(() => {});
+          }).catch(() => { });
         }
       }
     };
@@ -421,7 +657,8 @@ export default function DesignerWorkSpace() {
       const submittedConfig = structuredClone(config);
       const submittedName = title;
       const submittedQuote = quotedConfig === config && quote ? structuredClone(quote) : null;
-      const snapshot = { config: submittedConfig, designName: submittedName, views: blueprintViewsRef.current, quote: submittedQuote, pdf: null,
+      const snapshot = {
+        config: submittedConfig, designName: submittedName, views: blueprintViewsRef.current, quote: submittedQuote, pdf: null,
         submissionId: crypto.randomUUID(),
         deliveryDate: `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`,
         customerName: account?.displayName || 'Guest',
@@ -515,6 +752,7 @@ export default function DesignerWorkSpace() {
   }, [navigate]);
 
   const handleSaveDesign = async () => {
+    if (tutorialOpen) return;
     if (!account) {
       try {
         localStorage.setItem('cakenmake_draft_design', JSON.stringify({
@@ -522,7 +760,7 @@ export default function DesignerWorkSpace() {
           config,
           lastEdited: new Date().toISOString(),
         }));
-      } catch (e) {}
+      } catch (e) { }
       setGuestAuthAction('save');
       setGuestAuthModalOpen(true);
       return;
@@ -534,6 +772,7 @@ export default function DesignerWorkSpace() {
   };
 
   const handleSendToBakery = () => {
+    if (tutorialOpen) return;
     if (!account) {
       try {
         localStorage.setItem('cakenmake_draft_design', JSON.stringify({
@@ -541,7 +780,7 @@ export default function DesignerWorkSpace() {
           config,
           lastEdited: new Date().toISOString(),
         }));
-      } catch (e) {}
+      } catch (e) { }
       setGuestAuthAction('order');
       setGuestAuthModalOpen(true);
       return;
@@ -670,6 +909,9 @@ export default function DesignerWorkSpace() {
   }, []);
 
   const handlePlace = useCallback((item) => {
+    if (tutorialOpen) {
+      setTutorialActionPerformed(true);
+    }
     setPlaceItems(prevItems => {
       if (item?.type && typeof item.type === 'string' && item.type.startsWith('center-')) {
         const designId = item.type.split('-')[1];
@@ -719,23 +961,23 @@ export default function DesignerWorkSpace() {
 
       const nextItems = nextMode === 'individual'
         ? (prev.place?.items || []).map((item) => (
-            item.type?.startsWith('center-letter')
-              ? {
-                  ...item,
-                  colorId: item.colorId || item.sugarColor?.colorId || sharedColor.colorId,
-                  sugarColor: item.sugarColor || sharedColor,
-                }
-              : item
-          ))
+          item.type?.startsWith('center-letter')
+            ? {
+              ...item,
+              colorId: item.colorId || item.sugarColor?.colorId || sharedColor.colorId,
+              sugarColor: item.sugarColor || sharedColor,
+            }
+            : item
+        ))
         : (prev.place?.items || []).map((item) => (
-            item.type?.startsWith('center-letter')
-              ? {
-                  ...item,
-                  colorId: sharedColor.colorId,
-                  sugarColor: sharedColor,
-                }
-              : item
-          ));
+          item.type?.startsWith('center-letter')
+            ? {
+              ...item,
+              colorId: sharedColor.colorId,
+              sugarColor: sharedColor,
+            }
+            : item
+        ));
 
       return {
         ...prev,
@@ -834,6 +1076,22 @@ export default function DesignerWorkSpace() {
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Tutorial Tour button */}
+          {!orderComplete && (
+            <Button
+              onClick={handleStartTutorial}
+              disabled={aiChatSession?.thinking}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-1.5 rounded-xl font-semibold text-muted-foreground hover:text-foreground hover:border-primary/50"
+              title="Interactive Designer Tutorial"
+              aria-label="Interactive Designer Tutorial"
+            >
+              <HelpCircle className="w-4 h-4 text-primary" />
+              <span className="hidden sm:inline">Tutorial</span>
+            </Button>
+          )}
+
           {/* Save Design button - only when not sent to bakery */}
           {!orderComplete && (
             <Button
@@ -865,6 +1123,7 @@ export default function DesignerWorkSpace() {
             <Button
               onClick={handleSendToBakery}
               disabled={aiChatSession?.thinking}
+              data-tutorial="send-bakery"
               className="flex items-center gap-2 rounded-xl font-semibold"
               size="sm"
               title={aiChatSession?.thinking ? 'AI is currently editing the cake' : undefined}
@@ -882,11 +1141,10 @@ export default function DesignerWorkSpace() {
                 variant={panelOpen ? "default" : "outline"}
                 size="icon"
                 disabled={isBreakdownOpen}
-                className={`rounded-xl transition-all shadow-sm ${
-                  panelOpen
+                className={`rounded-xl transition-all shadow-sm ${panelOpen
                     ? 'bg-primary text-primary-foreground shadow-primary/20'
                     : 'bg-card/90 border-border/70 text-foreground hover:bg-muted'
-                } ${activeTool && !panelOpen ? 'ring-2 ring-primary ring-offset-1' : ''}`}
+                  } ${activeTool && !panelOpen ? 'ring-2 ring-primary ring-offset-1' : ''}`}
                 onClick={() => setPanelOpen(!panelOpen)}
                 title={panelOpen ? "Close Tools" : activeTool ? "Placement Active - Open Tools" : "Open Tools"}
                 aria-label={panelOpen ? "Close Tools" : "Open Tools"}
@@ -926,13 +1184,14 @@ export default function DesignerWorkSpace() {
             onCenterItemSelect={setSelectedCenterItemId}
             onDeleteCenterItem={handleDeleteSelectedCenterItem}
             onPlacedItemsChange={setPlaceItems}
+            lockCameraAngle={tutorialOpen && tutorialStepIndex === 7}
           />
 
           <Button
             type="button"
             variant="outline"
             size="sm"
-            disabled={isBreakdownOpen}
+            disabled={isBreakdownOpen || (tutorialOpen && tutorialStepIndex === 7)}
             onClick={() => cakeSceneRef.current?.resetCamera()}
             title="Reset camera perspective"
             aria-label="Reset camera perspective"
@@ -1129,6 +1388,18 @@ export default function DesignerWorkSpace() {
         onClose={() => setGuestAuthModalOpen(false)}
         actionType={guestAuthAction}
         onSuccess={handleGuestAuthSuccess}
+      />
+
+      <DesignerTutorial
+        isOpen={tutorialOpen}
+        currentStepIndex={tutorialStepIndex}
+        isActionActive={tutorialActionActive}
+        hasPerformedAction={tutorialActionPerformed}
+        activeTool={activeTool}
+        onStepChange={handleTutorialStepChange}
+        onStartStepAction={() => setTutorialActionActive(true)}
+        onComplete={handleTutorialComplete}
+        onSkip={handleTutorialSkip}
       />
     </div>
   );

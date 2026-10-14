@@ -235,13 +235,12 @@ function LetterButton({ letter, isArmed, isArmedTool = false, disabled = false, 
       onClick={() => onSelect(letter.toolId)}
       onContextMenu={onContextMenu}
       title={isArmedTool ? `Remove ${letter.label}` : letter.label}
-      className={`aspect-square rounded-lg text-sm font-bold transition-all duration-150 border-2 ${
-        disabled
+      className={`aspect-square rounded-lg text-sm font-bold transition-all duration-150 border-2 ${disabled
           ? 'opacity-40 cursor-not-allowed bg-muted border-transparent text-muted-foreground'
           : isArmed
-          ? 'bg-primary text-primary-foreground border-primary shadow-md scale-[1.05]'
-          : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
-      }`}
+            ? 'bg-primary text-primary-foreground border-primary shadow-md scale-[1.05]'
+            : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
+        }`}
     >
       {/* armLetterTool deselects the armed tool when its own letter is
           clicked again, so an ARMED letter swaps its glyph for an X. A
@@ -307,11 +306,10 @@ function LetterGroup({
                     <button
                       type="button"
                       onClick={onToggleTextColorMode}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold border-2 transition-all duration-200 ${
-                        textColorMode === 'individual'
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold border-2 transition-all duration-200 ${textColorMode === 'individual'
                           ? 'bg-primary text-primary-foreground border-primary'
                           : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
-                      }`}
+                        }`}
                     >
                       {textColorMode === 'individual'
                         ? <><Unlink className="w-3 h-3" /> Individual</>
@@ -706,27 +704,24 @@ export default function CenterSection({
           <button
             type="button"
             onClick={switchToDecorations}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
-              mode === 'decorations' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
-            }`}
+            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${mode === 'decorations' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
+              }`}
           >
             Decorations
           </button>
           <button
             type="button"
             onClick={switchToText}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
-              mode === 'text' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
-            }`}
+            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${mode === 'text' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
+              }`}
           >
             Text
           </button>
           <button
             type="button"
             onClick={switchToVariations}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
-              mode === 'variations' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
-            }`}
+            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${mode === 'variations' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
+              }`}
           >
             Variations
           </button>
@@ -786,14 +781,14 @@ export default function CenterSection({
                   disabled={isMaxReached}
                   onClick={() => armDecorationTool(design.toolId)}
                   onContextMenu={deselectArmedTool}
+                  data-tutorial={design.designId === 'strawberry' ? 'center-strawberry' : undefined}
                   title={isMaxReached ? `${design.label} (Max limit reached: ${limit})` : isArmed ? `Remove ${design.label}` : design.label}
-                  className={`flex flex-col items-center justify-between gap-1.5 rounded-xl p-3 text-center transition-all duration-200 border-2 ${
-                    isMaxReached
+                  className={`flex flex-col items-center justify-between gap-1.5 rounded-xl p-3 text-center transition-all duration-200 border-2 ${isMaxReached
                       ? 'opacity-60 cursor-not-allowed bg-muted/40 border-dashed border-border/60 text-muted-foreground'
                       : isArmed
-                      ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-[1.02]'
-                      : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
-                  }`}
+                        ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-[1.02]'
+                        : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
+                    }`}
                 >
                   {/* armDecorationTool disarms the armed design when its own
                       card is clicked again — selected card swaps its label
@@ -811,13 +806,12 @@ export default function CenterSection({
                   )}
                   {limit !== null && (
                     <span
-                      className={`text-[10px] font-medium px-2 py-0.5 rounded-full transition-colors ${
-                        isMaxReached
+                      className={`text-[10px] font-medium px-2 py-0.5 rounded-full transition-colors ${isMaxReached
                           ? 'bg-destructive/15 text-destructive font-semibold'
                           : isArmed
-                          ? 'bg-primary-foreground/20 text-primary-foreground'
-                          : 'bg-background/80 text-muted-foreground'
-                      }`}
+                            ? 'bg-primary-foreground/20 text-primary-foreground'
+                            : 'bg-background/80 text-muted-foreground'
+                        }`}
                     >
                       {count} / {limit}{isMaxReached ? ' • Max' : ''}
                     </span>
@@ -968,11 +962,10 @@ function Circle({ active, canDeselect = false, onClick, title, children }) {
       type="button"
       onClick={onClick}
       title={title}
-      className={`relative w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
-        active
+      className={`relative w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${active
           ? 'bg-primary text-primary-foreground border-primary shadow-md'
           : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
-      }`}
+        }`}
     >
       <OptionButtonContent selected={active} canDeselect={canDeselect} label={title}>
         {children}
