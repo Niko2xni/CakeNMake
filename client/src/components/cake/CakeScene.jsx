@@ -875,7 +875,16 @@ function morphGroupToBoxyRectangle(cakeGroup, baseRadius, customW = null, custom
   const transformedGeometries = new Set();
 
   cakeGroup.traverse((child) => {
-    if (child.userData?.isBoxySunshinePlay || child.userData?.isBoxyPipingScrolls || child.userData?.morphedToBoxy) {
+    let curr = child;
+    let isAlreadyMorphed = false;
+    while (curr) {
+      if (curr.userData?.isBoxySunshinePlay || curr.userData?.isBoxyPipingScrolls || curr.userData?.morphedToBoxy) {
+        isAlreadyMorphed = true;
+        break;
+      }
+      curr = curr.parent;
+    }
+    if (isAlreadyMorphed) {
       return;
     }
 
@@ -910,7 +919,7 @@ function morphGroupToBoxyRectangle(cakeGroup, baseRadius, customW = null, custom
     }
 
     if (child.isInstancedMesh) {
-      if (!child.userData?.morphedToBoxy) {
+      if (!child.userData?.morphedToBoxy && child.userData?.isScatterPearls) {
         spreadScatterPearls(child, baseRadius, W, D, rc);
       }
       return;
@@ -4290,7 +4299,11 @@ const CakeScene = React.forwardRef(function CakeScene({
           trim.position.y = edgeTrimY;
           group.add(trim);
         } else if (fruitRimBuilder) {
-          const trim = fruitRimBuilder(edgeTrimRadius, edgeTrimY, rand, { isBottom });
+          const trim = fruitRimBuilder(edgeTrimRadius, edgeTrimY, rand, {
+            isBottom,
+            shape: cakeShape,
+            baseRadius: BASE_RADIUS,
+          });
           group.add(trim);
         } else if (slot?.pipingTip) {
           const isAltTip = typeof slot.pipingTip === 'string' && slot.pipingTip.includes('Alt');
@@ -4304,6 +4317,8 @@ const CakeScene = React.forwardRef(function CakeScene({
             rand,
             scale: 3,
             secondaryMaterial: secondaryMat,
+            shape: cakeShape,
+            baseRadius: BASE_RADIUS,
           });
           if (edgePiping) {
             edgePiping.receiveShadow = true;
@@ -4353,7 +4368,11 @@ const CakeScene = React.forwardRef(function CakeScene({
           middleTrim.receiveShadow = true;
           group.add(middleTrim);
         } else if (middleFruitRimBuilder) {
-          group.add(middleFruitRimBuilder(middleRadius, middleY, rand, { isBottom: true }));
+          group.add(middleFruitRimBuilder(middleRadius, middleY, rand, {
+            isBottom: true,
+            shape: cakeShape,
+            baseRadius: BASE_RADIUS,
+          }));
         } else {
           const middlePipingMat = getFrostingMaterial(
             activeMiddleSlot.pipingColor || lastFrostColor,
@@ -4372,6 +4391,8 @@ const CakeScene = React.forwardRef(function CakeScene({
             rand,
             scale: 3,
             secondaryMaterial: secondaryMat,
+            shape: cakeShape,
+            baseRadius: BASE_RADIUS,
           });
           if (middlePiping) {
             middlePiping.receiveShadow = true;

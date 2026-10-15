@@ -162,3 +162,86 @@ export function getBoxyRadius(theta, W, D, rc = 0.35) {
     return Math.max(W, D);
   }
 }
+
+/**
+ * Creates a continuous, arc-length parameterized closed path around a rounded rectangle.
+ * Moving in clockwise order around the perimeter:
+ * Front edge -> Front-right corner -> Right edge -> Back-right corner ->
+ * Back edge -> Back-left corner -> Left edge -> Front-left corner.
+ */
+export function createRoundedRectanglePath(width, depth, cornerRadius) {
+  const radius = Math.max(0, Math.min(cornerRadius, width, depth));
+  const xExtent = width - radius;
+  const zExtent = depth - radius;
+  const segments = [];
+  let pathLength = 0;
+
+  const addLine = (x1, z1, x2, z2) => {
+    const dx = x2 - x1;
+    const dz = z2 - z1;
+    const length = Math.hypot(dx, dz);
+    if (length > 0) {
+      segments.push({ type: 'line', x1, z1, dx, dz, length, startDistance: pathLength });
+      pathLength += length;
+    }
+  };
+  const addArc = (cx, cz, start, end) => {
+    const length = Math.abs(end - start) * radius;
+    if (length > 0) {
+      segments.push({ type: 'arc', cx, cz, start, end, length, startDistance: pathLength });
+      pathLength += length;
+    }
+  };
+
+  addLine(-xExtent, depth, xExtent, depth);
+  addArc(xExtent, zExtent, Math.PI / 2, 0);
+  addLine(width, zExtent, width, -zExtent);
+  addArc(xExtent, -zExtent, 0, -Math.PI / 2);
+  addLine(xExtent, -depth, -xExtent, -depth);
+  addArc(-xExtent, -zExtent, -Math.PI / 2, -Math.PI);
+  addLine(-width, -zExtent, -width, zExtent);
+  addArc(-xExtent, zExtent, Math.PI, Math.PI / 2);
+
+  const perimeter = pathLength;
+  return {
+    width,
+    depth,
+    cornerRadius: radius,
+    perimeter,
+    sideLengths: [
+      2 * (width - radius) + (Math.PI * radius) / 2,
+      2 * (depth - radius) + (Math.PI * radius) / 2,
+      2 * (width - radius) + (Math.PI * radius) / 2,
+      2 * (depth - radius) + (Math.PI * radius) / 2,
+    ],
+    pointAtDistance(distance) {
+      let remaining = ((distance % perimeter) + perimeter) % perimeter;
+      for (let i = 0; i < segments.length; i++) {
+        const segment = segments[i];
+        if (remaining <= segment.length || i === segments.length - 1) {
+          const segRemaining = Math.min(Math.max(0, remaining), segment.length);
+          if (segment.type === 'line') {
+            const t = segment.length > 0 ? segRemaining / segment.length : 0;
+            return {
+              x: segment.x1 + segment.dx * t,
+              z: segment.z1 + segment.dz * t,
+              tangentX: segment.dx / segment.length,
+              tangentZ: segment.dz / segment.length,
+            };
+          }
+
+          const direction = Math.sign(segment.end - segment.start);
+          const angle = segment.start + (radius > 0 ? (direction * segRemaining) / radius : 0);
+          return {
+            x: segment.cx + radius * Math.cos(angle),
+            z: segment.cz + radius * Math.sin(angle),
+            tangentX: -Math.sin(angle) * direction,
+            tangentZ: Math.cos(angle) * direction,
+          };
+        }
+        remaining -= segment.length;
+      }
+      return { x: segments[0].x1, z: segments[0].z1, tangentX: segments[0].dx / segments[0].length, tangentZ: segments[0].dz / segments[0].length };
+    },
+  };
+}

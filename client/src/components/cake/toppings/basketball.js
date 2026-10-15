@@ -225,6 +225,7 @@ export function buildBasketballCollar(ballRadius) {
 
 export function buildBasketballMesh(x, y, z, scale = 0.22) {
   const topperGroup = new THREE.Group();
+  topperGroup.userData.isRigidDecor = true;
   const radius = 2.75;
 
   const geo = getSharedBasketballGeometry();

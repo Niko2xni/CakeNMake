@@ -91,6 +91,7 @@ export function buildHersheysKissMesh(x, y, z, scale = 0.22, rotY = 0) {
   const geo = getSharedHersheysKissGeometry();
   const mat = getSharedHersheysKissMaterial();
   const mesh = new THREE.Mesh(geo, mat);
+  mesh.userData.isRigidDecor = true;
   mesh.scale.set(scale, scale, scale);
   mesh.rotation.y = rotY;
   mesh.position.set(x, y - 0.18 * scale, z);

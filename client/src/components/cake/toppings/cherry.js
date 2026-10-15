@@ -142,6 +142,7 @@ export function getSharedCherryBasalCollarGeometry() {
  */
 export function buildCherryMesh(x = 0, y = 0, z = 0, scale = 1.0, rand = Math.random, opts = {}) {
   const root = new THREE.Group();
+  root.userData.isRigidDecor = true;
   const hasStem = opts?.stem !== false;
   root.userData.hasStem = hasStem;
 

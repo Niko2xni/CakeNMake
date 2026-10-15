@@ -278,6 +278,7 @@ export function getOrBuildSoccerPanelGeos() {
 
 export function buildSoccerBallMesh(x, y, z, scale = 0.22) {
   const topperGroup = new THREE.Group();
+  topperGroup.userData.isRigidDecor = true;
   const radius = 2.75;
 
   const { pentagonGeos, hexagonGeos } = getOrBuildSoccerPanelGeos();

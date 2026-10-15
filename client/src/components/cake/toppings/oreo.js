@@ -486,6 +486,7 @@ export function getSharedOreoCremeMaterial() {
 // wafer's own radius (2.25).
 export function buildOreoMesh(x, y, z, scale = 0.20, rotX = Math.PI / 2, rotY = 0, rotZ = 0) {
   const oreoGroup = new THREE.Group();
+  oreoGroup.userData.isRigidDecor = true;
   const waferGeo = getSharedOreoWaferGeometry();
   const cremeGeo = getSharedOreoCremeGeometry();
   const waferMat = getSharedOreoWaferMaterial();

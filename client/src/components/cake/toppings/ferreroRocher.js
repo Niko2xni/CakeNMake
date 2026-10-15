@@ -227,6 +227,7 @@ export function buildFerreroRocherMesh(x, y, z, scale = 0.45) {
   const geo = getSharedFerreroGeometry();
   const mat = getSharedFerreroMaterial();
   const mesh = new THREE.Mesh(geo, mat);
+  mesh.userData.isRigidDecor = true;
   mesh.scale.set(scale, scale, scale);
   mesh.position.set(x, y + 0.90 * scale, z);
   mesh.castShadow = true;

@@ -462,20 +462,59 @@ export function buildBeadedTrimRing(radius, colorHex, rand, opts = {}) {
   return mesh;
 }
 
+function getFruitRimLayout(radius, opts = {}) {
+  const isBoxy = opts.path || opts.shape === 'rectangle' || opts.shape === 'square' || opts.shape === 'petitsFour';
+  let boxyPath = opts.path || null;
+  if (!boxyPath && isBoxy) {
+    let W, D;
+    if (opts.shape === 'rectangle') {
+      W = opts.customW !== null && opts.customW !== undefined ? opts.customW : radius * 1.25;
+      D = opts.customD !== null && opts.customD !== undefined ? opts.customD : radius * 0.85;
+    } else {
+      W = opts.customW !== null && opts.customW !== undefined ? opts.customW : radius;
+      D = opts.customD !== null && opts.customD !== undefined ? opts.customD : radius;
+    }
+    const rc = 0.35 * (opts.baseRadius ? radius / opts.baseRadius : 1);
+    const cornerRadius = Math.min(rc, Math.min(W, D) * 0.45);
+    boxyPath = createRoundedRectanglePath(W, D, cornerRadius);
+  }
+
+  const perimeter = boxyPath ? boxyPath.perimeter : (radius * Math.PI * 2);
+
+  const getPoint = (i, count) => {
+    if (boxyPath) {
+      const dist = (i / count) * boxyPath.perimeter;
+      const pt = boxyPath.pointAtDistance(dist);
+      const angle = Math.atan2(-pt.tangentZ, pt.tangentX);
+      return { x: pt.x, z: pt.z, angle };
+    }
+    const angle = (i / count) * Math.PI * 2;
+    return {
+      x: Math.sin(angle) * radius,
+      z: Math.cos(angle) * radius,
+      angle,
+    };
+  };
+
+  return { isBoxy: !!boxyPath, perimeter, getPoint };
+}
+
 /**
  * Fresh Strawberries Rim — a handcrafted ring of complete ripe strawberries
  * sitting directly along the cake edge.
  */
 export function buildStrawberryRimRing(radius, y, rand = Math.random, opts = {}) {
-  const count = opts.count ?? Math.max(10, Math.round((radius * Math.PI * 2) / 1.45));
+  const layout = getFruitRimLayout(radius, opts);
+  const count = opts.count ?? Math.max(10, Math.round(layout.perimeter / 1.45));
   const scale = opts.scale ?? 0.82;
   const group = new THREE.Group();
+  if (layout.isBoxy) group.userData.morphedToBoxy = true;
   for (let i = 0; i < count; i++) {
-    const angle = (i / count) * Math.PI * 2;
-    const cx = Math.sin(angle) * radius;
-    const cz = Math.cos(angle) * radius;
-    const strawberry = buildStrawberryMesh(cx, y, cz, scale, rand);
-    strawberry.rotation.y = angle;
+    const pt = layout.getPoint(i, count);
+    const strawberry = buildStrawberryMesh(pt.x, y, pt.z, scale, rand);
+    strawberry.userData.isRigidDecor = true;
+    if (layout.isBoxy) strawberry.userData.morphedToBoxy = true;
+    strawberry.rotation.y = pt.angle;
     strawberry.rotation.x = -0.38 + (rand() - 0.5) * 0.08;
     strawberry.rotation.z += (rand() - 0.5) * 0.08;
     group.add(strawberry);
@@ -487,36 +526,42 @@ export function buildStrawberryRimRing(radius, y, rand = Math.random, opts = {})
  * Hershey's Kisses Chocolate Rim — upright chocolate kisses lining the cake rim.
  */
 export function buildHersheysKissRimRing(radius, y, rand = Math.random, opts = {}) {
-  const count = opts.count ?? Math.max(10, Math.round((radius * Math.PI * 2) / 1.7));
+  const layout = getFruitRimLayout(radius, opts);
+  const count = opts.count ?? Math.max(10, Math.round(layout.perimeter / 1.7));
   const scale = opts.scale ?? 0.36;
   const group = new THREE.Group();
+  if (layout.isBoxy) group.userData.morphedToBoxy = true;
   for (let i = 0; i < count; i++) {
-    const angle = (i / count) * Math.PI * 2;
-    const cx = Math.sin(angle) * radius;
-    const cz = Math.cos(angle) * radius;
-    const rotY = angle + (rand() - 0.5) * 0.3;
-    const kiss = buildHersheysKissMesh(cx, y, cz, scale, rotY);
+    const pt = layout.getPoint(i, count);
+    const rotY = pt.angle + (rand() - 0.5) * 0.3;
+    const kiss = buildHersheysKissMesh(pt.x, y, pt.z, scale, rotY);
+    kiss.userData.isRigidDecor = true;
+    if (layout.isBoxy) kiss.userData.morphedToBoxy = true;
     group.add(kiss);
   }
   return group;
 }
 
 export function buildHersheysKissRimRingSparse(radius, y, rand = Math.random, opts = {}) {
-  const kissCount = opts.kissesCount ?? Math.max(3, Math.round((radius * Math.PI * 2) / 3.4));
+  const layout = getFruitRimLayout(radius, opts);
+  const kissCount = opts.kissesCount ?? Math.max(3, Math.round(layout.perimeter / 3.4));
   const totalCount = kissCount * 2;
   const kissScale = opts.kissScale ?? 0.36;
   const ferreroScale = opts.ferreroScale ?? 0.45;
   const group = new THREE.Group();
+  if (layout.isBoxy) group.userData.morphedToBoxy = true;
   for (let i = 0; i < totalCount; i++) {
-    const angle = (i / totalCount) * Math.PI * 2;
-    const cx = Math.sin(angle) * radius;
-    const cz = Math.cos(angle) * radius;
+    const pt = layout.getPoint(i, totalCount);
     if (i % 2 === 0) {
-      const rotY = angle + (rand() - 0.5) * 0.3;
-      const kiss = buildHersheysKissMesh(cx, y, cz, kissScale, rotY);
+      const rotY = pt.angle + (rand() - 0.5) * 0.3;
+      const kiss = buildHersheysKissMesh(pt.x, y, pt.z, kissScale, rotY);
+      kiss.userData.isRigidDecor = true;
+      if (layout.isBoxy) kiss.userData.morphedToBoxy = true;
       group.add(kiss);
     } else {
-      const truffle = buildFerreroRocherMesh(cx, y, cz, ferreroScale);
+      const truffle = buildFerreroRocherMesh(pt.x, y, pt.z, ferreroScale);
+      truffle.userData.isRigidDecor = true;
+      if (layout.isBoxy) truffle.userData.morphedToBoxy = true;
       truffle.rotation.y = rand() * Math.PI * 2;
       group.add(truffle);
     }
@@ -528,14 +573,16 @@ export function buildHersheysKissRimRingSparse(radius, y, rand = Math.random, op
  * Ferrero Rocher Truffle Rim — textured hazelnut chocolate truffles lining the cake rim.
  */
 export function buildFerreroRocherRimRing(radius, y, rand = Math.random, opts = {}) {
-  const count = opts.count ?? Math.max(6, Math.round((radius * Math.PI * 2) / 2.8));
+  const layout = getFruitRimLayout(radius, opts);
+  const count = opts.count ?? Math.max(6, Math.round(layout.perimeter / 2.8));
   const scale = opts.scale ?? 0.45;
   const group = new THREE.Group();
+  if (layout.isBoxy) group.userData.morphedToBoxy = true;
   for (let i = 0; i < count; i++) {
-    const angle = (i / count) * Math.PI * 2;
-    const cx = Math.sin(angle) * radius;
-    const cz = Math.cos(angle) * radius;
-    const truffle = buildFerreroRocherMesh(cx, y, cz, scale);
+    const pt = layout.getPoint(i, count);
+    const truffle = buildFerreroRocherMesh(pt.x, y, pt.z, scale);
+    truffle.userData.isRigidDecor = true;
+    if (layout.isBoxy) truffle.userData.morphedToBoxy = true;
     truffle.rotation.y = rand() * Math.PI * 2;
     group.add(truffle);
   }
@@ -543,22 +590,26 @@ export function buildFerreroRocherRimRing(radius, y, rand = Math.random, opts = 
 }
 
 export function buildFerreroRocherRimRingSparse(radius, y, rand = Math.random, opts = {}) {
-  const ferreroCount = opts.ferreroCount ?? (Math.max(3, Math.round((radius * Math.PI * 2) / 4.8)) + 1);
+  const layout = getFruitRimLayout(radius, opts);
+  const ferreroCount = opts.ferreroCount ?? (Math.max(3, Math.round(layout.perimeter / 4.8)) + 1);
   const totalCount = ferreroCount * 2;
   const ferreroScale = opts.ferreroScale ?? 0.45;
   const cherryScale = opts.cherryScale ?? 0.85;
   const group = new THREE.Group();
+  if (layout.isBoxy) group.userData.morphedToBoxy = true;
   for (let i = 0; i < totalCount; i++) {
-    const angle = (i / totalCount) * Math.PI * 2;
-    const cx = Math.sin(angle) * radius;
-    const cz = Math.cos(angle) * radius;
+    const pt = layout.getPoint(i, totalCount);
     if (i % 2 === 0) {
-      const truffle = buildFerreroRocherMesh(cx, y, cz, ferreroScale);
+      const truffle = buildFerreroRocherMesh(pt.x, y, pt.z, ferreroScale);
+      truffle.userData.isRigidDecor = true;
+      if (layout.isBoxy) truffle.userData.morphedToBoxy = true;
       truffle.rotation.y = rand() * Math.PI * 2;
       group.add(truffle);
     } else {
-      const cherry = buildCherryMesh(cx, y, cz, cherryScale, rand);
-      cherry.rotation.y = angle + (rand() - 0.5) * 0.3;
+      const cherry = buildCherryMesh(pt.x, y, pt.z, cherryScale, rand);
+      cherry.userData.isRigidDecor = true;
+      if (layout.isBoxy) cherry.userData.morphedToBoxy = true;
+      cherry.rotation.y = pt.angle + (rand() - 0.5) * 0.3;
       cherry.rotation.x = (rand() - 0.5) * 0.06;
       cherry.rotation.z = (rand() - 0.5) * 0.06;
       group.add(cherry);
@@ -574,25 +625,27 @@ export function buildFerreroRocherRimRingSparse(radius, y, rand = Math.random, o
  * radially inward so their upper edges meet the cake wall.
  */
 export function buildOreoRimRing(radius, y, rand = Math.random, opts = {}) {
-  const count = opts.count ?? Math.max(10, Math.round((radius * Math.PI * 2) / 1.8));
+  const layout = getFruitRimLayout(radius, opts);
+  const count = opts.count ?? Math.max(10, Math.round(layout.perimeter / 1.8));
   const scale = opts.scale ?? 0.3889;
   const isBottom = opts.isBottom ?? false;
   const inwardLean = isBottom ? 0.22 : 0;
   const surfaceOffset = (isBottom ? -0.04 : -0.18) * scale;
   const group = new THREE.Group();
+  if (layout.isBoxy) group.userData.morphedToBoxy = true;
   for (let i = 0; i < count; i++) {
-    const angle = (i / count) * Math.PI * 2;
-    const cx = Math.sin(angle) * radius;
-    const cz = Math.cos(angle) * radius;
+    const pt = layout.getPoint(i, count);
     const cookie = buildOreoMesh(
-      cx,
+      pt.x,
       y + surfaceOffset,
-      cz,
+      pt.z,
       scale,
       Math.PI / 2 - inwardLean,
-      angle,
+      pt.angle,
       0
     );
+    cookie.userData.isRigidDecor = true;
+    if (layout.isBoxy) cookie.userData.morphedToBoxy = true;
     cookie.rotation.z += (rand() - 0.5) * 0.08;
     group.add(cookie);
   }
@@ -601,15 +654,17 @@ export function buildOreoRimRing(radius, y, rand = Math.random, opts = {}) {
 
 /** Cherry Rim — complete glossy cherries nestled along the cake edge. */
 export function buildCherryRimRing(radius, y, rand = Math.random, opts = {}) {
-  const count = opts.count ?? 10;
+  const layout = getFruitRimLayout(radius, opts);
+  const count = opts.count ?? (layout.isBoxy ? Math.max(10, Math.round(layout.perimeter / 1.63)) : 10);
   const scale = opts.scale ?? 0.85;
   const group = new THREE.Group();
+  if (layout.isBoxy) group.userData.morphedToBoxy = true;
   for (let i = 0; i < count; i++) {
-    const angle = (i / count) * Math.PI * 2;
-    const cx = Math.sin(angle) * radius;
-    const cz = Math.cos(angle) * radius;
-    const cherry = buildCherryMesh(cx, y, cz, scale, rand);
-    cherry.rotation.y = angle + (rand() - 0.5) * 0.3;
+    const pt = layout.getPoint(i, count);
+    const cherry = buildCherryMesh(pt.x, y, pt.z, scale, rand);
+    cherry.userData.isRigidDecor = true;
+    if (layout.isBoxy) cherry.userData.morphedToBoxy = true;
+    cherry.rotation.y = pt.angle + (rand() - 0.5) * 0.3;
     cherry.rotation.x = (rand() - 0.5) * 0.06;
     cherry.rotation.z = (rand() - 0.5) * 0.06;
     group.add(cherry);
@@ -618,24 +673,28 @@ export function buildCherryRimRing(radius, y, rand = Math.random, opts = {}) {
 }
 
 export function buildCherryRimRingSparse(radius, y, rand = Math.random, opts = {}) {
-  const cherryCount = opts.cherryCount ?? Math.max(3, Math.round((radius * Math.PI * 2) / 4.2));
+  const layout = getFruitRimLayout(radius, opts);
+  const cherryCount = opts.cherryCount ?? Math.max(3, Math.round(layout.perimeter / 4.2));
   const totalCount = cherryCount * 2;
   const cherryScale = opts.cherryScale ?? 0.85;
   const kissScale = opts.kissScale ?? 0.36;
   const group = new THREE.Group();
+  if (layout.isBoxy) group.userData.morphedToBoxy = true;
   for (let i = 0; i < totalCount; i++) {
-    const angle = (i / totalCount) * Math.PI * 2;
-    const cx = Math.sin(angle) * radius;
-    const cz = Math.cos(angle) * radius;
+    const pt = layout.getPoint(i, totalCount);
     if (i % 2 === 0) {
-      const cherry = buildCherryMesh(cx, y, cz, cherryScale, rand);
-      cherry.rotation.y = angle + (rand() - 0.5) * 0.3;
+      const cherry = buildCherryMesh(pt.x, y, pt.z, cherryScale, rand);
+      cherry.userData.isRigidDecor = true;
+      if (layout.isBoxy) cherry.userData.morphedToBoxy = true;
+      cherry.rotation.y = pt.angle + (rand() - 0.5) * 0.3;
       cherry.rotation.x = (rand() - 0.5) * 0.06;
       cherry.rotation.z = (rand() - 0.5) * 0.06;
       group.add(cherry);
     } else {
-      const rotY = angle + (rand() - 0.5) * 0.3;
-      const kiss = buildHersheysKissMesh(cx, y, cz, kissScale, rotY);
+      const rotY = pt.angle + (rand() - 0.5) * 0.3;
+      const kiss = buildHersheysKissMesh(pt.x, y, pt.z, kissScale, rotY);
+      kiss.userData.isRigidDecor = true;
+      if (layout.isBoxy) kiss.userData.morphedToBoxy = true;
       group.add(kiss);
     }
   }
@@ -643,16 +702,18 @@ export function buildCherryRimRingSparse(radius, y, rand = Math.random, opts = {
 }
 
 function buildBallRimRing(buildBall, radius, y, rand, opts) {
-  const count = opts.count ?? 16;
+  const layout = getFruitRimLayout(radius, opts);
+  const count = opts.count ?? Math.max(16, Math.round(layout.perimeter / 1.0));
   const scale = opts.scale ?? 0.18;
   const surfaceLift = 0.40 * scale;
   const group = new THREE.Group();
+  if (layout.isBoxy) group.userData.morphedToBoxy = true;
   for (let i = 0; i < count; i++) {
-    const angle = (i / count) * Math.PI * 2;
-    const cx = Math.sin(angle) * radius;
-    const cz = Math.cos(angle) * radius;
-    const ball = buildBall(cx, y + surfaceLift, cz, scale);
-    ball.rotation.y = angle + rand() * Math.PI * 2;
+    const pt = layout.getPoint(i, count);
+    const ball = buildBall(pt.x, y + surfaceLift, pt.z, scale);
+    ball.userData.isRigidDecor = true;
+    if (layout.isBoxy) ball.userData.morphedToBoxy = true;
+    ball.rotation.y = pt.angle + rand() * Math.PI * 2;
     group.add(ball);
   }
   return group;

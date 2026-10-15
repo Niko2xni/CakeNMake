@@ -314,6 +314,7 @@ export function getSharedPedicelMaterial() {
  */
 export function buildStrawberryMesh(x = 0, y = 0, z = 0, scale = 1.0, rand = Math.random) {
   const root = new THREE.Group();
+  root.userData.isRigidDecor = true;
 
   const bodyGeo = getSharedStrawberryBodyGeometry();
   const bodyMat = getSharedStrawberryBodyMaterial();
@@ -607,6 +608,7 @@ export function getSharedSlicedStrawberryFaceMaterial() {
  */
 export function buildSlicedStrawberryMesh(x = 0, y = 0, z = 0, scale = 1.0, rand = Math.random) {
   const root = new THREE.Group();
+  root.userData.isRigidDecor = true;
 
   const bodyGeo = getSharedSlicedStrawberryBodyGeometry();
   const bodyMat = getSharedStrawberryBodyMaterial();

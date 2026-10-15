@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { buildCherryMesh } from './toppings/cherry';
 import { buildSlicedStrawberryMesh } from './toppings/strawberry';
 import { applyVerticalGradientUV } from './frostingMaterial';
+import { createRoundedRectanglePath } from './cakeMath';
 
 // ─── Piping Tip Geometry Engine ──────────────────────────────────────────
 // Real, physically-motivated geometry for piped icing — not the metal
@@ -2047,7 +2048,7 @@ function buildContinuousStarDollopRingGeometry(ringRadius) {
 
 // ─── Instancing helper ────────────────────────────────────────────────────
 
-function instanceAroundRing(geometry, material, {
+function _instanceAroundRingImpl(geometry, material, {
   ringRadius,
   y,
   count,
@@ -2058,9 +2059,56 @@ function instanceAroundRing(geometry, material, {
   scaleY = null,
   angleOffset = 0,
   secondaryMaterial = null,
+  path = null,
+  unitLength = null,
 }) {
+  const baseGeomLen = unitLength || geometry?.userData?.unitLength || null;
+
+  const getTransform = (i) => {
+    let px, pz, rotY, instScaleX = scale;
+    if (path) {
+      const dist = ((i / count) * path.perimeter) + (angleOffset ? (angleOffset / (Math.PI * 2)) * path.perimeter : 0);
+      const pt = path.pointAtDistance(dist);
+      px = pt.x;
+      pz = pt.z;
+
+      // Predict next instance position along the path for secant alignment
+      const nextDist = (((i + 1) / count) * path.perimeter) + (angleOffset ? (angleOffset / (Math.PI * 2)) * path.perimeter : 0);
+      const nextPt = path.pointAtDistance(nextDist);
+      const dx = nextPt.x - pt.x;
+      const dz = nextPt.z - pt.z;
+      const chordLen = Math.hypot(dx, dz);
+
+      // Tangent alignment between current and next sample reveals curvature / corner turns
+      const dot = pt.tangentX * nextPt.tangentX + pt.tangentZ * nextPt.tangentZ;
+      const turnFactor = Math.max(0, Math.min(1, (1 - dot) / 0.15));
+
+      let baseYaw;
+      if (chordLen > 1e-6) {
+        baseYaw = Math.atan2(-dz, dx);
+      } else {
+        baseYaw = Math.atan2(-pt.tangentZ, pt.tangentX);
+      }
+      rotY = faceOutward ? baseYaw + (randomYaw ? (rand() - 0.5) * randomYaw * (1 - turnFactor) : 0) : 0;
+
+      // At corners, modulate longitudinal scale (scaleX) so the tail tucks into nextPt instead of overshooting the corner.
+      // Width (Z) and height (Y) remain full scale.
+      if (baseGeomLen && turnFactor > 0.01 && chordLen > 0) {
+        const maxScaleAtCorner = chordLen / baseGeomLen;
+        instScaleX = scale * (1 - turnFactor) + Math.min(scale, maxScaleAtCorner) * turnFactor;
+      }
+    } else {
+      const angle = angleOffset + (i / count) * Math.PI * 2;
+      px = Math.sin(angle) * ringRadius;
+      pz = Math.cos(angle) * ringRadius;
+      rotY = faceOutward ? angle + (randomYaw ? (rand() - 0.5) * randomYaw : 0) : 0;
+    }
+    return { px, pz, rotY, instScaleX };
+  };
+
   if (secondaryMaterial && secondaryMaterial !== material) {
     const group = new THREE.Group();
+    if (path) group.userData.morphedToBoxy = true;
     const count1 = Math.ceil(count / 2);
     const count2 = Math.floor(count / 2);
     const mesh1 = new THREE.InstancedMesh(geometry, material, count1);
@@ -2069,19 +2117,23 @@ function instanceAroundRing(geometry, material, {
     mesh1.receiveShadow = true;
     mesh2.castShadow = true;
     mesh2.receiveShadow = true;
+    if (path) {
+      mesh1.userData.morphedToBoxy = true;
+      mesh2.userData.morphedToBoxy = true;
+    }
 
     const dummy = new THREE.Object3D();
     let idx1 = 0;
     let idx2 = 0;
 
     for (let i = 0; i < count; i++) {
-      const angle = angleOffset + (i / count) * Math.PI * 2;
-      dummy.position.set(Math.sin(angle) * ringRadius, y, Math.cos(angle) * ringRadius);
-      dummy.rotation.y = faceOutward ? angle + (randomYaw ? (rand() - 0.5) * randomYaw : 0) : 0;
+      const { px, pz, rotY, instScaleX } = getTransform(i);
+      dummy.position.set(px, y, pz);
+      dummy.rotation.y = rotY;
       if (scaleY !== null) {
-        dummy.scale.set(scale, scaleY, scale);
+        dummy.scale.set(instScaleX, scaleY, scale);
       } else {
-        dummy.scale.setScalar(scale);
+        dummy.scale.set(instScaleX, scale, scale);
       }
       dummy.updateMatrix();
 
@@ -2100,15 +2152,16 @@ function instanceAroundRing(geometry, material, {
   }
 
   const mesh = new THREE.InstancedMesh(geometry, material, count);
+  if (path) mesh.userData.morphedToBoxy = true;
   const dummy = new THREE.Object3D();
   for (let i = 0; i < count; i++) {
-    const angle = angleOffset + (i / count) * Math.PI * 2;
-    dummy.position.set(Math.sin(angle) * ringRadius, y, Math.cos(angle) * ringRadius);
-    dummy.rotation.y = faceOutward ? angle + (randomYaw ? (rand() - 0.5) * randomYaw : 0) : 0;
+    const { px, pz, rotY, instScaleX } = getTransform(i);
+    dummy.position.set(px, y, pz);
+    dummy.rotation.y = rotY;
     if (scaleY !== null) {
-      dummy.scale.set(scale, scaleY, scale);
+      dummy.scale.set(instScaleX, scaleY, scale);
     } else {
-      dummy.scale.setScalar(scale);
+      dummy.scale.set(instScaleX, scale, scale);
     }
     dummy.updateMatrix();
     mesh.setMatrixAt(i, dummy.matrix);
@@ -2116,6 +2169,10 @@ function instanceAroundRing(geometry, material, {
   mesh.instanceMatrix.needsUpdate = true;
   mesh.castShadow = true;
   return mesh;
+}
+
+function instanceAroundRing(geometry, material, options) {
+  return _instanceAroundRingImpl(geometry, material, options);
 }
 
 // ─── Cherry Placement Helper ──────────────────────────────────────────────
@@ -2129,17 +2186,28 @@ function instanceAroundRing(geometry, material, {
  * maxLeanRad: maximum random tilt angle (radians) applied on X and Z
  *   independently, simulating imperfect hand-placement.
  */
-function wrapWithCherries(dollopMesh, { count, radius, y, rand, cherryScale, cherryScaleY, peakYOffset, sinkAmount = 0, maxLeanRad = 0.21, step = 1 }) {
+function wrapWithCherries(dollopMesh, { count, radius, y, rand, cherryScale, cherryScaleY, peakYOffset, sinkAmount = 0, maxLeanRad = 0.21, step = 1, path = null }) {
   const group = new THREE.Group();
+  if (path) group.userData.morphedToBoxy = true;
   group.add(dollopMesh);
   for (let i = 0; i < count; i += step) {
-    const angle = (i / count) * Math.PI * 2;
-    const cx = Math.sin(angle) * radius;
-    const cz = Math.cos(angle) * radius;
+    let cx, cz, angle;
+    if (path) {
+      const dist = (i / count) * path.perimeter;
+      const pt = path.pointAtDistance(dist);
+      cx = pt.x;
+      cz = pt.z;
+      angle = Math.atan2(-pt.tangentZ, pt.tangentX);
+    } else {
+      angle = (i / count) * Math.PI * 2;
+      cx = Math.sin(angle) * radius;
+      cz = Math.cos(angle) * radius;
+    }
     // Seat the cherry: place its base at the dollop peak, then sink it slightly
     // into the buttercream so it looks nestled rather than balanced on the tip.
     const cy = y + peakYOffset - sinkAmount;
     const cherry = buildCherryMesh(cx, cy, cz, cherryScale, rand);
+    if (path) cherry.userData.morphedToBoxy = true;
     // Apply non-uniform Y scale to simulate cherry settling into soft cream.
     if (cherryScaleY !== undefined && cherryScaleY !== cherryScale) {
       cherry.scale.set(cherryScale, cherryScaleY, cherryScale);
@@ -2159,15 +2227,26 @@ function wrapWithCherries(dollopMesh, { count, radius, y, rand, cherryScale, che
  * berry slice into the dollop peak with the cut face facing outward and tilted gently
  * back into the cream fold.
  */
-function wrapWithStrawberries(dollopMesh, { count, radius, y, rand, strawberryScale, peakYOffset, sinkAmount = 0, maxLeanRad = 0.12, step = 1 }) {
+function wrapWithStrawberries(dollopMesh, { count, radius, y, rand, strawberryScale, peakYOffset, sinkAmount = 0, maxLeanRad = 0.12, step = 1, path = null }) {
   const group = new THREE.Group();
+  if (path) group.userData.morphedToBoxy = true;
   group.add(dollopMesh);
   for (let i = 0; i < count; i += step) {
-    const angle = (i / count) * Math.PI * 2;
-    const cx = Math.sin(angle) * radius;
-    const cz = Math.cos(angle) * radius;
+    let cx, cz, angle;
+    if (path) {
+      const dist = (i / count) * path.perimeter;
+      const pt = path.pointAtDistance(dist);
+      cx = pt.x;
+      cz = pt.z;
+      angle = Math.atan2(-pt.tangentZ, pt.tangentX);
+    } else {
+      angle = (i / count) * Math.PI * 2;
+      cx = Math.sin(angle) * radius;
+      cz = Math.cos(angle) * radius;
+    }
     const cy = y + peakYOffset - sinkAmount;
     const strawberry = buildSlicedStrawberryMesh(cx, cy, cz, strawberryScale, rand);
+    if (path) strawberry.userData.morphedToBoxy = true;
     strawberry.rotation.y = angle + (rand() - 0.5) * 0.15;
     strawberry.rotation.x = -0.32 + (rand() - 0.5) * 2 * maxLeanRad;
     strawberry.rotation.z += (rand() - 0.5) * 2 * maxLeanRad;
@@ -2186,11 +2265,11 @@ function getUnitGeometry(tip) {
   if (!unitGeometryCache[tip]) {
     switch (tip) {
       case 'star': unitGeometryCache[tip] = buildStarUnitGeometry(); break;
-      case 'shell': unitGeometryCache[tip] = buildShellUnitGeometry(); break;
-      case 'bead': unitGeometryCache[tip] = buildBeadUnitGeometry(); break;
-      case 'pulledDot': unitGeometryCache[tip] = buildPulledDotUnitGeometry(); break;
+      case 'shell': unitGeometryCache[tip] = buildShellUnitGeometry(); unitGeometryCache[tip].userData.unitLength = 0.35; break;
+      case 'bead': unitGeometryCache[tip] = buildBeadUnitGeometry(); unitGeometryCache[tip].userData.unitLength = 0.25; break;
+      case 'pulledDot': unitGeometryCache[tip] = buildPulledDotUnitGeometry(); unitGeometryCache[tip].userData.unitLength = 0.30; break;
       case 'round': unitGeometryCache[tip] = buildRoundUnitGeometry(); break;
-      case 'leaf': unitGeometryCache[tip] = buildLeafUnitGeometry(); break;
+      case 'leaf': unitGeometryCache[tip] = buildLeafUnitGeometry(); unitGeometryCache[tip].userData.unitLength = 0.28; break;
       case 'dropFlower': unitGeometryCache[tip] = buildDropFlowerUnitGeometry(); break;
       case 'starDollop': unitGeometryCache[tip] = buildStarDollopUnitGeometry(); break;
       case 'roundDollop': unitGeometryCache[tip] = buildRoundDollopUnitGeometry(); break;
@@ -2223,8 +2302,46 @@ function getUnitGeometry(tip) {
  *   border (e.g. Edge Piping) can pass a larger value. Spacing scales down
  *   proportionally so bigger units don't overcrowd/overlap the ring.
  */
-function buildPipingRingRaw(tip, material, { radius, y, rand = Math.random, scale = 1, secondaryMaterial = null } = {}) {
+function buildPipingRingRaw(tip, material, options = {}) {
   if (!tip) return null;
+
+  const {
+    radius: rawRadius,
+    y,
+    rand = Math.random,
+    scale = 1,
+    secondaryMaterial = null,
+    shape = options.cakeShape || 'round',
+    baseRadius = null,
+    customW = null,
+    customD = null,
+  } = options;
+
+  const isBoxy = shape === 'rectangle' || shape === 'square' || shape === 'petitsFour';
+  let boxyPath = null;
+  if (isBoxy) {
+    let W, D;
+    if (shape === 'rectangle') {
+      W = customW !== null ? customW : rawRadius * 1.25;
+      D = customD !== null ? customD : rawRadius * 0.85;
+    } else {
+      W = customW !== null ? customW : rawRadius;
+      D = customD !== null ? customD : rawRadius;
+    }
+    const rc = 0.35 * (baseRadius ? rawRadius / baseRadius : 1);
+    const cornerRadius = Math.min(rc, Math.min(W, D) * 0.45);
+    boxyPath = createRoundedRectanglePath(W, D, cornerRadius);
+  }
+
+  const ringRadius = rawRadius;
+  const radius = isBoxy ? (boxyPath.perimeter / (Math.PI * 2)) : rawRadius;
+
+  const instanceAroundRing = (geometry, mat, opts) => {
+    return _instanceAroundRingImpl(geometry, mat, {
+      ...opts,
+      path: isBoxy ? boxyPath : null,
+    });
+  };
 
   const isAlt = typeof tip === 'string' && tip.includes('Alt');
   const withCherry = typeof tip === 'string' && tip.includes('Cherry');
@@ -2241,14 +2358,14 @@ function buildPipingRingRaw(tip, material, { radius, y, rand = Math.random, scal
       const cherryScale = (opts.cherryScale !== undefined ? opts.cherryScale : UNIFORM_CHERRY_SCALE) * (scale / 3);
       const sinkAmount = opts.sinkAmount !== undefined ? opts.sinkAmount : cherryScale * 0.38 * 0.45;
       const cherryScaleY = cherryScale * 0.92;
-      return wrapWithCherries(mesh, { count, radius, y, rand, cherryScale, cherryScaleY, peakYOffset, sinkAmount, maxLeanRad: opts.maxLeanRad !== undefined ? opts.maxLeanRad : 0.14, ...opts });
+      return wrapWithCherries(mesh, { count, radius: ringRadius, y, rand, cherryScale, cherryScaleY, peakYOffset, sinkAmount, maxLeanRad: opts.maxLeanRad !== undefined ? opts.maxLeanRad : 0.14, path: isBoxy ? boxyPath : null, ...opts });
     }
     if (withStrawberry) {
       const dollopScaleY = scaleY !== null && scaleY !== undefined ? scaleY : dollopScale;
       const peakYOffset = peakRatio * dollopScaleY;
       const strawberryScale = (opts.strawberryScale !== undefined ? opts.strawberryScale : UNIFORM_STRAWBERRY_SCALE) * (scale / 3);
       const sinkAmount = opts.sinkAmount !== undefined ? opts.sinkAmount : strawberryScale * 0.12;
-      return wrapWithStrawberries(mesh, { count, radius, y, rand, strawberryScale, peakYOffset, sinkAmount, maxLeanRad: opts.maxLeanRad !== undefined ? opts.maxLeanRad : 0.12, ...opts });
+      return wrapWithStrawberries(mesh, { count, radius: ringRadius, y, rand, strawberryScale, peakYOffset, sinkAmount, maxLeanRad: opts.maxLeanRad !== undefined ? opts.maxLeanRad : 0.12, path: isBoxy ? boxyPath : null, ...opts });
     }
     return mesh;
   };
@@ -2269,7 +2386,7 @@ function buildPipingRingRaw(tip, material, { radius, y, rand = Math.random, scal
       return instanceAroundRing(getUnitGeometry('shell'), material, { ringRadius: radius, y, count, rand, scale, secondaryMaterial: secMat });
     }
     case 'reverseShell': {
-      const geo = buildReverseShellRingGeometry(radius);
+      const geo = buildReverseShellRingGeometry(ringRadius);
       const mesh = new THREE.Mesh(geo, material);
       mesh.position.y = y;
       mesh.castShadow = true;
@@ -2277,7 +2394,7 @@ function buildPipingRingRaw(tip, material, { radius, y, rand = Math.random, scal
       return mesh;
     }
     case 'reverseShellAlt': {
-      const geos = buildReverseShellUnitGeometries(radius);
+      const geos = buildReverseShellUnitGeometries(ringRadius);
       const geoA = mergeGeometries(geos.filter((_, i) => i % 2 === 0));
       const geoB = mergeGeometries(geos.filter((_, i) => i % 2 === 1));
       const group = new THREE.Group();
@@ -2294,7 +2411,7 @@ function buildPipingRingRaw(tip, material, { radius, y, rand = Math.random, scal
     }
 
     case 'elongatedShell': {
-      const geo = buildElongatedShellRingGeometry(radius);
+      const geo = buildElongatedShellRingGeometry(ringRadius);
       const mesh = new THREE.Mesh(geo, material);
       mesh.position.y = y;
       mesh.castShadow = true;
@@ -2302,7 +2419,7 @@ function buildPipingRingRaw(tip, material, { radius, y, rand = Math.random, scal
       return mesh;
     }
     case 'elongatedShellAlt': {
-      const geos = buildElongatedShellUnitGeometries(radius);
+      const geos = buildElongatedShellUnitGeometries(ringRadius);
       const geoA = mergeGeometries(geos.filter((_, i) => i % 3 === 0));
       const geoB = mergeGeometries(geos.filter((_, i) => i % 3 !== 0));
       const group = new THREE.Group();
@@ -2461,22 +2578,22 @@ function buildPipingRingRaw(tip, material, { radius, y, rand = Math.random, scal
     }
     case 'starScallop': {
       const N = Math.max(8, Math.round((radius * Math.PI * 2) / 2.0));
-      return buildScallopedPiping(material, radius, y, { N, tubeRadius: 0.20, bulgeAmount: 0.14, starSharpness: 0.75, starFloor: 0.25, starPoints: 6, cuspPower: 1.6, peakSharpness: 1.0, surfaceLift: 0.05 });
+      return buildScallopedPiping(material, ringRadius, y, { N, tubeRadius: 0.20, bulgeAmount: 0.14, starSharpness: 0.75, starFloor: 0.25, starPoints: 6, cuspPower: 1.6, peakSharpness: 1.0, surfaceLift: 0.05 });
     }
     case 'starScallopSoft': {
       const N = Math.max(8, Math.round((radius * Math.PI * 2) / 2.2));
-      return buildScallopedPiping(material, radius, y, { N, tubeRadius: 0.19, bulgeAmount: 0.10, starSharpness: 0.55, starFloor: 0.3, starPoints: 5, cuspPower: 1.4, peakSharpness: 1.0, surfaceLift: 0.05 });
+      return buildScallopedPiping(material, ringRadius, y, { N, tubeRadius: 0.19, bulgeAmount: 0.10, starSharpness: 0.55, starFloor: 0.3, starPoints: 5, cuspPower: 1.4, peakSharpness: 1.0, surfaceLift: 0.05 });
     }
     case 'starScallopDollops': {
       const N = Math.max(8, Math.round((radius * Math.PI * 2) / 2.0));
-      return buildScallopedDollopPiping(material, radius, y, { N, tubeRadius: 0.20, bulgeAmount: 0.14, starSharpness: 0.7, starFloor: 0.25, starPoints: 6, cuspPower: 1.6, peakSharpness: 1.0, withDollops: true, dollopScale: 0.46, surfaceLift: 0.05 }, rand);
+      return buildScallopedDollopPiping(material, ringRadius, y, { N, tubeRadius: 0.20, bulgeAmount: 0.14, starSharpness: 0.7, starFloor: 0.25, starPoints: 6, cuspPower: 1.6, peakSharpness: 1.0, withDollops: true, dollopScale: 0.46, surfaceLift: 0.05 }, rand);
     }
     case 'starScallopLayered': {
       const N = Math.max(8, Math.round((radius * Math.PI * 2) / 2.0));
-      return buildScallopedDollopPiping(material, radius, y, { N, tubeRadius: 0.13, bulgeAmount: 0.12, starSharpness: 0.7, starPoints: 6, cuspPower: 1.6, peakSharpness: 1.0, withDollops: true, dollopScale: 0.42, layered: true, surfaceLift: 0.04 }, rand);
+      return buildScallopedDollopPiping(material, ringRadius, y, { N, tubeRadius: 0.13, bulgeAmount: 0.12, starSharpness: 0.7, starPoints: 6, cuspPower: 1.6, peakSharpness: 1.0, withDollops: true, dollopScale: 0.42, layered: true, surfaceLift: 0.04 }, rand);
     }
     case 'zigzag': {
-      const geo = buildZigzagRingGeometry(radius);
+      const geo = buildZigzagRingGeometry(ringRadius);
       const mesh = new THREE.Mesh(geo, material);
       mesh.position.y = y;
       mesh.castShadow = true;
@@ -2484,7 +2601,7 @@ function buildPipingRingRaw(tip, material, { radius, y, rand = Math.random, scal
       return mesh;
     }
     case 'wavePiping': {
-      const geo = buildWavePipingRingGeometry(radius);
+      const geo = buildWavePipingRingGeometry(ringRadius);
       const mesh = new THREE.Mesh(geo, material);
       mesh.position.y = y;
       mesh.castShadow = true;
@@ -2492,14 +2609,14 @@ function buildPipingRingRaw(tip, material, { radius, y, rand = Math.random, scal
       return mesh;
     }
     case 'rope': {
-      const geo = buildRopeRingGeometry(radius);
+      const geo = buildRopeRingGeometry(ringRadius);
       const mesh = new THREE.Mesh(geo, material);
       mesh.position.y = y;
       mesh.castShadow = true;
       return mesh;
     }
     case 'ropeTwist': {
-      const geo = buildRopeTwistRingGeometry(radius);
+      const geo = buildRopeTwistRingGeometry(ringRadius);
       const mesh = new THREE.Mesh(geo, material);
       mesh.position.y = y;
       mesh.castShadow = true;
@@ -2507,7 +2624,7 @@ function buildPipingRingRaw(tip, material, { radius, y, rand = Math.random, scal
       return mesh;
     }
     case 'ropeTwistAlt': {
-      const geos = buildRopeTwistUnitGeometries(radius);
+      const geos = buildRopeTwistUnitGeometries(ringRadius);
       const geoA = mergeGeometries(geos.filter((_, i) => i % 2 === 0));
       const geoB = mergeGeometries(geos.filter((_, i) => i % 2 === 1));
       const group = new THREE.Group();
@@ -2523,7 +2640,7 @@ function buildPipingRingRaw(tip, material, { radius, y, rand = Math.random, scal
       return group;
     }
     case 'ropeTwistClassic': {
-      const geo = buildRopeTwistClassicRingGeometry(radius);
+      const geo = buildRopeTwistClassicRingGeometry(ringRadius);
       const mesh = new THREE.Mesh(geo, material);
       mesh.position.y = y;
       mesh.castShadow = true;
@@ -2531,7 +2648,7 @@ function buildPipingRingRaw(tip, material, { radius, y, rand = Math.random, scal
       return mesh;
     }
     case 'ropeTwistClassicAlt': {
-      const geos = buildRopeTwistClassicUnitGeometries(radius);
+      const geos = buildRopeTwistClassicUnitGeometries(ringRadius);
       const geoA = mergeGeometries(geos.filter((_, i) => i % 2 === 0));
       const geoB = mergeGeometries(geos.filter((_, i) => i % 2 === 1));
       const group = new THREE.Group();
@@ -2547,14 +2664,14 @@ function buildPipingRingRaw(tip, material, { radius, y, rand = Math.random, scal
       return group;
     }
     case 'petal': {
-      const geo = buildPetalRuffleRingGeometry(radius);
+      const geo = buildPetalRuffleRingGeometry(ringRadius);
       const mesh = new THREE.Mesh(geo, material);
       mesh.position.y = y;
       mesh.castShadow = true;
       return mesh;
     }
     case 'lambeth': {
-      const geo = buildLambethRingGeometry(radius);
+      const geo = buildLambethRingGeometry(ringRadius);
       const mesh = new THREE.Mesh(geo, material);
       mesh.position.y = y;
       mesh.castShadow = true;
