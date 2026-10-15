@@ -77,3 +77,13 @@ test('production OTP store requires Redis', async () => {
     { code: 'OTP_STORE_UNAVAILABLE', status: 503 }
   );
 });
+
+test('production OTP store gracefully falls back to memory if configured Redis encounters an error', async () => {
+  const store = new OtpStore({ redisUrl: 'redis://127.0.0.1:63999', nodeEnv: 'production' });
+  const email = `resilient-${Date.now()}@example.com`;
+
+  await store.set('login', email, { attempts: 0, passwordHash: 'hash-resilient' }, 5_000);
+  assert.equal(await store.consumeIfCurrent('login', email, 'hash-resilient'), true);
+  try { store.redis?.disconnect(); } catch (_) {}
+});
+

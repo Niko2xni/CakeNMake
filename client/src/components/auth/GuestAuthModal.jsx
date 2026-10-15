@@ -7,7 +7,7 @@ import { ArrowLeft, CheckCircle2, Loader2, LogIn, Mail, Sparkles, TimerReset } f
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import GoogleIcon from "@/components/GoogleIcon";
 import { auth, firebaseConfigured, getAuxiliaryAuth, googleProvider, missingFirebaseConfigMessage } from "@/lib/firebase";
-import { signInWithCustomToken, signInWithPopup, signOut } from "firebase/auth";
+import { signInWithCustomToken, signInWithPopup, signInWithRedirect, signOut } from "firebase/auth";
 import { authApi } from "@/services/api";
 import { useAuth } from '@/lib/AuthContext';
 
@@ -20,6 +20,7 @@ export default function GuestAuthModal({
   onClose,
   actionType = "general", // 'save' | 'order' | 'general'
   onSuccess,
+  initialEmail = "",
 }) {
   const { isAuthenticated, isLoadingAuth, authError } = useAuth();
   const [pendingUser, setPendingUser] = useState(null);
@@ -43,6 +44,39 @@ export default function GuestAuthModal({
   const [loading, setLoading] = useState(false);
   const [otpExpiresAt, setOtpExpiresAt] = useState(null);
   const [otpTimeLeft, setOtpTimeLeft] = useState(0);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setPendingUser(null);
+      setEmail("");
+      setOtp("");
+      setOtpSent(false);
+      setError("");
+      setStatusMessage("");
+      setOtpExpiredMessage("");
+      setLoading(false);
+      setOtpExpiresAt(null);
+      setOtpTimeLeft(0);
+    } else if (initialEmail && !otpSent) {
+      setEmail(initialEmail);
+      setLoading(true);
+      authApi.requestEmailOtp(initialEmail)
+        .then((response) => {
+          const expiresAt = response?.expiresAt || Date.now() + 3 * 60 * 1000;
+          setOtp("");
+          setOtpSent(true);
+          setOtpExpiresAt(expiresAt);
+          setStatusMessage(`A 6-digit verification code was sent to ${initialEmail}.`);
+          setError("");
+        })
+        .catch((err) => {
+          setError(err.message || "Could not send verification code.");
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    }
+  }, [isOpen, initialEmail]);
 
   const formatTimeLeft = (seconds) => {
     const safeSeconds = Math.max(0, seconds);
@@ -167,7 +201,29 @@ export default function GuestAuthModal({
     try {
       if (!firebaseConfigured || !auth) throw new Error(missingFirebaseConfigMessage);
       const targetAuth = getAuxiliaryAuth ? getAuxiliaryAuth() : auth;
-      const userCredential = await signInWithPopup(targetAuth || auth, googleProvider);
+      try {
+        sessionStorage.setItem('cakenmake_pending_guest_action', JSON.stringify({ actionType }));
+      } catch {}
+
+      const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      if (isMobile && typeof signInWithRedirect === 'function') {
+        setStatusMessage("Redirecting to Google sign-in...");
+        await signInWithRedirect(targetAuth || auth, googleProvider);
+        return;
+      }
+
+      let userCredential = null;
+      try {
+        userCredential = await signInWithPopup(targetAuth || auth, googleProvider);
+      } catch (popupErr) {
+        if (popupErr.code === "auth/popup-blocked" && typeof signInWithRedirect === 'function') {
+          setStatusMessage("Redirecting to Google sign-in...");
+          await signInWithRedirect(targetAuth || auth, googleProvider);
+          return;
+        }
+        throw popupErr;
+      }
+
       const googleEmail = userCredential?.user?.email?.trim()?.toLowerCase();
       if (!googleEmail) {
         throw new Error("Could not retrieve email address from Google.");
@@ -187,7 +243,15 @@ export default function GuestAuthModal({
       setStatusMessage(`A 6-digit verification code was sent to ${googleEmail}.`);
       setError("");
     } catch (authError) {
-      setError(authError.code === "auth/popup-closed-by-user" ? "Sign-in was cancelled." : authError.message || "Provider sign-in failed.");
+      let message = "Provider sign-in failed.";
+      if (authError.code === "auth/popup-closed-by-user") {
+        message = "Sign-in was cancelled.";
+      } else if (authError.code === "auth/cancelled-popup-request") {
+        message = "Only one sign-in request can be active at a time.";
+      } else if (authError.message) {
+        message = authError.message;
+      }
+      setError(message);
     } finally {
       setLoading(false);
     }

@@ -5,11 +5,20 @@ import { vi } from 'vitest';
 import Login from './Login';
 import { authApi } from '@/services/api';
 const session = vi.hoisted(() => ({ account: null, isAuthenticated: false, isLoadingAuth: false, authError: null }));
-const firebase = vi.hoisted(() => ({ popup: vi.fn(), custom: vi.fn() }));
+const firebase = vi.hoisted(() => ({ popup: vi.fn(), custom: vi.fn(), redirect: vi.fn(), getRedirectResult: vi.fn().mockResolvedValue(null) }));
 vi.mock('@/lib/firebase', () => ({ auth: {}, firebaseConfigured: true, googleProvider: 'google', getAuxiliaryAuth: () => ({}) }));
-vi.mock('firebase/auth', () => ({ signInWithPopup: firebase.popup, signInWithCustomToken: firebase.custom, signOut: vi.fn() }));
+vi.mock('firebase/auth', () => ({
+  signInWithPopup: firebase.popup,
+  signInWithRedirect: firebase.redirect,
+  getRedirectResult: firebase.getRedirectResult,
+  signInWithCustomToken: firebase.custom,
+  signOut: vi.fn(),
+}));
 vi.mock('@/lib/AuthContext', () => ({ useAuth: () => session }));
-beforeEach(() => Object.assign(session, { account: null, isAuthenticated: false, isLoadingAuth: false, authError: null }));
+beforeEach(() => {
+  Object.assign(session, { account: null, isAuthenticated: false, isLoadingAuth: false, authError: null });
+  firebase.getRedirectResult.mockResolvedValue(null);
+});
 
 vi.mock('@/services/api', () => ({
   authApi: {
@@ -110,5 +119,37 @@ describe('Login auth experience', () => {
     });
 
     vi.useRealTimers();
+  });
+
+  it('falls back to signInWithRedirect when the popup is blocked', async () => {
+    const error = new Error('Popup blocked');
+    error.code = 'auth/popup-blocked';
+    firebase.popup.mockRejectedValueOnce(error);
+
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <Login />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Continue with Google/ }));
+    await vi.waitFor(() => {
+      expect(firebase.redirect).toHaveBeenCalled();
+    });
+  });
+
+  it('processes redirect sign-in credentials from getRedirectResult on mount', async () => {
+    firebase.getRedirectResult.mockResolvedValueOnce({
+      user: { uid: 'redirect-user', email: 'redirect@example.com' },
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <Login />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByLabelText('Verification code')).toBeInTheDocument();
+    expect(authApi.requestEmailOtp).toHaveBeenCalledWith('redirect@example.com');
   });
 });

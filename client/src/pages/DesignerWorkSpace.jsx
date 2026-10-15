@@ -21,6 +21,8 @@ import { DEFAULT_CONFIG, getCenterItemLimit, getCenterItemCount } from '@/lib/ca
 import { adaptConfigToLegacy, adaptConfigFromLegacy } from '@/lib/configAdapter';
 import useCakeQuote from '@/hooks/use-cake-quote';
 import { useAuth } from '@/lib/AuthContext';
+import { auth, firebaseConfigured, getAuxiliaryAuth } from '@/lib/firebase';
+import { getRedirectResult, signOut } from 'firebase/auth';
 
 // Use the new bakery-style config structure
 const INITIAL_CONFIG = DEFAULT_CONFIG;
@@ -64,6 +66,47 @@ export default function DesignerWorkSpace() {
   const [toolPanelModeUi, setToolPanelModeUi] = useState('design');
   const [guestAuthModalOpen, setGuestAuthModalOpen] = useState(false);
   const [guestAuthAction, setGuestAuthAction] = useState('general');
+  const [guestAuthInitialEmail, setGuestAuthInitialEmail] = useState('');
+
+  useEffect(() => {
+    let isMounted = true;
+    const processGuestRedirect = async () => {
+      if (typeof getRedirectResult !== 'function' || !firebaseConfigured || !auth) return;
+      try {
+        const targetAuth = getAuxiliaryAuth ? getAuxiliaryAuth() : auth;
+        const result = await getRedirectResult(targetAuth || auth);
+        if (!result?.user) return;
+        const googleEmail = result.user.email?.trim()?.toLowerCase();
+        if (!googleEmail) return;
+
+        if (targetAuth && targetAuth !== auth) {
+          try { await signOut(targetAuth); } catch {}
+        } else if (auth?.currentUser) {
+          try { await signOut(auth); } catch {}
+        }
+
+        let pendingAction = 'save';
+        try {
+          const raw = sessionStorage.getItem('cakenmake_pending_guest_action');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed?.actionType) pendingAction = parsed.actionType;
+            sessionStorage.removeItem('cakenmake_pending_guest_action');
+          }
+        } catch {}
+
+        if (!isMounted) return;
+        setGuestAuthAction(pendingAction);
+        setGuestAuthInitialEmail(googleEmail);
+        setGuestAuthModalOpen(true);
+      } catch (err) {
+        console.warn('Redirect sign-in error in designer:', err);
+      }
+    };
+    processGuestRedirect();
+    return () => { isMounted = false; };
+  }, []);
+
   const [expandedSections, setExpandedSections] = useState({
     structure: true,
     sponge: true,
@@ -407,10 +450,23 @@ export default function DesignerWorkSpace() {
         .finally(() => setIsDesignLoading(false));
     } else {
       setIsDesignLoading(false);
-      // Completely new design
+      // Completely new design or restored guest draft
       isLoadingRef.current = true;
       setDesignId(null);
-      setConfig(INITIAL_CONFIG);
+
+      let draft = null;
+      try {
+        const raw = localStorage.getItem('cakenmake_draft_design');
+        if (raw) draft = JSON.parse(raw);
+      } catch (e) { }
+
+      if (draft?.config) {
+        setConfig(draft.config);
+        setTitle(draft.name || 'Unnamed 1');
+      } else {
+        setConfig(INITIAL_CONFIG);
+      }
+
       setOrderComplete(false);
       setSelectedCenterItemId(null);
       setActiveTool(null);
@@ -418,13 +474,10 @@ export default function DesignerWorkSpace() {
       setSaveStatus('saved');
       placeUndoStackRef.current = [];
       placeRedoStackRef.current = [];
-      try {
-        localStorage.removeItem('cakenmake_draft_design');
-      } catch (e) { }
 
       let isMounted = true;
       const initNewDesign = async () => {
-        let defaultTitle = 'Unnamed 1';
+        let defaultTitle = draft?.name || 'Unnamed 1';
         if (account) {
           try {
             const userDesigns = await designApi.getDesigns();
@@ -438,15 +491,21 @@ export default function DesignerWorkSpace() {
             while (existingNames.has(`unnamed ${num}`) || existingNames.has(`untitled ${num}`)) {
               num++;
             }
-            defaultTitle = `Unnamed ${num}`;
+            if (!draft?.name) {
+              defaultTitle = `Unnamed ${num}`;
+            }
 
             if (!isMounted) return;
 
             const savedDesign = await designApi.createDesign({
               name: defaultTitle,
-              config: INITIAL_CONFIG,
+              config: draft?.config || INITIAL_CONFIG,
               isPublic: false,
             });
+
+            try {
+              localStorage.removeItem('cakenmake_draft_design');
+            } catch (e) { }
 
             // Capture was cached during exit if creation completed after unmount.
             void saveThumbnail(savedDesign._id);
@@ -1385,9 +1444,13 @@ export default function DesignerWorkSpace() {
 
       <GuestAuthModal
         isOpen={guestAuthModalOpen}
-        onClose={() => setGuestAuthModalOpen(false)}
+        onClose={() => {
+          setGuestAuthModalOpen(false);
+          setGuestAuthInitialEmail('');
+        }}
         actionType={guestAuthAction}
         onSuccess={handleGuestAuthSuccess}
+        initialEmail={guestAuthInitialEmail}
       />
 
       <DesignerTutorial

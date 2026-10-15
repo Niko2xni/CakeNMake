@@ -5,9 +5,14 @@ import GuestAuthModal from './GuestAuthModal';
 import { authApi } from '@/services/api';
 const session = vi.hoisted(() => ({ isAuthenticated: false, isLoadingAuth: false, authError: null }));
 vi.mock('@/lib/AuthContext', () => ({ useAuth: () => session }));
-const firebase = vi.hoisted(() => ({ popup: vi.fn(), custom: vi.fn() }));
+const firebase = vi.hoisted(() => ({ popup: vi.fn(), custom: vi.fn(), redirect: vi.fn() }));
 vi.mock('@/lib/firebase', () => ({ auth: {}, firebaseConfigured: true, googleProvider: 'google', getAuxiliaryAuth: () => ({}) }));
-vi.mock('firebase/auth', () => ({ signInWithPopup: firebase.popup, signInWithCustomToken: firebase.custom, signOut: vi.fn() }));
+vi.mock('firebase/auth', () => ({
+  signInWithPopup: firebase.popup,
+  signInWithRedirect: firebase.redirect,
+  signInWithCustomToken: firebase.custom,
+  signOut: vi.fn(),
+}));
 beforeEach(() => Object.assign(session, { isAuthenticated: false, isLoadingAuth: false, authError: null }));
 
 vi.mock('@/services/api', () => ({
@@ -86,5 +91,40 @@ describe('GuestAuthModal', () => {
     expect(authApi.requestEmailOtp).toHaveBeenCalledWith('guest@example.com');
     expect(await screen.findByText(/^Verification code$/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /resend otp/i })).toBeInTheDocument();
+  });
+
+  it('automatically triggers OTP request and shows verification code when initialEmail is provided', async () => {
+    render(
+      <GuestAuthModal
+        isOpen={true}
+        onClose={vi.fn()}
+        actionType="save"
+        onSuccess={vi.fn()}
+        initialEmail="returned-guest@google.com"
+      />
+    );
+
+    expect(authApi.requestEmailOtp).toHaveBeenCalledWith('returned-guest@google.com');
+    expect(await screen.findByText(/^Verification code$/i)).toBeInTheDocument();
+  });
+
+  it('falls back to signInWithRedirect when the popup is blocked in GuestAuthModal', async () => {
+    const error = new Error('Popup blocked');
+    error.code = 'auth/popup-blocked';
+    firebase.popup.mockRejectedValueOnce(error);
+
+    render(
+      <GuestAuthModal
+        isOpen={true}
+        onClose={vi.fn()}
+        actionType="save"
+        onSuccess={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Continue with Google/ }));
+    await vi.waitFor(() => {
+      expect(firebase.redirect).toHaveBeenCalled();
+    });
   });
 });

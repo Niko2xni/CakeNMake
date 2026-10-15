@@ -23,14 +23,34 @@ class OtpStore {
     this.redis = redisUrl
       ? new Redis(redisUrl, {
           lazyConnect: true,
-          enableOfflineQueue: false,
-          maxRetriesPerRequest: 1,
+          enableOfflineQueue: true,
+          maxRetriesPerRequest: 3,
+          keepAlive: 15000,
+          retryStrategy(times) {
+            return Math.min(times * 100, 2000);
+          },
+          reconnectOnError(err) {
+            const targetErrors = [/READONLY/, /ETIMEDOUT/, /ECONNRESET/, /ECONNREFUSED/];
+            return targetErrors.some((pattern) => pattern.test(err.message));
+          },
         })
       : null;
 
     this.redis?.on('error', (error) => {
       console.warn('Redis OTP store error:', error.message);
     });
+  }
+
+  async ensureConnected() {
+    if (!this.redis) return;
+    const { status } = this.redis;
+    if (status === 'wait') {
+      await this.redis.connect();
+    } else if (status === 'close' || status === 'end') {
+      try {
+        await this.redis.connect();
+      } catch (_) {}
+    }
   }
 
   otpKey(purpose, email) {
@@ -48,17 +68,16 @@ class OtpStore {
     }
 
     try {
-      if (this.redis.status === 'wait') await this.redis.connect();
+      await this.ensureConnected();
       return await operation(this.redis);
     } catch (error) {
+      console.warn('Redis OTP store failed, falling back to memory store:', error.message);
       if (this.nodeEnv !== 'production') {
-        console.warn('Redis OTP store failed, falling back to memory in development:', error.message);
         try { this.redis.disconnect(); } catch (_) {}
         this.redis = null;
         this.useMemory = true;
-        return operation(null);
       }
-      throw createUnavailableError(error);
+      return operation(null);
     }
   }
 

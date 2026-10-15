@@ -7,9 +7,9 @@ const OTP_TTL_MS = 3 * 60 * 1000;
 const RESEND_COOLDOWN_MS = 60 * 1000;
 const MAX_ATTEMPTS = 5;
 const EMAIL_REQUEST_LIMIT = 5;
-const IP_REQUEST_LIMIT = 20;
+const IP_REQUEST_LIMIT = Number(process.env.OTP_IP_REQUEST_LIMIT || 60);
 const EMAIL_VERIFY_LIMIT = 10;
-const IP_VERIFY_LIMIT = 50;
+const IP_VERIFY_LIMIT = Number(process.env.OTP_IP_VERIFY_LIMIT || 100);
 const RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
 
 const otpStore = new OtpStore();

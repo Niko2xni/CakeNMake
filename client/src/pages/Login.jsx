@@ -8,7 +8,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
 import { auth, firebaseConfigured, getAuxiliaryAuth, googleProvider, missingFirebaseConfigMessage } from "@/lib/firebase";
-import { signInWithCustomToken, signInWithPopup, signOut } from "firebase/auth";
+import { getRedirectResult, signInWithCustomToken, signInWithPopup, signInWithRedirect, signOut } from "firebase/auth";
 import { authApi } from "@/services/api";
 import { useAuth } from '@/lib/AuthContext';
 
@@ -28,6 +28,46 @@ export default function Login() {
   const [otpSent, setOtpSent] = useState(false);
   const [error, setError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+    const processRedirectResult = async () => {
+      if (typeof getRedirectResult !== "function" || !firebaseConfigured || !auth) return;
+      try {
+        const targetAuth = getAuxiliaryAuth ? getAuxiliaryAuth() : auth;
+        const result = await getRedirectResult(targetAuth || auth);
+        if (!result?.user) return;
+        const googleEmail = result.user.email?.trim()?.toLowerCase();
+        if (!googleEmail) return;
+
+        if (targetAuth && targetAuth !== auth) {
+          try { await signOut(targetAuth); } catch {}
+        } else if (auth?.currentUser) {
+          try { await signOut(auth); } catch {}
+        }
+
+        if (!isMounted) return;
+        setLoading(true);
+        const response = await authApi.requestEmailOtp(googleEmail);
+        const expiresAt = response?.expiresAt || Date.now() + 3 * 60 * 1000;
+        setEmail(googleEmail);
+        setOtp("");
+        setOtpSent(true);
+        setOtpExpiresAt(expiresAt);
+        setStatusMessage(`A 6-digit verification code was sent to ${googleEmail}.`);
+        setError("");
+      } catch (redirectError) {
+        if (!isMounted) return;
+        if (redirectError.code !== "auth/credential-already-in-use") {
+          setError(redirectError.message || "Could not complete Google sign-in redirect.");
+        }
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+    processRedirectResult();
+    return () => { isMounted = false; };
+  }, []);
   const [otpExpiredMessage, setOtpExpiredMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [otpExpiresAt, setOtpExpiresAt] = useState(null);
@@ -178,7 +218,25 @@ export default function Login() {
     try {
       if (!firebaseConfigured || !auth) throw new Error(missingFirebaseConfigMessage);
       const targetAuth = getAuxiliaryAuth ? getAuxiliaryAuth() : auth;
-      const userCredential = await signInWithPopup(targetAuth || auth, googleProvider);
+      const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      if (isMobile && typeof signInWithRedirect === 'function') {
+        setStatusMessage("Redirecting to Google sign-in...");
+        await signInWithRedirect(targetAuth || auth, googleProvider);
+        return;
+      }
+
+      let userCredential = null;
+      try {
+        userCredential = await signInWithPopup(targetAuth || auth, googleProvider);
+      } catch (popupErr) {
+        if (popupErr.code === "auth/popup-blocked" && typeof signInWithRedirect === 'function') {
+          setStatusMessage("Popup was blocked by your browser. Redirecting to Google in this tab...");
+          await signInWithRedirect(targetAuth || auth, googleProvider);
+          return;
+        }
+        throw popupErr;
+      }
+
       const googleEmail = userCredential?.user?.email?.trim()?.toLowerCase();
       if (!googleEmail) {
         throw new Error("Could not retrieve email address from Google.");
@@ -198,7 +256,15 @@ export default function Login() {
       setStatusMessage(`A 6-digit verification code was sent to ${googleEmail}.`);
       setError("");
     } catch (authError) {
-      setError(authError.code === "auth/popup-closed-by-user" ? "Sign-in was cancelled." : authError.message || "Provider sign-in failed.");
+      let message = "Provider sign-in failed.";
+      if (authError.code === "auth/popup-closed-by-user") {
+        message = "Sign-in was cancelled.";
+      } else if (authError.code === "auth/cancelled-popup-request") {
+        message = "Only one sign-in request can be active at a time.";
+      } else if (authError.message) {
+        message = authError.message;
+      }
+      setError(message);
     } finally {
       setLoading(false);
     }

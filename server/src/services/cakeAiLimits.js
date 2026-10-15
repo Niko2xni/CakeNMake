@@ -5,8 +5,28 @@ const DAY = 86400000;
 class CakeAiLimits {
   constructor({ redisUrl = process.env.REDIS_URL, production = process.env.NODE_ENV === 'production', now = Date.now, dailyBudget = Number(process.env.AI_DAILY_TOKEN_BUDGET || 1000000) } = {}) {
     this.now = now; this.budget = dailyBudget; this.production = production; this.memory = new Map();
-    this.redis = redisUrl ? new Redis(redisUrl, { lazyConnect: true, enableOfflineQueue: false, maxRetriesPerRequest: 1 }) : null;
+    this.redis = redisUrl
+      ? new Redis(redisUrl, {
+          lazyConnect: true,
+          enableOfflineQueue: true,
+          maxRetriesPerRequest: 3,
+          keepAlive: 15000,
+          retryStrategy: (times) => Math.min(times * 100, 2000),
+          reconnectOnError: (err) => [/READONLY/, /ETIMEDOUT/, /ECONNRESET/, /ECONNREFUSED/].some((pattern) => pattern.test(err.message)),
+        })
+      : null;
     this.redis?.on('error', () => {});
+  }
+  async ensureConnected() {
+    if (!this.redis) return;
+    const { status } = this.redis;
+    if (status === 'wait') {
+      await this.redis.connect();
+    } else if (status === 'close' || status === 'end') {
+      try {
+        await this.redis.connect();
+      } catch (_) {}
+    }
   }
   async atomic(key, operation, args) {
     const keys = Array.isArray(key) ? key : [key];
@@ -21,7 +41,7 @@ for i, key in ipairs(KEYS) do redis.call('SET', key, cjson.encode(states[i]), 'P
 return cjson.encode(result)`;
     try {
       if (this.redis) {
-        if (this.redis.status === 'wait') await this.redis.connect();
+        await this.ensureConnected();
         return JSON.parse(await this.redis.eval(script, keys.length, ...keys, JSON.stringify({ ...args, now: this.now() })));
       }
       if (this.production) throw new Error('Redis required');
