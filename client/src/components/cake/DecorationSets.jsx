@@ -342,127 +342,7 @@ export function getBeadedTrimMaterial(colorHex, colorId = null) {
  * rhythms, built from spheres + capsules rather than the plain sphere
  * ring the other patterns use).
  */
-export function buildBeadedTrimRing(radius, colorHex, rand, opts = {}) {
-  const pattern = opts.pattern || 'classic';
-  const colorId = opts.colorId || null;
-  const mat = getBeadedTrimMaterial(colorHex, colorId);
-
-  if (pattern.startsWith('morse')) {
-    const MORSE_SPECS = {
-      morseDotDashDot: { nominal: 1.84, dots: [0.13, 1.39], dashes: [0.76], dashLen: 0.46 },
-      morseDotDash: { nominal: 1.40, dots: [0.13], dashes: [0.76], dashLen: 0.46 },
-      morseDotDotDash: { nominal: 1.84, dots: [0.13, 0.53], dashes: [1.16], dashLen: 0.46 },
-    };
-    const spec = MORSE_SPECS[pattern] || MORSE_SPECS.morseDotDashDot;
-    const C = Math.PI * 2 * radius;
-    const M = Math.max(4, Math.round(C / spec.nominal));
-    const cycleLen = C / M;
-    const k = cycleLen / spec.nominal;
-
-    const dotAngles = [];
-    const dashAngles = [];
-    for (let c = 0; c < M; c++) {
-      const cycleStartArc = c * cycleLen;
-      for (const dOffset of spec.dots) {
-        dotAngles.push((cycleStartArc + dOffset * k) / radius);
-      }
-      for (const dsOffset of spec.dashes) {
-        dashAngles.push((cycleStartArc + dsOffset * k) / radius);
-      }
-    }
-
-    const group = new THREE.Group();
-    if (dotAngles.length > 0) {
-      const dotGeo = applyVerticalGradientUV(new THREE.SphereGeometry(0.13, 14, 10));
-      const dotMesh = new THREE.InstancedMesh(dotGeo, mat, dotAngles.length);
-      const dummy = new THREE.Object3D();
-      for (let i = 0; i < dotAngles.length; i++) {
-        const angle = dotAngles[i];
-        dummy.position.set(Math.sin(angle) * radius, 0, Math.cos(angle) * radius);
-        const scale = 0.95 + rand() * 0.10;
-        dummy.scale.setScalar(scale);
-        dummy.rotation.set(0, 0, 0);
-        dummy.updateMatrix();
-        dotMesh.setMatrixAt(i, dummy.matrix);
-      }
-      dotMesh.instanceMatrix.needsUpdate = true;
-      dotMesh.castShadow = true;
-      dotMesh.receiveShadow = true;
-      group.add(dotMesh);
-    }
-
-    if (dashAngles.length > 0) {
-      const dashGeo = applyVerticalGradientUV(new THREE.CapsuleGeometry(0.13, spec.dashLen * k, 8, 14));
-      const dashMesh = new THREE.InstancedMesh(dashGeo, mat, dashAngles.length);
-      const dummy = new THREE.Object3D();
-      const upVec = new THREE.Vector3(0, 1, 0);
-      for (let i = 0; i < dashAngles.length; i++) {
-        const angle = dashAngles[i];
-        dummy.position.set(Math.sin(angle) * radius, 0, Math.cos(angle) * radius);
-        const tangent = new THREE.Vector3(Math.cos(angle), 0, -Math.sin(angle));
-        dummy.quaternion.setFromUnitVectors(upVec, tangent);
-        const scale = 0.95 + rand() * 0.10;
-        dummy.scale.setScalar(scale);
-        dummy.updateMatrix();
-        dashMesh.setMatrixAt(i, dummy.matrix);
-      }
-      dashMesh.instanceMatrix.needsUpdate = true;
-      dashMesh.castShadow = true;
-      dashMesh.receiveShadow = true;
-      group.add(dashMesh);
-    }
-
-    return group;
-  }
-
-  let count = opts.count;
-  if (!count) {
-    const rawCount = Math.max(18, Math.round((radius * Math.PI * 2) / 0.28));
-    if (pattern === 'trio' || pattern === 'spacer') {
-      count = Math.max(18, Math.round(rawCount / 3) * 3);
-    } else if (pattern === 'graduated') {
-      count = Math.max(18, Math.round(rawCount / 6) * 6);
-    } else if (pattern === 'classic') {
-      count = Math.max(18, Math.round(rawCount / 2) * 2);
-    } else {
-      count = rawCount;
-    }
-  }
-  const geo = applyVerticalGradientUV(new THREE.SphereGeometry(0.13, 14, 10));
-  const mesh = new THREE.InstancedMesh(geo, mat, count);
-  const dummy = new THREE.Object3D();
-  for (let i = 0; i < count; i++) {
-    const angle = (i / count) * Math.PI * 2;
-    let baseScale;
-    if (pattern === 'trio') {
-      const cyclePos = i % 3;
-      baseScale = cyclePos === 0 ? 0.58 : cyclePos === 1 ? 1.05 : 0.82;
-    } else if (pattern === 'petite') {
-      baseScale = 0.62;
-    } else if (pattern === 'graduated') {
-      const cyclePos = i % 6;
-      baseScale = [0.55, 0.72, 0.92, 1.06, 0.92, 0.72][cyclePos];
-    } else if (pattern === 'spacer') {
-      const cyclePos = i % 3;
-      baseScale = cyclePos === 0 ? 1.06 : 0.55;
-    } else if (pattern === 'grand') {
-      baseScale = 1.02;
-    } else {
-      const big = i % 2 === 0;
-      baseScale = big ? 1 : 0.62;
-    }
-    const scale = baseScale * (0.92 + rand() * 0.16);
-    dummy.position.set(Math.sin(angle) * radius, 0, Math.cos(angle) * radius);
-    dummy.scale.setScalar(scale);
-    dummy.updateMatrix();
-    mesh.setMatrixAt(i, dummy.matrix);
-  }
-  mesh.instanceMatrix.needsUpdate = true;
-  mesh.castShadow = true;
-  return mesh;
-}
-
-function getFruitRimLayout(radius, opts = {}) {
+function getRimPathLayout(radius, opts = {}) {
   const isBoxy = opts.path || opts.shape === 'rectangle' || opts.shape === 'square' || opts.shape === 'petitsFour';
   let boxyPath = opts.path || null;
   if (!boxyPath && isBoxy) {
@@ -486,17 +366,166 @@ function getFruitRimLayout(radius, opts = {}) {
       const dist = (i / count) * boxyPath.perimeter;
       const pt = boxyPath.pointAtDistance(dist);
       const angle = Math.atan2(-pt.tangentZ, pt.tangentX);
-      return { x: pt.x, z: pt.z, angle };
+      return { x: pt.x, z: pt.z, angle, tangentX: pt.tangentX, tangentZ: pt.tangentZ };
     }
     const angle = (i / count) * Math.PI * 2;
     return {
       x: Math.sin(angle) * radius,
       z: Math.cos(angle) * radius,
       angle,
+      tangentX: Math.cos(angle),
+      tangentZ: -Math.sin(angle),
     };
   };
 
-  return { isBoxy: !!boxyPath, perimeter, getPoint };
+  const getPointAtDistance = (dist) => {
+    if (boxyPath) {
+      const pt = boxyPath.pointAtDistance(dist);
+      const angle = Math.atan2(-pt.tangentZ, pt.tangentX);
+      return { x: pt.x, z: pt.z, angle, tangentX: pt.tangentX, tangentZ: pt.tangentZ };
+    }
+    const angle = dist / radius;
+    return {
+      x: Math.sin(angle) * radius,
+      z: Math.cos(angle) * radius,
+      angle,
+      tangentX: Math.cos(angle),
+      tangentZ: -Math.sin(angle),
+    };
+  };
+
+  return { isBoxy: !!boxyPath, boxyPath, perimeter, getPoint, getPointAtDistance };
+}
+
+const getFruitRimLayout = getRimPathLayout;
+
+export function buildBeadedTrimRing(radius, colorHex, rand, opts = {}) {
+  const pattern = opts.pattern || 'classic';
+  const colorId = opts.colorId || null;
+  const mat = getBeadedTrimMaterial(colorHex, colorId);
+  const layout = getRimPathLayout(radius, opts);
+
+  if (pattern.startsWith('morse')) {
+    const MORSE_SPECS = {
+      morseDotDashDot: { nominal: 1.84, dots: [0.13, 1.39], dashes: [0.76], dashLen: 0.46 },
+      morseDotDash: { nominal: 1.40, dots: [0.13], dashes: [0.76], dashLen: 0.46 },
+      morseDotDotDash: { nominal: 1.84, dots: [0.13, 0.53], dashes: [1.16], dashLen: 0.46 },
+    };
+    const spec = MORSE_SPECS[pattern] || MORSE_SPECS.morseDotDashDot;
+    const C = layout.perimeter;
+    const M = Math.max(4, Math.round(C / spec.nominal));
+    const cycleLen = C / M;
+    const k = cycleLen / spec.nominal;
+
+    const dotDists = [];
+    const dashDists = [];
+    for (let c = 0; c < M; c++) {
+      const cycleStartArc = c * cycleLen;
+      for (const dOffset of spec.dots) {
+        dotDists.push(cycleStartArc + dOffset * k);
+      }
+      for (const dsOffset of spec.dashes) {
+        dashDists.push(cycleStartArc + dsOffset * k);
+      }
+    }
+
+    const group = new THREE.Group();
+    if (layout.isBoxy) group.userData.morphedToBoxy = true;
+
+    if (dotDists.length > 0) {
+      const dotGeo = applyVerticalGradientUV(new THREE.SphereGeometry(0.13, 14, 10));
+      const dotMesh = new THREE.InstancedMesh(dotGeo, mat, dotDists.length);
+      if (layout.isBoxy) dotMesh.userData.morphedToBoxy = true;
+      dotMesh.userData.isRigidDecor = true;
+      const dummy = new THREE.Object3D();
+      for (let i = 0; i < dotDists.length; i++) {
+        const pt = layout.getPointAtDistance(dotDists[i]);
+        dummy.position.set(pt.x, 0, pt.z);
+        const scale = 0.95 + rand() * 0.10;
+        dummy.scale.setScalar(scale);
+        dummy.rotation.set(0, 0, 0);
+        dummy.updateMatrix();
+        dotMesh.setMatrixAt(i, dummy.matrix);
+      }
+      dotMesh.instanceMatrix.needsUpdate = true;
+      dotMesh.castShadow = true;
+      dotMesh.receiveShadow = true;
+      group.add(dotMesh);
+    }
+
+    if (dashDists.length > 0) {
+      const dashGeo = applyVerticalGradientUV(new THREE.CapsuleGeometry(0.13, spec.dashLen * k, 8, 14));
+      const dashMesh = new THREE.InstancedMesh(dashGeo, mat, dashDists.length);
+      if (layout.isBoxy) dashMesh.userData.morphedToBoxy = true;
+      dashMesh.userData.isRigidDecor = true;
+      const dummy = new THREE.Object3D();
+      const upVec = new THREE.Vector3(0, 1, 0);
+      for (let i = 0; i < dashDists.length; i++) {
+        const pt = layout.getPointAtDistance(dashDists[i]);
+        dummy.position.set(pt.x, 0, pt.z);
+        const tangent = new THREE.Vector3(pt.tangentX, 0, pt.tangentZ);
+        dummy.quaternion.setFromUnitVectors(upVec, tangent);
+        const scale = 0.95 + rand() * 0.10;
+        dummy.scale.setScalar(scale);
+        dummy.updateMatrix();
+        dashMesh.setMatrixAt(i, dummy.matrix);
+      }
+      dashMesh.instanceMatrix.needsUpdate = true;
+      dashMesh.castShadow = true;
+      dashMesh.receiveShadow = true;
+      group.add(dashMesh);
+    }
+
+    return group;
+  }
+
+  let count = opts.count;
+  if (!count) {
+    const rawCount = Math.max(18, Math.round(layout.perimeter / 0.28));
+    if (pattern === 'trio' || pattern === 'spacer') {
+      count = Math.max(18, Math.round(rawCount / 3) * 3);
+    } else if (pattern === 'graduated') {
+      count = Math.max(18, Math.round(rawCount / 6) * 6);
+    } else if (pattern === 'classic') {
+      count = Math.max(18, Math.round(rawCount / 2) * 2);
+    } else {
+      count = rawCount;
+    }
+  }
+  const geo = applyVerticalGradientUV(new THREE.SphereGeometry(0.13, 14, 10));
+  const mesh = new THREE.InstancedMesh(geo, mat, count);
+  if (layout.isBoxy) mesh.userData.morphedToBoxy = true;
+  mesh.userData.isRigidDecor = true;
+  const dummy = new THREE.Object3D();
+  for (let i = 0; i < count; i++) {
+    const pt = layout.getPoint(i, count);
+    let baseScale;
+    if (pattern === 'trio') {
+      const cyclePos = i % 3;
+      baseScale = cyclePos === 0 ? 0.58 : cyclePos === 1 ? 1.05 : 0.82;
+    } else if (pattern === 'petite') {
+      baseScale = 0.62;
+    } else if (pattern === 'graduated') {
+      const cyclePos = i % 6;
+      baseScale = [0.55, 0.72, 0.92, 1.06, 0.92, 0.72][cyclePos];
+    } else if (pattern === 'spacer') {
+      const cyclePos = i % 3;
+      baseScale = cyclePos === 0 ? 1.06 : 0.55;
+    } else if (pattern === 'grand') {
+      baseScale = 1.02;
+    } else {
+      const big = i % 2 === 0;
+      baseScale = big ? 1 : 0.62;
+    }
+    const scale = baseScale * (0.92 + rand() * 0.16);
+    dummy.position.set(pt.x, 0, pt.z);
+    dummy.scale.setScalar(scale);
+    dummy.updateMatrix();
+    mesh.setMatrixAt(i, dummy.matrix);
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+  mesh.castShadow = true;
+  return mesh;
 }
 
 /**

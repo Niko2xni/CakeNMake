@@ -4294,7 +4294,12 @@ const CakeScene = React.forwardRef(function CakeScene({
             edgeTrimRadius,
             slot?.pipingColor || slot?.decorationColor || lastFrostColor,
             rand,
-            { pattern: beadedTrimPattern, colorId: slot?.pipingColorId || slot?.decorationColorId }
+            {
+              pattern: beadedTrimPattern,
+              colorId: slot?.pipingColorId || slot?.decorationColorId,
+              shape: cakeShape,
+              baseRadius: BASE_RADIUS,
+            }
           );
           trim.position.y = edgeTrimY;
           group.add(trim);
@@ -4362,7 +4367,12 @@ const CakeScene = React.forwardRef(function CakeScene({
             middleRadius,
             activeMiddleSlot.pipingColor || lastFrostColor,
             rand,
-            { pattern: middleBeadedPattern, colorId: activeMiddleSlot.pipingColorId },
+            {
+              pattern: middleBeadedPattern,
+              colorId: activeMiddleSlot.pipingColorId,
+              shape: cakeShape,
+              baseRadius: BASE_RADIUS,
+            },
           );
           middleTrim.position.y = middleY;
           middleTrim.receiveShadow = true;
