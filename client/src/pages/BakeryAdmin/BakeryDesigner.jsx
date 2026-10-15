@@ -17,6 +17,8 @@ import {
   SlidersHorizontal,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Cloud,
   AlertCircle,
   Wand2,
@@ -208,34 +210,113 @@ function extractSpecsFromConfig(config) {
   if (!config || typeof config !== 'object') return [];
   const specs = [];
 
+  // Structure/Tiers - similar to pricing breakdown
   const tiers = config.structure?.tiers || config.cakeStructure?.tiers;
-  const layers = config.structure?.layers || config.layers;
-  const size = config.structure?.tierConfigs?.[0]?.size || config.cakeStructure?.size;
-  if (tiers) {
-    const tierText = tiers === '2_tiers' ? '2 Tiers' : '1 Tier';
-    const sizeText = size ? ` (${size})` : '';
-    specs.push({ label: 'Structure', value: `${tierText}${sizeText}` });
-  } else if (layers) {
-    specs.push({ label: 'Structure', value: `${layers} Layers` });
-  }
-
-  const frostStyle = config.exteriorFinish?.style || config.frosting?.style;
-  const frostColor = config.sugarColor?.top?.id || config.frosting?.flavor || config.frostingColor;
-  if (frostStyle || frostColor) {
-    specs.push({
-      label: 'Frosting',
-      value: [frostStyle ? `${frostStyle} finish` : null, frostColor].filter(Boolean).join(' · '),
+  const tierConfigs = config.structure?.tierConfigs || [];
+  
+  if (tiers === '2_tiers' && tierConfigs.length >= 2) {
+    // Two-tier cake
+    const tier1 = tierConfigs[0];
+    const tier2 = tierConfigs[1];
+    specs.push({ 
+      label: 'Structure', 
+      value: `2-Tier Cake (${tier1?.size || 'Medium'} + ${tier2?.size || 'Small'})` 
+    });
+  } else if (tiers === '1_tier' || tierConfigs.length === 1) {
+    // Single tier cake
+    const tier1 = tierConfigs[0];
+    specs.push({ 
+      label: 'Structure', 
+      value: `1-Tier Cake (${tier1?.size || 'Medium'})` 
+    });
+  } else if (config.layers) {
+    // Legacy structure format
+    specs.push({ 
+      label: 'Structure', 
+      value: config.layers === 1 ? '1-Tier Cake' : `${config.layers}-Layer Cake` 
     });
   }
 
-  const sideStyle = config.side?.design?.type || config.side?.style;
-  if (sideStyle && sideStyle !== 'none') {
-    specs.push({ label: 'Side Design', value: sideStyle });
+  // Sponge Base
+  const spongeType = config.sponge?.type || config.base?.type;
+  if (spongeType) {
+    const spongeLabel = spongeType === 'vanilla' ? 'Vanilla Sponge' :
+                       spongeType === 'chocolate' ? 'Chocolate Sponge' :
+                       spongeType === 'red-velvet' ? 'Red Velvet Sponge' :
+                       spongeType === 'ube' ? 'Ube Sponge' :
+                       `${spongeType.charAt(0).toUpperCase() + spongeType.slice(1)} Sponge`;
+    specs.push({ label: 'Sponge', value: spongeLabel });
   }
 
-  const edgeStyle = config.edge?.design?.type || config.edge?.style;
-  if (edgeStyle && edgeStyle !== 'none') {
-    specs.push({ label: 'Edge Border', value: edgeStyle });
+  // Filling
+  const fillingType = config.filling?.type;
+  if (fillingType && fillingType !== 'none') {
+    const fillingLabel = fillingType === 'buttercream' ? 'Buttercream Filling' :
+                        fillingType === 'cream-cheese' ? 'Cream Cheese Filling' :
+                        fillingType === 'whipped-cream' ? 'Whipped Cream Filling' :
+                        fillingType === 'ganache' ? 'Ganache Filling' :
+                        `${fillingType.charAt(0).toUpperCase() + fillingType.slice(1)} Filling`;
+    specs.push({ label: 'Filling', value: fillingLabel });
+  }
+
+  // Exterior Finish (Frosting)
+  const finishStyle = config.exteriorFinish?.style || config.frosting?.style;
+  if (finishStyle) {
+    const finishLabel = finishStyle === 'smooth' ? 'Smooth Finish' :
+                       finishStyle === 'textured' ? 'Textured Finish' :
+                       finishStyle === 'rustic' ? 'Rustic Finish' :
+                       finishStyle === 'naked' ? 'Naked Finish' :
+                       `${finishStyle.charAt(0).toUpperCase() + finishStyle.slice(1)} Finish`;
+    specs.push({ label: 'Exterior Finish', value: finishLabel });
+  }
+
+  // Sugar Color (Main color)
+  const sugarColor = config.sugarColor?.top?.label || config.sugarColor?.top?.id;
+  if (sugarColor) {
+    specs.push({ label: 'Color', value: sugarColor });
+  }
+
+  // Side Design
+  const sideDesign = config.side?.design?.type || config.side?.style;
+  if (sideDesign && sideDesign !== 'none') {
+    const sideLabel = sideDesign === 'piping-lines' ? 'Piping Lines' :
+                     sideDesign === 'piping-dots' ? 'Piping Dots' :
+                     sideDesign === 'fondant-ribbon' ? 'Fondant Ribbon' :
+                     `${sideDesign.charAt(0).toUpperCase() + sideDesign.slice(1)}`;
+    specs.push({ label: 'Side Design', value: sideLabel });
+  }
+
+  // Edge Design
+  const edgeDesign = config.edge?.design?.type || config.edge?.style;
+  if (edgeDesign && edgeDesign !== 'none') {
+    const edgeLabel = edgeDesign === 'shell-border' ? 'Shell Border' :
+                     edgeDesign === 'rope-border' ? 'Rope Border' :
+                     edgeDesign === 'bead-border' ? 'Bead Border' :
+                     edgeDesign === 'ruffle-border' ? 'Ruffle Border' :
+                     `${edgeDesign.charAt(0).toUpperCase() + edgeDesign.slice(1)} Border`;
+    specs.push({ label: 'Edge Border', value: edgeLabel });
+  }
+
+  // Center Items (Decorations)
+  const centerItems = config.center?.items || [];
+  if (centerItems.length > 0) {
+    const decorationTypes = {};
+    centerItems.forEach(item => {
+      const type = item.type || 'decoration';
+      decorationTypes[type] = (decorationTypes[type] || 0) + 1;
+    });
+
+    Object.entries(decorationTypes).forEach(([type, count]) => {
+      const typeLabel = type === 'strawberry' ? 'Strawberries' :
+                       type === 'flower' ? 'Flowers' :
+                       type === 'rose' ? 'Roses' :
+                       type === 'text' || type.includes('letter') ? 'Text/Letters' :
+                       'Decorations';
+      specs.push({ 
+        label: 'Decoration', 
+        value: count > 1 ? `${typeLabel} (${count}×)` : typeLabel 
+      });
+    });
   }
 
   return specs;
@@ -298,6 +379,95 @@ export default function BakeryDesigner() {
 
   // Dynamic Quote Pricing
   const { quote, loading: quoteLoading } = useCakeQuote(cakeConfig);
+
+  // Auto-save cache key
+  const CACHE_KEY = 'bakery_designer_autosave';
+  const CACHE_TIMESTAMP_KEY = 'bakery_designer_autosave_timestamp';
+
+  // Load cached design on mount
+  useEffect(() => {
+    // Only load cache if not editing an existing template
+    if (!templateId) {
+      try {
+        const cached = localStorage.getItem(CACHE_KEY);
+        const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
+        
+        if (cached) {
+          const data = JSON.parse(cached);
+          const cacheAge = Date.now() - parseInt(timestamp || '0');
+          const ONE_WEEK = 7 * 24 * 60 * 60 * 1000;
+          
+          // Only restore if cache is less than 1 week old
+          if (cacheAge < ONE_WEEK) {
+            if (data.cakeConfig) setCakeConfig(data.cakeConfig);
+            if (data.templateName) setTemplateName(data.templateName);
+            if (data.description) setDescription(data.description);
+            if (data.longDescription) setLongDescription(data.longDescription);
+            if (data.selectedSectionId) setSelectedSectionId(data.selectedSectionId);
+            // Note: capturedViews are no longer cached to avoid storage quota issues
+            
+            console.log('Restored cached design from', new Date(parseInt(timestamp)));
+          } else {
+            // Clear old cache
+            localStorage.removeItem(CACHE_KEY);
+            localStorage.removeItem(CACHE_TIMESTAMP_KEY);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load cached design:', err);
+      }
+    }
+  }, [templateId]);
+
+  // Auto-save to cache whenever important data changes
+  useEffect(() => {
+    // Don't cache if editing existing template (only for new designs)
+    if (templateId) return;
+
+    const timeoutId = setTimeout(() => {
+      try {
+        const dataToCache = {
+          cakeConfig,
+          templateName,
+          description,
+          longDescription,
+          selectedSectionId,
+          // Don't cache captured views to avoid QuotaExceededError (they're too large as base64)
+          // capturedViews: capturedViews.length > 0 ? capturedViews : undefined,
+        };
+        
+        localStorage.setItem(CACHE_KEY, JSON.stringify(dataToCache));
+        localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+      } catch (err) {
+        console.error('Failed to cache design:', err);
+        // If quota exceeded, try clearing old cache and retrying with minimal data
+        if (err.name === 'QuotaExceededError') {
+          try {
+            localStorage.removeItem(CACHE_KEY);
+            localStorage.setItem(CACHE_KEY, JSON.stringify({
+              cakeConfig,
+              templateName,
+            }));
+            localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+          } catch (retryErr) {
+            console.error('Failed to cache even minimal data:', retryErr);
+          }
+        }
+      }
+    }, 2000); // Debounce by 2 seconds
+
+    return () => clearTimeout(timeoutId);
+  }, [cakeConfig, templateName, description, longDescription, selectedSectionId, templateId]);
+
+  // Clear cache when successfully publishing
+  const clearCache = () => {
+    try {
+      localStorage.removeItem(CACHE_KEY);
+      localStorage.removeItem(CACHE_TIMESTAMP_KEY);
+    } catch (err) {
+      console.error('Failed to clear cache:', err);
+    }
+  };
 
   useEffect(() => {
     fetchSections();
@@ -564,8 +734,67 @@ export default function BakeryDesigner() {
     setErrorMessage('');
 
     try {
+      // Check for duplicate template names (only when creating new templates)
+      if (!templateId) {
+        const data = await templateApi.getBakeryTemplates();
+        const sections = Array.isArray(data?.sections) ? data.sections : [];
+        
+        // Flatten all templates from all sections into a single array
+        const existingTemplates = sections.flatMap(section => 
+          Array.isArray(section?.templates) ? section.templates : []
+        );
+        
+        // Extra safety check
+        if (Array.isArray(existingTemplates)) {
+          const nameTaken = existingTemplates.some(
+            (template) => template?.name?.trim().toLowerCase() === templateName.trim().toLowerCase()
+          );
+          
+          if (nameTaken) {
+            setErrorMessage(`The template name "${templateName.trim()}" is already taken. Please choose a different name.`);
+            setSavingTemplate(false);
+            return;
+          }
+        }
+      }
+
       const specs = extractSpecsFromConfig(cakeConfig);
       const calculatedPriceMinor = Number(quote?.totalMinor) || 0;
+
+      // Upload all view images to Cloudinary to reduce payload size
+      const uploadedViews = await Promise.all(
+        capturedViews.map(async (view) => {
+          let currentUrl = view.url;
+          let currentPublicId = view.cloudinaryPublicId || '';
+
+          // Only upload if the URL is a data URL (base64)
+          if (currentUrl && currentUrl.startsWith('data:')) {
+            const uploadResult = await templateApi.uploadTemplateImage(currentUrl);
+            currentUrl = uploadResult.secureUrl;
+            currentPublicId = uploadResult.publicId;
+          }
+          
+          // Return clean view with ONLY database fields.
+          // Explicitly omit studio working fields (rawUrl, cutoutUrl, transparentUrl)
+          // which contain megabytes of temporary base64 image data that cause HTTP 413.
+          return {
+            label: view.label || '',
+            angle: view.angle || '',
+            url: currentUrl,
+            cloudinaryPublicId: currentPublicId,
+          };
+        })
+      );
+
+      // Create a clean config copy without any embedded image data
+      const cleanConfig = JSON.parse(JSON.stringify(cakeConfig, (key, value) => {
+        // Filter out any base64 data URLs that might be embedded in config
+        if (typeof value === 'string' && (value.startsWith('data:') || (value.length > 5000 && value.startsWith('iVBORw')))) {
+          return '[IMAGE_DATA_REMOVED]';
+        }
+        return value;
+      }));
+
       const payload = {
         name: templateName.trim(),
         description: description.trim(),
@@ -573,9 +802,9 @@ export default function BakeryDesigner() {
         sectionId: selectedSectionId,
         priceMinor: calculatedPriceMinor,
         specs,
-        views: capturedViews,
-        thumbnail: capturedViews[0]?.url || '',
-        config: cakeConfig,
+        views: uploadedViews,
+        thumbnail: uploadedViews[0]?.url || '',
+        config: cleanConfig,
       };
 
       if (templateId) {
@@ -584,10 +813,18 @@ export default function BakeryDesigner() {
         await templateApi.createTemplate(payload);
       }
 
+      // Clear the auto-save cache after successful publish
+      clearCache();
+
       navigate('/bakery/templates');
     } catch (err) {
       console.error('Failed to save template:', err);
-      setErrorMessage('Failed to save template. Please check the fields and try again.');
+      setErrorMessage(
+        err.message === 'This request is too large. Your latest changes could not be saved.' ||
+        err.message?.toLowerCase().includes('upload')
+          ? 'Failed to upload template images. Please try again.'
+          : err.message || 'Failed to save template. Please check the fields and try again.'
+      );
     } finally {
       setSavingTemplate(false);
     }
@@ -647,8 +884,7 @@ export default function BakeryDesigner() {
             ) : (
               <>
                 <Camera className="w-4 h-4" />
-                <span className="inline sm:hidden">Capture & Save</span>
-                <span className="hidden sm:inline">Capture 8 Angles & Save</span>
+                <span>Finish</span>
               </>
             )}
           </Button>
@@ -926,13 +1162,6 @@ export default function BakeryDesigner() {
                     <span className="text-[10px] font-bold text-primary uppercase tracking-wider">
                       Angle Preview ({activeViewIndex + 1} of 8)
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => setBackgroundStudioOpen(true)}
-                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-pink-500 hover:bg-pink-600 text-white text-[11px] font-bold shadow-xs transition-all cursor-pointer"
-                    >
-                      <Palette className="w-3.5 h-3.5" /> Backgrounds & Ribbon
-                    </button>
                   </div>
 
                   {/* Main Large View */}
@@ -969,13 +1198,6 @@ export default function BakeryDesigner() {
                     <span className="text-[11px] text-muted-foreground">
                       {capturedViews[activeViewIndex]?.label || `Angle ${activeViewIndex + 1}`}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => setBackgroundStudioOpen(true)}
-                      className="text-[11px] font-bold text-pink-600 hover:text-pink-700 hover:underline flex items-center gap-1 cursor-pointer"
-                    >
-                      <Pencil className="w-3 h-3" /> Edit Pictures & Background
-                    </button>
                   </div>
                 </div>
 
@@ -1032,9 +1254,17 @@ export default function BakeryDesigner() {
                       <button
                         type="button"
                         onClick={() => setShowAddSectionInline(!showAddSectionInline)}
-                        className="text-primary hover:text-primary/80 font-medium flex items-center gap-1"
+                        className="text-primary hover:text-primary/80 font-medium flex items-center gap-1 transition-colors"
                       >
-                        <Plus className="w-3 h-3" /> New Section
+                        {showAddSectionInline ? (
+                          <>
+                            <X className="w-3 h-3" /> Cancel
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="w-3 h-3" /> New Section
+                          </>
+                        )}
                       </button>
                     </div>
 
@@ -1056,21 +1286,24 @@ export default function BakeryDesigner() {
                         </button>
                       </div>
                     ) : (
-                      <select
-                        required
-                        value={selectedSectionId}
-                        onChange={(e) => setSelectedSectionId(e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-input focus:ring-2 focus:ring-primary bg-background font-normal text-sm text-foreground"
-                      >
-                        <option value="" disabled>
-                          {sections.length === 0 ? 'No sections created yet — click + New Section' : 'Select a section'}
-                        </option>
-                        {sections.map((sec) => (
-                          <option key={sec._id} value={sec._id}>
-                            {sec.name}
+                      <div className="relative">
+                        <select
+                          required
+                          value={selectedSectionId}
+                          onChange={(e) => setSelectedSectionId(e.target.value)}
+                          className="w-full px-3.5 py-2.5 pr-10 rounded-xl border border-input focus:ring-2 focus:ring-primary bg-background font-normal text-sm text-foreground appearance-none"
+                        >
+                          <option value="" disabled>
+                            {sections.length === 0 ? 'No sections created yet — click + New Section' : 'Select a section'}
                           </option>
-                        ))}
-                      </select>
+                          {sections.map((sec) => (
+                            <option key={sec._id} value={sec._id}>
+                              {sec.name}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown className="w-4 h-4 text-muted-foreground absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </div>
                     )}
                   </div>
 
@@ -1091,10 +1324,11 @@ export default function BakeryDesigner() {
                   {/* Descriptions */}
                   <div>
                     <label className="block text-xs font-medium text-foreground uppercase tracking-wider mb-1">
-                      Short Tagline (Card description)
+                      Short Tagline (Card description) *
                     </label>
                     <input
                       type="text"
+                      required
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       placeholder="e.g. Perfect for birthdays and celebrations"
@@ -1104,10 +1338,11 @@ export default function BakeryDesigner() {
 
                   <div>
                     <label className="block text-xs font-medium text-foreground uppercase tracking-wider mb-1">
-                      Detailed Story Description (Popup modal)
+                      Detailed Story Description (Popup modal) *
                     </label>
                     <textarea
                       rows={2}
+                      required
                       value={longDescription}
                       onChange={(e) => setLongDescription(e.target.value)}
                       placeholder="A timeless birthday cake with soft buttercream layers and candle-ready top tier..."

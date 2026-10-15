@@ -19,7 +19,7 @@ app.use(cors(corsOptions));
 app.use('/api/media', require('./routes/mediaRoutes'));
 app.use('/api/blueprint-submissions', require('./routes/blueprintSubmissionRoutes'));
 app.use('/api/cake-ai', express.json({ limit: '650kb' }));
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '25mb' }));
 
 app.get("/", (req, res) => {
     res.send("CakeNMake API Running");

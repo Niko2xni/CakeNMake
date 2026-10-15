@@ -13,7 +13,6 @@ import {
   ChevronRight,
   Eye,
   Camera,
-  Star,
   Tag,
   CheckCircle2,
   Copy,
@@ -86,7 +85,9 @@ export default function TemplateBackgroundStudioModal({
   const [newBgName, setNewBgName] = useState('');
   const [newBgType, setNewBgType] = useState('gradient'); // 'gradient' | 'solid' | 'image'
   const [newBgTopColor, setNewBgTopColor] = useState('#fff5eb');
+  const [newBgMidColor, setNewBgMidColor] = useState('#fff0e6');
   const [newBgBottomColor, setNewBgBottomColor] = useState('#ffe4d6');
+  const [newBgUseMidColor, setNewBgUseMidColor] = useState(false);
   const [newBgImageUrl, setNewBgImageUrl] = useState('');
   const customBgImageInputRef = useRef(null);
 
@@ -207,7 +208,7 @@ export default function TemplateBackgroundStudioModal({
   const handleSaveNewBackground = () => {
     const trimmed = newBgName.trim();
     if (!trimmed) {
-      alert('Please enter a name for your custom background.');
+      // Field is required, browser will show validation
       return;
     }
     if (newBgType === 'image' && !newBgImageUrl) {
@@ -223,7 +224,7 @@ export default function TemplateBackgroundStudioModal({
       background: {
         type: newBgType,
         topColor: newBgTopColor,
-        midColor: newBgTopColor,
+        midColor: newBgUseMidColor ? newBgMidColor : newBgTopColor,
         bottomColor: newBgType === 'gradient' ? newBgBottomColor : newBgTopColor,
         imageUrl: newBgType === 'image' ? newBgImageUrl : null,
         lightingIntensity: 0.7,
@@ -459,9 +460,6 @@ export default function TemplateBackgroundStudioModal({
                 <h2 className="font-heading font-bold text-gray-900 text-lg leading-tight">
                   Template Background Maker & Studio
                 </h2>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-pink-100 text-pink-700 uppercase tracking-wider">
-                  Showcase Ad Creator
-                </span>
               </div>
               <p className="text-xs text-gray-500 mt-0.5">
                 Apply marketing backdrops, Red Ribbon arched title banners, pedestal plates, and manually edit each picture.
@@ -486,13 +484,6 @@ export default function TemplateBackgroundStudioModal({
             </button>
           </div>
         </div>
-
-        {/* Notification Toast */}
-        {notification && (
-          <div className="bg-pink-600 text-white text-xs font-semibold px-4 py-2 text-center animate-in slide-in-from-top-2 duration-150">
-            {notification}
-          </div>
-        )}
 
         {/* Main Body */}
         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
@@ -754,11 +745,6 @@ export default function TemplateBackgroundStudioModal({
                               <div>
                                 <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5">
                                   {p.name}
-                                  {p.id === 'banner-background' && (
-                                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-rose-100 text-rose-700 font-bold">
-                                      Red Ribbon Ad
-                                    </span>
-                                  )}
                                   {p.id === 'no-background' && (
                                     <span className="text-[9px] px-1.5 py-0.2 rounded bg-gray-100 text-gray-700 font-bold">
                                       Transparent
@@ -870,69 +856,6 @@ export default function TemplateBackgroundStudioModal({
                     )}
                   </div>
 
-                  {/* Fine-Tune Gradient / Color */}
-                  <div className="pt-4 border-t border-gray-200 space-y-3">
-                    <h4 className="font-bold text-gray-800 text-xs">Fine-Tune Active Colors</h4>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div>
-                        <label className="text-[10px] text-gray-500 block mb-1">Top Tone</label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={studioSettings.background.topColor || '#f9a875'}
-                            onChange={(e) =>
-                              setStudioSettings((prev) => ({
-                                ...prev,
-                                background: { ...prev.background, type: prev.background.type === 'transparent' ? 'gradient' : prev.background.type, topColor: e.target.value },
-                              }))
-                            }
-                            className="w-8 h-8 rounded-lg cursor-pointer border border-gray-300 p-0.5"
-                          />
-                          <span className="text-[10px] text-gray-600 font-mono">
-                            {studioSettings.background.topColor}
-                          </span>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-gray-500 block mb-1">Mid Tone</label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={studioSettings.background.midColor || '#fbe2d2'}
-                            onChange={(e) =>
-                              setStudioSettings((prev) => ({
-                                ...prev,
-                                background: { ...prev.background, type: prev.background.type === 'transparent' ? 'gradient' : prev.background.type, midColor: e.target.value },
-                              }))
-                            }
-                            className="w-8 h-8 rounded-lg cursor-pointer border border-gray-300 p-0.5"
-                          />
-                          <span className="text-[10px] text-gray-600 font-mono">
-                            {studioSettings.background.midColor}
-                          </span>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-gray-500 block mb-1">Bottom Tone</label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={studioSettings.background.bottomColor || '#fde6eb'}
-                            onChange={(e) =>
-                              setStudioSettings((prev) => ({
-                                ...prev,
-                                background: { ...prev.background, type: prev.background.type === 'transparent' ? 'gradient' : prev.background.type, bottomColor: e.target.value },
-                              }))
-                            }
-                            className="w-8 h-8 rounded-lg cursor-pointer border border-gray-300 p-0.5"
-                          />
-                          <span className="text-[10px] text-gray-600 font-mono">
-                            {studioSettings.background.bottomColor}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               )}
 
@@ -1015,8 +938,9 @@ export default function TemplateBackgroundStudioModal({
                               }
                               className="w-full px-2.5 py-1.5 rounded-lg border border-gray-300 bg-white text-xs"
                             >
-                              <option value="arched-ribbon">Arched Ribbon (Red Ribbon Style)</option>
-                              <option value="modern-pill">Modern Pill Badge</option>
+                              <option value="arched-ribbon">Arched Ribbon</option>
+                              <option value="curved-wave">Curved Wave Ribbon</option>
+                              <option value="wavy-ribbon">Wavy Ribbon Banner</option>
                             </select>
                           </div>
                         </div>
@@ -1042,62 +966,7 @@ export default function TemplateBackgroundStudioModal({
                     )}
                   </div>
 
-                  {/* Rating / Badge Tag */}
-                  <div className="p-4 rounded-2xl border border-gray-200 bg-white space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Star className="w-4 h-4 text-amber-500" />
-                        <h4 className="font-bold text-gray-900 text-xs">Rating & Location Badge</h4>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={studioSettings.badge.enabled}
-                          onChange={(e) =>
-                            setStudioSettings((prev) => ({
-                              ...prev,
-                              badge: { ...prev.badge, enabled: e.target.checked },
-                            }))
-                          }
-                          className="sr-only peer"
-                        />
-                        <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-pink-500"></div>
-                      </label>
-                    </div>
 
-                    {studioSettings.badge.enabled && (
-                      <div className="grid grid-cols-2 gap-2 pt-2">
-                        <div>
-                          <label className="text-[10px] text-gray-500 block mb-1">Badge Text</label>
-                          <input
-                            type="text"
-                            value={studioSettings.badge.text || ''}
-                            onChange={(e) =>
-                              setStudioSettings((prev) => ({
-                                ...prev,
-                                badge: { ...prev.badge, text: e.target.value },
-                              }))
-                            }
-                            className="w-full px-2.5 py-1.5 rounded-lg border border-gray-300 bg-white text-xs font-semibold"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] text-gray-500 block mb-1">Subtitle / Location</label>
-                          <input
-                            type="text"
-                            value={studioSettings.badge.subtitle || ''}
-                            onChange={(e) =>
-                              setStudioSettings((prev) => ({
-                                ...prev,
-                                badge: { ...prev.badge, subtitle: e.target.value },
-                              }))
-                            }
-                            className="w-full px-2.5 py-1.5 rounded-lg border border-gray-300 bg-white text-xs"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
 
                   {/* Promo Headline Banner */}
                   <div className="p-4 rounded-2xl border border-gray-200 bg-white space-y-3">
@@ -1242,68 +1111,6 @@ export default function TemplateBackgroundStudioModal({
                     </div>
                   </div>
 
-                  {/* Serving Plate & Contact Shadow */}
-                  <div className="space-y-3 p-4 rounded-2xl border border-gray-200 bg-white">
-                    <h4 className="font-bold text-gray-900 text-xs">Serving Plate & Studio Shadow</h4>
-
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs text-gray-700 font-medium cursor-pointer">
-                        Serving Plate Pedestal
-                      </label>
-                      <input
-                        type="checkbox"
-                        checked={studioSettings.plate.enabled}
-                        onChange={(e) =>
-                          setStudioSettings((prev) => ({
-                            ...prev,
-                            plate: { ...prev.plate, enabled: e.target.checked },
-                          }))
-                        }
-                        className="rounded text-pink-500 focus:ring-pink-400"
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs text-gray-700 font-medium cursor-pointer">
-                        Soft Floor Contact Shadow
-                      </label>
-                      <input
-                        type="checkbox"
-                        checked={studioSettings.shadow.enabled}
-                        onChange={(e) =>
-                          setStudioSettings((prev) => ({
-                            ...prev,
-                            shadow: { ...prev.shadow, enabled: e.target.checked },
-                          }))
-                        }
-                        className="rounded text-pink-500 focus:ring-pink-400"
-                      />
-                    </div>
-
-                    {studioSettings.shadow.enabled && (
-                      <div>
-                        <div className="flex justify-between text-[11px] mb-1">
-                          <span className="text-gray-600 font-medium">Shadow Darkness</span>
-                          <span className="font-mono">{Math.round(studioSettings.shadow.opacity * 100)}%</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="0"
-                          max="0.8"
-                          step="0.05"
-                          value={studioSettings.shadow.opacity}
-                          onChange={(e) =>
-                            setStudioSettings((prev) => ({
-                              ...prev,
-                              shadow: { ...prev.shadow, opacity: parseFloat(e.target.value) },
-                            }))
-                          }
-                          className="w-full accent-pink-500"
-                        />
-                      </div>
-                    )}
-                  </div>
-
                   {/* Image Color Filters */}
                   <div className="space-y-3 p-4 rounded-2xl border border-gray-200 bg-gray-50/50">
                     <h4 className="font-bold text-gray-900 text-xs">Lighting & Color Tone</h4>
@@ -1401,7 +1208,13 @@ export default function TemplateBackgroundStudioModal({
       {/* ADD CUSTOM BACKGROUND MODAL */}
       {showAddBackgroundModal && (
         <div className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl w-full max-w-md p-5 shadow-2xl border border-pink-200 space-y-4">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSaveNewBackground();
+            }}
+            className="bg-white rounded-3xl w-full max-w-md p-5 shadow-2xl border border-pink-200 space-y-4"
+          >
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-pink-100 text-pink-600 flex items-center justify-center">
@@ -1428,6 +1241,7 @@ export default function TemplateBackgroundStudioModal({
                 </label>
                 <input
                   type="text"
+                  required
                   value={newBgName}
                   onChange={(e) => setNewBgName(e.target.value)}
                   placeholder="e.g. Birthday Pastel, Modern Velvet"
@@ -1463,31 +1277,62 @@ export default function TemplateBackgroundStudioModal({
               </div>
 
               {newBgType === 'gradient' && (
-                <div className="grid grid-cols-2 gap-3 pt-1">
-                  <div>
-                    <label className="text-[10px] text-gray-500 block mb-1">Top Color</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={newBgTopColor}
-                        onChange={(e) => setNewBgTopColor(e.target.value)}
-                        className="w-9 h-9 rounded-xl cursor-pointer border border-gray-300 p-0.5"
-                      />
-                      <span className="text-xs font-mono text-gray-600">{newBgTopColor}</span>
+                <div className="space-y-3 pt-1">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] text-gray-500 block mb-1">Top Color</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={newBgTopColor}
+                          onChange={(e) => setNewBgTopColor(e.target.value)}
+                          className="w-9 h-9 rounded-xl cursor-pointer border border-gray-300 p-0.5"
+                        />
+                        <span className="text-xs font-mono text-gray-600">{newBgTopColor}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-gray-500 block mb-1">Bottom Color</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={newBgBottomColor}
+                          onChange={(e) => setNewBgBottomColor(e.target.value)}
+                          className="w-9 h-9 rounded-xl cursor-pointer border border-gray-300 p-0.5"
+                        />
+                        <span className="text-xs font-mono text-gray-600">{newBgBottomColor}</span>
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <label className="text-[10px] text-gray-500 block mb-1">Bottom Color</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={newBgBottomColor}
-                        onChange={(e) => setNewBgBottomColor(e.target.value)}
-                        className="w-9 h-9 rounded-xl cursor-pointer border border-gray-300 p-0.5"
-                      />
-                      <span className="text-xs font-mono text-gray-600">{newBgBottomColor}</span>
-                    </div>
+                  
+                  {/* Optional Mid Color */}
+                  <div className="flex items-center gap-2 pb-1">
+                    <input
+                      type="checkbox"
+                      id="useMidColor"
+                      checked={newBgUseMidColor}
+                      onChange={(e) => setNewBgUseMidColor(e.target.checked)}
+                      className="rounded text-pink-500 focus:ring-pink-400"
+                    />
+                    <label htmlFor="useMidColor" className="text-[10px] text-gray-600 font-medium cursor-pointer">
+                      Use Mid Color (3-color gradient)
+                    </label>
                   </div>
+                  
+                  {newBgUseMidColor && (
+                    <div>
+                      <label className="text-[10px] text-gray-500 block mb-1">Mid Color</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={newBgMidColor}
+                          onChange={(e) => setNewBgMidColor(e.target.value)}
+                          className="w-9 h-9 rounded-xl cursor-pointer border border-gray-300 p-0.5"
+                        />
+                        <span className="text-xs font-mono text-gray-600">{newBgMidColor}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1561,6 +1406,8 @@ export default function TemplateBackgroundStudioModal({
                         ? `url(${newBgImageUrl}) center/cover no-repeat`
                         : newBgType === 'solid'
                         ? newBgTopColor
+                        : newBgUseMidColor
+                        ? `linear-gradient(135deg, ${newBgTopColor}, ${newBgMidColor}, ${newBgBottomColor})`
                         : `linear-gradient(135deg, ${newBgTopColor}, ${newBgBottomColor})`,
                   }}
                 >
@@ -1578,14 +1425,13 @@ export default function TemplateBackgroundStudioModal({
                 Cancel
               </button>
               <button
-                type="button"
-                onClick={handleSaveNewBackground}
+                type="submit"
                 className="px-5 py-2 rounded-xl bg-pink-500 hover:bg-pink-600 text-white text-xs font-bold shadow-md shadow-pink-500/20 transition-all active:scale-98"
               >
                 Save Background
               </button>
             </div>
-          </div>
+          </form>
         </div>
       )}
     </div>

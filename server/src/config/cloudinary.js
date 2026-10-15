@@ -64,8 +64,28 @@ const deleteTrustedThumbnail = async ({ asset, firebaseUid, designId }) => {
   }
 };
 
+const templateFolder = 'cakenmake/templates';
+
+const createTemplateUploadSignature = () => {
+  const timestamp = Math.floor(Date.now() / 1000);
+  const folder = templateFolder;
+  const signature = cloudinary.utils.api_sign_request(
+    { folder, timestamp },
+    process.env.CLOUDINARY_API_SECRET
+  );
+
+  return {
+    apiKey: process.env.CLOUDINARY_API_KEY,
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    folder,
+    signature,
+    timestamp,
+  };
+};
+
 module.exports = {
   cloudinary,
+  createTemplateUploadSignature,
   createThumbnailUploadSignature,
   deleteTrustedThumbnail,
   thumbnailPrefix,

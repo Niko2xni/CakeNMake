@@ -69,9 +69,29 @@ export default function BakeryTemplates() {
   const handleSaveStudioViews = async (updatedViews) => {
     if (!studioTargetTemplate) return;
     try {
-      const updatedThumbnail = updatedViews[0]?.url || studioTargetTemplate.thumbnail;
+      setSavingAction(true);
+      // Upload any new base64 views to Cloudinary and strip temporary studio fields
+      const cleanedViews = await Promise.all(
+        (updatedViews || []).map(async (view) => {
+          let currentUrl = view.url;
+          let currentPublicId = view.cloudinaryPublicId || '';
+          if (currentUrl && currentUrl.startsWith('data:')) {
+            const uploadResult = await templateApi.uploadTemplateImage(currentUrl);
+            currentUrl = uploadResult.secureUrl;
+            currentPublicId = uploadResult.publicId;
+          }
+          return {
+            label: view.label || '',
+            angle: view.angle || '',
+            url: currentUrl,
+            cloudinaryPublicId: currentPublicId,
+          };
+        })
+      );
+
+      const updatedThumbnail = cleanedViews[0]?.url || studioTargetTemplate.thumbnail;
       await templateApi.updateTemplate(studioTargetTemplate._id, {
-        views: updatedViews,
+        views: cleanedViews,
         thumbnail: updatedThumbnail,
       });
       showNotification('Showcase pictures and background updated successfully!');
@@ -81,6 +101,8 @@ export default function BakeryTemplates() {
     } catch (err) {
       console.error('Failed to update template pictures:', err);
       setError('Failed to save updated showcase pictures.');
+    } finally {
+      setSavingAction(false);
     }
   };
 
@@ -226,7 +248,7 @@ export default function BakeryTemplates() {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-16">
+    <div className="space-y-6 max-w-7xl mx-auto pb-16 px-4 pt-6">
       {/* Top Banner & Action */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gradient-to-r from-pink-500/10 via-rose-50 to-orange-50/20 p-6 rounded-2xl border border-pink-100 shadow-xs">
         <div>

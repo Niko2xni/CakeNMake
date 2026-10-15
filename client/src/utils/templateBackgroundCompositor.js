@@ -45,7 +45,7 @@ export const STUDIO_PRESETS = [
   {
     id: 'banner-background',
     name: 'Banner Background',
-    subtitle: 'Foodpanda / Red Ribbon style with red arched banner & rating badge',
+    subtitle: 'Foodpanda / Red Ribbon style with red arched banner',
     background: {
       type: 'gradient',
       topColor: '#f9a875',
@@ -71,16 +71,10 @@ export const STUDIO_PRESETS = [
       yOffset: 12,
     },
     badge: {
-      enabled: true,
-      text: '$$$ ★ 4.8',
-      subtitle: 'CakeNMake Bakery - Signature',
-      bgColor: '#e91e63',
+      enabled: false,
     },
     promo: {
-      enabled: true,
-      mainText: 'up to 50% off',
-      subText: 'Special bakery promotion',
-      color: '#e91e63',
+      enabled: false,
     },
   },
 ];
@@ -428,7 +422,7 @@ function drawArchedRibbon(ctx, x, y, width, height, title, ribbonConfig) {
   const totalAngle = Math.min(Math.PI * 0.45, (chars.length * fontSize * 0.55) / radius);
   const startAngle = -Math.PI / 2 - totalAngle / 2;
   const angleStep = totalAngle / Math.max(1, chars.length - 1);
-  const textCenterY = radius - archDepth / 2 + 4;
+  const textCenterY = radius - archDepth / 2 + height / 2;
 
   // Text shadow
   ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
@@ -456,35 +450,202 @@ function drawArchedRibbon(ctx, x, y, width, height, title, ribbonConfig) {
 }
 
 /**
- * Draws a modern pill badge for title (alternative to arched ribbon)
+ * Draws a curved wave ribbon banner
  */
-function drawModernPillBanner(ctx, x, y, title, ribbonConfig) {
+function drawCurvedWaveRibbon(ctx, x, y, width, height, title, ribbonConfig) {
   if (!title) return;
-  const color = ribbonConfig?.color || '#ee4f84';
+  const ribbonColor = ribbonConfig?.color || '#e91e63';
+  const hasGoldTrim = ribbonConfig?.goldTrim ?? false;
   const textColor = ribbonConfig?.textColor || '#ffffff';
-  const fontSize = ribbonConfig?.fontSize || 20;
+  const fontSize = ribbonConfig?.fontSize || 24;
 
   ctx.save();
-  ctx.font = `bold ${fontSize}px "DM Sans", sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
+  ctx.translate(x, y);
 
-  const textWidth = ctx.measureText(title).width;
-  const padX = 24;
-  const pillW = textWidth + padX * 2;
-  const pillH = fontSize + 18;
+  const halfW = width / 2;
+  
+  // Draw wavy ribbon shape
+  const waveGrad = ctx.createLinearGradient(0, 0, 0, height);
+  waveGrad.addColorStop(0, shadeColor(ribbonColor, 15));
+  waveGrad.addColorStop(0.5, ribbonColor);
+  waveGrad.addColorStop(1, shadeColor(ribbonColor, -20));
 
-  ctx.shadowColor = 'rgba(44, 23, 19, 0.2)';
+  ctx.fillStyle = waveGrad;
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
   ctx.shadowBlur = 10;
   ctx.shadowOffsetY = 4;
 
-  ctx.fillStyle = color;
-  roundRect(ctx, x - pillW / 2, y - pillH / 2, pillW, pillH, 999);
+  // Create smooth wave path
+  ctx.beginPath();
+  ctx.moveTo(-halfW, height / 2);
+  
+  // Top wave
+  for (let i = 0; i <= width; i += 10) {
+    const xPos = -halfW + i;
+    const yPos = Math.sin((i / width) * Math.PI * 2) * 8;
+    ctx.lineTo(xPos, yPos);
+  }
+  
+  // Right side
+  ctx.lineTo(halfW, height / 2);
+  
+  // Bottom wave
+  for (let i = width; i >= 0; i -= 10) {
+    const xPos = -halfW + i;
+    const yPos = height + Math.sin((i / width) * Math.PI * 2 + Math.PI) * 8;
+    ctx.lineTo(xPos, yPos);
+  }
+  
+  ctx.closePath();
   ctx.fill();
-
+  
   ctx.shadowColor = 'transparent';
+  
+  // Gold trim if enabled
+  if (hasGoldTrim) {
+    ctx.strokeStyle = '#f6d376';
+    ctx.lineWidth = 2;
+    
+    // Top wave trim
+    ctx.beginPath();
+    for (let i = 0; i <= width; i += 10) {
+      const xPos = -halfW + i;
+      const yPos = Math.sin((i / width) * Math.PI * 2) * 8 + 2;
+      if (i === 0) ctx.moveTo(xPos, yPos);
+      else ctx.lineTo(xPos, yPos);
+    }
+    ctx.stroke();
+    
+    // Bottom wave trim
+    ctx.beginPath();
+    for (let i = 0; i <= width; i += 10) {
+      const xPos = -halfW + i;
+      const yPos = height + Math.sin((i / width) * Math.PI * 2 + Math.PI) * 8 - 2;
+      if (i === 0) ctx.moveTo(xPos, yPos);
+      else ctx.lineTo(xPos, yPos);
+    }
+    ctx.stroke();
+  }
+
+  // Draw text
+  ctx.font = `bold italic ${fontSize}px "Pacifico", "DM Sans", cursive, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
   ctx.fillStyle = textColor;
-  ctx.fillText(title, x, y);
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+  ctx.shadowBlur = 3;
+  ctx.fillText(title, 0, height / 2);
+
+  ctx.restore();
+}
+
+/**
+ * Draws a wavy ribbon banner with stitching
+ */
+function drawWavyRibbonBanner(ctx, x, y, width, height, title, ribbonConfig) {
+  if (!title) return;
+  const ribbonColor = ribbonConfig?.color || '#8e44ad';
+  const hasGoldTrim = ribbonConfig?.goldTrim ?? false;
+  const textColor = ribbonConfig?.textColor || '#ffffff';
+  const fontSize = ribbonConfig?.fontSize || 32; // Increased to 32px for larger ribbon
+
+  ctx.save();
+  ctx.translate(x, y);
+
+  const halfW = width / 2;
+  const expandedHeight = height * 2.0; // Make it 100% larger (2x size)
+  
+  // Create ribbon gradient
+  const ribbonGrad = ctx.createLinearGradient(0, 0, 0, expandedHeight);
+  ribbonGrad.addColorStop(0, shadeColor(ribbonColor, 20));
+  ribbonGrad.addColorStop(0.5, ribbonColor);
+  ribbonGrad.addColorStop(1, shadeColor(ribbonColor, -25));
+
+  ctx.fillStyle = ribbonGrad;
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+  ctx.shadowBlur = 12;
+  ctx.shadowOffsetY = 5;
+
+  // Draw main ribbon body with waves
+  ctx.beginPath();
+  ctx.moveTo(-halfW, expandedHeight * 0.3);
+  
+  // Top wavy edge
+  for (let i = 0; i <= width; i += 15) {
+    const xPos = -halfW + i;
+    const yPos = expandedHeight * 0.3 + Math.sin((i / width) * Math.PI * 3) * 10; // Increased wave amplitude to 10px
+    ctx.lineTo(xPos, yPos);
+  }
+  
+  ctx.lineTo(halfW, expandedHeight * 0.7);
+  
+  // Bottom wavy edge
+  for (let i = width; i >= 0; i -= 15) {
+    const xPos = -halfW + i;
+    const yPos = expandedHeight * 0.7 + Math.sin((i / width) * Math.PI * 3 + Math.PI) * 10; // Increased wave amplitude to 10px
+    ctx.lineTo(xPos, yPos);
+  }
+  
+  ctx.closePath();
+  ctx.fill();
+  
+  ctx.shadowColor = 'transparent';
+  
+  // Draw decorative stitching or golden trim
+  if (hasGoldTrim) {
+    // Golden trim lines that follow the wave pattern
+    ctx.strokeStyle = '#f6d376';
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([]);
+    
+    // Top golden trim following the wave
+    ctx.beginPath();
+    for (let i = 0; i <= width; i += 10) {
+      const xPos = -halfW + i;
+      const yPos = expandedHeight * 0.3 + Math.sin((i / width) * Math.PI * 3) * 10 + 4;
+      if (i === 0) ctx.moveTo(xPos, yPos);
+      else ctx.lineTo(xPos, yPos);
+    }
+    ctx.stroke();
+    
+    // Bottom golden trim following the wave
+    ctx.beginPath();
+    for (let i = 0; i <= width; i += 10) {
+      const xPos = -halfW + i;
+      const yPos = expandedHeight * 0.7 + Math.sin((i / width) * Math.PI * 3 + Math.PI) * 10 - 4;
+      if (i === 0) ctx.moveTo(xPos, yPos);
+      else ctx.lineTo(xPos, yPos);
+    }
+    ctx.stroke();
+  } else {
+    // White stitching if no golden trim
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    
+    ctx.beginPath();
+    ctx.moveTo(-halfW + 10, expandedHeight * 0.35);
+    ctx.lineTo(halfW - 10, expandedHeight * 0.35);
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.moveTo(-halfW + 10, expandedHeight * 0.65);
+    ctx.lineTo(halfW - 10, expandedHeight * 0.65);
+    ctx.stroke();
+  }
+  
+  ctx.setLineDash([]);
+
+  // Draw text
+  ctx.font = `bold italic ${fontSize}px "Pacifico", "DM Sans", cursive, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = textColor;
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+  ctx.shadowBlur = 4;
+  ctx.shadowOffsetY = 2;
+  ctx.fillText(title, 0, expandedHeight / 2);
+
   ctx.restore();
 }
 
@@ -609,6 +770,9 @@ export async function compositeTemplateImage({
     color: '#e91e63',
   };
 
+  // Extract scale early for early return check
+  const scale = cakeTransform.scale || 1.0;
+
   // If plain background without overlays/adjustments, return the pristine original capture directly
   if (
     bg.type === 'plain' &&
@@ -675,7 +839,7 @@ export async function compositeTemplateImage({
   // Cake base position
   const centerX = canvasWidth / 2 + (cakeTransform.offsetX || 0);
   const centerY = canvasHeight / 2 + (cakeTransform.offsetY || 0);
-  const scale = cakeTransform.scale || 1.0;
+  // scale is already defined earlier for early return check
 
   // Cake dimensions (full 1:1 scale by default to match 3D camera framing)
   const cakeW = canvasWidth * scale;
@@ -731,24 +895,26 @@ export async function compositeTemplateImage({
   }
 
   // 3. Draw Floor Contact Shadow
-  if (shadow.enabled && bg.type !== 'transparent') {
-    const shadowRadiusX = cakeW * 0.45;
-    const shadowRadiusY = cakeW * 0.13;
-    const shadowY = cakeBottomY + (shadow.yOffset || 12);
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.ellipse(centerX, shadowY, shadowRadiusX, shadowRadiusY, 0, 0, Math.PI * 2);
-    const shadowGrad = ctx.createRadialGradient(centerX, shadowY, 10, centerX, shadowY, shadowRadiusX);
-    const sOpacity = shadow.opacity ?? 0.45;
-    shadowGrad.addColorStop(0, `rgba(44, 23, 19, ${sOpacity})`);
-    shadowGrad.addColorStop(0.5, `rgba(44, 23, 19, ${sOpacity * 0.5})`);
-    shadowGrad.addColorStop(1, 'rgba(44, 23, 19, 0)');
-    ctx.fillStyle = shadowGrad;
-    ctx.filter = `blur(${Math.max(2, (shadow.blur || 24) * 0.4)}px)`;
-    ctx.fill();
-    ctx.restore();
-  }
+  // Shadow rendering disabled - user requirement: no shadows below cakes
+  // Code kept for backward compatibility but not executed
+  // if (shadow.enabled && bg.type !== 'transparent') {
+  //   const shadowRadiusX = cakeW * 0.45;
+  //   const shadowRadiusY = cakeW * 0.13;
+  //   const shadowY = cakeBottomY + (shadow.yOffset || 12);
+  //
+  //   ctx.save();
+  //   ctx.beginPath();
+  //   ctx.ellipse(centerX, shadowY, shadowRadiusX, shadowRadiusY, 0, 0, Math.PI * 2);
+  //   const shadowGrad = ctx.createRadialGradient(centerX, shadowY, 10, centerX, shadowY, shadowRadiusX);
+  //   const sOpacity = shadow.opacity ?? 0.45;
+  //   shadowGrad.addColorStop(0, `rgba(44, 23, 19, ${sOpacity})`);
+  //   shadowGrad.addColorStop(0.5, `rgba(44, 23, 19, ${sOpacity * 0.5})`);
+  //   shadowGrad.addColorStop(1, 'rgba(44, 23, 19, 0)');
+  //   ctx.fillStyle = shadowGrad;
+  //   ctx.filter = `blur(${Math.max(2, (shadow.blur || 24) * 0.4)}px)`;
+  //   ctx.fill();
+  //   ctx.restore();
+  // }
 
   // 4. Draw 3D Cake Image
   if (cakeImageUrl) {
@@ -769,15 +935,18 @@ export async function compositeTemplateImage({
     }
   }
 
-  // 5. Draw Arched Title Ribbon (The "Red Ribbon" title maker!)
+  // 5. Draw Title Ribbon Banner
   if (ribbon.enabled && (ribbon.titleText || templateName)) {
     const title = ribbon.titleText || templateName;
-    if (ribbon.style === 'modern-pill') {
-      drawModernPillBanner(ctx, centerX, 80, title, ribbon);
+    const ribbonWidth = Math.min(460, canvasWidth * 0.58);
+    const ribbonHeight = 52;
+    
+    if (ribbon.style === 'curved-wave') {
+      drawCurvedWaveRibbon(ctx, centerX, 74, ribbonWidth, ribbonHeight, title, ribbon);
+    } else if (ribbon.style === 'wavy-ribbon') {
+      drawWavyRibbonBanner(ctx, centerX, 74, ribbonWidth, ribbonHeight, title, ribbon);
     } else {
-      // Classic Arched Ribbon Banner
-      const ribbonWidth = Math.min(460, canvasWidth * 0.58);
-      const ribbonHeight = 52;
+      // Classic Arched Ribbon Banner (default)
       drawArchedRibbon(ctx, centerX, 74, ribbonWidth, ribbonHeight, title, ribbon);
     }
   }

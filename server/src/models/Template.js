@@ -13,6 +13,10 @@ const templateViewSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  cloudinaryPublicId: {
+    type: String,
+    default: '',
+  },
 }, { _id: false });
 
 const templateSchema = new mongoose.Schema({

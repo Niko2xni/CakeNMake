@@ -4,6 +4,41 @@ const Template = require('../models/Template');
 const TemplateSection = require('../models/TemplateSection');
 const authenticate = require('../middleware/authenticate');
 const { loadAppUser, requireRole } = require('../middleware/authorize');
+const { createTemplateUploadSignature } = require('../config/cloudinary');
+
+let ensureDefaultSectionsPromise = null;
+
+const ensureDefaultSections = async () => {
+  if (ensureDefaultSectionsPromise) {
+    return ensureDefaultSectionsPromise;
+  }
+  ensureDefaultSectionsPromise = (async () => {
+    try {
+      const count = await TemplateSection.countDocuments();
+      if (count === 0) {
+        await TemplateSection.insertMany([
+          { name: 'Featured Cakes', order: 0 },
+          { name: 'Birthday Cakes', order: 1 },
+          { name: 'Wedding Cakes', order: 2 },
+          { name: 'Special Celebrations', order: 3 },
+        ]);
+      }
+    } finally {
+      ensureDefaultSectionsPromise = null;
+    }
+  })();
+  return ensureDefaultSectionsPromise;
+};
+
+const sanitizeViews = (views) => {
+  if (!Array.isArray(views)) return [];
+  return views.map((v) => ({
+    label: typeof v?.label === 'string' ? v.label : '',
+    angle: typeof v?.angle === 'string' ? v.angle : '',
+    url: typeof v?.url === 'string' ? v.url : '',
+    cloudinaryPublicId: typeof v?.cloudinaryPublicId === 'string' ? v.cloudinaryPublicId : '',
+  }));
+};
 
 // ----------------------------------------------------
 // Public Client Endpoints
@@ -12,6 +47,7 @@ const { loadAppUser, requireRole } = require('../middleware/authorize');
 // GET /api/templates - Get all sections and published templates for client
 router.get('/public', async (req, res) => {
   try {
+    await ensureDefaultSections();
     const sections = await TemplateSection.find().sort({ order: 1, createdAt: 1 }).lean();
     const templates = await Template.find({ isPublished: true }).sort({ order: 1, createdAt: 1 }).lean();
 
@@ -39,6 +75,7 @@ router.get('/public/:id', async (req, res) => {
     }
     return res.json(template);
   } catch (error) {
+    console.error('Failed to get template by ID:', error);
     return res.status(500).json({ message: 'Failed to fetch template' });
   }
 });
@@ -47,12 +84,28 @@ router.get('/public/:id', async (req, res) => {
 // Bakery Admin Endpoints
 // ----------------------------------------------------
 
+// POST /api/bakery/templates/upload-signature - Get upload signature for template view images
+router.post('/upload-signature', authenticate, loadAppUser, requireRole('bakery_staff', 'bakery_admin', 'platform_admin'), async (req, res) => {
+  try {
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      return res.status(503).json({ message: 'Cloudinary upload service is not configured' });
+    }
+    const signatureData = createTemplateUploadSignature();
+    return res.json(signatureData);
+  } catch (error) {
+    console.error('Failed to create template upload signature:', error);
+    return res.status(500).json({ message: 'Failed to authorize template image upload' });
+  }
+});
+
 // GET /api/bakery/templates/sections - List sections
 router.get('/sections', authenticate, loadAppUser, requireRole('bakery_staff', 'bakery_admin', 'platform_admin'), async (req, res) => {
   try {
+    await ensureDefaultSections();
     const sections = await TemplateSection.find().sort({ order: 1, createdAt: 1 }).lean();
     return res.json(sections);
   } catch (error) {
+    console.error('Failed to get sections:', error);
     return res.status(500).json({ message: 'Failed to fetch sections' });
   }
 });
@@ -93,6 +146,7 @@ router.put('/sections/:id', authenticate, loadAppUser, requireRole('bakery_staff
     }
     return res.json(section);
   } catch (error) {
+    console.error('Failed to update section:', error);
     return res.status(500).json({ message: 'Failed to update section' });
   }
 });
@@ -108,6 +162,7 @@ router.delete('/sections/:id', authenticate, loadAppUser, requireRole('bakery_st
     await Template.deleteMany({ sectionId: req.params.id });
     return res.json({ message: 'Section deleted', deletedId: req.params.id });
   } catch (error) {
+    console.error('Failed to delete section:', error);
     return res.status(500).json({ message: 'Failed to delete section' });
   }
 });
@@ -128,6 +183,7 @@ router.post('/sections/reorder', authenticate, loadAppUser, requireRole('bakery_
     const updated = await TemplateSection.find().sort({ order: 1 }).lean();
     return res.json(updated);
   } catch (error) {
+    console.error('Failed to reorder sections:', error);
     return res.status(500).json({ message: 'Failed to reorder sections' });
   }
 });
@@ -149,6 +205,7 @@ router.get('/', authenticate, loadAppUser, requireRole('bakery_staff', 'bakery_a
       allTemplates: templates,
     });
   } catch (error) {
+    console.error('Failed to fetch bakery templates:', error);
     return res.status(500).json({ message: 'Failed to fetch bakery templates' });
   }
 });
@@ -182,7 +239,8 @@ router.post('/', authenticate, loadAppUser, requireRole('bakery_staff', 'bakery_
     const maxOrderTemplate = await Template.findOne({ sectionId: targetSectionId }).sort({ order: -1 });
     const nextOrder = maxOrderTemplate ? maxOrderTemplate.order + 1 : 0;
 
-    const defaultThumb = thumbnail || (Array.isArray(views) && views[0]?.url ? views[0].url : '');
+    const cleanViews = sanitizeViews(views);
+    const defaultThumb = thumbnail || (cleanViews[0]?.url ? cleanViews[0].url : '');
 
     const template = await Template.create({
       name: name.trim(),
@@ -191,7 +249,7 @@ router.post('/', authenticate, loadAppUser, requireRole('bakery_staff', 'bakery_
       sectionId: targetSectionId,
       priceMinor: Number(priceMinor) || 0,
       specs: Array.isArray(specs) ? specs : [],
-      views: Array.isArray(views) ? views : [],
+      views: cleanViews,
       thumbnail: defaultThumb,
       config: config || {},
       order: nextOrder,
@@ -229,7 +287,7 @@ router.put('/:id', authenticate, loadAppUser, requireRole('bakery_staff', 'baker
     if (sectionId !== undefined) update.sectionId = sectionId;
     if (priceMinor !== undefined) update.priceMinor = Number(priceMinor);
     if (specs !== undefined) update.specs = specs;
-    if (views !== undefined) update.views = views;
+    if (views !== undefined) update.views = sanitizeViews(views);
     if (thumbnail !== undefined) update.thumbnail = thumbnail;
     if (config !== undefined) update.config = config;
     if (order !== undefined) update.order = Number(order);
@@ -241,6 +299,7 @@ router.put('/:id', authenticate, loadAppUser, requireRole('bakery_staff', 'baker
     }
     return res.json(template);
   } catch (error) {
+    console.error('Failed to update template:', error);
     return res.status(500).json({ message: 'Failed to update template' });
   }
 });
@@ -254,6 +313,7 @@ router.delete('/:id', authenticate, loadAppUser, requireRole('bakery_staff', 'ba
     }
     return res.json({ message: 'Template deleted', deletedId: req.params.id });
   } catch (error) {
+    console.error('Failed to delete template:', error);
     return res.status(500).json({ message: 'Failed to delete template' });
   }
 });
@@ -274,6 +334,7 @@ router.post('/reorder', authenticate, loadAppUser, requireRole('bakery_staff', '
     const updated = await Template.find(sectionId ? { sectionId } : {}).sort({ order: 1 }).lean();
     return res.json(updated);
   } catch (error) {
+    console.error('Failed to reorder templates:', error);
     return res.status(500).json({ message: 'Failed to reorder templates' });
   }
 });

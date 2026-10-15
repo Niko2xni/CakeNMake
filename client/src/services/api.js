@@ -307,6 +307,55 @@ export const templateApi = {
     body: JSON.stringify({ sectionId, orderedIds }),
   }),
 
+  // Upload template view images to Cloudinary
+  uploadTemplateImage: async (base64Image) => {
+    const owner = auth?.currentUser?.uid;
+    if (!owner) throw new Error('You must be signed in.');
+    
+    // Ensure the base64 data has the data URL prefix
+    const imageData = base64Image.startsWith('data:')
+      ? base64Image
+      : `data:image/png;base64,${base64Image}`;
+
+    // Get upload signature from server
+    const upload = await requestAuthenticatedJson(
+      `${API_BASE_URL}/bakery/templates/upload-signature`,
+      { method: 'POST' }
+    );
+
+    if (auth?.currentUser?.uid !== owner) throw new Error('Account changed.');
+
+    // Upload to Cloudinary
+    const formData = new FormData();
+    formData.append('file', imageData);
+    formData.append('api_key', upload.apiKey);
+    formData.append('timestamp', String(upload.timestamp));
+    formData.append('signature', upload.signature);
+    formData.append('folder', upload.folder);
+
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${encodeURIComponent(upload.cloudName)}/image/upload`,
+      {
+        method: 'POST',
+        body: formData
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Cloudinary upload error:', errorText);
+      throw new Error('Failed to upload template image');
+    }
+
+    const data = await response.json();
+    if (auth?.currentUser?.uid !== owner) throw new Error('Account changed.');
+    
+    return {
+      secureUrl: data.secure_url,
+      publicId: data.public_id
+    };
+  },
+
   getSections: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/templates/sections`),
   createSection: (name) => requestAuthenticatedJson(`${API_BASE_URL}/bakery/templates/sections`, {
     method: 'POST',

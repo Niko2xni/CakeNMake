@@ -16,8 +16,7 @@ import LogoutConfirmation from '@/components/shared/LogoutConfirmation';
 
 const primaryItems = [
   { to: '/client', icon: Clock, label: 'Recents' },
-  // Temporarily hidden:
-  // { to: '/templates', icon: LayoutTemplate, label: 'Templates' },
+  { to: '/templates', icon: LayoutTemplate, label: 'Templates' },
   { to: '/trash', icon: Trash2, label: 'Trash' },
 ];
 
