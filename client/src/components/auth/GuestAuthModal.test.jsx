@@ -3,17 +3,23 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import GuestAuthModal from './GuestAuthModal';
 import { authApi } from '@/services/api';
+
 const session = vi.hoisted(() => ({ isAuthenticated: false, isLoadingAuth: false, authError: null }));
 vi.mock('@/lib/AuthContext', () => ({ useAuth: () => session }));
-const firebase = vi.hoisted(() => ({ popup: vi.fn(), custom: vi.fn(), redirect: vi.fn() }));
+const firebase = vi.hoisted(() => ({ popup: vi.fn(), custom: vi.fn() }));
+
 vi.mock('@/lib/firebase', () => ({ auth: {}, firebaseConfigured: true, googleProvider: 'google', getAuxiliaryAuth: () => ({}) }));
 vi.mock('firebase/auth', () => ({
   signInWithPopup: firebase.popup,
-  signInWithRedirect: firebase.redirect,
   signInWithCustomToken: firebase.custom,
   signOut: vi.fn(),
 }));
-beforeEach(() => Object.assign(session, { isAuthenticated: false, isLoadingAuth: false, authError: null }));
+
+beforeEach(() => {
+  Object.assign(session, { isAuthenticated: false, isLoadingAuth: false, authError: null });
+  firebase.popup.mockReset();
+  firebase.custom.mockReset();
+});
 
 vi.mock('@/services/api', () => ({
   authApi: {
@@ -25,13 +31,11 @@ vi.mock('@/services/api', () => ({
 describe('GuestAuthModal', () => {
   it('waits for app account readiness after Google sign-in and OTP verification before resuming a designer action', async () => {
     const user = { uid: 'guest', email: 'guest@google.com' };
-    firebase.popup.mockResolvedValueOnce({ user });
     authApi.verifyEmailOtp.mockResolvedValueOnce({ token: 'guest-custom-token' });
     firebase.custom.mockResolvedValueOnce({ user });
     const onClose = vi.fn();
     const onSuccess = vi.fn();
-    const { rerender } = render(<GuestAuthModal isOpen onClose={onClose} onSuccess={onSuccess} />);
-    fireEvent.click(screen.getByRole('button', { name: /Continue with Google/ }));
+    const { rerender } = render(<GuestAuthModal isOpen onClose={onClose} onSuccess={onSuccess} initialEmail="guest@google.com" />);
     const input = await screen.findByLabelText('Verification code');
     expect(authApi.requestEmailOtp).toHaveBeenCalledWith('guest@google.com');
     fireEvent.change(input, { target: { value: '123456' } });
@@ -41,10 +45,11 @@ describe('GuestAuthModal', () => {
     await screen.findByText('Loading your account…');
     expect(onSuccess).not.toHaveBeenCalled();
     session.isAuthenticated = true;
-    rerender(<GuestAuthModal isOpen onClose={onClose} onSuccess={onSuccess} />);
+    rerender(<GuestAuthModal isOpen onClose={onClose} onSuccess={onSuccess} initialEmail="guest@google.com" />);
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onSuccess).toHaveBeenCalledWith(user);
   });
+
   it('renders modal with Save title when actionType is save', () => {
     render(
       <GuestAuthModal
@@ -108,11 +113,8 @@ describe('GuestAuthModal', () => {
     expect(await screen.findByText(/^Verification code$/i)).toBeInTheDocument();
   });
 
-  it('falls back to signInWithRedirect when the popup is blocked in GuestAuthModal', async () => {
-    const error = new Error('Popup blocked');
-    error.code = 'auth/popup-blocked';
-    firebase.popup.mockRejectedValueOnce(error);
-
+  it('triggers signInWithPopup when Continue with Google is clicked in GuestAuthModal', async () => {
+    firebase.popup.mockResolvedValueOnce({ user: { uid: 'popup-guest' } });
     render(
       <GuestAuthModal
         isOpen={true}
@@ -124,7 +126,22 @@ describe('GuestAuthModal', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Continue with Google/ }));
     await vi.waitFor(() => {
-      expect(firebase.redirect).toHaveBeenCalled();
+      expect(firebase.popup).toHaveBeenCalledWith({}, 'google');
     });
+  });
+
+  it('displays friendly message when popup is closed by user in GuestAuthModal', async () => {
+    firebase.popup.mockRejectedValueOnce({ code: 'auth/popup-closed-by-user' });
+    render(
+      <GuestAuthModal
+        isOpen={true}
+        onClose={vi.fn()}
+        actionType="save"
+        onSuccess={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Continue with Google/ }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Sign-in was cancelled. You can also sign in with your email below.');
   });
 });
