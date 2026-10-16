@@ -14,5 +14,6 @@ test('public authentication routes do not expose OTP cancellation', () => {
   assert.deepEqual(routes, [
     { path: '/email/request-otp', methods: ['post'] },
     { path: '/email/verify-otp', methods: ['post'] },
+    { path: '/google', methods: ['post'] },
   ]);
 });

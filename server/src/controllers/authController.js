@@ -65,3 +65,76 @@ exports.verifyEmailOtp = async (req, res) => {
     return sendServiceError(res, error, 'We could not complete sign-in.');
   }
 };
+
+exports.handleGoogleOAuth = async (req, res) => {
+  const { code, redirectUri } = req.body || {};
+  if (!code || !redirectUri) {
+    return res.status(400).json({ message: 'Authorization code and redirectUri are required.' });
+  }
+
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret || !firebaseAdminConfigured || !firebaseAdminAuth) {
+    return res.status(503).json({ message: 'Google OAuth is not configured on the server.' });
+  }
+
+  try {
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code',
+      }),
+    });
+
+    const tokenData = await tokenResponse.json();
+    if (!tokenResponse.ok) {
+      console.error('Google token exchange error:', tokenData);
+      return res.status(401).json({ message: tokenData.error_description || 'Failed to exchange Google code.' });
+    }
+
+    const userinfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+    const profile = await userinfoResponse.json();
+
+    if (!profile.email) {
+      return res.status(400).json({ message: 'Google account has no associated email address.' });
+    }
+
+    const email = profile.email.trim().toLowerCase();
+    const displayName = profile.name || '';
+    const photoURL = profile.picture || '';
+
+    let user;
+    try {
+      user = await firebaseAdminAuth.getUserByEmail(email);
+      const updates = {};
+      if (!user.emailVerified) updates.emailVerified = true;
+      if (!user.displayName && displayName) updates.displayName = displayName;
+      if (!user.photoURL && photoURL) updates.photoURL = photoURL;
+      if (Object.keys(updates).length > 0) {
+        user = await firebaseAdminAuth.updateUser(user.uid, updates);
+      }
+    } catch (err) {
+      if (err.code !== 'auth/user-not-found') throw err;
+      user = await firebaseAdminAuth.createUser({
+        email,
+        displayName: displayName || undefined,
+        photoURL: photoURL || undefined,
+        emailVerified: true,
+      });
+    }
+
+    const customToken = await firebaseAdminAuth.createCustomToken(user.uid);
+    return res.json({ token: customToken });
+  } catch (err) {
+    return sendServiceError(res, err, 'We could not complete Google sign-in.');
+  }
+};
+

@@ -6,19 +6,22 @@ import { authApi } from '@/services/api';
 
 const session = vi.hoisted(() => ({ isAuthenticated: false, isLoadingAuth: false, authError: null }));
 vi.mock('@/lib/AuthContext', () => ({ useAuth: () => session }));
-const firebase = vi.hoisted(() => ({ popup: vi.fn(), custom: vi.fn() }));
+const firebase = vi.hoisted(() => ({ custom: vi.fn() }));
+const googleAuthMock = vi.hoisted(() => ({ redirectToGoogleOAuth: vi.fn() }));
 
 vi.mock('@/lib/firebase', () => ({ auth: {}, firebaseConfigured: true, googleProvider: 'google', getAuxiliaryAuth: () => ({}) }));
 vi.mock('firebase/auth', () => ({
-  signInWithPopup: firebase.popup,
   signInWithCustomToken: firebase.custom,
   signOut: vi.fn(),
+}));
+vi.mock('@/lib/googleAuth', () => ({
+  redirectToGoogleOAuth: googleAuthMock.redirectToGoogleOAuth,
 }));
 
 beforeEach(() => {
   Object.assign(session, { isAuthenticated: false, isLoadingAuth: false, authError: null });
-  firebase.popup.mockReset();
   firebase.custom.mockReset();
+  googleAuthMock.redirectToGoogleOAuth.mockReset();
 });
 
 vi.mock('@/services/api', () => ({
@@ -113,8 +116,7 @@ describe('GuestAuthModal', () => {
     expect(await screen.findByText(/^Verification code$/i)).toBeInTheDocument();
   });
 
-  it('triggers signInWithPopup when Continue with Google is clicked in GuestAuthModal', async () => {
-    firebase.popup.mockResolvedValueOnce({ user: { uid: 'popup-guest' } });
+  it('triggers redirectToGoogleOAuth when Continue with Google is clicked in GuestAuthModal', async () => {
     render(
       <GuestAuthModal
         isOpen={true}
@@ -125,13 +127,13 @@ describe('GuestAuthModal', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /Continue with Google/ }));
-    await vi.waitFor(() => {
-      expect(firebase.popup).toHaveBeenCalledWith({}, 'google');
-    });
+    expect(googleAuthMock.redirectToGoogleOAuth).toHaveBeenCalled();
   });
 
-  it('displays friendly message when popup is closed by user in GuestAuthModal', async () => {
-    firebase.popup.mockRejectedValueOnce({ code: 'auth/popup-closed-by-user' });
+  it('displays friendly message when Google redirect fails in GuestAuthModal', async () => {
+    googleAuthMock.redirectToGoogleOAuth.mockImplementationOnce(() => {
+      throw new Error('Google sign-in redirection failed.');
+    });
     render(
       <GuestAuthModal
         isOpen={true}
@@ -142,6 +144,6 @@ describe('GuestAuthModal', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /Continue with Google/ }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Sign-in was cancelled. You can also sign in with your email below.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Google sign-in redirection failed.');
   });
 });

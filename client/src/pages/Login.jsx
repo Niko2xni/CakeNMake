@@ -7,8 +7,9 @@ import { ArrowLeft, CheckCircle2, Loader2, Mail, TimerReset } from "lucide-react
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
-import { auth, firebaseConfigured, googleProvider, missingFirebaseConfigMessage } from "@/lib/firebase";
-import { signInWithCustomToken, signInWithPopup, signOut } from "firebase/auth";
+import { auth, firebaseConfigured, missingFirebaseConfigMessage } from "@/lib/firebase";
+import { signInWithCustomToken } from "firebase/auth";
+import { redirectToGoogleOAuth } from "@/lib/googleAuth";
 import { authApi } from "@/services/api";
 import { useAuth } from '@/lib/AuthContext';
 
@@ -170,28 +171,15 @@ export default function Login() {
     await verifyCode(otp);
   };
 
-  const handleProviderAuth = async () => {
+  const handleProviderAuth = () => {
     setError("");
     setStatusMessage("");
     setOtpExpiredMessage("");
     setLoading(true);
     try {
-      if (!firebaseConfigured || !auth) throw new Error(missingFirebaseConfigMessage);
-      await signInWithPopup(auth, googleProvider);
-      navigate("/login-success");
+      redirectToGoogleOAuth("/login-success");
     } catch (authError) {
-      let message = "Provider sign-in failed.";
-      if (authError.code === "auth/popup-closed-by-user") {
-        message = "Sign-in was cancelled. You can also sign in with your email below.";
-      } else if (authError.code === "auth/popup-blocked") {
-        message = "Popup was blocked by your browser. Please allow popups or use email sign-in below.";
-      } else if (authError.code === "auth/cancelled-popup-request") {
-        message = "Only one sign-in request can be active at a time.";
-      } else if (authError.message) {
-        message = authError.message;
-      }
-      setError(message);
-    } finally {
+      setError(authError.message || "Provider sign-in failed.");
       setLoading(false);
     }
   };

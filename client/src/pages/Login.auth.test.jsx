@@ -6,20 +6,23 @@ import Login from './Login';
 import { authApi } from '@/services/api';
 
 const session = vi.hoisted(() => ({ account: null, isAuthenticated: false, isLoadingAuth: false, authError: null }));
-const firebase = vi.hoisted(() => ({ popup: vi.fn(), custom: vi.fn() }));
+const firebase = vi.hoisted(() => ({ custom: vi.fn() }));
+const googleAuthMock = vi.hoisted(() => ({ redirectToGoogleOAuth: vi.fn() }));
 
 vi.mock('@/lib/firebase', () => ({ auth: {}, firebaseConfigured: true, googleProvider: 'google', getAuxiliaryAuth: () => ({}) }));
 vi.mock('firebase/auth', () => ({
-  signInWithPopup: firebase.popup,
   signInWithCustomToken: firebase.custom,
   signOut: vi.fn(),
+}));
+vi.mock('@/lib/googleAuth', () => ({
+  redirectToGoogleOAuth: googleAuthMock.redirectToGoogleOAuth,
 }));
 vi.mock('@/lib/AuthContext', () => ({ useAuth: () => session }));
 
 beforeEach(() => {
   Object.assign(session, { account: null, isAuthenticated: false, isLoadingAuth: false, authError: null });
-  firebase.popup.mockReset();
   firebase.custom.mockReset();
+  googleAuthMock.redirectToGoogleOAuth.mockReset();
 });
 
 vi.mock('@/services/api', () => ({
@@ -30,23 +33,22 @@ vi.mock('@/services/api', () => ({
 }));
 
 describe('Login auth experience', () => {
-  it('triggers signInWithPopup when Continue with Google is clicked', async () => {
-    firebase.popup.mockResolvedValueOnce({ user: { uid: 'google-user' } });
+  it('triggers redirectToGoogleOAuth when Continue with Google is clicked', async () => {
     render(
       <MemoryRouter initialEntries={['/login']}>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route path="/login-success" element={<div>Completing sign-in</div>} />
         </Routes>
       </MemoryRouter>
     );
     fireEvent.click(screen.getByRole('button', { name: /Continue with Google/ }));
-    expect(firebase.popup).toHaveBeenCalledWith({}, 'google');
-    expect(await screen.findByText('Completing sign-in')).toBeInTheDocument();
+    expect(googleAuthMock.redirectToGoogleOAuth).toHaveBeenCalledWith('/login-success');
   });
 
-  it('displays a helpful message when popup is closed by user', async () => {
-    firebase.popup.mockRejectedValueOnce({ code: 'auth/popup-closed-by-user' });
+  it('displays a helpful message when Google redirect throws an error', async () => {
+    googleAuthMock.redirectToGoogleOAuth.mockImplementationOnce(() => {
+      throw new Error('Google Client ID is not configured.');
+    });
     render(
       <MemoryRouter initialEntries={['/login']}>
         <Routes>
@@ -55,20 +57,7 @@ describe('Login auth experience', () => {
       </MemoryRouter>
     );
     fireEvent.click(screen.getByRole('button', { name: /Continue with Google/ }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Sign-in was cancelled. You can also sign in with your email below.');
-  });
-
-  it('displays a helpful message when popup is blocked by browser', async () => {
-    firebase.popup.mockRejectedValueOnce({ code: 'auth/popup-blocked' });
-    render(
-      <MemoryRouter initialEntries={['/login']}>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-        </Routes>
-      </MemoryRouter>
-    );
-    fireEvent.click(screen.getByRole('button', { name: /Continue with Google/ }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Popup was blocked by your browser. Please allow popups or use email sign-in below.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Google Client ID is not configured.');
   });
 
   it('exchanges the verified email OTP for a Firebase session', async () => {

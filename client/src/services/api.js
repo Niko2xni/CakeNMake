@@ -137,6 +137,11 @@ export const authApi = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, code }),
   }),
+  exchangeGoogleCode: (code, redirectUri) => requestJson(`${API_BASE_URL}/auth/google`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code, redirectUri }),
+  }),
 };
 
 export const accountApi = {

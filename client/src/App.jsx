@@ -19,6 +19,7 @@ import Login from '@/pages/Login';
 import ForgotPassword from '@/pages/ForgotPassword';
 import ResetPassword from '@/pages/ResetPassword';
 import LoginSuccess from '@/pages/LoginSuccess';
+import GoogleCallback from '@/pages/GoogleCallback';
 import Templates from '@/pages/Client/Templates';
 import CakeAI from '@/pages/Client/CakeAI';
 import Trash from '@/pages/Client/Trash';
@@ -87,6 +88,7 @@ const AuthenticatedApp = () => {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/login-success" element={<LoginSuccess />} />
+      <Route path="/auth/google/callback" element={<GoogleCallback />} />
 
       {/* Original designer workspace: only logged in client accounts can access */}
       <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/guest-designer" replace />} />}>

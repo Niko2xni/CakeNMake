@@ -477,6 +477,9 @@ export default function DesignerWorkSpace() {
             setHasUnsavedChanges(false);
             navigate(`/designer?designId=${savedDesign._id}`, { replace: true });
             setTimeout(() => saveThumbnail(savedDesign._id), 600);
+            if (draft?.action === 'order') {
+              setBakeryOpen(true);
+            }
             return;
           } catch (err) {
             console.warn('Could not initialize new design in db:', err);
@@ -777,6 +780,7 @@ export default function DesignerWorkSpace() {
           name: title,
           config,
           lastEdited: new Date().toISOString(),
+          action: 'save',
         }));
       } catch (e) { }
       setGuestAuthAction('save');
@@ -797,6 +801,7 @@ export default function DesignerWorkSpace() {
           name: title,
           config,
           lastEdited: new Date().toISOString(),
+          action: 'order',
         }));
       } catch (e) { }
       setGuestAuthAction('order');
