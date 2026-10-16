@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
@@ -28,8 +28,27 @@ function getActiveToolLabel(tool) {
 
 export default function Designer() {
   const { account, isAuthenticated, isLoadingAuth } = useAuth();
-  const [cakeConfig, setCakeConfig] = useState(defaultCakeConfig);
+  const [cakeConfig, setCakeConfig] = useState(() => {
+    try {
+      const raw = localStorage.getItem('cakenmake_draft_design');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.config) return parsed.config;
+      }
+    } catch (e) {}
+    return defaultCakeConfig;
+  });
   const [activeTool, setActiveTool] = useState(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('cakenmake_draft_design', JSON.stringify({
+        name: 'Guest Design',
+        config: cakeConfig,
+        lastEdited: new Date().toISOString(),
+      }));
+    } catch (e) {}
+  }, [cakeConfig]);
 
   // Logged in users cannot access guest designer page
   if (!isLoadingAuth && isAuthenticated && account) {
