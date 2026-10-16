@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Store, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import DeliveryCalendar from './DeliveryCalendar';
-import FulfillmentStep from './FulfillmentStep';
 import GCashPayment from './GCashPayment';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
@@ -12,28 +11,19 @@ import { activeRestriction } from '@/lib/moderation';
 import { moderationApi } from '@/services/chat-api';
 
 export default function SendBakeryModal({ config, total, onClose, onOrderComplete, onPaymentComplete }) {
-  const [step, setStep] = useState('calendar'); // 'calendar' | 'fulfillment' | 'pay'
+  const [step, setStep] = useState('calendar'); // 'calendar' | 'pay'
   const [selectedDate, setSelectedDate] = useState(null);
-  const [fulfillment, setFulfillment] = useState({
-    type: 'pickup',
-    timeWindow: '1:00 PM – 4:00 PM',
-    address: '',
-    landmarks: '',
-    notes: '',
-    recipientPhone: '',
-    policyAgreed: false,
-  });
   const [busy, setBusy] = useState(false);
   const { account } = useAuth();
   const [accessError, setAccessError] = useState('');
   const restricted = Boolean(activeRestriction(account));
 
-  async function continueToFulfillment() {
+  async function continueToPayment() {
     setBusy(true); setAccessError('');
     try {
       const data = await moderationApi.mine();
       if (data.restriction) throw new Error('New orders are restricted. Existing orders remain available through Orders & Support.');
-      setStep('fulfillment');
+      setStep('pay');
     } catch (error) { setAccessError(error.message); }
     finally { setBusy(false); }
   }
@@ -65,9 +55,9 @@ export default function SendBakeryModal({ config, total, onClose, onOrderComplet
             {step !== 'calendar' ? (
               <button
                 type="button"
-                onClick={() => setStep(step === 'pay' ? 'fulfillment' : 'calendar')}
+                onClick={() => setStep('calendar')}
                 disabled={busy}
-                aria-label="Back to previous step"
+                aria-label="Back to calendar"
                 className="w-8 h-8 rounded-xl bg-muted/80 hover:bg-muted flex items-center justify-center transition-colors disabled:opacity-40"
               >
                 <ChevronLeft className="w-4 h-4 text-foreground" />
@@ -81,14 +71,14 @@ export default function SendBakeryModal({ config, total, onClose, onOrderComplet
               <div className="flex items-center gap-2">
                 <h2 className="font-heading font-bold text-sm sm:text-base">Send to Bakery</h2>
                 <span className="text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
-                  {step === 'calendar' ? 'Step 1 of 3: Date' : step === 'fulfillment' ? 'Step 2 of 3: Method' : 'Step 3 of 3: Payment'}
+                  {step === 'calendar' ? 'Step 1 of 2: Reservation Date' : 'Step 2 of 2: Payment'}
                 </span>
               </div>
               <div className="flex gap-1.5 mt-1">
-                {['calendar', 'fulfillment', 'pay'].map((s, i) => (
-                  <div key={s} className={`h-1 w-7 rounded-full transition-colors ${
+                {['calendar', 'pay'].map((s, i) => (
+                  <div key={s} className={`h-1 w-10 rounded-full transition-colors ${
                     step === s ? 'bg-primary' :
-                    ((step === 'fulfillment' && i === 0) || (step === 'pay' && i <= 1)) ? 'bg-primary/50' : 'bg-muted'
+                    (step === 'pay' && i === 0) ? 'bg-primary/50' : 'bg-muted'
                   }`} />
                 ))}
               </div>
@@ -112,21 +102,10 @@ export default function SendBakeryModal({ config, total, onClose, onOrderComplet
                   onSelect={setSelectedDate}
                 />
                 {selectedDate && (
-                  <Button disabled={busy} className="w-full mt-4" onClick={continueToFulfillment}>
-                    Continue to Fulfillment
+                  <Button disabled={busy} className="w-full mt-4" onClick={continueToPayment}>
+                    Continue to Payment
                   </Button>
                 )}
-              </motion.div>
-            )}
-            {step === 'fulfillment' && (
-              <motion.div key="fulfillment" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-                <FulfillmentStep
-                  fulfillment={fulfillment}
-                  onChange={setFulfillment}
-                  selectedDate={selectedDate}
-                  onNext={() => setStep('pay')}
-                  onBack={() => setStep('calendar')}
-                />
               </motion.div>
             )}
             {step === 'pay' && (
@@ -134,11 +113,10 @@ export default function SendBakeryModal({ config, total, onClose, onOrderComplet
                 <GCashPayment
                   total={total}
                   selectedDate={selectedDate}
-                  fulfillment={fulfillment}
-                  onPaid={async () => { await onOrderComplete?.(selectedDate, fulfillment); onClose(); }}
+                  onPaid={async () => { await onOrderComplete?.(selectedDate); onClose(); }}
                   onPaymentComplete={onPaymentComplete}
                   onBusyChange={setBusy}
-                  onBack={() => setStep('fulfillment')}
+                  onBack={() => setStep('calendar')}
                 />
               </motion.div>
             )}

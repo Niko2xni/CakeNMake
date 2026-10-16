@@ -67,7 +67,7 @@ export default function GCashPayment({ total, selectedDate, fulfillment, onPaid,
   return (
     <div>
       <button onClick={onBack} disabled={paying || done} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-4 transition-colors disabled:opacity-40">
-        <ChevronLeft className="w-3.5 h-3.5" /> Back to fulfillment
+        <ChevronLeft className="w-3.5 h-3.5" /> Back to date selection
       </button>
 
       <p className="font-heading font-bold text-base mb-1">Simulated GCash checkout</p>
@@ -78,27 +78,9 @@ export default function GCashPayment({ total, selectedDate, fulfillment, onPaid,
       {/* Order summary */}
       <div className="bg-muted/40 rounded-xl p-4 mb-4 space-y-2">
         <div className="flex justify-between text-xs">
-          <span className="text-muted-foreground">Fulfillment</span>
-          <span className="font-medium">
-            {isPickup ? 'Store Pickup' : 'Courier Delivery (Client-Booked)'}
-          </span>
-        </div>
-        <div className="flex justify-between text-xs">
-          <span className="text-muted-foreground">{isPickup ? 'Pickup date' : 'Delivery date'}</span>
+          <span className="text-muted-foreground">Reservation date</span>
           <span className="font-medium">{selectedDate ? format(selectedDate, 'MMM d, yyyy') : '—'}</span>
         </div>
-        {fulfillment?.timeWindow && (
-          <div className="flex justify-between text-xs">
-            <span className="text-muted-foreground">{isPickup ? 'Pickup window' : 'Dispatch window'}</span>
-            <span className="font-medium text-muted-foreground">{fulfillment.timeWindow}</span>
-          </div>
-        )}
-        {!isPickup && fulfillment?.address && (
-          <div className="flex justify-between text-xs gap-3">
-            <span className="text-muted-foreground shrink-0">Destination</span>
-            <span className="font-medium text-right line-clamp-1">{fulfillment.address}</span>
-          </div>
-        )}
         <div className="flex justify-between text-xs pt-1 border-t border-border/40">
           <span className="text-muted-foreground">Total cake price</span>
           <span className="font-medium">₱{total}</span>

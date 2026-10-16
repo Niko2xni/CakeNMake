@@ -739,18 +739,17 @@ export default function DesignerWorkSpace() {
     const remaining = totalPesos - downpayment;
     const formattedDate = selectedDate ? format(selectedDate, 'MMM d, yyyy') : 'Scheduled Date';
     const fulfillment = snapshot.fulfillment || fulfillmentDetails;
-    const isPickup = fulfillment?.type !== 'delivery';
-    const fulfillmentLines = [
-      `• Fulfillment: ${isPickup ? 'Store Pickup (AH Tinaps Bakeshop)' : 'Courier Delivery (Client-Booked)'}`,
-      `• Date: ${formattedDate}${fulfillment?.timeWindow ? ` (${isPickup ? 'Pickup' : 'Dispatch'}: ${fulfillment.timeWindow})` : ''}`,
-      !isPickup && fulfillment?.address ? `• Destination: ${fulfillment.address}${fulfillment.landmarks ? ` (Landmark: ${fulfillment.landmarks})` : ''}` : null,
-      fulfillment?.notes ? `• Notes: ${fulfillment.notes}` : null,
-    ].filter(Boolean).join('\n');
+    const fulfillmentLines = fulfillment ? [
+      `• Fulfillment: ${fulfillment.type === 'delivery' ? 'Courier Delivery (Client-Booked)' : 'Store Pickup (AH Tinaps Bakeshop)'}`,
+      `• Date: ${formattedDate}${fulfillment.timeWindow ? ` (${fulfillment.type === 'delivery' ? 'Dispatch' : 'Pickup'}: ${fulfillment.timeWindow})` : ''}`,
+      fulfillment.type === 'delivery' && fulfillment.address ? `• Destination: ${fulfillment.address}${fulfillment.landmarks ? ` (Landmark: ${fulfillment.landmarks})` : ''}` : null,
+      fulfillment.notes ? `• Notes: ${fulfillment.notes}` : null,
+    ].filter(Boolean).join('\n') : `• Reservation Date: ${formattedDate}`;
 
     try {
       await chatApi.sendMessage(convoId, {
         clientMessageId: `order_${snapshot.submissionId}`,
-        text: `🎂 Cake Order Submitted!\n• Design: "${snapshot.designName}"\n${fulfillmentLines}\n• Down Payment (50%): ₱${downpayment} (Paid - Simulated checkout)\n• Remaining Balance (50%): ₱${remaining} (Due 48h before event to begin baking)\n\nSimulated down payment completed. The bakery will review your design and confirm production.`,
+        text: `🎂 Cake Order Submitted!\n• Design: "${snapshot.designName}"\n${fulfillmentLines}\n• Down Payment (50%): ₱${downpayment} (Paid - Simulated checkout)\n• Remaining Balance (50%): ₱${remaining} (Due 48h before event to begin baking)\n\nSimulated down payment completed. You can coordinate pickup or delivery arrangements and cake specifications directly here with the bakery!`,
       });
     } catch (err) {
       console.warn('Failed to send automated initial chat message:', err);
