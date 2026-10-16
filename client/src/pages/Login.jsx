@@ -7,7 +7,7 @@ import { ArrowLeft, CheckCircle2, Loader2, Mail, TimerReset } from "lucide-react
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
-import { auth, firebaseConfigured, getAuxiliaryAuth, googleProvider, missingFirebaseConfigMessage } from "@/lib/firebase";
+import { auth, firebaseConfigured, googleProvider, missingFirebaseConfigMessage } from "@/lib/firebase";
 import { signInWithCustomToken, signInWithPopup, signOut } from "firebase/auth";
 import { authApi } from "@/services/api";
 import { useAuth } from '@/lib/AuthContext';
@@ -177,8 +177,7 @@ export default function Login() {
     setLoading(true);
     try {
       if (!firebaseConfigured || !auth) throw new Error(missingFirebaseConfigMessage);
-      const targetAuth = getAuxiliaryAuth ? getAuxiliaryAuth() : auth;
-      await signInWithPopup(targetAuth || auth, googleProvider);
+      await signInWithPopup(auth, googleProvider);
       navigate("/login-success");
     } catch (authError) {
       let message = "Provider sign-in failed.";

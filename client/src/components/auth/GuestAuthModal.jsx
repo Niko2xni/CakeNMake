@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, CheckCircle2, Loader2, LogIn, Mail, Sparkles, TimerReset } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import GoogleIcon from "@/components/GoogleIcon";
-import { auth, firebaseConfigured, getAuxiliaryAuth, googleProvider, missingFirebaseConfigMessage } from "@/lib/firebase";
+import { auth, firebaseConfigured, googleProvider, missingFirebaseConfigMessage } from "@/lib/firebase";
 import { signInWithCustomToken, signInWithPopup, signOut } from "firebase/auth";
 import { authApi } from "@/services/api";
 import { useAuth } from '@/lib/AuthContext';
@@ -200,8 +200,7 @@ export default function GuestAuthModal({
     setLoading(true);
     try {
       if (!firebaseConfigured || !auth) throw new Error(missingFirebaseConfigMessage);
-      const targetAuth = getAuxiliaryAuth ? getAuxiliaryAuth() : auth;
-      const userCredential = await signInWithPopup(targetAuth || auth, googleProvider);
+      const userCredential = await signInWithPopup(auth, googleProvider);
       setPendingUser(userCredential.user);
     } catch (authError) {
       let message = "Provider sign-in failed.";
