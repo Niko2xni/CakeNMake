@@ -1116,6 +1116,9 @@ const CakeScene = React.forwardRef(function CakeScene({
   const refreshGhostRef = useRef(null);
   const topMetricsRef = useRef({ baseY: 0, domeHeight: 0, topY: 0, radius: 4 });
   const handleResizeRef = useRef(null);
+  const cameraAnimRef = useRef(null);
+  const wasLockedRef = useRef(false);
+
   // Lock camera to top-down placement angle and disable rotation/zoom when requested (Tutorial Step 7)
   useEffect(() => {
     const controls = controlsRef.current;
@@ -1123,11 +1126,88 @@ const CakeScene = React.forwardRef(function CakeScene({
     const mount = mountRef.current;
     if (!controls || !camera) return;
 
+    if (cameraAnimRef.current) {
+      cancelAnimationFrame(cameraAnimRef.current);
+      cameraAnimRef.current = null;
+    }
+
+    const easeInOutCubic = (t) => {
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    };
+    const animDuration = 850;
+
     if (lockCameraAngle) {
-      camera.position.set(0, 13.5, 20.5);
-      controls.target.set(0, 4, 0);
-      if (mount && mount.clientWidth && mount.clientHeight) {
-        const aspect = mount.clientWidth / mount.clientHeight;
+      wasLockedRef.current = true;
+      controls.enableRotate = false;
+      controls.enableZoom = false;
+      controls.enablePan = false;
+
+      // Adjust FOV for current aspect ratio
+      const aspect = mount && mount.clientWidth && mount.clientHeight
+        ? mount.clientWidth / mount.clientHeight
+        : (camera.aspect || 1);
+      const baseFov = 40;
+      const baseAspect = 1.6;
+      if (aspect < baseAspect) {
+        const fovRad = 2 * Math.atan(Math.tan((baseFov * Math.PI) / 360) * (baseAspect / aspect));
+        camera.fov = Math.min(62, Math.max(35, (fovRad * 180) / Math.PI));
+      } else {
+        camera.fov = baseFov;
+      }
+      camera.aspect = aspect;
+      camera.updateProjectionMatrix();
+
+      // Top-down camera target and position
+      const cakeTopY = topMetricsRef.current?.topY || 4.2;
+      const targetRadius = topMetricsRef.current?.radius || 4;
+      const targetDiameter = targetRadius * 2;
+      const minDimFraction = 0.78;
+      const fitDim = Math.min(1, aspect);
+      const fovRad = (camera.fov * Math.PI) / 180;
+      const desiredVisibleHeight = (targetDiameter / minDimFraction) / fitDim;
+      const D = desiredVisibleHeight / (2 * Math.tan(fovRad / 2));
+
+      const startPos = camera.position.clone();
+      const startTarget = controls.target.clone();
+      const endPos = new THREE.Vector3(0, cakeTopY + D, 0.01);
+      const endTarget = new THREE.Vector3(0, cakeTopY, 0);
+
+      const startTime = performance.now();
+
+      const animateCamera = (now) => {
+        const elapsed = now - startTime;
+        const progress = Math.min(1, elapsed / animDuration);
+        const ease = easeInOutCubic(progress);
+
+        camera.position.lerpVectors(startPos, endPos, ease);
+        controls.target.lerpVectors(startTarget, endTarget, ease);
+        controls.update();
+
+        if (progress < 1) {
+          cameraAnimRef.current = requestAnimationFrame(animateCamera);
+        } else {
+          camera.position.copy(endPos);
+          controls.target.copy(endTarget);
+          controls.update();
+          controls.enableRotate = false;
+          controls.enableZoom = false;
+          controls.enablePan = false;
+          cameraAnimRef.current = null;
+        }
+      };
+
+      cameraAnimRef.current = requestAnimationFrame(animateCamera);
+    } else {
+      if (wasLockedRef.current) {
+        wasLockedRef.current = false;
+        controls.enableRotate = false;
+        controls.enableZoom = false;
+        controls.enablePan = false;
+
+        // Restore normal perspective view (0, 8, 22) looking at (0, 4, 0)
+        const aspect = mount && mount.clientWidth && mount.clientHeight
+          ? mount.clientWidth / mount.clientHeight
+          : (camera.aspect || 1);
         const baseFov = 40;
         const baseAspect = 1.6;
         if (aspect < baseAspect) {
@@ -1138,16 +1218,50 @@ const CakeScene = React.forwardRef(function CakeScene({
         }
         camera.aspect = aspect;
         camera.updateProjectionMatrix();
+
+        const startPos = camera.position.clone();
+        const startTarget = controls.target.clone();
+        const endPos = new THREE.Vector3(0, 8, 22);
+        const endTarget = new THREE.Vector3(0, 4, 0);
+
+        const startTime = performance.now();
+
+        const animateCamera = (now) => {
+          const elapsed = now - startTime;
+          const progress = Math.min(1, elapsed / animDuration);
+          const ease = easeInOutCubic(progress);
+
+          camera.position.lerpVectors(startPos, endPos, ease);
+          controls.target.lerpVectors(startTarget, endTarget, ease);
+          controls.update();
+
+          if (progress < 1) {
+            cameraAnimRef.current = requestAnimationFrame(animateCamera);
+          } else {
+            camera.position.copy(endPos);
+            controls.target.copy(endTarget);
+            controls.update();
+            controls.enableRotate = true;
+            controls.enableZoom = true;
+            controls.enablePan = true;
+            cameraAnimRef.current = null;
+          }
+        };
+
+        cameraAnimRef.current = requestAnimationFrame(animateCamera);
+      } else {
+        controls.enableRotate = true;
+        controls.enableZoom = true;
+        controls.enablePan = true;
       }
-      controls.update();
-      controls.enableRotate = false;
-      controls.enableZoom = false;
-      controls.enablePan = false;
-    } else {
-      controls.enableRotate = true;
-      controls.enableZoom = true;
-      controls.enablePan = true;
     }
+
+    return () => {
+      if (cameraAnimRef.current) {
+        cancelAnimationFrame(cameraAnimRef.current);
+        cameraAnimRef.current = null;
+      }
+    };
   }, [lockCameraAngle]);
 
   // Update visual slot markers and ghost preview
@@ -1235,6 +1349,11 @@ const CakeScene = React.forwardRef(function CakeScene({
   React.useImperativeHandle(ref, () => ({
     getRenderer: () => rendererRef.current,
     resetCamera: () => {
+      if (cameraAnimRef.current) {
+        cancelAnimationFrame(cameraAnimRef.current);
+        cameraAnimRef.current = null;
+      }
+      wasLockedRef.current = false;
       const camera = cameraRef.current;
       const controls = controlsRef.current;
       const mount = mountRef.current;
@@ -5409,6 +5528,10 @@ const CakeScene = React.forwardRef(function CakeScene({
 
       return () => {
         isContextLost = true;
+        if (cameraAnimRef.current) {
+          cancelAnimationFrame(cameraAnimRef.current);
+          cameraAnimRef.current = null;
+        }
         cancelAnimationFrame(animFrameRef.current);
         window.removeEventListener('resize', handleResize);
         resizeObserver.disconnect();

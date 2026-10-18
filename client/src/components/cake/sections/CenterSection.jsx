@@ -56,161 +56,189 @@ function ArmedItemControls({
   onCancel,
   onDelete,
   canDelete = false,
+  isControlsInteractionStep = false,
+  onControlsInteraction,
 }) {
   if (!armedDesign) return null;
 
+  const handleSetRotation = (val) => {
+    onControlsInteraction?.();
+    setArmedRotation(val);
+  };
+  const handleSetTilt = (val) => {
+    onControlsInteraction?.();
+    setArmedTilt(val);
+  };
+  const handleSetRoll = (val) => {
+    onControlsInteraction?.();
+    setArmedRoll(val);
+  };
+
   return (
-    <>
-      <div>
-        <DecorationPreview
-          designId={armedDesign.designId}
-          orientation={armedDesign.orientation}
-          color={previewColor}
-          colorId={previewColorId}
-          rotationY={(armedRotation * Math.PI) / 180}
-          rotationX={(armedTilt * Math.PI) / 180}
-          rotationZ={(armedRoll * Math.PI) / 180}
-        />
-      </div>
-
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          title="Cancel selection"
-          className="flex-1 h-8 px-3 rounded-lg border border-border/80 bg-muted/60 hover:bg-muted text-xs font-semibold text-foreground flex items-center justify-center gap-1.5 transition-colors"
-        >
-          <X className="w-3.5 h-3.5" />
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={onDelete}
-          disabled={!canDelete}
-          title={canDelete ? "Delete item" : "No placed item to delete"}
-          className="flex-1 h-8 px-3 rounded-lg border border-destructive/30 bg-destructive/10 hover:bg-destructive/20 text-xs font-semibold text-destructive disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 transition-colors"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-          Delete
-        </button>
-      </div>
-
-      <div className="rounded-xl bg-muted/60 px-3 py-2.5 space-y-3">
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">Rotate</span>
-            <span className="text-xs font-semibold text-foreground">{Math.round(armedRotation)}°</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setArmedRotation(armedRotation - 15)}
-              disabled={!armedDesign}
-              title="Rotate left 15°"
-              className="w-7 h-7 shrink-0 rounded-full border border-transparent bg-muted text-foreground hover:border-primary hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-40 flex items-center justify-center"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-            </button>
-            <input
-              type="range"
-              min={0}
-              max={360}
-              step={1}
-              value={armedRotation}
-              onChange={(e) => setArmedRotation(Number(e.target.value))}
-              disabled={!armedDesign}
-              className="flex-1 accent-primary disabled:opacity-40"
-              aria-label="Rotation angle"
+    <div data-tutorial="center-item-controls" className="flex flex-col md:flex-col gap-2.5">
+      {/* On mobile: row layout (side-by-side). On desktop: stacked (md:flex-col) */}
+      <div className="flex flex-row md:flex-col gap-2.5 items-stretch">
+        {/* Left on mobile (Preview + Cancel/Delete) / Top on desktop */}
+        <div className="w-[42%] md:w-full flex flex-col justify-between shrink-0">
+          <div className="flex-1 min-h-[120px] md:min-h-0 flex items-center justify-center">
+            <DecorationPreview
+              designId={armedDesign.designId}
+              orientation={armedDesign.orientation}
+              color={previewColor}
+              colorId={previewColorId}
+              rotationY={(armedRotation * Math.PI) / 180}
+              rotationX={(armedTilt * Math.PI) / 180}
+              rotationZ={(armedRoll * Math.PI) / 180}
+              className="w-full h-full min-h-[120px] md:h-32 rounded-xl bg-muted/40 overflow-hidden"
             />
+          </div>
+
+          <div className="flex items-center gap-1.5 mt-2">
             <button
               type="button"
-              onClick={() => setArmedRotation(armedRotation + 15)}
-              disabled={!armedDesign}
-              title="Rotate right 15°"
-              className="w-7 h-7 shrink-0 rounded-full border border-transparent bg-muted text-foreground hover:border-primary hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-40 flex items-center justify-center"
+              onClick={onCancel}
+              disabled={isControlsInteractionStep}
+              title="Cancel selection"
+              className={`flex-1 h-8 px-2 rounded-lg border border-border/80 bg-muted/60 hover:bg-muted text-xs font-semibold text-foreground flex items-center justify-center gap-1 transition-colors ${
+                isControlsInteractionStep ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''
+              }`}
             >
-              <RotateCw className="w-3.5 h-3.5" />
+              <X className="w-3.5 h-3.5" />
+              <span>Cancel</span>
+            </button>
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={!canDelete || isControlsInteractionStep}
+              title={canDelete ? "Delete item" : "No placed item to delete"}
+              className={`flex-1 h-8 px-2 rounded-lg border border-destructive/30 bg-destructive/10 hover:bg-destructive/20 text-xs font-semibold text-destructive disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1 transition-colors ${
+                isControlsInteractionStep ? 'pointer-events-none' : ''
+              }`}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Delete</span>
             </button>
           </div>
         </div>
 
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">Left to Right</span>
-            <span className="text-xs font-semibold text-foreground">{Math.round(armedRoll)}°</span>
+        {/* Right on mobile (Rotate and Tilts control box) / Bottom on desktop */}
+        <div className="w-[58%] md:w-full rounded-xl bg-muted/60 px-2.5 sm:px-3 py-2 sm:py-2.5 space-y-2 sm:space-y-3 flex flex-col justify-center">
+          <div className="space-y-1.5 sm:space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] sm:text-xs text-muted-foreground font-medium">Rotate</span>
+              <span className="text-[11px] sm:text-xs font-semibold text-foreground">{Math.round(armedRotation)}°</span>
+            </div>
+            <div className="flex items-center gap-1 sm:gap-2">
+              <button
+                type="button"
+                onClick={() => handleSetRotation(armedRotation - 15)}
+                disabled={!armedDesign}
+                title="Rotate left 15°"
+                className="w-6 h-6 sm:w-7 sm:h-7 shrink-0 rounded-full border border-transparent bg-muted text-foreground hover:border-primary hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-40 flex items-center justify-center"
+              >
+                <RotateCcw className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={360}
+                step={1}
+                value={armedRotation}
+                onChange={(e) => handleSetRotation(Number(e.target.value))}
+                disabled={!armedDesign}
+                className="flex-1 accent-primary disabled:opacity-40 h-1.5"
+                aria-label="Rotation angle"
+              />
+              <button
+                type="button"
+                onClick={() => handleSetRotation(armedRotation + 15)}
+                disabled={!armedDesign}
+                title="Rotate right 15°"
+                className="w-6 h-6 sm:w-7 sm:h-7 shrink-0 rounded-full border border-transparent bg-muted text-foreground hover:border-primary hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-40 flex items-center justify-center"
+              >
+                <RotateCw className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setArmedRoll(armedRoll - 15)}
-              disabled={!armedDesign}
-              title="Tilt left 15°"
-              className="w-7 h-7 shrink-0 rounded-full border border-transparent bg-muted text-foreground hover:border-primary hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-40 flex items-center justify-center"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-            </button>
-            <input
-              type="range"
-              min={0}
-              max={360}
-              step={1}
-              value={armedRoll}
-              onChange={(e) => setArmedRoll(Number(e.target.value))}
-              disabled={!armedDesign}
-              className="flex-1 accent-primary disabled:opacity-40"
-              aria-label="Left/right tilt angle"
-            />
-            <button
-              type="button"
-              onClick={() => setArmedRoll(armedRoll + 15)}
-              disabled={!armedDesign}
-              title="Tilt right 15°"
-              className="w-7 h-7 shrink-0 rounded-full border border-transparent bg-muted text-foreground hover:border-primary hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-40 flex items-center justify-center"
-            >
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
 
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">Up to Down</span>
-            <span className="text-xs font-semibold text-foreground">{Math.round(armedTilt)}°</span>
+          <div className="space-y-1.5 sm:space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] sm:text-xs text-muted-foreground font-medium">Left to Right</span>
+              <span className="text-[11px] sm:text-xs font-semibold text-foreground">{Math.round(armedRoll)}°</span>
+            </div>
+            <div className="flex items-center gap-1 sm:gap-2">
+              <button
+                type="button"
+                onClick={() => handleSetRoll(armedRoll - 15)}
+                disabled={!armedDesign}
+                title="Tilt left 15°"
+                className="w-6 h-6 sm:w-7 sm:h-7 shrink-0 rounded-full border border-transparent bg-muted text-foreground hover:border-primary hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-40 flex items-center justify-center"
+              >
+                <ChevronLeft className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={360}
+                step={1}
+                value={armedRoll}
+                onChange={(e) => handleSetRoll(Number(e.target.value))}
+                disabled={!armedDesign}
+                className="flex-1 accent-primary disabled:opacity-40 h-1.5"
+                aria-label="Left/right tilt angle"
+              />
+              <button
+                type="button"
+                onClick={() => handleSetRoll(armedRoll + 15)}
+                disabled={!armedDesign}
+                title="Tilt right 15°"
+                className="w-6 h-6 sm:w-7 sm:h-7 shrink-0 rounded-full border border-transparent bg-muted text-foreground hover:border-primary hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-40 flex items-center justify-center"
+              >
+                <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setArmedTilt(armedTilt - 15)}
-              disabled={!armedDesign}
-              title="Tilt down 15°"
-              className="w-7 h-7 shrink-0 rounded-full border border-transparent bg-muted text-foreground hover:border-primary hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-40 flex items-center justify-center"
-            >
-              <ChevronDown className="w-3.5 h-3.5" />
-            </button>
-            <input
-              type="range"
-              min={0}
-              max={360}
-              step={1}
-              value={armedTilt}
-              onChange={(e) => setArmedTilt(Number(e.target.value))}
-              disabled={!armedDesign}
-              className="flex-1 accent-primary disabled:opacity-40"
-              aria-label="Tilt angle"
-            />
-            <button
-              type="button"
-              onClick={() => setArmedTilt(armedTilt + 15)}
-              disabled={!armedDesign}
-              title="Tilt up 15°"
-              className="w-7 h-7 shrink-0 rounded-full border border-transparent bg-muted text-foreground hover:border-primary hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-40 flex items-center justify-center"
-            >
-              <ChevronUp className="w-3.5 h-3.5" />
-            </button>
+
+          <div className="space-y-1.5 sm:space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] sm:text-xs text-muted-foreground font-medium">Up to Down</span>
+              <span className="text-[11px] sm:text-xs font-semibold text-foreground">{Math.round(armedTilt)}°</span>
+            </div>
+            <div className="flex items-center gap-1 sm:gap-2">
+              <button
+                type="button"
+                onClick={() => handleSetTilt(armedTilt - 15)}
+                disabled={!armedDesign}
+                title="Tilt down 15°"
+                className="w-6 h-6 sm:w-7 sm:h-7 shrink-0 rounded-full border border-transparent bg-muted text-foreground hover:border-primary hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-40 flex items-center justify-center"
+              >
+                <ChevronDown className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={360}
+                step={1}
+                value={armedTilt}
+                onChange={(e) => handleSetTilt(Number(e.target.value))}
+                disabled={!armedDesign}
+                className="flex-1 accent-primary disabled:opacity-40 h-1.5"
+                aria-label="Tilt angle"
+              />
+              <button
+                type="button"
+                onClick={() => handleSetTilt(armedTilt + 15)}
+                disabled={!armedDesign}
+                title="Tilt up 15°"
+                className="w-6 h-6 sm:w-7 sm:h-7 shrink-0 rounded-full border border-transparent bg-muted text-foreground hover:border-primary hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-40 flex items-center justify-center"
+              >
+                <ChevronUp className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -335,22 +363,27 @@ export default function CenterSection({
   onItemSelect,
   onDeleteSelectedItem,
   onTextColorModeChange,
+  isStrawberryPickStep = false,
+  isControlsInteractionStep = false,
+  onControlsInteraction,
 }) {
   const mode = center.mode || 'decorations';
   const selectionMode = activeTool ? 'placement' : 'selection';
   const textColorMode = center.text?.colorMode || 'uniform';
 
   // Click-to-arm: activeTool holds pending item and rotation.
-  const armedCenterType = activeTool && typeof activeTool === 'object' && activeTool.type?.startsWith('center-')
-    ? activeTool.type
+  const armedCenterType = activeTool
+    ? typeof activeTool === 'string'
+      ? (activeTool.startsWith('center-') ? activeTool : null)
+      : (activeTool.type?.startsWith('center-') ? activeTool.type : null)
     : null;
   const armedDesign = armedCenterType
     ? (CENTER_PLACEABLE_DESIGNS.find((d) => d.toolId === armedCenterType)
       || BUTTERCREAM_LETTERS.find((d) => d.toolId === armedCenterType))
     : null;
-  const armedRotation = armedCenterType ? (activeTool.rotationY || 0) : 0;
-  const armedTilt = armedCenterType ? (activeTool.rotationX || 0) : 0;
-  const armedRoll = armedCenterType ? (activeTool.rotationZ || 0) : 0; // left/right lean, degrees (+ = leans right)
+  const armedRotation = (activeTool && typeof activeTool === 'object') ? (activeTool.rotationY || 0) : 0;
+  const armedTilt = (activeTool && typeof activeTool === 'object') ? (activeTool.rotationX || 0) : 0;
+  const armedRoll = (activeTool && typeof activeTool === 'object') ? (activeTool.rotationZ || 0) : 0; // left/right lean, degrees (+ = leans right)
 
   // Mutually exclusive tabs -- switching changes which editor shows
   const switchToDecorations = () => {
@@ -690,24 +723,42 @@ export default function CenterSection({
         <div className="flex gap-1 bg-muted/40 rounded-xl p-1">
           <button
             type="button"
+            disabled={isStrawberryPickStep || isControlsInteractionStep}
             onClick={switchToDecorations}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${mode === 'decorations' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
+            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
+              (isStrawberryPickStep || isControlsInteractionStep)
+                ? 'opacity-40 cursor-not-allowed bg-transparent text-muted-foreground'
+                : mode === 'decorations'
+                  ? 'bg-card shadow text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
           >
             Decorations
           </button>
           <button
             type="button"
+            disabled={isStrawberryPickStep || isControlsInteractionStep}
             onClick={switchToText}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${mode === 'text' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
+            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
+              (isStrawberryPickStep || isControlsInteractionStep)
+                ? 'opacity-40 cursor-not-allowed bg-transparent text-muted-foreground'
+                : mode === 'text'
+                  ? 'bg-card shadow text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
           >
             Text
           </button>
           <button
             type="button"
+            disabled={isStrawberryPickStep || isControlsInteractionStep}
             onClick={switchToVariations}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${mode === 'variations' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
+            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
+              (isStrawberryPickStep || isControlsInteractionStep)
+                ? 'opacity-40 cursor-not-allowed bg-transparent text-muted-foreground'
+                : mode === 'variations'
+                  ? 'bg-card shadow text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
           >
             Variations
@@ -737,6 +788,8 @@ export default function CenterSection({
             onCancel={handleCancel}
             onDelete={handleDelete}
             canDelete={canDeleteDecor}
+            isControlsInteractionStep={isControlsInteractionStep}
+            onControlsInteraction={onControlsInteraction}
           />
 
           {placedDecorationItems.length > 0 && (
@@ -746,8 +799,11 @@ export default function CenterSection({
               </span>
               <button
                 type="button"
+                disabled={isStrawberryPickStep || isControlsInteractionStep}
                 onClick={clearDecorationItems}
-                className="text-xs font-semibold text-destructive hover:underline"
+                className={`text-xs font-semibold text-destructive hover:underline ${
+                  (isStrawberryPickStep || isControlsInteractionStep) ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''
+                }`}
               >
                 Clear All
               </button>
@@ -760,18 +816,28 @@ export default function CenterSection({
               const limit = getCenterItemLimit(design.designId, structure);
               const count = getCenterItemCount(placedItems, design.designId);
               const isMaxReached = limit !== null && count >= limit;
+              const isStrawberry = design.designId === 'strawberry';
+              const isDisabled = isStrawberryPickStep ? !isStrawberry : (isControlsInteractionStep ? true : isMaxReached);
 
               return (
                 <button
                   key={design.toolId}
                   type="button"
-                  disabled={isMaxReached}
+                  disabled={isDisabled}
                   onClick={() => armDecorationTool(design.toolId)}
                   onContextMenu={deselectArmedTool}
-                  data-tutorial={design.designId === 'strawberry' ? 'center-strawberry' : undefined}
-                  title={isMaxReached ? `${design.label} (Max limit reached: ${limit})` : isArmed ? `Remove ${design.label}` : design.label}
-                  className={`flex flex-col items-center justify-between gap-1.5 rounded-xl p-3 text-center transition-all duration-200 border-2 ${isMaxReached
-                      ? 'opacity-60 cursor-not-allowed bg-muted/40 border-dashed border-border/60 text-muted-foreground'
+                  data-tutorial={isStrawberry ? 'center-strawberry' : undefined}
+                  title={
+                    isDisabled
+                      ? (isStrawberryPickStep || isControlsInteractionStep)
+                        ? `${design.label} (Locked during tutorial step)`
+                        : `${design.label} (Max limit reached: ${limit})`
+                      : isArmed
+                        ? `Remove ${design.label}`
+                        : design.label
+                  }
+                  className={`flex flex-col items-center justify-between gap-1.5 rounded-xl p-3 text-center transition-all duration-200 border-2 ${isDisabled
+                      ? 'opacity-40 cursor-not-allowed bg-muted/40 border-dashed border-border/60 text-muted-foreground'
                       : isArmed
                         ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-[1.02]'
                         : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
@@ -832,6 +898,8 @@ export default function CenterSection({
             onCancel={handleCancel}
             onDelete={handleDelete}
             canDelete={canDeleteText}
+            isControlsInteractionStep={isControlsInteractionStep}
+            onControlsInteraction={onControlsInteraction}
           />
 
           {placedLetterItems.length > 0 && (

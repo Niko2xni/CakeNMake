@@ -164,9 +164,11 @@ export default function EdgeSection({
   return (
     <div className="space-y-4">
       <div>
-        <div className={`grid ${hasMiddle ? 'grid-cols-3' : 'grid-cols-2'} gap-1 bg-muted/40 rounded-xl p-1`}>
+        <div data-tutorial="edge-toggle-row" className={`grid ${hasMiddle ? 'grid-cols-3' : 'grid-cols-2'} gap-1 bg-muted/40 rounded-xl p-1`}>
           <button
             type="button"
+            data-tutorial="edge-toggle-top"
+            data-edge-toggle="true"
             onClick={switchToTop}
             className={`py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
               (mode === 'topBottomSeparate' ? activeSlot === 'top' : effectiveActiveSlot === 'top')
@@ -193,6 +195,8 @@ export default function EdgeSection({
 
           <button
             type="button"
+            data-tutorial="edge-toggle-bottom"
+            data-edge-toggle="true"
             onClick={switchToBottom}
             className={`py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
               (mode === 'topBottomSeparate' ? activeSlot === 'bottom' : effectiveActiveSlot === 'bottom')
@@ -269,7 +273,7 @@ export default function EdgeSection({
       ) : (
         <div className="space-y-4">
           <div className="space-y-3">
-            <div className="space-y-3">
+            <div className="space-y-3" data-tutorial="edge-piping-row">
               <span className="text-xs font-semibold text-foreground block mb-2">Border Piping</span>
               <VariantRow
                 variants={BORDER_PIPING_VARIATIONS_DELUXE}
@@ -372,6 +376,8 @@ function VariantRow({ label, variants, currentSlot, updateSlot, showSugarColor =
             <React.Fragment key={variant.id}>
               <button
                 type="button"
+                data-edge-design="true"
+                data-tutorial={`edge-piping-item-${i + 1}`}
                 onClick={() =>
                   updateSlot({
                     decorations: { ...currentSlot.decorations, setId: null },

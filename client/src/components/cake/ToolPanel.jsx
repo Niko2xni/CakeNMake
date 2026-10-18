@@ -57,7 +57,14 @@ export default function ToolPanel({
   expandedSections: controlledExpandedSections,
   onExpandedSectionsChange,
   onClose,
+  isGlazeDeselectStep = false,
+  isStrawberryPickStep = false,
+  isControlsInteractionStep = false,
+  isSideCheckeredStep = false,
+  isEdgeDesignStep = false,
+  onControlsInteraction,
 }) {
+  const isStepLocked = isGlazeDeselectStep || isStrawberryPickStep || isControlsInteractionStep || isSideCheckeredStep || isEdgeDesignStep;
   const [internalAiThinking, setInternalAiThinking] = useState(false);
   const isAiBusy = Boolean(aiChatSession?.thinking || internalAiThinking);
 
@@ -350,7 +357,7 @@ export default function ToolPanel({
   const suppressClickRef = useRef(false);
 
   const handlePointerDownScroll = useCallback((e) => {
-    if (e.button !== 0) return;
+    if (e.button !== 0 || isSideCheckeredStep) return;
     if (e.target.closest('input, select, textarea, [role="slider"]')) return;
 
     const root = e.currentTarget;
@@ -396,6 +403,19 @@ export default function ToolPanel({
     e.preventDefault();
     e.stopPropagation();
   }, []);
+
+  useEffect(() => {
+    if (!isSideCheckeredStep) return;
+    const preventScroll = (e) => {
+      e.preventDefault();
+    };
+    window.addEventListener('wheel', preventScroll, { passive: false });
+    window.addEventListener('touchmove', preventScroll, { passive: false });
+    return () => {
+      window.removeEventListener('wheel', preventScroll);
+      window.removeEventListener('touchmove', preventScroll);
+    };
+  }, [isSideCheckeredStep]);
 
   const updateContextSugarColor = (context, newSugarColor) => {
     const nextOverrides = { ...(config.sugarColorOverrides || {}) };
@@ -498,12 +518,13 @@ export default function ToolPanel({
         <button
           data-tutorial="mode-design"
           onClick={() => {
-            if (isAiBusy) return;
+            if (isAiBusy || isStepLocked) return;
             setModeUi('design');
           }}
-          disabled={isAiBusy}
+          disabled={isAiBusy || isStepLocked}
           title={isAiBusy ? 'AI is editing the cake. Switching to manual design is locked until it finishes.' : undefined}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-sm font-semibold transition-all duration-200 ${isAiBusy
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
+            (isAiBusy || isStepLocked)
               ? 'opacity-40 cursor-not-allowed bg-muted/40 text-muted-foreground'
               : modeUi === 'design'
                 ? 'bg-primary text-primary-foreground shadow-md'
@@ -516,12 +537,17 @@ export default function ToolPanel({
         <button
           data-tutorial="mode-ai"
           onClick={() => {
+            if (isStepLocked) return;
             onSelectTool?.(null);
             setModeUi('ai');
           }}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-sm font-semibold transition-all duration-200 ${modeUi === 'ai'
-              ? 'bg-primary text-primary-foreground shadow-md'
-              : 'bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted'
+          disabled={isStepLocked}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
+            isStepLocked
+              ? 'opacity-40 cursor-not-allowed bg-muted/40 text-muted-foreground'
+              : modeUi === 'ai'
+                ? 'bg-primary text-primary-foreground shadow-md'
+                : 'bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted'
             }`}
         >
           <Bot className="w-4 h-4" />
@@ -533,8 +559,8 @@ export default function ToolPanel({
         <Button
           variant="ghost"
           size="icon"
-          disabled={isAiBusy}
-          className={`rounded-full shrink-0 h-9 w-9 ${isAiBusy ? 'opacity-40 cursor-not-allowed' : ''
+          disabled={isAiBusy || isStepLocked}
+          className={`rounded-full shrink-0 h-9 w-9 ${(isAiBusy || isStepLocked) ? 'opacity-40 cursor-not-allowed' : ''
             } ${config.interiorPreview ? 'text-amber-600' : 'text-muted-foreground hover:text-foreground'
             }`}
           onClick={toggleInteriorPreview}
@@ -549,11 +575,11 @@ export default function ToolPanel({
         <Button
           variant="ghost"
           size="icon"
-          disabled={isAiBusy}
-          className={`rounded-full text-muted-foreground hover:text-foreground shrink-0 h-9 w-9 ${isAiBusy ? 'opacity-40 cursor-not-allowed' : ''
+          disabled={isAiBusy || isStepLocked}
+          className={`rounded-full text-muted-foreground hover:text-foreground shrink-0 h-9 w-9 ${(isAiBusy || isStepLocked) ? 'opacity-40 cursor-not-allowed' : ''
             }`}
           onClick={() => {
-            if (isAiBusy) return;
+            if (isAiBusy || isStepLocked) return;
             setShowResetConfirm(true);
           }}
           title={isAiBusy ? 'AI is editing the cake.' : 'Reset Cake Design'}
@@ -565,7 +591,8 @@ export default function ToolPanel({
           <Button
             variant="ghost"
             size="icon"
-            className="rounded-full text-muted-foreground hover:text-foreground shrink-0 h-9 w-9 md:hidden"
+            disabled={isStepLocked}
+            className={`rounded-full text-muted-foreground hover:text-foreground shrink-0 h-9 w-9 md:hidden ${isStepLocked ? 'opacity-40 cursor-not-allowed' : ''}`}
             onClick={onClose}
             title="Close Tools"
             aria-label="Close Tools"
@@ -604,33 +631,39 @@ export default function ToolPanel({
           </div>
           {modeUi !== 'ai' && (
             <>
-              {/* Tab switcher — balanced 2x2 layout for the four remaining sections */}
-              <div data-tutorial="tabs-surface" className="grid grid-cols-2 gap-2 px-4 py-2 bg-muted/30">
-                {tabs.map(({ id, label, icon: Icon, zIndex }) => (
-                  <button
-                    key={id}
-                    onClick={() => {
-                      onSelectTool?.(null);
-                      setTab(id);
-                    }}
-                    style={{ zIndex }}
-                    className={`relative flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-lg text-xs font-semibold transition-all duration-200 ${activeTab === id
-                        ? 'bg-card shadow text-foreground'
-                        : 'text-muted-foreground hover:text-foreground'
-                      }`}
-                  >
-                    <Icon className="w-3.5 h-3.5" />
-                    {label}
-                  </button>
-                ))}
-              </div>
-
               {/* Scrollable content with drag-to-scroll */}
               <ScrollArea
-                className="flex-1"
+                className={`flex-1 ${isSideCheckeredStep ? 'overflow-hidden touch-none' : ''}`}
                 onPointerDown={handlePointerDownScroll}
                 onClickCapture={handleClickCapture}
               >
+                {/* Tab switcher — balanced 2x2 layout, scrolls along with content */}
+                <div data-tutorial="tabs-surface" className="grid grid-cols-2 gap-2 p-3 sm:px-4 sm:py-2.5 bg-muted/30 border-b border-border/40">
+                  {tabs.map(({ id, label, icon: Icon, zIndex }) => (
+                    <button
+                      key={id}
+                      data-tutorial={`tab-${id}`}
+                      disabled={isStepLocked}
+                      onClick={() => {
+                        if (isStepLocked) return;
+                        onSelectTool?.(null);
+                        setTab(id);
+                      }}
+                      style={{ zIndex }}
+                      className={`relative flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                        isStepLocked
+                          ? 'opacity-40 cursor-not-allowed'
+                          : activeTab === id
+                            ? 'bg-card shadow text-foreground'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
                 <motion.div
                   className="p-4 space-y-4"
                   initial={{ opacity: 0 }}
@@ -935,6 +968,9 @@ export default function ToolPanel({
                         onItemSelect={onCenterItemSelect}
                         onDeleteSelectedItem={onDeleteSelectedCenterItem}
                         onTextColorModeChange={onCenterTextColorModeChange}
+                        isStrawberryPickStep={isStrawberryPickStep}
+                        isControlsInteractionStep={isControlsInteractionStep}
+                        onControlsInteraction={onControlsInteraction}
                         sugarColor={config.sugarColorOverrides?.center || DEFAULT_CONFIG.sugarColor}
                         onSugarColorChange={(newSugarColor) => onChange({
                           ...config,
@@ -1003,8 +1039,8 @@ export default function ToolPanel({
                 </motion.div>
               </ScrollArea>
 
-              {/* Footer hint */}
-              <div className="px-5 py-3 border-t border-border/50 bg-muted/30 select-none">
+              {/* Footer hint (Hidden in mobile view to reclaim space) */}
+              <div className="hidden md:block px-5 py-3 border-t border-border/50 bg-muted/30 select-none">
                 <p className="text-[11px] text-muted-foreground text-center flex items-center justify-center gap-1.5">
                   Drag to rotate • Scroll to zoom
                 </p>

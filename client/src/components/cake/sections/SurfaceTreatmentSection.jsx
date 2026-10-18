@@ -95,6 +95,8 @@ export default function SurfaceTreatmentSection({ surfaceTreatment, onChange, is
         <span className="text-xs text-muted-foreground mb-2 block">{sectionLabel}</span>
         <button
           type="button"
+          data-tutorial="surface-treatment-toggle"
+          data-glaze-toggle="true"
           onClick={toggleGlaze}
           title={active ? `Turn off ${glaze.label}` : undefined}
           aria-label={active ? `Turn off ${glaze.label}` : undefined}

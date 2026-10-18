@@ -101,10 +101,15 @@ export default function SideSection({ side, structure, activeLayer = 0, onChange
               const currentSetId = activeSide[multiVariant.stateKey]?.setId;
               return (
                 <React.Fragment key={t.id}>
-                  <OptionRow label={tierLabel(isBento && t.bentoLabel ? t.bentoLabel : t.label)}>
+                  <OptionRow
+                    label={tierLabel(isBento && t.bentoLabel ? t.bentoLabel : t.label)}
+                    data-tutorial={t.id === 'checkeredPattern' ? 'side-checkered-row' : undefined}
+                  >
                     {multiVariant.sets.map((variant, i) => (
                       <Circle
                         key={variant.id}
+                        data-tutorial={t.id === 'checkeredPattern' ? `side-checkered-item-${i + 1}` : undefined}
+                        data-side-checkered={t.id === 'checkeredPattern' ? 'true' : undefined}
                         active={activeSide.mode === t.id && (currentSetId === variant.id || (!currentSetId && i === 0))}
                         canDeselect
                         onClick={() => multiVariant.select(variant.id)}
@@ -219,21 +224,22 @@ function ChevronTwoToneColorSection({ activeSlot, onSlotChange, sugarColor, onCh
 
 // Name above its circle(s) — matches the sketch's "label, then a row of
 // circles beneath it" shape, whether that row has one circle or several.
-function OptionRow({ label, children }) {
+function OptionRow({ label, children, ...rest }) {
   return (
-    <div>
+    <div {...rest}>
       <span className="text-xs font-semibold text-foreground/80 mb-1.5 block">{label}</span>
       <div className="flex flex-wrap gap-2">{children}</div>
     </div>
   );
 }
 
-function Circle({ active, canDeselect = false, onClick, title, children }) {
+function Circle({ active, canDeselect = false, onClick, title, children, ...rest }) {
   return (
     <button
       type="button"
       onClick={onClick}
       title={title}
+      {...rest}
       className={`relative w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
         active
           ? 'bg-primary text-primary-foreground border-primary shadow-md'

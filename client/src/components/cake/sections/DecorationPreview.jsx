@@ -21,6 +21,7 @@ export default function DecorationPreview({
   rotationZ = 0,
   color = '#F6DEAB',
   colorId = null,
+  className = "w-full h-32 rounded-xl bg-muted/40 overflow-hidden",
 }) {
   const mountRef = useRef(null);
   const sceneRef = useRef(null);
@@ -160,5 +161,5 @@ export default function DecorationPreview({
     renderer.render(scene, camera);
   }, [designId, orientation, rotationY, rotationX, rotationZ, color, colorId, fontsReady]);
 
-  return <div ref={mountRef} className="w-full h-32 rounded-xl bg-muted/40 overflow-hidden" />;
+  return <div ref={mountRef} className={className} />;
 }
