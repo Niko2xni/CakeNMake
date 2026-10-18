@@ -888,39 +888,14 @@ export default function BakeryDesigner() {
               </>
             )}
           </Button>
-
-          {/* Mobile toolpanel toggle */}
-          <div className="relative md:hidden">
-            <Button
-              variant={panelOpen ? 'default' : 'outline'}
-              size="icon"
-              disabled={isBreakdownOpen}
-              className={`rounded-xl transition-all shadow-sm ${
-                panelOpen
-                  ? 'bg-primary text-primary-foreground shadow-primary/20'
-                  : 'bg-card/90 border-border/70 text-foreground hover:bg-muted'
-              } ${activeTool && !panelOpen ? 'ring-2 ring-primary ring-offset-1' : ''}`}
-              onClick={() => setPanelOpen(!panelOpen)}
-              title={panelOpen ? 'Close Tools' : activeTool ? 'Placement Active - Open Tools' : 'Open Tools'}
-              aria-label={panelOpen ? 'Close Tools' : 'Open Tools'}
-            >
-              {panelOpen ? <X className="w-5 h-5" /> : <SlidersHorizontal className="w-5 h-5" />}
-            </Button>
-            {activeTool && !panelOpen && (
-              <span className="absolute -top-1 -right-1 flex h-3 w-3 pointer-events-none">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-primary border-2 border-card"></span>
-              </span>
-            )}
-          </div>
         </div>
       </header>
 
-      {/* Main Studio Area - Exact layout & sizing structure */}
-      <div ref={mainAreaRef} className="flex-1 flex relative overflow-hidden">
-        {/* 3D View */}
+      {/* Main Studio Area - Split in 2 on mobile (top: 3D render, bottom: toolpanel), side-by-side on desktop */}
+      <div ref={mainAreaRef} className="flex-1 flex flex-col md:flex-row relative overflow-hidden min-h-0">
+        {/* 3D View - Top screen on mobile, left workspace on desktop */}
         <motion.div
-          className="flex-1 relative"
+          className="flex-1 min-h-0 relative h-1/2 md:h-full"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6 }}
@@ -950,7 +925,7 @@ export default function BakeryDesigner() {
             className="absolute top-4 right-4 z-10 gap-2 rounded-xl border-border/70 bg-card/90 px-3 shadow-sm backdrop-blur-sm hover:bg-card"
           >
             <RotateCcw className="h-4 w-4" />
-            <span>Reset view</span>
+            <span className="hidden sm:inline">Reset view</span>
           </Button>
 
           {/* Pricing panel breakdown */}
@@ -1018,8 +993,8 @@ export default function BakeryDesigner() {
           </AnimatePresence>
         </motion.div>
 
-        {/* Desktop Panel - Clean floating card with exact width & padding as original */}
-        <div className={`hidden md:block w-[280px] lg:w-[320px] xl:w-[340px] max-w-[40vw] p-2 sm:p-3 shrink-0 ${isBreakdownOpen ? 'pointer-events-none opacity-50 select-none' : ''}`}>
+        {/* ToolPanel - Bottom screen on mobile (active without button), right panel on desktop */}
+        <div className={`flex-1 md:flex-initial h-1/2 md:h-full min-h-0 w-full md:w-[280px] lg:w-[320px] xl:w-[340px] md:max-w-[40vw] p-2 sm:p-3 shrink-0 ${isBreakdownOpen ? 'pointer-events-none opacity-50 select-none' : ''}`}>
           <ToolPanel
             config={cakeConfig}
             onChange={handleConfigChange}
@@ -1054,66 +1029,6 @@ export default function BakeryDesigner() {
             quote={quote}
           />
         </div>
-
-        {/* Mobile Panel Overlay */}
-        <AnimatePresence>
-          {panelOpen && !isBreakdownOpen && (
-            <>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 bg-black/40 backdrop-blur-sm z-30 md:hidden"
-                onClick={() => setPanelOpen(false)}
-              />
-              <motion.div
-                key="mobile-toolpanel"
-                initial={{ x: '100%' }}
-                animate={{ x: 0 }}
-                exit={{ x: '100%' }}
-                transition={{ type: 'spring', damping: 26, stiffness: 300 }}
-                className="fixed inset-y-0 right-0 w-[340px] max-w-[88vw] z-40 p-2 sm:p-3 md:hidden flex flex-col"
-              >
-                <div className="flex-1 min-h-0 bg-card rounded-2xl border border-border/70 overflow-hidden shadow-2xl">
-                  <ToolPanel
-                    config={cakeConfig}
-                    onChange={handleConfigChange}
-                    onReset={() => {
-                      setCakeConfig(DEFAULT_CONFIG);
-                      setActiveTool(null);
-                      placeUndoStackRef.current = [];
-                      placeRedoStackRef.current = [];
-                      setPlaceHistoryVersion((v) => v + 1);
-                    }}
-                    activeTool={activeTool}
-                    onSelectTool={setActiveTool}
-                    onPlaceChange={setPlaceItems}
-                    onPlaceUndo={handlePlaceUndo}
-                    onPlaceRedo={handlePlaceRedo}
-                    canPlaceUndo={placeUndoStackRef.current.length > 0}
-                    canPlaceRedo={placeRedoStackRef.current.length > 0}
-                    selectedCenterItemId={selectedCenterItemId}
-                    onCenterItemSelect={setSelectedCenterItemId}
-                    onDeleteSelectedCenterItem={handleDeleteSelectedCenterItem}
-                    onCenterTextColorModeChange={handleCenterTextColorModeChange}
-                    tab={activeTab}
-                    onTabChange={setActiveTab}
-                    activeLayer={activeLayer}
-                    onActiveLayerChange={setActiveLayer}
-                    activeEdgeSlot={activeEdgeSlot}
-                    onActiveEdgeSlotChange={setActiveEdgeSlot}
-                    modeUi={toolPanelModeUi}
-                    onModeUiChange={setToolPanelModeUi}
-                    expandedSections={expandedSections}
-                    onExpandedSectionsChange={setExpandedSections}
-                    quote={quote}
-                    onClose={() => setPanelOpen(false)}
-                  />
-                </div>
-              </motion.div>
-            </>
-          )}
-        </AnimatePresence>
       </div>
 
       {/* 8-ANGLE CAPTURE & PUBLISH TEMPLATE MODAL */}

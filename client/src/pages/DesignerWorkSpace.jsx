@@ -8,8 +8,8 @@ import PricingPanel from '@/components/cake/PricingPanel';
 import SendBakeryModal from '@/components/bakery/SendBakeryModal';
 import useDesignAiChat from '@/hooks/useDesignAiChat';
 import GuestAuthModal from '@/components/auth/GuestAuthModal';
-import DesignerTutorial from '@/components/tutorial/DesignerTutorial';
-import { Home, X, Send, Cloud, CloudOff, Loader2, RotateCcw, SlidersHorizontal, HelpCircle } from 'lucide-react';
+import DesignerTutorial, { TUTORIAL_STEPS } from '@/components/tutorial/DesignerTutorial';
+import { Home, X, Send, Cloud, CloudOff, Loader2, RotateCcw, SlidersHorizontal, HelpCircle, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { blueprintApi, designApi, pricingApi, templateApi } from '@/services/api';
@@ -41,7 +41,7 @@ function getActiveToolLabel(tool) {
   return cleaned ? cleaned.charAt(0).toUpperCase() + cleaned.slice(1) : 'Decoration';
 }
 
-export default function DesignerWorkSpace() {
+export default function DesignerWorkSpace({ isGuestPage = false }) {
   const { account } = useAuth();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -241,7 +241,7 @@ export default function DesignerWorkSpace() {
         const tabsEl = document.querySelector('[data-tutorial="tabs-surface"]');
         if (tabsEl) tabsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }, 50);
-    } else if (stepIndex === 7) {
+    } else if (stepIndex === 7 || stepIndex === 8) {
       setActiveTab('center');
       setToolPanelModeUi('design');
       setPanelOpen(true);
@@ -333,6 +333,14 @@ export default function DesignerWorkSpace() {
     } catch (e) {}
   }, [restorePreTutorialState]);
 
+  const hasTriggeredUrlTutorialRef = useRef(false);
+  useEffect(() => {
+    if (searchParams.get('tutorial') === 'true' && !hasTriggeredUrlTutorialRef.current && !tutorialOpen) {
+      hasTriggeredUrlTutorialRef.current = true;
+      handleStartTutorial();
+    }
+  }, [searchParams, handleStartTutorial, tutorialOpen]);
+
   const handleModeUiChange = useCallback((next) => {
     if (aiChatSession?.thinking && next === 'design') {
       return;
@@ -415,12 +423,14 @@ export default function DesignerWorkSpace() {
       setDesignId(null);
 
       let draft = null;
-      try {
-        const raw = localStorage.getItem('cakenmake_draft_design');
-        if (raw) draft = JSON.parse(raw);
-      } catch (e) { }
+      if (account) {
+        try {
+          const raw = localStorage.getItem('cakenmake_draft_design');
+          if (raw) draft = JSON.parse(raw);
+        } catch (e) { }
+      }
 
-      if (draft?.config) {
+      if (account && draft?.config) {
         setConfig(draft.config);
         setTitle(draft.name || 'Unnamed 1');
       } else {
@@ -518,19 +528,7 @@ export default function DesignerWorkSpace() {
   }, [config, captureThumbnail]);
 
   const saveDesign = useCallback(async ({ skipThumbnail = false, sentToBakery = false } = {}) => {
-    if (tutorialOpen) return null;
-    if (!account) {
-      try {
-        localStorage.setItem('cakenmake_draft_design', JSON.stringify({
-          name: title,
-          config,
-          lastEdited: new Date().toISOString(),
-        }));
-        setSaveStatus('saved');
-        setHasUnsavedChanges(false);
-      } catch (e) { }
-      return null;
-    }
+    if (tutorialOpen || !account) return null;
 
     try {
       setSaveStatus('saving');
@@ -572,11 +570,11 @@ export default function DesignerWorkSpace() {
       setSaveStatus('error');
       return null;
     }
-  }, [account, config, title, designId, navigate, quote]);
+  }, [account, config, title, designId, navigate, quote, tutorialOpen]);
 
-  // Auto-save effect with 600ms debounce
+  // Auto-save effect with 600ms debounce (only for logged-in accounts)
   useEffect(() => {
-    if (orderComplete || !hasUnsavedChanges || tutorialOpen) return;
+    if (!account || orderComplete || !hasUnsavedChanges || tutorialOpen) return;
 
     const saveTimer = setTimeout(async () => {
       const snapshot = captureThumbnail();
@@ -585,11 +583,11 @@ export default function DesignerWorkSpace() {
     }, 600); // Fast auto-save after 600ms of inactivity
 
     return () => clearTimeout(saveTimer);
-  }, [hasUnsavedChanges, saveDesign, saveThumbnail, captureThumbnail, orderComplete, tutorialOpen]);
+  }, [account, hasUnsavedChanges, saveDesign, saveThumbnail, captureThumbnail, orderComplete, tutorialOpen]);
 
-  // Mark as having unsaved changes when config or title changes (skipping initial mount, design loading, and completed orders)
+  // Mark as having unsaved changes when config or title changes (only for logged-in accounts)
   useEffect(() => {
-    if (orderComplete || tutorialOpen) return;
+    if (!account || orderComplete || tutorialOpen) return;
     if (isInitialMountRef.current) {
       isInitialMountRef.current = false;
       return;
@@ -600,7 +598,7 @@ export default function DesignerWorkSpace() {
     }
     setHasUnsavedChanges(true);
     setSaveStatus('unsaved');
-  }, [config, title, orderComplete, tutorialOpen]);
+  }, [account, config, title, orderComplete, tutorialOpen]);
 
   const handleCategoryChange = useCallback((category) => {
     setActiveCategory(category);
@@ -811,15 +809,23 @@ export default function DesignerWorkSpace() {
     setBakeryOpen(true);
   };
 
+  const handleGuestLogin = () => {
+    if (tutorialOpen) return;
+    try {
+      localStorage.setItem('cakenmake_draft_design', JSON.stringify({
+        name: title,
+        config,
+        lastEdited: new Date().toISOString(),
+        action: 'save',
+      }));
+    } catch (e) { }
+    setGuestAuthAction('general');
+    setGuestAuthModalOpen(true);
+  };
+
   const handleGuestAuthSuccess = async (authenticatedUser) => {
-    if (guestAuthAction === 'save') {
-      const savedId = await saveDesign();
-      if (savedId) {
-        await saveThumbnail(savedId);
-      }
-    } else if (guestAuthAction === 'order') {
-      setBakeryOpen(true);
-    }
+    // When the user logs in, transfer their design from the guest designer to /designer where it will be saved to their account in db
+    navigate('/designer', { replace: true });
   };
 
   // Helper that records previous place.items to undo stack before updating
@@ -1041,31 +1047,27 @@ export default function DesignerWorkSpace() {
         <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 sm:flex-initial">
           <Link
             to={account ? (account.role?.startsWith('bakery') ? '/bakery' : '/client') : '/'}
-            className={account
-              ? "w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-primary flex items-center justify-center shadow-md shadow-primary/20 hover:bg-primary/90 transition-colors cursor-pointer shrink-0"
-              : "shrink-0 rounded-xl px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/10 transition-colors"}
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-primary flex items-center justify-center shadow-md shadow-primary/20 hover:bg-primary/90 transition-colors cursor-pointer shrink-0"
             title="Back to home"
           >
-            {account ? <Home className="w-4 h-4 text-primary-foreground" /> : 'Back'}
+            <Home className="w-4 h-4 text-primary-foreground" />
           </Link>
-          {account && (
-            <Input
-              ref={titleRef}
-              value={title}
-              readOnly={orderComplete}
-              disabled={orderComplete}
-              onChange={(e) => setTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.target.blur();
-                }
-              }}
-              className="font-display text-base sm:text-xl font-bold leading-tight tracking-tight border-none shadow-none bg-transparent p-0 h-auto w-[120px] sm:w-[180px] max-w-[180px] focus-visible:ring-0 focus-visible:ring-offset-0 hover:bg-muted/50 rounded-md px-1 -ml-1 truncate disabled:opacity-100 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-            />
-          )}
+          <Input
+            ref={titleRef}
+            value={title}
+            readOnly={orderComplete}
+            disabled={orderComplete}
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.target.blur();
+              }
+            }}
+            className="font-display text-base sm:text-xl font-bold leading-tight tracking-tight border-none shadow-none bg-transparent p-0 h-auto w-[120px] sm:w-[180px] max-w-[180px] focus-visible:ring-0 focus-visible:ring-offset-0 hover:bg-muted/50 rounded-md px-1 -ml-1 truncate disabled:opacity-100 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+          />
 
-          {/* Save status indicator - only when order not complete */}
-          {!orderComplete && (
+          {/* Save status indicator - only for logged in users and when order not complete */}
+          {account && !orderComplete && (
             <div className="hidden sm:flex items-center gap-1.5 text-xs shrink min-w-0 truncate">
               {saveStatus === 'saving' && (
                 <>
@@ -1115,6 +1117,21 @@ export default function DesignerWorkSpace() {
             </Button>
           )}
 
+          {/* Log in button - only for guest users */}
+          {!account && !orderComplete && (
+            <Button
+              onClick={handleGuestLogin}
+              disabled={aiChatSession?.thinking}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-1.5 rounded-xl font-semibold text-primary border-primary/30 hover:bg-primary/10"
+              title="Log in to your account"
+            >
+              <LogIn className="w-4 h-4" />
+              <span>Log in</span>
+            </Button>
+          )}
+
           {/* Save Design button - only when not sent to bakery */}
           {!orderComplete && (
             <Button
@@ -1156,40 +1173,14 @@ export default function DesignerWorkSpace() {
               <span className="hidden sm:inline">Send Bakery</span>
             </Button>
           )}
-
-          {/* Mobile panel toggle */}
-          {!orderComplete && (
-            <div className="relative md:hidden">
-              <Button
-                variant={panelOpen ? "default" : "outline"}
-                size="icon"
-                disabled={isBreakdownOpen}
-                className={`rounded-xl transition-all shadow-sm ${panelOpen
-                    ? 'bg-primary text-primary-foreground shadow-primary/20'
-                    : 'bg-card/90 border-border/70 text-foreground hover:bg-muted'
-                  } ${activeTool && !panelOpen ? 'ring-2 ring-primary ring-offset-1' : ''}`}
-                onClick={() => setPanelOpen(!panelOpen)}
-                title={panelOpen ? "Close Tools" : activeTool ? "Placement Active - Open Tools" : "Open Tools"}
-                aria-label={panelOpen ? "Close Tools" : "Open Tools"}
-              >
-                {panelOpen ? <X className="w-5 h-5" /> : <SlidersHorizontal className="w-5 h-5" />}
-              </Button>
-              {activeTool && !panelOpen && (
-                <span className="absolute -top-1 -right-1 flex h-3 w-3 pointer-events-none">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-primary border-2 border-card"></span>
-                </span>
-              )}
-            </div>
-          )}
         </div>
       </header>
 
-      {/* Main content */}
-      <div ref={mainAreaRef} className="flex-1 flex relative overflow-hidden">
-        {/* 3D View */}
+      {/* Main content - split in 2 on mobile (top: 3D render, bottom: toolpanel), side-by-side on desktop */}
+      <div ref={mainAreaRef} className="flex-1 flex flex-col md:flex-row relative overflow-hidden min-h-0">
+        {/* 3D View - Top screen on mobile, left workspace on desktop */}
         <motion.div
-          className="flex-1 relative"
+          className="flex-1 min-h-0 relative h-1/2 md:h-full"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6 }}
@@ -1207,21 +1198,21 @@ export default function DesignerWorkSpace() {
             onCenterItemSelect={setSelectedCenterItemId}
             onDeleteCenterItem={handleDeleteSelectedCenterItem}
             onPlacedItemsChange={setPlaceItems}
-            lockCameraAngle={tutorialOpen && tutorialStepIndex === 7}
+            lockCameraAngle={tutorialOpen && TUTORIAL_STEPS[tutorialStepIndex]?.id === 'center-strawberry'}
           />
 
           <Button
             type="button"
             variant="outline"
             size="sm"
-            disabled={isBreakdownOpen || (tutorialOpen && tutorialStepIndex === 7)}
+            disabled={isBreakdownOpen || (tutorialOpen && TUTORIAL_STEPS[tutorialStepIndex]?.id === 'center-strawberry')}
             onClick={() => cakeSceneRef.current?.resetCamera()}
             title="Reset camera perspective"
             aria-label="Reset camera perspective"
             className="absolute top-4 right-4 z-10 gap-2 rounded-xl border-border/70 bg-card/90 px-3 shadow-sm backdrop-blur-sm hover:bg-card"
           >
             <RotateCcw className="h-4 w-4" />
-            <span>Reset view</span>
+            <span className="hidden sm:inline">Reset view</span>
           </Button>
 
           {/* Pricing panel */}
@@ -1289,9 +1280,9 @@ export default function DesignerWorkSpace() {
           </AnimatePresence>
         </motion.div>
 
-        {/* Desktop Panel */}
+        {/* ToolPanel - Bottom screen on mobile (active without button), right panel on desktop */}
         {!orderComplete && (
-          <div className={`hidden md:block w-[280px] lg:w-[320px] xl:w-[340px] max-w-[40vw] p-2 sm:p-3 shrink-0 ${isBreakdownOpen ? 'pointer-events-none opacity-50 select-none' : ''}`}>
+          <div className={`flex-1 md:flex-initial h-1/2 md:h-full min-h-0 w-full md:w-[280px] lg:w-[320px] xl:w-[340px] md:max-w-[40vw] p-1.5 sm:p-3 shrink-0 ${isBreakdownOpen ? 'pointer-events-none opacity-50 select-none' : ''}`}>
             <ToolPanel
               aiChatSession={aiChatSession}
               config={config}
@@ -1328,69 +1319,6 @@ export default function DesignerWorkSpace() {
             />
           </div>
         )}
-
-        {/* Mobile Panel Overlay */}
-        {!orderComplete && (
-          <AnimatePresence>
-            {panelOpen && !isBreakdownOpen && (
-              <>
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="fixed inset-0 bg-black/40 backdrop-blur-sm z-30 md:hidden"
-                  onClick={() => setPanelOpen(false)}
-                />
-                <motion.div
-                  key="mobile-toolpanel"
-                  initial={{ x: '100%' }}
-                  animate={{ x: 0 }}
-                  exit={{ x: '100%' }}
-                  transition={{ type: 'spring', damping: 26, stiffness: 300 }}
-                  className="fixed inset-y-0 right-0 w-[340px] max-w-[88vw] z-40 p-2 sm:p-3 md:hidden flex flex-col"
-                >
-                  <div className="flex-1 min-h-0 bg-card rounded-2xl border border-border/70 overflow-hidden shadow-2xl">
-                    <ToolPanel
-                      aiChatSession={aiChatSession}
-                      config={config}
-                      quote={quote}
-                      onChange={setConfig}
-                      onReset={() => {
-                        setConfig(INITIAL_CONFIG);
-                        setActiveTool(null);
-                        placeUndoStackRef.current = [];
-                        placeRedoStackRef.current = [];
-                        setPlaceHistoryVersion(v => v + 1);
-                      }}
-                      activeTool={activeTool}
-                      onSelectTool={setActiveTool}
-                      onPlaceChange={setPlaceItems}
-                      onPlaceUndo={handlePlaceUndo}
-                      onPlaceRedo={handlePlaceRedo}
-                      canPlaceUndo={placeUndoStackRef.current.length > 0}
-                      canPlaceRedo={placeRedoStackRef.current.length > 0}
-                      selectedCenterItemId={selectedCenterItemId}
-                      onCenterItemSelect={setSelectedCenterItemId}
-                      onDeleteSelectedCenterItem={handleDeleteSelectedCenterItem}
-                      onCenterTextColorModeChange={handleCenterTextColorModeChange}
-                      tab={activeTab}
-                      onTabChange={setActiveTab}
-                      activeLayer={activeLayer}
-                      onActiveLayerChange={setActiveLayer}
-                      activeEdgeSlot={activeEdgeSlot}
-                      onActiveEdgeSlotChange={setActiveEdgeSlot}
-                      modeUi={toolPanelModeUi}
-                      onModeUiChange={handleModeUiChange}
-                      expandedSections={expandedSections}
-                      onExpandedSectionsChange={setExpandedSections}
-                      onClose={() => setPanelOpen(false)}
-                    />
-                  </div>
-                </motion.div>
-              </>
-            )}
-          </AnimatePresence>
-        )}
       </div>
 
 
@@ -1408,7 +1336,14 @@ export default function DesignerWorkSpace() {
 
       <GuestAuthModal
         isOpen={guestAuthModalOpen}
-        onClose={() => setGuestAuthModalOpen(false)}
+        onClose={() => {
+          setGuestAuthModalOpen(false);
+          if (!account) {
+            try {
+              localStorage.removeItem('cakenmake_draft_design');
+            } catch (e) { }
+          }
+        }}
         actionType={guestAuthAction}
         onSuccess={handleGuestAuthSuccess}
       />

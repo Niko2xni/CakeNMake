@@ -57,7 +57,11 @@ export default function BakeryNavbar() {
 
   return (
     <>
-    <nav className="cn-bakery-nav" aria-label="Bakery navigation">
+    <nav
+      className={`cn-bakery-nav ${logoutConfirmationOpen ? '!z-30 pointer-events-none' : ''}`}
+      style={logoutConfirmationOpen ? { zIndex: 30 } : undefined}
+      aria-label="Bakery navigation"
+    >
       {/* Brand */}
       <div className="relative mb-6 flex-shrink-0" title="AH TINAPS BAKESHOP">
         <div className="w-11 h-11 rounded-full bg-gradient-to-br from-pink-500 via-rose-500 to-orange-400 flex items-center justify-center">
@@ -102,7 +106,11 @@ export default function BakeryNavbar() {
       </button>
     </nav>
 
-    <nav className="cn-bakery-mobile-nav" aria-label="Bakery mobile navigation">
+    <nav
+      className={`cn-bakery-mobile-nav ${logoutConfirmationOpen ? '!z-30 pointer-events-none' : ''}`}
+      style={logoutConfirmationOpen ? { zIndex: 30 } : undefined}
+      aria-label="Bakery mobile navigation"
+    >
       {mobilePrimaryItems.map(({ to, icon: Icon, label }) => {
         const active = isActive(to);
         return (

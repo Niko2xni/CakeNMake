@@ -70,7 +70,11 @@ export default function ClientNavbar() {
 
 
   return (
-    <nav className="cn-sidebar" aria-label="Client navigation">
+    <nav
+      className={`cn-sidebar ${logoutConfirmationOpen ? '!z-30 pointer-events-none' : ''}`}
+      style={logoutConfirmationOpen ? { zIndex: 30 } : undefined}
+      aria-label="Client navigation"
+    >
       <Link to="/client" className="cn-sidebar-brand" aria-label="CakeNMake dashboard">
         <span>C</span><span className="is-accent">N</span><span>M</span>
       </Link>

@@ -25,6 +25,7 @@ export default function GuestAuthModal({
 }) {
   const { isAuthenticated, isLoadingAuth, authError } = useAuth();
   const [pendingUser, setPendingUser] = useState(null);
+
   useEffect(() => {
     if (!isOpen || !pendingUser || isLoadingAuth) return;
     if (authError) {
@@ -36,6 +37,7 @@ export default function GuestAuthModal({
       onSuccess?.(pendingUser);
     }
   }, [isOpen, pendingUser, isLoadingAuth, authError, isAuthenticated, onClose, onSuccess]);
+
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
@@ -45,6 +47,7 @@ export default function GuestAuthModal({
   const [loading, setLoading] = useState(false);
   const [otpExpiresAt, setOtpExpiresAt] = useState(null);
   const [otpTimeLeft, setOtpTimeLeft] = useState(0);
+  const isOtpActive = otpSent && otpTimeLeft > 0;
 
   useEffect(() => {
     if (!isOpen) {
@@ -59,15 +62,16 @@ export default function GuestAuthModal({
       setOtpExpiresAt(null);
       setOtpTimeLeft(0);
     } else if (initialEmail && !otpSent) {
-      setEmail(initialEmail);
+      const cleanEmail = initialEmail.trim().toLowerCase();
+      setEmail(cleanEmail);
       setLoading(true);
-      authApi.requestEmailOtp(initialEmail)
+      authApi.requestEmailOtp(cleanEmail)
         .then((response) => {
           const expiresAt = response?.expiresAt || Date.now() + 3 * 60 * 1000;
           setOtp("");
           setOtpSent(true);
           setOtpExpiresAt(expiresAt);
-          setStatusMessage(`A 6-digit verification code was sent to ${initialEmail}.`);
+          setStatusMessage(`A 6-digit verification code was sent to ${cleanEmail}.`);
           setError("");
         })
         .catch((err) => {
@@ -85,21 +89,6 @@ export default function GuestAuthModal({
     const remainingSeconds = safeSeconds % 60;
     return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
   };
-
-  useEffect(() => {
-    if (!isOpen) {
-      setPendingUser(null);
-      setEmail("");
-      setOtp("");
-      setOtpSent(false);
-      setError("");
-      setStatusMessage("");
-      setOtpExpiredMessage("");
-      setLoading(false);
-      setOtpExpiresAt(null);
-      setOtpTimeLeft(0);
-    }
-  }, [isOpen]);
 
   useEffect(() => {
     if (!otpExpiresAt) {
@@ -126,8 +115,58 @@ export default function GuestAuthModal({
     return () => window.clearInterval(timer);
   }, [otpExpiresAt]);
 
+  // Warn if leaving while OTP is counting down
+  useEffect(() => {
+    if (!isOtpActive) return undefined;
+
+    const handleBeforeUnload = (event) => {
+      event.preventDefault();
+      event.returnValue = "Your OTP is still active. Leaving now will expire the code and reset your sign-in progress.";
+      return event.returnValue;
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isOtpActive]);
+
+  const verifyCode = async (codeToVerify) => {
+    const targetCode = String(codeToVerify || otp || "").trim();
+    if (loading || Boolean(pendingUser)) return;
+    setError("");
+    setStatusMessage("");
+    setOtpExpiredMessage("");
+    setLoading(true);
+
+    try {
+      if (!otpExpiresAt || Date.now() >= otpExpiresAt || otpTimeLeft <= 0) {
+        setOtp("");
+        setOtpExpiresAt(null);
+        setOtpTimeLeft(0);
+        setOtpExpiredMessage("OTP expired");
+        setStatusMessage("Please request a new code to continue.");
+        setError("Your verification code expired. Please request a new code.");
+        return;
+      }
+
+      if (!/^\d{6}$/.test(targetCode)) throw new Error("Enter the 6-digit verification code.");
+      const cleanEmail = email.trim().toLowerCase();
+      const { token } = await authApi.verifyEmailOtp(cleanEmail, targetCode);
+      if (!firebaseConfigured || !auth) throw new Error(missingFirebaseConfigMessage);
+      const userCredential = await signInWithCustomToken(auth, token);
+      setPendingUser(userCredential.user);
+    } catch (authError) {
+      setError(authError.message || "Authentication failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleOtpChange = (value) => {
-    setOtp(value.replace(/\D/g, "").slice(0, 6));
+    const cleaned = value.replace(/\D/g, "").slice(0, 6);
+    setOtp(cleaned);
+    if (cleaned.length === 6 && !loading && !pendingUser && otpSent && otpTimeLeft > 0) {
+      verifyCode(cleaned);
+    }
   };
 
   const requestNewOtp = async () => {
@@ -154,44 +193,32 @@ export default function GuestAuthModal({
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setError("");
-    setStatusMessage("");
-    setOtpExpiredMessage("");
-    setLoading(true);
+    if (loading || Boolean(pendingUser)) return;
 
-    try {
-      if (!email) throw new Error("Enter your email address.");
+    if (!otpSent) {
+      setError("");
+      setStatusMessage("");
+      setOtpExpiredMessage("");
+      setLoading(true);
 
-      if (!otpSent) {
-        const response = await authApi.requestEmailOtp(email);
+      try {
+        if (!email) throw new Error("Enter your email address.");
+        const cleanEmail = email.trim().toLowerCase();
+        const response = await authApi.requestEmailOtp(cleanEmail);
         const expiresAt = response?.expiresAt || Date.now() + 3 * 60 * 1000;
         setOtpSent(true);
         setOtpExpiresAt(expiresAt);
-        setStatusMessage("A 6-digit verification code was sent to your email.");
+        setStatusMessage(`A 6-digit verification code was sent to ${cleanEmail}.`);
         setError("");
-        return;
+      } catch (authError) {
+        setError(authError.message || "Authentication failed.");
+      } finally {
+        setLoading(false);
       }
-
-      if (!otpExpiresAt || Date.now() >= otpExpiresAt) {
-        setOtp("");
-        setOtpExpiresAt(null);
-        setOtpTimeLeft(0);
-        setOtpExpiredMessage("OTP expired");
-        setStatusMessage("Please request a new code to continue.");
-        setError("Your verification code expired. Please request a new code.");
-        return;
-      }
-
-      if (!/^\d{6}$/.test(otp)) throw new Error("Enter the 6-digit verification code.");
-      const { token } = await authApi.verifyEmailOtp(email, otp);
-      if (!firebaseConfigured || !auth) throw new Error(missingFirebaseConfigMessage);
-      const userCredential = await signInWithCustomToken(auth, token);
-      setPendingUser(userCredential.user);
-    } catch (authError) {
-      setError(authError.message || "Authentication failed.");
-    } finally {
-      setLoading(false);
+      return;
     }
+
+    await verifyCode(otp);
   };
 
   const handleProviderAuth = () => {
@@ -200,7 +227,7 @@ export default function GuestAuthModal({
     setOtpExpiredMessage("");
     setLoading(true);
     try {
-      const returnPath = window.location.pathname + window.location.search || '/designer';
+      const returnPath = '/designer' + (actionType === 'order' ? '?action=order' : '');
       redirectToGoogleOAuth(returnPath);
     } catch (authError) {
       setError(authError.message || "Provider sign-in failed.");
@@ -218,7 +245,7 @@ export default function GuestAuthModal({
     ? "Create a free account or log in to save this cake design to your personal collection."
     : actionType === "order"
     ? "Log in or sign up to finalize your order and send your design directly to our bakery."
-    : "Log in or sign up with your account to proceed.";
+    : "Log in or sign up with your account. Your custom cake design will be preserved.";
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -341,6 +368,13 @@ export default function GuestAuthModal({
                   maxLength={6}
                   value={otp}
                   onChange={handleOtpChange}
+                  onComplete={(val) => {
+                    const cleaned = String(val || "").replace(/\D/g, "").slice(0, 6);
+                    if (cleaned.length === 6 && !loading && !pendingUser && otpSent && otpTimeLeft > 0) {
+                      verifyCode(cleaned);
+                    }
+                  }}
+                  disabled={loading || Boolean(pendingUser) || otpTimeLeft <= 0}
                   autoFocus
                   autoComplete="one-time-code"
                 >
@@ -370,15 +404,17 @@ export default function GuestAuthModal({
           <Button
             type="submit"
             className="w-full h-11 font-semibold rounded-xl"
-            disabled={loading || Boolean(pendingUser) || (otpSent && otp.length !== 6)}
+            disabled={loading || Boolean(pendingUser) || (otpSent && (otp.length !== 6 || otpTimeLeft <= 0))}
           >
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                {otpSent ? "Verifying..." : "Sending code..."}
+                {otpSent ? "Verifying..." : "Logging in..."}
               </>
             ) : otpSent ? (
               "Verify and log in"
+            ) : actionType === "general" ? (
+              "Log in"
             ) : (
               "Send OTP"
             )}

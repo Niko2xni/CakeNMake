@@ -75,6 +75,28 @@ export const TUTORIAL_STEPS = [
         preferredSide: 'left',
     },
     {
+        id: 'decor-controls-tip',
+        target: '[data-tutorial="center-strawberry"]',
+        fallbackSelector: '[data-tutorial="toolpanel"]',
+        title: 'Design Controls & Shortcuts',
+        description: (
+            <span>
+                Tip: while a design is selected —{' '}
+                <kbd className="px-1.5 py-0.5 rounded bg-muted border border-border/80 font-mono text-[10px] font-semibold text-foreground">W</kbd>{' '}
+                <kbd className="px-1.5 py-0.5 rounded bg-muted border border-border/80 font-mono text-[10px] font-semibold text-foreground">S</kbd>{' '}
+                tilt up/down,{' '}
+                <kbd className="px-1.5 py-0.5 rounded bg-muted border border-border/80 font-mono text-[10px] font-semibold text-foreground">A</kbd>{' '}
+                <kbd className="px-1.5 py-0.5 rounded bg-muted border border-border/80 font-mono text-[10px] font-semibold text-foreground">D</kbd>{' '}
+                tilt left/right,{' '}
+                <kbd className="px-1.5 py-0.5 rounded bg-muted border border-border/80 font-mono text-[10px] font-semibold text-foreground">Q</kbd>{' '}
+                <kbd className="px-1.5 py-0.5 rounded bg-muted border border-border/80 font-mono text-[10px] font-semibold text-foreground">E</kbd>{' '}
+                rotate. If you are using a phone, you can just use the toolpanel buttons instead!
+            </span>
+        ),
+        displayStep: 7,
+        preferredSide: 'left',
+    },
+    {
         id: 'center-strawberry',
         target: '[data-tutorial="center-strawberry"]',
         title: 'Center Decor: Place a Strawberry',
@@ -125,10 +147,18 @@ export default function DesignerTutorial({
     const measureTarget = useCallback(() => {
         let el = null;
         if (step.target) {
-            el = document.querySelector(step.target);
+            const matches = Array.from(document.querySelectorAll(step.target));
+            el = matches.find((m) => {
+                const r = m.getBoundingClientRect();
+                return r.width > 0 && r.height > 0;
+            }) || matches[0] || null;
         }
         if (!el && step.fallbackSelector) {
-            el = document.querySelector(step.fallbackSelector);
+            const matches = Array.from(document.querySelectorAll(step.fallbackSelector));
+            el = matches.find((m) => {
+                const r = m.getBoundingClientRect();
+                return r.width > 0 && r.height > 0;
+            }) || matches[0] || null;
         }
 
         if (el) {
@@ -173,7 +203,11 @@ export default function DesignerTutorial({
         const scrollTimer = setTimeout(() => {
             const selector = step.target || step.fallbackSelector;
             if (selector) {
-                const el = document.querySelector(selector);
+                const matches = Array.from(document.querySelectorAll(selector));
+                const el = matches.find((m) => {
+                    const r = m.getBoundingClientRect();
+                    return r.width > 0 && r.height > 0;
+                }) || matches[0] || null;
                 if (el) {
                     if (step.id === 'surface-treatment-deselection') {
                         el.scrollIntoView({ behavior: 'smooth', block: 'start' });

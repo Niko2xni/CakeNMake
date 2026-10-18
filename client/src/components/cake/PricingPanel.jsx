@@ -135,12 +135,46 @@ export default function PricingPanel({ quote, loading, error, onOpenChange }) {
 
   return (
     <>
+      {/* Mobile View: Compact total price badge, clicking directly opens full price breakdown modal */}
+      <motion.div
+        layout
+        initial={{ opacity: 0, x: -16 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.2 }}
+        className="md:hidden flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border/60 bg-card/90 shadow-md backdrop-blur-md cursor-pointer hover:bg-card hover:shadow-lg transition-all active:scale-95 select-none"
+        onClick={openModal}
+        role="button"
+        tabIndex={0}
+        title="Click to view full price breakdown"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            openModal();
+          }
+        }}
+      >
+        <div className="flex h-5 w-5 items-center justify-center rounded-md bg-primary/10 shrink-0">
+          {loading ? (
+            <LoaderCircle className="h-3 w-3 animate-spin text-primary" />
+          ) : (
+            <ReceiptText className="h-3 w-3 text-primary" />
+          )}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total</span>
+          <span className="font-heading text-xs sm:text-sm font-bold tabular-nums text-primary">
+            {quote ? formatMoney(quote.totalMinor) : '—'}
+          </span>
+        </div>
+      </motion.div>
+
+      {/* Desktop View: Full Card with collapse/expand toggle */}
       <motion.div
         layout
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.3 }}
-        className={`w-[220px] max-w-[calc(100vw-2rem)] rounded-2xl border border-border/40 bg-card/90 text-left shadow-lg backdrop-blur-md transition-shadow hover:shadow-xl select-none ${
+        className={`hidden md:block w-[220px] max-w-[calc(100vw-2rem)] rounded-2xl border border-border/40 bg-card/90 text-left shadow-lg backdrop-blur-md transition-shadow hover:shadow-xl select-none ${
           isCollapsed ? 'p-3 cursor-pointer' : 'p-4'
         }`}
         onClick={isCollapsed ? () => setIsCollapsed(false) : undefined}

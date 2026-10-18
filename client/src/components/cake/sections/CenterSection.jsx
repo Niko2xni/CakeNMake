@@ -209,19 +209,6 @@ function ArmedItemControls({
             </button>
           </div>
         </div>
-
-        <p className="text-[10px] text-muted-foreground flex items-center gap-1 flex-wrap">
-          Tip: while a design is selected —
-          <kbd className="px-1.5 py-0.5 rounded bg-card border border-border/70 font-mono text-[10px]">W</kbd>
-          <kbd className="px-1.5 py-0.5 rounded bg-card border border-border/70 font-mono text-[10px]">S</kbd>
-          tilt up/down,
-          <kbd className="px-1.5 py-0.5 rounded bg-card border border-border/70 font-mono text-[10px]">A</kbd>
-          <kbd className="px-1.5 py-0.5 rounded bg-card border border-border/70 font-mono text-[10px]">D</kbd>
-          tilt left/right,
-          <kbd className="px-1.5 py-0.5 rounded bg-card border border-border/70 font-mono text-[10px]">Q</kbd>
-          <kbd className="px-1.5 py-0.5 rounded bg-card border border-border/70 font-mono text-[10px]">E</kbd>
-          rotate
-        </p>
       </div>
     </>
   );
