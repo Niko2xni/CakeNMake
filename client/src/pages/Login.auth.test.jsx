@@ -42,7 +42,7 @@ describe('Login auth experience', () => {
       </MemoryRouter>
     );
     fireEvent.click(screen.getByRole('button', { name: /Continue with Google/ }));
-    expect(googleAuthMock.redirectToGoogleOAuth).toHaveBeenCalledWith('/login-success');
+    expect(googleAuthMock.redirectToGoogleOAuth).toHaveBeenCalledWith('/login');
   });
 
   it('displays a helpful message when Google redirect throws an error', async () => {
@@ -58,6 +58,20 @@ describe('Login auth experience', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: /Continue with Google/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Google Client ID is not configured.');
+  });
+
+  it('prefills email and shows OTP input when returning from Google OAuth with state', async () => {
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/login', state: { email: 'google-user@example.com', otpSent: true, expiresAt: Date.now() + 180000 } }]}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText('A 6-digit verification code was sent to google-user@example.com.')).toBeInTheDocument();
+    expect(screen.getByLabelText(/verification code/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^verify$/i })).toBeInTheDocument();
   });
 
   it('exchanges the verified email OTP for a Firebase session', async () => {

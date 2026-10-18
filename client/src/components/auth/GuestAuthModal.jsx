@@ -22,6 +22,7 @@ export default function GuestAuthModal({
   actionType = "general", // 'save' | 'order' | 'general'
   onSuccess,
   initialEmail = "",
+  initialExpiresAt = null,
 }) {
   const { isAuthenticated, isLoadingAuth, authError } = useAuth();
   const [pendingUser, setPendingUser] = useState(null);
@@ -64,24 +65,32 @@ export default function GuestAuthModal({
     } else if (initialEmail && !otpSent) {
       const cleanEmail = initialEmail.trim().toLowerCase();
       setEmail(cleanEmail);
-      setLoading(true);
-      authApi.requestEmailOtp(cleanEmail)
-        .then((response) => {
-          const expiresAt = response?.expiresAt || Date.now() + 3 * 60 * 1000;
-          setOtp("");
-          setOtpSent(true);
-          setOtpExpiresAt(expiresAt);
-          setStatusMessage(`A 6-digit verification code was sent to ${cleanEmail}.`);
-          setError("");
-        })
-        .catch((err) => {
-          setError(err.message || "Could not send verification code.");
-        })
-        .finally(() => {
-          setLoading(false);
-        });
+      if (initialExpiresAt) {
+        setOtp("");
+        setOtpSent(true);
+        setOtpExpiresAt(initialExpiresAt);
+        setStatusMessage(`A 6-digit verification code was sent to ${cleanEmail}.`);
+        setError("");
+      } else {
+        setLoading(true);
+        authApi.requestEmailOtp(cleanEmail)
+          .then((response) => {
+            const expiresAt = response?.expiresAt || Date.now() + 3 * 60 * 1000;
+            setOtp("");
+            setOtpSent(true);
+            setOtpExpiresAt(expiresAt);
+            setStatusMessage(`A 6-digit verification code was sent to ${cleanEmail}.`);
+            setError("");
+          })
+          .catch((err) => {
+            setError(err.message || "Could not send verification code.");
+          })
+          .finally(() => {
+            setLoading(false);
+          });
+      }
     }
-  }, [isOpen, initialEmail]);
+  }, [isOpen, initialEmail, initialExpiresAt]);
 
   const formatTimeLeft = (seconds) => {
     const safeSeconds = Math.max(0, seconds);

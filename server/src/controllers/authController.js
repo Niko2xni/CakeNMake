@@ -131,8 +131,17 @@ exports.handleGoogleOAuth = async (req, res) => {
       });
     }
 
-    const customToken = await firebaseAdminAuth.createCustomToken(user.uid);
-    return res.json({ token: customToken });
+    const { expiresAt } = await requestOtp({
+      email,
+      purpose: 'login',
+      ip: req.ip,
+    });
+
+    return res.json({
+      email,
+      expiresAt,
+      message: `A 6-digit verification code was sent to ${email}.`,
+    });
   } catch (err) {
     return sendServiceError(res, err, 'We could not complete Google sign-in.');
   }
