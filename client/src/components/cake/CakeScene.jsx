@@ -1094,6 +1094,14 @@ const CakeScene = React.forwardRef(function CakeScene({
   const lastMousePosRef = useRef({ x: 0, y: 0 });
   const cakeConfigRef = useRef(cakeConfig);
   const lastValidGhostDropRef = useRef(null);
+  const dragRef = useRef({
+    isDragging: false,
+    pendingItem: null,
+    item: null,
+    startPos: { x: 0, y: 0 },
+    origCoords: { x: 0, z: 0 },
+    currentDrop: null,
+  });
   const [error, setError] = useState(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [fontsReady, setFontsReady] = useState(() => areFontsReady());
@@ -4645,6 +4653,8 @@ const CakeScene = React.forwardRef(function CakeScene({
       baselineYRef.current = baselineY;
     }
 
+    group.updateMatrixWorld(true);
+
     // Update slot markers and ghost previews after build
     updateSlotVisuals();
     refreshSelectionOverlayRef.current?.();
@@ -4664,12 +4674,13 @@ const CakeScene = React.forwardRef(function CakeScene({
       scene.fog = new THREE.Fog('#FFF5EE', 40, 80);
       sceneRef.current = scene;
 
-      const camera = new THREE.PerspectiveCamera(40, mount.clientWidth / mount.clientHeight, 0.1, 300);
+      const initialAspect = (mount.clientWidth && mount.clientHeight) ? mount.clientWidth / mount.clientHeight : 1.6;
+      const camera = new THREE.PerspectiveCamera(40, initialAspect, 0.1, 300);
       camera.position.set(0, 8, 22);
       camera.lookAt(0, 4, 0);
       cameraRef.current = camera;
 
-      const thumbnailCamera = new THREE.PerspectiveCamera(40, mount.clientWidth / mount.clientHeight, 0.1, 300);
+      const thumbnailCamera = new THREE.PerspectiveCamera(40, initialAspect, 0.1, 300);
       thumbnailCamera.position.set(8, 6, 16);
       thumbnailCamera.lookAt(0, 4, 0);
       thumbnailCameraRef.current = thumbnailCamera;
@@ -4712,6 +4723,7 @@ const CakeScene = React.forwardRef(function CakeScene({
         RIGHT: THREE.MOUSE.PAN,
       };
       controls.update();
+      camera.updateMatrixWorld(true);
 
       scene.add(new THREE.AmbientLight('#FFFFFF', 0.35));
       const mainLight = new THREE.DirectionalLight('#FFFFFF', 1.2);
@@ -4810,6 +4822,7 @@ const CakeScene = React.forwardRef(function CakeScene({
         }
 
         camera.updateProjectionMatrix();
+        camera.updateMatrixWorld(true);
         thumbnailCamera.aspect = aspect;
         thumbnailCamera.updateProjectionMatrix();
         renderer.setSize(w, h);
@@ -4824,9 +4837,13 @@ const CakeScene = React.forwardRef(function CakeScene({
 
       const getMouseNDC = (clientX, clientY) => {
         const rect = mount.getBoundingClientRect();
+        const w = (rect && rect.width > 0) ? rect.width : (mount.clientWidth || 1);
+        const h = (rect && rect.height > 0) ? rect.height : (mount.clientHeight || 1);
+        const left = rect ? rect.left : 0;
+        const top = rect ? rect.top : 0;
         return {
-          x: ((clientX - rect.left) / rect.width) * 2 - 1,
-          y: -((clientY - rect.top) / rect.height) * 2 + 1,
+          x: ((clientX - left) / w) * 2 - 1,
+          y: -((clientY - top) / h) * 2 + 1,
         };
       };
 
@@ -4868,12 +4885,58 @@ const CakeScene = React.forwardRef(function CakeScene({
         for (const hit of hits) {
           let current = hit.object;
           while (current) {
-            if (current.userData?.placedItemId && current.userData.itemType?.startsWith('center-')) {
+            if (current.userData?.placedItemId && (current.userData.itemType?.startsWith('center-') || isPlaceItemTool(current.userData.itemType))) {
               return { id: current.userData.placedItemId, group: current };
             }
             current = current.parent;
           }
         }
+
+        // Footprint proximity fallback: allows clicking small or thin items (cherries, candles, letters) forgivingly
+        const local = raycastLocalXZ(clientX, clientY);
+        if (local) {
+          const placedItems = cakeConfigRef.current?.placedItems || [];
+          const centerDecorScale = topMetricsRef.current?.centerDecorScale ?? 1;
+          let closest = null;
+          let minDistance = Infinity;
+          for (const item of placedItems) {
+            if (!item?.type || !item?.id) continue;
+            const fp = getItemFootprint(item, centerDecorScale);
+            let isInside = false;
+            let dist = 0;
+
+            if (fp.type === 'obb') {
+              const cos = Math.cos(fp.angle || 0);
+              const sin = Math.sin(fp.angle || 0);
+              const dx = local.x - (item.x || 0);
+              const dz = local.z - (item.z || 0);
+              const localX = Math.abs(dx * cos + dz * sin);
+              const localZ = Math.abs(-dx * sin + dz * cos);
+              const tolerance = 0.05;
+              if (localX <= fp.halfLength + tolerance && localZ <= fp.halfWidth + tolerance) {
+                isInside = true;
+                dist = Math.hypot(Math.max(0, localX - fp.halfLength), Math.max(0, localZ - fp.halfWidth));
+              }
+            } else {
+              const d = Math.hypot(local.x - (item.x || 0), local.z - (item.z || 0));
+              const tolerance = 0.05;
+              if (d <= (fp.radius || 0.3) + tolerance) {
+                isInside = true;
+                dist = d;
+              }
+            }
+
+            if (isInside && dist < minDistance) {
+              const node = findSelectableItemAtForId(item.id);
+              if (node) {
+                closest = node;
+                minDistance = dist;
+              }
+            }
+          }
+          if (closest) return closest;
+        }
+
         return null;
       };
 
@@ -4881,7 +4944,7 @@ const CakeScene = React.forwardRef(function CakeScene({
         const overlay = selectionOverlayGroupRef.current;
         if (!overlay) return null;
         clearSelectionOverlay();
-        if (activeToolRef.current || cakeConfigRef.current?.interiorPreview) {
+        if (activeToolRef.current || cakeConfigRef.current?.interiorPreview || dragRef.current.isDragging) {
           renderer.domElement.style.cursor = '';
           return null;
         }
@@ -4914,7 +4977,7 @@ const CakeScene = React.forwardRef(function CakeScene({
         if (!cakeGroupRef.current) return null;
         let match = null;
         cakeGroupRef.current.traverse((object) => {
-          if (!match && object.userData?.placedItemId === itemId && object.userData?.itemType?.startsWith('center-')) {
+          if (!match && object.userData?.placedItemId === itemId) {
             match = { id: itemId, group: object };
           }
         });
@@ -4928,11 +4991,13 @@ const CakeScene = React.forwardRef(function CakeScene({
       // items, oriented bounding boxes for standing Oreos & letters).
       // Acknowledges all available free distance and allows tight placement in available
       // space without penetrating or clashing with neighboring items.
-      const resolveCenterDrop = (designId, orientation, x, z, rotation = 0, tiltX = 0, tiltZ = 0) => {
+      const resolveCenterDrop = (designId, orientation, x, z, rotation = 0, tiltX = 0, tiltZ = 0, ignoreItemId = null) => {
         const placedItems = cakeConfigRef.current?.placedItems || [];
-        const limit = getCenterItemLimit(designId, cakeConfigRef.current?.structure);
-        if (limit !== null && getCenterItemCount(placedItems, designId) >= limit) {
-          return { x, z, valid: false, reason: 'limit' };
+        if (!ignoreItemId) {
+          const limit = getCenterItemLimit(designId, cakeConfigRef.current?.structure);
+          if (limit !== null && getCenterItemCount(placedItems, designId) >= limit) {
+            return { x, z, valid: false, reason: 'limit' };
+          }
         }
 
         if (topMetricsRef.current?.isPetitsFour) {
@@ -4950,6 +5015,7 @@ const CakeScene = React.forwardRef(function CakeScene({
           }
           // On Petits Fours, max placeable center decoration for each petit cake is one
           const alreadyOnPiece = placedItems.some((item) => {
+            if (ignoreItemId && item.id === ignoreItemId) return false;
             const d = Math.hypot((item.x || 0) - targetPiece.x, (item.z || 0) - targetPiece.z);
             return d <= pieceRadius * 1.25;
           });
@@ -4977,6 +5043,7 @@ const CakeScene = React.forwardRef(function CakeScene({
 
         for (const item of placedItems) {
           if (!item?.type) continue;
+          if (ignoreItemId && item.id === ignoreItemId) continue;
           const otherFp = getItemFootprint(item, centerDecorScale);
           if (doFootprintsClash(candidateFp, otherFp, 0.01)) {
             return { x, z, valid: false, reason: 'overlap' };
@@ -4989,7 +5056,7 @@ const CakeScene = React.forwardRef(function CakeScene({
       // Resolves a candidate Place-tab drop point (cherry, strawberry,
       // candle, chocolateChip, rosette, piping): checks boundary and overlap
       // against all items with true geometric footprints.
-      const resolvePlaceItemDrop = (toolType, x, z) => {
+      const resolvePlaceItemDrop = (toolType, x, z, ignoreItemId = null) => {
         const centerDecorScale = topMetricsRef.current?.centerDecorScale ?? 1;
         const candidateFp = getItemFootprint({ type: toolType, x, z }, centerDecorScale);
 
@@ -5008,6 +5075,7 @@ const CakeScene = React.forwardRef(function CakeScene({
         const placedItems = cakeConfigRef.current?.placedItems || [];
         for (const item of placedItems) {
           if (!item?.type) continue;
+          if (ignoreItemId && item.id === ignoreItemId) continue;
           const otherFp = getItemFootprint(item, centerDecorScale);
           if (doFootprintsClash(candidateFp, otherFp, 0.01)) {
             return { x, z, valid: false, reason: 'overlap' };
@@ -5271,6 +5339,98 @@ const CakeScene = React.forwardRef(function CakeScene({
         ghostGroup.add(ghostContainer);
       };
 
+      const updateDragGhost = (clientX, clientY) => {
+        const ghostGroup = ghostGroupRef.current;
+        if (!ghostGroup || !dragRef.current.item) return;
+        clearGhostGroup(ghostGroup);
+        if (cakeConfigRef.current?.interiorPreview) return;
+
+        const item = dragRef.current.item;
+        const local = raycastLocalXZ(clientX, clientY);
+        if (!local) {
+          dragRef.current.currentDrop = { x: dragRef.current.origCoords.x, z: dragRef.current.origCoords.z, valid: false, reason: 'outside' };
+          return;
+        }
+
+        const isCenter = item.type && item.type.startsWith('center-');
+        if (isCenter) {
+          const { designId, orientation } = parseCenterTool(item.type);
+          const rotationRad = item.rotation || 0;
+          const tiltXRad = item.tiltX || 0;
+          const tiltZRad = item.tiltZ || 0;
+          const resolved = resolveCenterDrop(
+            designId,
+            orientation,
+            local.x,
+            local.z,
+            rotationRad,
+            tiltXRad,
+            tiltZRad,
+            item.id
+          );
+          dragRef.current.currentDrop = resolved;
+
+          const centerDecorScale = topMetricsRef.current?.centerDecorScale ?? 1;
+          const isLetter = isButtercreamLetterDesign(designId);
+          const itemColor = isLetter
+            ? (cakeConfigRef.current?.centerTextColor || '#F6DEAB')
+            : (cakeConfigRef.current?.centerDecorationColor || '#F6DEAB');
+          const itemColorId = isLetter
+            ? (item.colorId || item.sugarColor?.colorId || cakeConfigRef.current?.centerTextColorId)
+            : (item.colorId || cakeConfigRef.current?.centerDecorationColorId);
+          const resolvedItemColor = itemColorId
+            ? (SUGAR_COLORS.find((color) => color.id === itemColorId)?.hex || itemColor)
+            : itemColor;
+
+          const rotatedGroup = buildRotatedDecoration(
+            designId,
+            orientation,
+            tiltXRad,
+            rotationRad,
+            centerDecorScale,
+            resolvedItemColor,
+            Math.random,
+            tiltZRad,
+            itemColorId
+          );
+          const y = getDecorationLandingY(rotatedGroup, resolved.x, resolved.z, topMetricsRef.current);
+          rotatedGroup.position.set(resolved.x, y, resolved.z);
+          tintAsGhost(rotatedGroup, resolved.valid);
+          ghostGroup.add(rotatedGroup);
+        } else if (isPlaceItemTool(item.type)) {
+          const toolType = item.type;
+          const resolved = resolvePlaceItemDrop(toolType, local.x, local.z, item.id);
+          dragRef.current.currentDrop = resolved;
+
+          const surfacePt = getCakeTopSurfacePoint(resolved.x, resolved.z, topMetricsRef.current);
+          const surfaceY = surfacePt.y - 0.015;
+
+          const ghostContainer = new THREE.Group();
+          const ghostRand = makePRNG(12345);
+          if (toolType === 'cherry') {
+            addCherry(ghostContainer, resolved.x, surfaceY, resolved.z, ghostRand);
+          } else if (toolType === 'blueberry') {
+            addBlueberry(ghostContainer, resolved.x, surfaceY, resolved.z, ghostRand);
+          } else if (toolType === 'mango' || toolType === 'mangoCube') {
+            addMangoCube(ghostContainer, resolved.x, surfaceY, resolved.z, ghostRand);
+          } else if (toolType === 'strawberry') {
+            addStrawberry(ghostContainer, resolved.x, surfaceY, resolved.z);
+          } else if (toolType === 'candle') {
+            addCandle(ghostContainer, resolved.x, surfaceY, resolved.z, ghostRand);
+          } else if (toolType === 'chocolateChip') {
+            addChocolateChip(ghostContainer, resolved.x, surfaceY, resolved.z);
+          } else if (toolType === 'rosette') {
+            const roseColor = item?.colorId ? (SUGAR_COLORS.find(c => c.id === item.colorId)?.hex || '#FF8BA7') : '#FF8BA7';
+            addRosette(ghostContainer, resolved.x, surfaceY, resolved.z, roseColor);
+          } else if (toolType === 'piping') {
+            const pipeColor = item?.colorId ? (SUGAR_COLORS.find(c => c.id === item.colorId)?.hex || '#FFAB00') : '#FFAB00';
+            addPipingPattern(ghostContainer, resolved.x, surfaceY, resolved.z, item?.pattern || 'shell', pipeColor);
+          }
+          tintAsGhost(ghostContainer, resolved.valid);
+          ghostGroup.add(ghostContainer);
+        }
+      };
+
       refreshGhostRef.current = () => {
         if (cakeConfigRef.current?.interiorPreview) {
           if (ghostGroupRef.current) clearGhostGroup(ghostGroupRef.current);
@@ -5286,12 +5446,54 @@ const CakeScene = React.forwardRef(function CakeScene({
         }
       };
 
+      const handlePointerDownCapture = (e) => {
+        if (disabledRef.current || readOnlyRef.current || e.button !== THREE.MOUSE.LEFT) return;
+        if (activeToolRef.current || cakeConfigRef.current?.interiorPreview) return;
+        const selectable = findSelectableItemAt(e.clientX, e.clientY);
+        if (selectable) {
+          const placedItem = (cakeConfigRef.current?.placedItems || []).find((it) => it.id === selectable.id);
+          if (placedItem) {
+            dragRef.current = {
+              isDragging: false,
+              pendingItem: placedItem,
+              item: null,
+              startPos: { x: e.clientX, y: e.clientY },
+              origCoords: { x: placedItem.x, z: placedItem.z },
+              currentDrop: null,
+            };
+            if (controlsRef.current) {
+              controlsRef.current.enabled = false;
+            }
+          }
+        }
+      };
+
       const handleMouseDown = (e) => {
         if (disabledRef.current || e.button !== THREE.MOUSE.LEFT) return;
         mouseRef.current.isDown = true;
         mouseRef.current.moved = false;
         mouseRef.current.prevX = e.clientX;
         mouseRef.current.prevY = e.clientY;
+
+        if (!activeToolRef.current && !cakeConfigRef.current?.interiorPreview) {
+          const selectable = findSelectableItemAt(e.clientX, e.clientY);
+          if (selectable) {
+            const placedItem = (cakeConfigRef.current?.placedItems || []).find((it) => it.id === selectable.id);
+            if (placedItem) {
+              dragRef.current = {
+                isDragging: false,
+                pendingItem: placedItem,
+                item: null,
+                startPos: { x: e.clientX, y: e.clientY },
+                origCoords: { x: placedItem.x, z: placedItem.z },
+                currentDrop: null,
+              };
+              if (controlsRef.current) {
+                controlsRef.current.enabled = false;
+              }
+            }
+          }
+        }
       };
 
       const handleMouseMove = (e) => {
@@ -5309,6 +5511,27 @@ const CakeScene = React.forwardRef(function CakeScene({
           if (ghostGroupRef.current) clearGhostGroup(ghostGroupRef.current);
           clearSelectionOverlay();
           renderer.domElement.style.cursor = '';
+          return;
+        }
+
+        // Check if pending drag should activate
+        if (dragRef.current.pendingItem && !dragRef.current.isDragging) {
+          const dist = Math.hypot(e.clientX - dragRef.current.startPos.x, e.clientY - dragRef.current.startPos.y);
+          if (dist > 4) {
+            dragRef.current.isDragging = true;
+            dragRef.current.item = dragRef.current.pendingItem;
+            onCenterItemSelectRef.current?.(dragRef.current.item.id);
+            const itemNode = findSelectableItemAtForId(dragRef.current.item.id);
+            if (itemNode?.group) {
+              itemNode.group.visible = false;
+            }
+            clearSelectionOverlay();
+          }
+        }
+
+        if (dragRef.current.isDragging) {
+          updateDragGhost(e.clientX, e.clientY);
+          renderer.domElement.style.cursor = 'grabbing';
           return;
         }
 
@@ -5334,7 +5557,75 @@ const CakeScene = React.forwardRef(function CakeScene({
       };
 
       const handleMouseUp = (e) => {
-        if (disabledRef.current || readOnlyRef.current || cakeConfigRef.current?.interiorPreview) return;
+        if (disabledRef.current || readOnlyRef.current || cakeConfigRef.current?.interiorPreview) {
+          if (controlsRef.current) controlsRef.current.enabled = true;
+          return;
+        }
+
+        const wasDragging = dragRef.current.isDragging;
+        const draggedItem = dragRef.current.item;
+        const currentDrop = dragRef.current.currentDrop;
+
+        if (wasDragging && draggedItem) {
+          const itemNode = findSelectableItemAtForId(draggedItem.id);
+          if (currentDrop && currentDrop.valid) {
+            const nextX = currentDrop.x;
+            const nextZ = currentDrop.z;
+            if (cakeConfigRef.current?.placedItems) {
+              cakeConfigRef.current = {
+                ...cakeConfigRef.current,
+                placedItems: cakeConfigRef.current.placedItems.map((it) =>
+                  it.id === draggedItem.id ? { ...it, x: nextX, z: nextZ } : it
+                ),
+              };
+            }
+            onPlacedItemsChangeRef.current?.((currentItems) =>
+              (currentItems || []).map((it) =>
+                it.id === draggedItem.id ? { ...it, x: nextX, z: nextZ } : it
+              )
+            );
+            if (itemNode?.group) {
+              itemNode.group.visible = true;
+            }
+            onCenterItemSelectRef.current?.(draggedItem.id);
+          } else {
+            // Wasn't able to comply at the green highlight -> bring that selected item back to its original place!
+            if (itemNode?.group) {
+              itemNode.group.visible = true;
+            }
+            onPlacementBlockedRef.current?.(currentDrop?.reason || 'boundary');
+            onCenterItemSelectRef.current?.(draggedItem.id);
+          }
+
+          if (ghostGroupRef.current) {
+            clearGhostGroup(ghostGroupRef.current);
+          }
+
+          dragRef.current = {
+            isDragging: false,
+            pendingItem: null,
+            item: null,
+            startPos: { x: 0, y: 0 },
+            origCoords: { x: 0, z: 0 },
+            currentDrop: null,
+          };
+
+          if (controlsRef.current) controlsRef.current.enabled = true;
+          mouseRef.current.isDown = false;
+          updateSelectionOverlay(e.clientX, e.clientY);
+          return;
+        }
+
+        if (controlsRef.current) controlsRef.current.enabled = true;
+        dragRef.current = {
+          isDragging: false,
+          pendingItem: null,
+          item: null,
+          startPos: { x: 0, y: 0 },
+          origCoords: { x: 0, z: 0 },
+          currentDrop: null,
+        };
+
         const wasDown = mouseRef.current.isDown;
         const wasDrag = mouseRef.current.moved;
         mouseRef.current.isDown = false;
@@ -5364,6 +5655,23 @@ const CakeScene = React.forwardRef(function CakeScene({
       };
       const handleContextMenu = (e) => {
         if (disabledRef.current || readOnlyRef.current || cakeConfigRef.current?.interiorPreview) return;
+        if (dragRef.current.isDragging) {
+          e.preventDefault();
+          const itemNode = findSelectableItemAtForId(dragRef.current.item?.id);
+          if (itemNode?.group) itemNode.group.visible = true;
+          if (ghostGroupRef.current) clearGhostGroup(ghostGroupRef.current);
+          if (controlsRef.current) controlsRef.current.enabled = true;
+          dragRef.current = {
+            isDragging: false,
+            pendingItem: null,
+            item: null,
+            startPos: { x: 0, y: 0 },
+            origCoords: { x: 0, z: 0 },
+            currentDrop: null,
+          };
+          updateSelectionOverlay(e.clientX, e.clientY);
+          return;
+        }
         const moved = Math.hypot(e.clientX - rightDownRef.x, e.clientY - rightDownRef.y) > 5;
         if (moved) return;
         const hasArmedTool = Boolean(activeToolRef.current);
@@ -5382,6 +5690,20 @@ const CakeScene = React.forwardRef(function CakeScene({
       };
 
       const handleMouseLeave = () => {
+        if (dragRef.current.isDragging) {
+          const itemNode = findSelectableItemAtForId(dragRef.current.item?.id);
+          if (itemNode?.group) itemNode.group.visible = true;
+          if (ghostGroupRef.current) clearGhostGroup(ghostGroupRef.current);
+          if (controlsRef.current) controlsRef.current.enabled = true;
+          dragRef.current = {
+            isDragging: false,
+            pendingItem: null,
+            item: null,
+            startPos: { x: 0, y: 0 },
+            origCoords: { x: 0, z: 0 },
+            currentDrop: null,
+          };
+        }
         if (hoveredSlotRef.current) {
           hoveredSlotRef.current = null;
           updateSlotVisuals();
@@ -5416,6 +5738,22 @@ const CakeScene = React.forwardRef(function CakeScene({
 
         if (e.key === 'Escape') {
           e.preventDefault();
+          if (dragRef.current.isDragging) {
+            const itemNode = findSelectableItemAtForId(dragRef.current.item?.id);
+            if (itemNode?.group) itemNode.group.visible = true;
+            if (ghostGroupRef.current) clearGhostGroup(ghostGroupRef.current);
+            if (controlsRef.current) controlsRef.current.enabled = true;
+            dragRef.current = {
+              isDragging: false,
+              pendingItem: null,
+              item: null,
+              startPos: { x: 0, y: 0 },
+              origCoords: { x: 0, z: 0 },
+              currentDrop: null,
+            };
+            refreshSelectionOverlayRef.current?.();
+            return;
+          }
           if (activeToolRef.current) {
             onSelectToolRef.current?.(null);
             activeToolRef.current = null;
@@ -5515,6 +5853,7 @@ const CakeScene = React.forwardRef(function CakeScene({
       el.addEventListener('webglcontextrestored', handleContextRestored, false);
 
       if (!thumbnailMode) {
+        el.addEventListener('pointerdown', handlePointerDownCapture, { capture: true });
         el.addEventListener('mousedown', handleMouseDown);
         el.addEventListener('mousedown', handleRightMouseDown);
         el.addEventListener('contextmenu', handleContextMenu);
@@ -5539,6 +5878,7 @@ const CakeScene = React.forwardRef(function CakeScene({
         el.removeEventListener('webglcontextlost', handleContextLost);
         el.removeEventListener('webglcontextrestored', handleContextRestored);
         if (!thumbnailMode) {
+          el.removeEventListener('pointerdown', handlePointerDownCapture, { capture: true });
           el.removeEventListener('mousedown', handleMouseDown);
           el.removeEventListener('mousedown', handleRightMouseDown);
           el.removeEventListener('contextmenu', handleContextMenu);

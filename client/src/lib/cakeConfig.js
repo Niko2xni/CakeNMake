@@ -772,6 +772,12 @@ export function getItemFootprint(item, centerDecorScale = 1) {
     const parts = toolType.split('-');
     designId = parts[1];
     orientation = parts[2] || item.orientation || 'default';
+  } else if (!designId) {
+    if (toolType === 'mango') {
+      designId = 'mangoCube';
+    } else if (CENTER_ITEM_RADII[toolType] !== undefined) {
+      designId = toolType;
+    }
   }
 
   if (designId) {
@@ -838,7 +844,7 @@ export function getItemFootprint(item, centerDecorScale = 1) {
       x,
       z,
       type: 'circle',
-      radius: PLACE_ITEM_RADII[toolType] * 0.75,
+      radius: PLACE_ITEM_RADII[toolType],
     };
   }
 
@@ -846,7 +852,7 @@ export function getItemFootprint(item, centerDecorScale = 1) {
     x,
     z,
     type: 'circle',
-    radius: 0.5,
+    radius: 0.30,
   };
 }
 
@@ -2743,15 +2749,15 @@ export const PLACEABLE_DECORATIONS = [
 // preview) and PlaceSection.jsx (UI hints) both read from here rather than
 // keeping their own copies.
 export const PLACE_ITEM_RADII = {
-  cherry: 0.50,
-  strawberry: 0.62,
-  blueberry: 0.45,
-  mangoCube: 0.45,
-  mango: 0.45,
-  candle: 0.38,
-  chocolateChip: 0.30,
-  rosette: 0.75,
-  piping: 0.70,
+  cherry: 0.34,
+  strawberry: 0.30,
+  blueberry: 0.25,
+  mangoCube: 0.24,
+  mango: 0.24,
+  candle: 0.16,
+  chocolateChip: 0.20,
+  rosette: 0.48,
+  piping: 0.42,
 };
 
 export function getSlotById(slotId) {

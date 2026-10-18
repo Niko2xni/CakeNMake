@@ -57,14 +57,7 @@ export default function ToolPanel({
   expandedSections: controlledExpandedSections,
   onExpandedSectionsChange,
   onClose,
-  isGlazeDeselectStep = false,
-  isStrawberryPickStep = false,
-  isControlsInteractionStep = false,
-  isSideCheckeredStep = false,
-  isEdgeDesignStep = false,
-  onControlsInteraction,
 }) {
-  const isStepLocked = isGlazeDeselectStep || isStrawberryPickStep || isControlsInteractionStep || isSideCheckeredStep || isEdgeDesignStep;
   const [internalAiThinking, setInternalAiThinking] = useState(false);
   const isAiBusy = Boolean(aiChatSession?.thinking || internalAiThinking);
 
@@ -357,7 +350,7 @@ export default function ToolPanel({
   const suppressClickRef = useRef(false);
 
   const handlePointerDownScroll = useCallback((e) => {
-    if (e.button !== 0 || isSideCheckeredStep) return;
+    if (e.button !== 0) return;
     if (e.target.closest('input, select, textarea, [role="slider"]')) return;
 
     const root = e.currentTarget;
@@ -403,19 +396,6 @@ export default function ToolPanel({
     e.preventDefault();
     e.stopPropagation();
   }, []);
-
-  useEffect(() => {
-    if (!isSideCheckeredStep) return;
-    const preventScroll = (e) => {
-      e.preventDefault();
-    };
-    window.addEventListener('wheel', preventScroll, { passive: false });
-    window.addEventListener('touchmove', preventScroll, { passive: false });
-    return () => {
-      window.removeEventListener('wheel', preventScroll);
-      window.removeEventListener('touchmove', preventScroll);
-    };
-  }, [isSideCheckeredStep]);
 
   const updateContextSugarColor = (context, newSugarColor) => {
     const nextOverrides = { ...(config.sugarColorOverrides || {}) };
@@ -518,13 +498,12 @@ export default function ToolPanel({
         <button
           data-tutorial="mode-design"
           onClick={() => {
-            if (isAiBusy || isStepLocked) return;
+            if (isAiBusy) return;
             setModeUi('design');
           }}
-          disabled={isAiBusy || isStepLocked}
+          disabled={isAiBusy}
           title={isAiBusy ? 'AI is editing the cake. Switching to manual design is locked until it finishes.' : undefined}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
-            (isAiBusy || isStepLocked)
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-sm font-semibold transition-all duration-200 ${(isAiBusy)
               ? 'opacity-40 cursor-not-allowed bg-muted/40 text-muted-foreground'
               : modeUi === 'design'
                 ? 'bg-primary text-primary-foreground shadow-md'
@@ -537,17 +516,12 @@ export default function ToolPanel({
         <button
           data-tutorial="mode-ai"
           onClick={() => {
-            if (isStepLocked) return;
             onSelectTool?.(null);
             setModeUi('ai');
           }}
-          disabled={isStepLocked}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
-            isStepLocked
-              ? 'opacity-40 cursor-not-allowed bg-muted/40 text-muted-foreground'
-              : modeUi === 'ai'
-                ? 'bg-primary text-primary-foreground shadow-md'
-                : 'bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted'
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-sm font-semibold transition-all duration-200 ${modeUi === 'ai'
+              ? 'bg-primary text-primary-foreground shadow-md'
+              : 'bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted'
             }`}
         >
           <Bot className="w-4 h-4" />
@@ -559,8 +533,8 @@ export default function ToolPanel({
         <Button
           variant="ghost"
           size="icon"
-          disabled={isAiBusy || isStepLocked}
-          className={`rounded-full shrink-0 h-9 w-9 ${(isAiBusy || isStepLocked) ? 'opacity-40 cursor-not-allowed' : ''
+          disabled={isAiBusy}
+          className={`rounded-full shrink-0 h-9 w-9 ${(isAiBusy) ? 'opacity-40 cursor-not-allowed' : ''
             } ${config.interiorPreview ? 'text-amber-600' : 'text-muted-foreground hover:text-foreground'
             }`}
           onClick={toggleInteriorPreview}
@@ -575,11 +549,11 @@ export default function ToolPanel({
         <Button
           variant="ghost"
           size="icon"
-          disabled={isAiBusy || isStepLocked}
-          className={`rounded-full text-muted-foreground hover:text-foreground shrink-0 h-9 w-9 ${(isAiBusy || isStepLocked) ? 'opacity-40 cursor-not-allowed' : ''
+          disabled={isAiBusy}
+          className={`rounded-full text-muted-foreground hover:text-foreground shrink-0 h-9 w-9 ${(isAiBusy) ? 'opacity-40 cursor-not-allowed' : ''
             }`}
           onClick={() => {
-            if (isAiBusy || isStepLocked) return;
+            if (isAiBusy) return;
             setShowResetConfirm(true);
           }}
           title={isAiBusy ? 'AI is editing the cake.' : 'Reset Cake Design'}
@@ -591,8 +565,7 @@ export default function ToolPanel({
           <Button
             variant="ghost"
             size="icon"
-            disabled={isStepLocked}
-            className={`rounded-full text-muted-foreground hover:text-foreground shrink-0 h-9 w-9 md:hidden ${isStepLocked ? 'opacity-40 cursor-not-allowed' : ''}`}
+            className="rounded-full text-muted-foreground hover:text-foreground shrink-0 h-9 w-9 md:hidden"
             onClick={onClose}
             title="Close Tools"
             aria-label="Close Tools"
@@ -613,8 +586,8 @@ export default function ToolPanel({
       <div className="relative flex-1 flex flex-col min-h-0">
         <div
           className={`flex-1 flex flex-col min-h-0 transition-all duration-300 ${config.interiorPreview
-              ? 'blur-[3px] opacity-30 pointer-events-none select-none'
-              : ''
+            ? 'blur-[3px] opacity-30 pointer-events-none select-none'
+            : ''
             }`}
           aria-hidden={config.interiorPreview}
         >
@@ -633,7 +606,7 @@ export default function ToolPanel({
             <>
               {/* Scrollable content with drag-to-scroll */}
               <ScrollArea
-                className={`flex-1 ${isSideCheckeredStep ? 'overflow-hidden touch-none' : ''}`}
+                className="flex-1"
                 onPointerDown={handlePointerDownScroll}
                 onClickCapture={handleClickCapture}
               >
@@ -643,19 +616,14 @@ export default function ToolPanel({
                     <button
                       key={id}
                       data-tutorial={`tab-${id}`}
-                      disabled={isStepLocked}
                       onClick={() => {
-                        if (isStepLocked) return;
                         onSelectTool?.(null);
                         setTab(id);
                       }}
                       style={{ zIndex }}
-                      className={`relative flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-lg text-xs font-semibold transition-all duration-200 ${
-                        isStepLocked
-                          ? 'opacity-40 cursor-not-allowed'
-                          : activeTab === id
-                            ? 'bg-card shadow text-foreground'
-                            : 'text-muted-foreground hover:text-foreground'
+                      className={`relative flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-lg text-xs font-semibold transition-all duration-200 ${activeTab === id
+                          ? 'bg-card shadow text-foreground'
+                          : 'text-muted-foreground hover:text-foreground'
                         }`}
                     >
                       <Icon className="w-3.5 h-3.5" />
@@ -697,7 +665,7 @@ export default function ToolPanel({
                   {activeTab === 'fundamentals' && (
                     <>
                       {/* 1. Cake Structure */}
-                      <div ref={registerSectionRef('structure')} className="scroll-mt-4">
+                      <div ref={registerSectionRef('structure')} data-tutorial="section-structure" className="scroll-mt-4">
                         <Collapsible
                           open={expandedSections.structure}
                           onOpenChange={() => toggleSection('structure')}
@@ -715,7 +683,7 @@ export default function ToolPanel({
                               <ChevronDown className="w-4 h-4 text-muted-foreground" />
                             )}
                           </CollapsibleTrigger>
-                          <CollapsibleContent className="mt-3">
+                          <CollapsibleContent data-tutorial="content-structure" className="mt-3">
                             <CakeStructureSection
                               structure={config.structure || DEFAULT_CONFIG.structure}
                               realSize={config.realSize}
@@ -728,7 +696,7 @@ export default function ToolPanel({
                       <Separator className="opacity-50" />
 
                       {/* 2. Sponge Flavor */}
-                      <div ref={registerSectionRef('sponge')} className="scroll-mt-4">
+                      <div ref={registerSectionRef('sponge')} data-tutorial="section-sponge" className="scroll-mt-4">
                         <Collapsible
                           open={expandedSections.sponge}
                           onOpenChange={() => toggleSection('sponge')}
@@ -746,7 +714,7 @@ export default function ToolPanel({
                               <ChevronDown className="w-4 h-4 text-muted-foreground" />
                             )}
                           </CollapsibleTrigger>
-                          <CollapsibleContent className="mt-3">
+                          <CollapsibleContent data-tutorial="content-sponge" className="mt-3">
                             <SpongeFlavorSection
                               sponge={config.sponge || DEFAULT_CONFIG.sponge}
                               structure={config.structure || DEFAULT_CONFIG.structure}
@@ -774,7 +742,7 @@ export default function ToolPanel({
                       <Separator className="opacity-50" />
 
                       {/* 3. Filling */}
-                      <div ref={registerSectionRef('filling')} className="scroll-mt-4">
+                      <div ref={registerSectionRef('filling')} data-tutorial="section-filling" className="scroll-mt-4">
                         <Collapsible
                           open={expandedSections.filling}
                           onOpenChange={() => toggleSection('filling')}
@@ -792,7 +760,7 @@ export default function ToolPanel({
                               <ChevronDown className="w-4 h-4 text-muted-foreground" />
                             )}
                           </CollapsibleTrigger>
-                          <CollapsibleContent className="mt-3">
+                          <CollapsibleContent data-tutorial="content-filling" className="mt-3">
                             <FillingSection
                               filling={config.filling || DEFAULT_CONFIG.filling}
                               structure={config.structure || DEFAULT_CONFIG.structure}
@@ -816,7 +784,7 @@ export default function ToolPanel({
                       <Separator className="opacity-50" />
 
                       {/* 4. Exterior Finish */}
-                      <div ref={registerSectionRef('exteriorFinish')} className="scroll-mt-4">
+                      <div ref={registerSectionRef('exteriorFinish')} data-tutorial="section-exteriorFinish" className="scroll-mt-4">
                         <Collapsible
                           open={expandedSections.exteriorFinish}
                           onOpenChange={() => toggleSection('exteriorFinish')}
@@ -834,7 +802,7 @@ export default function ToolPanel({
                               <ChevronDown className="w-4 h-4 text-muted-foreground" />
                             )}
                           </CollapsibleTrigger>
-                          <CollapsibleContent className="mt-3">
+                          <CollapsibleContent data-tutorial="content-exteriorFinish" className="mt-3">
                             <ExteriorFinishSection
                               exterior={config.exteriorFinish || DEFAULT_CONFIG.exteriorFinish}
                               structure={config.structure || DEFAULT_CONFIG.structure}
@@ -902,7 +870,7 @@ export default function ToolPanel({
                       together with Surface Treatment rather than lingering
                       on screen as its own standalone block when this
                       section is closed. */}
-                      <div ref={registerSectionRef('surfaceTreatment')} data-tutorial="section-surface-treatment" className="scroll-mt-4">
+                      <div ref={registerSectionRef('surfaceTreatment')} data-tutorial="section-surfaceTreatment" className="scroll-mt-4">
                         <Collapsible
                           open={expandedSections.surfaceTreatment}
                           onOpenChange={() => toggleSection('surfaceTreatment')}
@@ -920,7 +888,7 @@ export default function ToolPanel({
                               <ChevronDown className="w-4 h-4 text-muted-foreground" />
                             )}
                           </CollapsibleTrigger>
-                          <CollapsibleContent className="mt-3">
+                          <CollapsibleContent data-tutorial="content-surfaceTreatment" className="mt-3">
                             {/* Wrapped in the same space-y-4 container Filling/
                           Exterior Finish use around their own SugarColorSection
                           sibling — SurfaceTreatmentSection's own space-y-4
@@ -968,9 +936,6 @@ export default function ToolPanel({
                         onItemSelect={onCenterItemSelect}
                         onDeleteSelectedItem={onDeleteSelectedCenterItem}
                         onTextColorModeChange={onCenterTextColorModeChange}
-                        isStrawberryPickStep={isStrawberryPickStep}
-                        isControlsInteractionStep={isControlsInteractionStep}
-                        onControlsInteraction={onControlsInteraction}
                         sugarColor={config.sugarColorOverrides?.center || DEFAULT_CONFIG.sugarColor}
                         onSugarColorChange={(newSugarColor) => onChange({
                           ...config,

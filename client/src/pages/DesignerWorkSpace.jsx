@@ -200,13 +200,26 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
   const isInitialMountRef = useRef(true);
   const isLoadingRef = useRef(false);
 
-  // Designer Tutorial state
+  // ── Designer Tutorial ───────────────────────────────────────────────
+  // Driven entirely by TUTORIAL_STEPS (see tutorialSteps.js). The workspace only does three
+  // generic things: apply a step's `setup`, lock the page to the step's `allow` list, and
+  // watch the step's `done` condition. The user's own cake is backed up on start and
+  // restored on finish/skip, so the tutorial always runs on a separate default cake.
+  const TUTORIAL_DONE_KEY = 'cakenmake_has_completed_tutorial';
+  const TUTORIAL_SECTION_KEYS = ['structure', 'sponge', 'filling', 'exteriorFinish', 'surfaceTreatment'];
+  const TUTORIAL_CANVAS_SELECTOR = '[data-tutorial="cake-canvas"] canvas';
+  const TUTORIAL_LOCKABLE =
+    'button, a, input, select, textarea, label, canvas, [role="button"], [role="slider"], [role="tab"], [role="switch"], [role="checkbox"], [data-radix-collection-item]';
+
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [tutorialStepIndex, setTutorialStepIndex] = useState(0);
-  const [tutorialActionActive, setTutorialActionActive] = useState(false);
-  const [tutorialActionPerformed, setTutorialActionPerformed] = useState(false);
-  const [hasControlsInteracted, setHasControlsInteracted] = useState(false);
+  const [tutorialStepDone, setTutorialStepDone] = useState(false);
+  const [tutorialEvents, setTutorialEvents] = useState({});
   const preTutorialStateRef = useRef(null);
+  const tutorialStartRef = useRef(null);
+  const hasAutoStartedTutorialRef = useRef(false);
+  const tutorialStep = tutorialOpen ? TUTORIAL_STEPS[tutorialStepIndex] || null : null;
+  const tutorialLockCamera = Boolean(tutorialStep?.lockCamera);
 
   const restorePreTutorialState = useCallback(() => {
     if (preTutorialStateRef.current) {
@@ -230,299 +243,39 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
     }
   }, []);
 
-  const syncWorkspaceForTutorialStep = useCallback((stepIndex) => {
-    const step = TUTORIAL_STEPS[stepIndex];
-    const stepId = step?.id;
-
-    if (
-      stepId === '3d-camera-controls' ||
-      stepId === 'price-breakdown-info' ||
-      stepId === 'intro' ||
-      stepId === 'design-mode'
-    ) {
-      setActiveTab('fundamentals');
-      setToolPanelModeUi('design');
-      setPanelOpen(true);
-      // All collapsible sections closed during initial mode intros
-      setExpandedSections({
-        structure: false,
-        sponge: false,
-        filling: false,
-        exteriorFinish: false,
-        surfaceTreatment: false,
-      });
-      setConfig(structuredClone(INITIAL_CONFIG));
-      if (stepId === '3d-camera-controls') {
-        cakeSceneRef.current?.resetCamera?.();
-      }
-      setTimeout(() => {
-        const viewport = document.querySelector('[data-tutorial="toolpanel"] [data-radix-scroll-area-viewport]');
-        if (viewport) viewport.scrollTo({ top: 0, behavior: 'smooth' });
-      }, 50);
-    } else if (stepId === 'ai-mode') {
-      setToolPanelModeUi('ai');
-      setPanelOpen(true);
-      setExpandedSections({
-        structure: false,
-        sponge: false,
-        filling: false,
-        exteriorFinish: false,
-        surfaceTreatment: false,
-      });
-      setConfig(structuredClone(INITIAL_CONFIG));
-    } else if (stepId === 'fundamentals-defaulted') {
-      // Step 4 in display: "Cake Fundamentals & Defaults"
-      setActiveTab('fundamentals');
-      setToolPanelModeUi('design');
-      setPanelOpen(true);
-      setExpandedSections({
-        structure: true,
-        sponge: true,
-        filling: true,
-        exteriorFinish: true,
-        surfaceTreatment: true,
-      });
-      setConfig(structuredClone(INITIAL_CONFIG));
-      setTimeout(() => {
-        const viewport = document.querySelector('[data-tutorial="toolpanel"] [data-radix-scroll-area-viewport]');
-        if (viewport) viewport.scrollTo({ top: 0, behavior: 'smooth' });
-      }, 50);
-    } else if (stepId === 'surface-treatment-deselection' || stepId === 'surface-treatment-deselect-action') {
-      // Step "Deselecting Options" & "Deselect with 'X'"
-      setActiveTab('fundamentals');
-      setToolPanelModeUi('design');
-      setPanelOpen(true);
-      setExpandedSections({
-        structure: false,
-        sponge: false,
-        filling: false,
-        exteriorFinish: false,
-        surfaceTreatment: true,
-      });
-      // Ensure glaze option is active on the tutorial cake to show the "X" and patterns
-      setConfig((prev) => {
-        return {
-          ...prev,
-          surfaceTreatment: {
-            mode: 'glaze',
-            pattern: prev.surfaceTreatment?.pattern || 'longGaps',
-            layerTreatments: [
-              { mode: 'glaze', pattern: 'longGaps' },
-              { mode: 'glaze', pattern: 'longGaps' },
-            ],
-          },
-        };
-      });
-      setTimeout(() => {
-        const toggleBtn = document.querySelector('[data-tutorial="surface-treatment-toggle"]');
-        if (toggleBtn) {
-          toggleBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        } else {
-          const target = document.querySelector('[data-tutorial="section-surface-treatment"]');
-          if (target) {
-            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        }
-      }, 60);
-    } else if (stepId === 'surface-treatment-deselected-result') {
-      // Step "Deselecting Function" - Glaze has been removed
-      setActiveTab('fundamentals');
-      setToolPanelModeUi('design');
-      setPanelOpen(true);
-      setExpandedSections({
-        structure: false,
-        sponge: false,
-        filling: false,
-        exteriorFinish: false,
-        surfaceTreatment: true,
-      });
-      // Ensure glaze is cleared so 3D render cleanly displays cake without glaze
-      setConfig((prev) => ({
-        ...prev,
-        surfaceTreatment: {
-          mode: null,
-          pattern: 'longGaps',
-          layerTreatments: [
-            { mode: null, pattern: 'longGaps' },
-            { mode: null, pattern: 'longGaps' },
-          ],
-        },
-      }));
-    } else if (stepId === 'side-tab-explore') {
-      // Step 5: Side, Edge & Center Tabs
-      setActiveTab('fundamentals');
-      setToolPanelModeUi('design');
-      setPanelOpen(true);
-      // Clean cake sponge without glaze
-      setConfig(structuredClone(INITIAL_CONFIG));
-      setTimeout(() => {
-        const viewport = document.querySelector('[data-tutorial="toolpanel"] [data-radix-scroll-area-viewport]');
-        if (viewport) viewport.scrollTo({ top: 0, behavior: 'smooth' });
-      }, 50);
-    } else if (stepId === 'surface-sugar-color') {
-      // Step 6: "Sugar Color Focus"
-      setActiveTab('fundamentals');
-      setToolPanelModeUi('design');
-      setPanelOpen(true);
-      setExpandedSections({
-        structure: false,
-        sponge: false,
-        filling: false,
-        exteriorFinish: false,
-        surfaceTreatment: true,
-      });
-      setConfig((prev) => {
-        return {
-          ...prev,
-          surfaceTreatment: {
-            mode: 'glaze',
-            pattern: 'longGaps',
-            layerTreatments: [
-              { mode: 'glaze', pattern: 'longGaps' },
-              { mode: 'glaze', pattern: 'longGaps' },
-            ],
-          },
-        };
-      });
-      // Scroll to the Sugar Color section so it is visible right under the Design / AI bar!
-      const scrollToSugar = () => {
-        const sugarColorEl = document.querySelector('[data-tutorial="surface-sugar-color"]');
-        if (sugarColorEl) {
-          sugarColorEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        } else {
-          const target = document.querySelector('[data-tutorial="section-surface-treatment"]');
-          if (target) {
-            target.scrollIntoView({ behavior: 'smooth', block: 'end' });
-          }
-        }
-      };
-      setTimeout(scrollToSugar, 80);
-      setTimeout(scrollToSugar, 250);
-    } else if (stepId === 'side-checkered-select') {
-      // Step 7: Open Side tab & select Checkered Pattern design
-      setActiveTab('side');
-      setToolPanelModeUi('design');
-      setPanelOpen(true);
-      // Clear previous side mode so user selects a checkered design
-      setConfig((prev) => ({
-        ...prev,
-        side: { ...(prev.side || DEFAULT_CONFIG.side), mode: null },
-      }));
-      setTimeout(() => {
-        const checkeredEl = document.querySelector('[data-tutorial="side-checkered-row"]');
-        if (checkeredEl) checkeredEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }, 60);
-    } else if (stepId === 'edge-toggle-intro') {
-      // Step 8a: Open Edge tab & show Top and Bottom toggles
-      setActiveTab('edge');
-      setToolPanelModeUi('design');
-      setPanelOpen(true);
-      setActiveEdgeSlot('top');
-      setConfig((prev) => ({
-        ...prev,
-        edge: {
-          ...(prev.edge || DEFAULT_CONFIG.edge),
-          mode: 'topBottomSeparate',
-          activeSlot: 'top',
-        },
-      }));
-      setTimeout(() => {
-        const toggleRow = document.querySelector('[data-tutorial="edge-toggle-row"]');
-        if (toggleRow) toggleRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }, 60);
-    } else if (stepId === 'edge-top-select') {
-      // Step 8b: Select Top Border Piping
-      setActiveTab('edge');
-      setToolPanelModeUi('design');
-      setPanelOpen(true);
-      setActiveEdgeSlot('top');
-      setConfig((prev) => ({
-        ...prev,
-        edge: {
-          ...(prev.edge || DEFAULT_CONFIG.edge),
-          mode: 'topBottomSeparate',
-          activeSlot: 'top',
-          top: { ...(prev.edge?.top || {}), piping: { tip: null, colorId: 'vanilla' } },
-        },
-      }));
-      setTimeout(() => {
-        const edgePipingEl = document.querySelector('[data-tutorial="edge-piping-row"]');
-        if (edgePipingEl) edgePipingEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }, 60);
-    } else if (stepId === 'edge-bottom-toggle') {
-      // Step 8c: Force user to press Bottom toggle button
-      setActiveTab('edge');
-      setToolPanelModeUi('design');
-      setPanelOpen(true);
-      setActiveEdgeSlot('top');
-      setConfig((prev) => ({
-        ...prev,
-        edge: {
-          ...(prev.edge || DEFAULT_CONFIG.edge),
-          mode: 'topBottomSeparate',
-          activeSlot: 'top',
-        },
-      }));
-      setTimeout(() => {
-        const bottomToggle = document.querySelector('[data-tutorial="edge-toggle-bottom"]');
-        if (bottomToggle) bottomToggle.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }, 60);
-    } else if (stepId === 'center-intro') {
-      // Step 9a: Introduce Center drag-and-drop
-      setActiveTab('center');
-      setToolPanelModeUi('design');
-      setPanelOpen(true);
+  // Put the workspace into the state a step expects.
+  const applyTutorialSetup = useCallback((step) => {
+    const s = step?.setup || {};
+    if (s.tab) setActiveTab(s.tab);
+    setToolPanelModeUi(s.mode || 'design');
+    setPanelOpen(true);
+    if (s.expand) {
+      setExpandedSections(Object.fromEntries(
+        TUTORIAL_SECTION_KEYS.map((key) => [key, s.expand !== 'none' && s.expand.includes(key)])
+      ));
+    }
+    if (s.edgeSlot) setActiveEdgeSlot(s.edgeSlot);
+    if (s.patch) setConfig((prev) => s.patch(prev, INITIAL_CONFIG));
+    if (s.tool === 'strawberry') {
+      setActiveTool((prev) => (
+        prev && typeof prev === 'object' && String(prev.type || '').startsWith('center-strawberry')
+          ? prev
+          : { type: 'center-strawberry-default', rotationY: 0, rotationX: 0, rotationZ: 0 }
+      ));
+    } else {
       setActiveTool(null);
-      setSelectedCenterItemId(null);
+    }
+    if (!s.keepSelection) setSelectedCenterItemId(null);
+    if (s.camera === 'reset') cakeSceneRef.current?.resetCamera?.();
+    if (s.scrollTop) {
       setTimeout(() => {
-        const decorGrid = document.querySelector('[data-tutorial="center-decor-grid"]');
-        if (decorGrid) decorGrid.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }, 60);
-    } else if (stepId === 'center-strawberry-pt1') {
-      // Step 9a: Pick Strawberry
-      setActiveTab('center');
-      setToolPanelModeUi('design');
-      setPanelOpen(true);
-      setActiveTool(null);
-      setTimeout(() => {
-        const strawberryEl = document.querySelector('[data-tutorial="center-strawberry"]');
-        if (strawberryEl) strawberryEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        document.querySelector('[data-tutorial="toolpanel"] [data-radix-scroll-area-viewport]')?.scrollTo({ top: 0, behavior: 'smooth' });
       }, 50);
-    } else if (
-      stepId === 'center-strawberry-pt2-preview' ||
-      stepId === 'center-strawberry-shortcuts' ||
-      stepId === 'decor-controls-tip'
-    ) {
-      // Step 9b & 9c: Rotate, Tilt & Preview and Design Controls & Shortcuts (normal camera!)
-      setActiveTab('center');
-      setToolPanelModeUi('design');
-      setPanelOpen(true);
-      setActiveTool((prev) => (prev && typeof prev === 'object' && prev.type === 'center-strawberry-default')
-        ? prev
-        : { type: 'center-strawberry-default', rotationY: 0, rotationX: 0, rotationZ: 0 }
-      );
-      setTimeout(() => {
-        const controlsEl = document.querySelector('[data-tutorial="center-item-controls"]');
-        if (controlsEl) controlsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }, 60);
-    } else if (stepId === 'center-strawberry-drop') {
-      // Step 9d: Drop on Canvas (camera will pan and lock to top angle!)
-      setActiveTab('center');
-      setToolPanelModeUi('design');
-      setPanelOpen(true);
-      setActiveTool((prev) => (prev && typeof prev === 'object' && prev.type === 'center-strawberry-default')
-        ? prev
-        : { type: 'center-strawberry-default', rotationY: 0, rotationX: 0, rotationZ: 0 }
-      );
-    } else if (stepId === 'send-bakery') {
-      // Step 10: Send to Bakery (camera restored)
-      setActiveTool(null);
-      setSelectedCenterItemId(null);
     }
   }, []);
 
   const handleStartTutorial = useCallback(() => {
-    // 1. Back up existing user design & UI state
+    // 1. Back up the user's design + UI state
     preTutorialStateRef.current = {
       config: structuredClone(config),
       title,
@@ -539,300 +292,157 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
       hasUnsavedChanges,
     };
 
-    // 2. Set tutorial active flags
-    setTutorialStepIndex(0);
-    setTutorialActionActive(false);
-    setTutorialActionPerformed(false);
-
-    // 3. Clear undo/redo stacks & active tool for clean tutorial cake
+    // 2. Fresh default cake for the tutorial; clean history
     placeUndoStackRef.current = [];
     placeRedoStackRef.current = [];
-    setActiveTool(null);
-    setSelectedCenterItemId(null);
     setPlaceHistoryVersion((v) => v + 1);
-
-    // 4. Initialize fresh clean default cake for the tutorial
     setConfig(structuredClone(INITIAL_CONFIG));
+    setActiveLayer(0);
 
-    // 5. ToolPanel: first step has everything closed from its collapse
-    syncWorkspaceForTutorialStep(0);
+    // 3. First step
+    setTutorialStepIndex(0);
+    setTutorialStepDone(false);
+    setTutorialEvents({});
+    applyTutorialSetup(TUTORIAL_STEPS[0]);
 
-    // 6. Suppress unsaved changes flag while in tutorial
+    // 4. No unsaved-changes noise while in the tutorial
     setSaveStatus('saved');
     setHasUnsavedChanges(false);
-
     setTutorialOpen(true);
   }, [
-    config,
-    title,
-    activeTab,
-    activeLayer,
-    activeEdgeSlot,
-    toolPanelModeUi,
-    expandedSections,
-    activeTool,
-    selectedCenterItemId,
-    saveStatus,
-    hasUnsavedChanges,
-    syncWorkspaceForTutorialStep,
+    config, title, activeTab, activeLayer, activeEdgeSlot, toolPanelModeUi, expandedSections,
+    activeTool, selectedCenterItemId, saveStatus, hasUnsavedChanges, applyTutorialSetup,
   ]);
+  tutorialStartRef.current = handleStartTutorial;
 
   const handleTutorialStepChange = useCallback((nextIndex) => {
-    setTutorialStepIndex(nextIndex);
-    const nextStep = TUTORIAL_STEPS[nextIndex];
-    if (
-      nextStep?.id !== 'center-strawberry-pt2-preview' &&
-      nextStep?.id !== 'center-strawberry-shortcuts' &&
-      nextStep?.id !== 'center-strawberry-drop'
-    ) {
-      setActiveTool(null);
-    }
-    setTutorialActionActive(Boolean(nextStep?.requiresAction));
-    setTutorialActionPerformed(false);
-    setHasControlsInteracted(false);
-    syncWorkspaceForTutorialStep(nextIndex);
-  }, [syncWorkspaceForTutorialStep]);
+    const next = Math.max(0, Math.min(TUTORIAL_STEPS.length - 1, nextIndex));
+    setTutorialStepIndex(next);
+    setTutorialStepDone(false);
+    setTutorialEvents({});
+    applyTutorialSetup(TUTORIAL_STEPS[next]);
+  }, [applyTutorialSetup]);
 
-  const handleTutorialComplete = useCallback(() => {
+  const finishTutorial = useCallback(() => {
     setTutorialOpen(false);
-    setTutorialActionActive(false);
+    setTutorialStepDone(false);
+    setTutorialEvents({});
     restorePreTutorialState();
     try {
-      localStorage.setItem('cakenmake_has_completed_tutorial', 'true');
-    } catch (e) {}
+      localStorage.setItem(TUTORIAL_DONE_KEY, 'true');
+    } catch (e) { }
   }, [restorePreTutorialState]);
 
-  const handleTutorialSkip = useCallback(() => {
-    setTutorialOpen(false);
-    setTutorialActionActive(false);
-    restorePreTutorialState();
+  // First-time users start the tutorial automatically (or via ?tutorial=true).
+  // Returning users, and anyone opening a saved design, can replay it from the header button.
+  useEffect(() => {
+    if (tutorialOpen || hasAutoStartedTutorialRef.current) return undefined;
+    const forced = searchParams.get('tutorial') === 'true';
+    let seen = false;
     try {
-      localStorage.setItem('cakenmake_has_completed_tutorial', 'true');
-    } catch (e) {}
-  }, [restorePreTutorialState]);
+      seen = localStorage.getItem(TUTORIAL_DONE_KEY) === 'true';
+    } catch (e) { }
+    if (!forced && (seen || searchParams.get('designId'))) return undefined;
+    const timer = setTimeout(() => {
+      if (hasAutoStartedTutorialRef.current) return;
+      hasAutoStartedTutorialRef.current = true;
+      tutorialStartRef.current?.();
+    }, forced ? 0 : 900);
+    return () => clearTimeout(timer);
+  }, [searchParams, tutorialOpen]);
 
-  const isGlazeDeselectStep = Boolean(
-    tutorialOpen && TUTORIAL_STEPS[tutorialStepIndex]?.id === 'surface-treatment-deselect-action'
-  );
-
-  const isSideCheckeredStep = Boolean(
-    tutorialOpen && TUTORIAL_STEPS[tutorialStepIndex]?.id === 'side-checkered-select'
-  );
-
-  const isEdgeTopStep = Boolean(
-    tutorialOpen && TUTORIAL_STEPS[tutorialStepIndex]?.id === 'edge-top-select'
-  );
-
-  const isEdgeBottomToggleStep = Boolean(
-    tutorialOpen && TUTORIAL_STEPS[tutorialStepIndex]?.id === 'edge-bottom-toggle'
-  );
-
-  const isEdgeDesignStep = isEdgeTopStep || isEdgeBottomToggleStep;
-
-  const isStrawberryPickStep = Boolean(
-    tutorialOpen &&
-    (TUTORIAL_STEPS[tutorialStepIndex]?.id === 'center-strawberry-pt1' ||
-     TUTORIAL_STEPS[tutorialStepIndex]?.actionInstruction === 'Click the Strawberry item below to pick it up.')
-  );
-
-  const isControlsInteractionStep = Boolean(
-    tutorialOpen &&
-    (TUTORIAL_STEPS[tutorialStepIndex]?.id === 'center-strawberry-shortcuts' ||
-     TUTORIAL_STEPS[tutorialStepIndex]?.id === 'decor-controls-tip')
-  );
-
-  const isStrawberryDropStep = Boolean(
-    tutorialOpen && TUTORIAL_STEPS[tutorialStepIndex]?.id === 'center-strawberry-drop'
-  );
-
-  const hasTriggeredUrlTutorialRef = useRef(false);
-
-  // Auto-advance when "X" button is clicked in Step 4 to deselect glaze
+  // Completion by state or workspace event
   useEffect(() => {
-    if (tutorialOpen && TUTORIAL_STEPS[tutorialStepIndex]?.id === 'surface-treatment-deselect-action') {
-      const isGlazeActive = Boolean(
-        config.surfaceTreatment?.mode === 'glaze' ||
-        (config.surfaceTreatment?.layerTreatments || []).some((t) => t?.mode === 'glaze')
-      );
-      if (!isGlazeActive) {
-        setTutorialActionPerformed(true);
-        const timer = setTimeout(() => {
-          handleTutorialStepChange(tutorialStepIndex + 1);
-        }, 350);
-        return () => clearTimeout(timer);
-      }
+    if (!tutorialStep || tutorialStep.kind !== 'try' || tutorialStepDone) return;
+    const done = tutorialStep.done || {};
+    const ctx = { config, activeTool, selectedCenterItemId, activeTab, activeEdgeSlot };
+    if ((done.when && done.when(ctx)) || (done.event && tutorialEvents[done.event])) {
+      setTutorialStepDone(true);
     }
-  }, [tutorialOpen, tutorialStepIndex, config.surfaceTreatment, handleTutorialStepChange]);
+  }, [tutorialStep, tutorialStepDone, tutorialEvents, config, activeTool, selectedCenterItemId, activeTab, activeEdgeSlot]);
 
-  // Auto-advance when Checkered Pattern design is selected in Step 7
+  // Lock + interaction watcher for 'try' steps. Everything interactive is blocked except the
+  // step's `allow` selectors (and the tutorial card). Clicks / gestures / keys on allowed
+  // regions are what complete click-, touch- and gesture-type steps.
   useEffect(() => {
-    if (tutorialOpen && TUTORIAL_STEPS[tutorialStepIndex]?.id === 'side-checkered-select') {
-      if (config.side?.mode === 'checkeredPattern') {
-        setTutorialActionPerformed(true);
-        const timer = setTimeout(() => {
-          handleTutorialStepChange(tutorialStepIndex + 1);
-        }, 350);
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [tutorialOpen, tutorialStepIndex, config.side?.mode, handleTutorialStepChange]);
+    if (!tutorialStep || tutorialStep.kind !== 'try') return undefined;
+    const allow = tutorialStep.allow || [];
+    const block = tutorialStep.block || [];
+    const done = tutorialStep.done || {};
+    const inAny = (el, selectors) => selectors.some((sel) => el.closest(sel));
+    const markDone = () => setTutorialStepDone(true);
+    let clicks = 0;
 
-  // Auto-advance when Top Edge design is selected in Step 8b
-  useEffect(() => {
-    if (tutorialOpen && TUTORIAL_STEPS[tutorialStepIndex]?.id === 'edge-top-select') {
-      const hasTopPiping = Boolean(config.edge?.top?.piping?.tip);
-      if (hasTopPiping) {
-        setTutorialActionPerformed(true);
-        const timer = setTimeout(() => {
-          handleTutorialStepChange(tutorialStepIndex + 1);
-        }, 350);
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [tutorialOpen, tutorialStepIndex, config.edge?.top?.piping?.tip, handleTutorialStepChange]);
+    const guard = (e) => {
+      const el = e.target;
+      if (!(el instanceof Element)) return;
+      if (el.closest('[data-tutorial-card="true"]')) return;
 
-  // Auto-advance when Bottom toggle button is clicked in Step 8c
-  useEffect(() => {
-    if (tutorialOpen && TUTORIAL_STEPS[tutorialStepIndex]?.id === 'edge-bottom-toggle') {
-      const isBottomActive = Boolean(
-        activeEdgeSlot === 'bottom' || config.edge?.activeSlot === 'bottom'
-      );
-      if (isBottomActive) {
-        setTutorialActionPerformed(true);
-        const timer = setTimeout(() => {
-          handleTutorialStepChange(tutorialStepIndex + 1);
-        }, 350);
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [tutorialOpen, tutorialStepIndex, activeEdgeSlot, config.edge?.activeSlot, handleTutorialStepChange]);
-
-  // Auto-advance when Strawberry is picked up in Step 9a
-  useEffect(() => {
-    if (tutorialOpen && activeTool && TUTORIAL_STEPS[tutorialStepIndex]?.id === 'center-strawberry-pt1') {
-      setTutorialActionPerformed(true);
-      // Automatically advance to preview step once the strawberry is picked up
-      handleTutorialStepChange(tutorialStepIndex + 1);
-    }
-  }, [tutorialOpen, activeTool, tutorialStepIndex, handleTutorialStepChange]);
-
-  // Keyboard interaction listener for shortcuts step (Q, E, W, S, A, D)
-  useEffect(() => {
-    if (!isControlsInteractionStep) return;
-    const handleControlsKeyDown = (e) => {
-      const key = e.key?.toLowerCase();
-      if (['q', 'e', 'w', 's', 'a', 'd'].includes(key)) {
-        setHasControlsInteracted(true);
-      }
-    };
-    window.addEventListener('keydown', handleControlsKeyDown);
-    return () => window.removeEventListener('keydown', handleControlsKeyDown);
-  }, [isControlsInteractionStep]);
-
-  // Global click & pointer capture:
-  // Strictly isolate clickable targets to only what's required for each tutorial step
-  useEffect(() => {
-    if (
-      !isGlazeDeselectStep &&
-      !isStrawberryPickStep &&
-      !isControlsInteractionStep &&
-      !isSideCheckeredStep &&
-      !isEdgeTopStep &&
-      !isEdgeBottomToggleStep &&
-      !isStrawberryDropStep
-    ) return;
-
-    const handleGlobalClickCapture = (e) => {
-      // 1. Tutorial modal card buttons (Back, Skip, Continue) are always permitted
-      if (e.target.closest('[data-tutorial-card="true"]')) return;
-
-      // 2. Home button is permitted
-      const isHome = e.target.closest('[data-tutorial-home="true"]') || e.target.closest('a[title="Back to home"]');
-      if (isHome) return;
-
-      if (isGlazeDeselectStep) {
-        // Only the glaze toggle "X" button is permitted
-        if (
-          e.target.closest('[data-tutorial="surface-treatment-toggle"]') ||
-          e.target.closest('[data-glaze-toggle="true"]')
-        ) {
-          return;
+      const blocked = block.length > 0 && inAny(el, block);
+      if (!blocked && inAny(el, allow)) {
+        if (e.type === 'click' && done.click && el.closest(done.click)) {
+          clicks += 1;
+          if (clicks >= (done.count || 1)) markDone();
         }
+        if ((e.type === 'pointerdown' || e.type === 'click') && done.touch && el.closest(done.touch)) markDone();
+        return;
       }
-
-      if (isSideCheckeredStep) {
-        // Only Checkered Pattern buttons in Side section are permitted
-        if (e.target.closest('[data-side-checkered="true"]') || e.target.closest('[data-tutorial^="side-checkered-"]')) {
-          return;
-        }
-      }
-
-      if (isEdgeTopStep) {
-        // Only Edge design buttons in Edge section are permitted for top
-        if (e.target.closest('[data-edge-design="true"]') || e.target.closest('[data-tutorial^="edge-piping-"]')) {
-          return;
-        }
-      }
-
-      if (isEdgeBottomToggleStep) {
-        // Only Bottom toggle button is permitted
-        if (
-          e.target.closest('[data-tutorial="edge-toggle-bottom"]') ||
-          (e.target.closest('[data-edge-toggle="true"]') && e.target.textContent?.toLowerCase()?.includes('bottom'))
-        ) {
-          return;
-        }
-      }
-
-      if (isStrawberryPickStep) {
-        // Strawberry decor card is permitted
-        const isStrawberry = e.target.closest('[data-tutorial="center-strawberry"]');
-        if (isStrawberry) return;
-      }
-
-      if (isControlsInteractionStep) {
-        // Rotate and Tilts controls in toolpanel are permitted!
-        if (e.target.closest('[data-tutorial="center-item-controls"]')) {
-          // Block Cancel and Delete buttons inside ArmedItemControls so user doesn't accidentally cancel/delete while interacting
-          if (e.target.closest('button[title*="Cancel"]') || e.target.closest('button[title*="Delete"]')) {
-            e.preventDefault();
-            e.stopPropagation();
-            return;
-          }
-          setHasControlsInteracted(true);
-          return;
-        }
-      }
-
-      if (isStrawberryDropStep) {
-        // 3D Canvas clicks are permitted to drop the strawberry
-        if (e.target.closest('canvas') || e.target.closest('[data-tutorial="cake-canvas"]')) {
-          return;
-        }
-      }
-
-      // Disable / prevent all other interactive elements across the screen
-      const clickable = e.target.closest('button, a, input, select, textarea, [role="button"]');
-      if (clickable) {
+      if (blocked || el.closest(TUTORIAL_LOCKABLE)) {
         e.preventDefault();
         e.stopPropagation();
       }
     };
 
-    window.addEventListener('click', handleGlobalClickCapture, true);
-    window.addEventListener('pointerdown', handleGlobalClickCapture, true);
-    return () => {
-      window.removeEventListener('click', handleGlobalClickCapture, true);
-      window.removeEventListener('pointerdown', handleGlobalClickCapture, true);
+    // Camera gestures on the 3D canvas
+    const pointers = new Map();
+    let gestureMode = 'rotate';
+    const onDown = (e) => {
+      if (!(e.target instanceof Element) || !e.target.closest(TUTORIAL_CANVAS_SELECTOR)) return;
+      pointers.set(e.pointerId, { x0: e.clientX, y0: e.clientY, moved: false });
+      gestureMode = (e.button === 2 || e.ctrlKey || e.shiftKey || e.metaKey) ? 'pan' : 'rotate';
     };
-  }, [isGlazeDeselectStep, isStrawberryPickStep, isControlsInteractionStep, isSideCheckeredStep, isEdgeTopStep, isEdgeBottomToggleStep, isEdgeDesignStep, isStrawberryDropStep]);
+    const onMove = (e) => {
+      const p = pointers.get(e.pointerId);
+      if (!p || p.moved) return;
+      if (Math.hypot(e.clientX - p.x0, e.clientY - p.y0) < 14) return;
+      p.moved = true;
+      if (pointers.size >= 2) {
+        if (done.gesture === 'zoom' || done.gesture === 'pan') markDone();
+      } else if (done.gesture === gestureMode) {
+        markDone();
+      }
+    };
+    const onUp = (e) => pointers.delete(e.pointerId);
+    const onWheel = (e) => {
+      if (done.gesture === 'zoom' && e.target instanceof Element && e.target.closest(TUTORIAL_CANVAS_SELECTOR)) markDone();
+    };
+    const onKey = (e) => {
+      if (!done.keys || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.target instanceof Element && e.target.closest('input, textarea')) return;
+      if (done.keys.includes(String(e.key).toLowerCase())) markDone();
+    };
 
-  useEffect(() => {
-    if (searchParams.get('tutorial') === 'true' && !hasTriggeredUrlTutorialRef.current && !tutorialOpen) {
-      hasTriggeredUrlTutorialRef.current = true;
-      handleStartTutorial();
+    window.addEventListener('click', guard, true);
+    window.addEventListener('pointerdown', guard, true);
+    if (done.gesture) {
+      window.addEventListener('pointerdown', onDown, true);
+      window.addEventListener('pointermove', onMove, true);
+      window.addEventListener('pointerup', onUp, true);
+      window.addEventListener('pointercancel', onUp, true);
+      window.addEventListener('wheel', onWheel, { capture: true, passive: true });
     }
-  }, [searchParams, handleStartTutorial, tutorialOpen]);
+    if (done.keys) window.addEventListener('keydown', onKey, true);
+    return () => {
+      window.removeEventListener('click', guard, true);
+      window.removeEventListener('pointerdown', guard, true);
+      window.removeEventListener('pointerdown', onDown, true);
+      window.removeEventListener('pointermove', onMove, true);
+      window.removeEventListener('pointerup', onUp, true);
+      window.removeEventListener('pointercancel', onUp, true);
+      window.removeEventListener('wheel', onWheel, true);
+      window.removeEventListener('keydown', onKey, true);
+    };
+  }, [tutorialStep]);
 
   const handleModeUiChange = useCallback((next) => {
     if (aiChatSession?.thinking && next === 'design') {
@@ -1432,7 +1042,8 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
 
   const handlePlace = useCallback((item) => {
     if (tutorialOpen) {
-      setTutorialActionPerformed(true);
+      setTutorialEvents((prev) => ({ ...prev, place: true }));
+      setActiveTool(null);
     }
     setPlaceItems(prevItems => {
       if (item?.type && typeof item.type === 'string' && item.type.startsWith('center-')) {
@@ -1461,20 +1072,50 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
       }
 
       const id = `${item.type || 'item'}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      if (tutorialOpen && TUTORIAL_STEPS[tutorialStepIndex]?.id === 'center-strawberry-drop') {
-        setSelectedCenterItemId(id);
-        setActiveTool(null);
-        handleTutorialStepChange(tutorialStepIndex + 1);
-      }
       return [...prevItems, { ...item, id }];
     });
-  }, [setPlaceItems, setActiveTool, config?.structure, tutorialOpen, tutorialStepIndex, handleTutorialStepChange]);
+  }, [setPlaceItems, setActiveTool, config?.structure, tutorialOpen]);
 
   const handleDeleteSelectedCenterItem = useCallback(() => {
     if (!selectedCenterItemId) return;
     setPlaceItems((items) => items.filter((item) => item.id !== selectedCenterItemId));
     setSelectedCenterItemId(null);
   }, [selectedCenterItemId, setPlaceItems]);
+
+  const handleCenterItemSelect = useCallback((id) => {
+    setSelectedCenterItemId(id);
+    if (!id) return;
+
+    setActiveTab('center');
+
+    setConfig((prev) => {
+      const items = prev.place?.items || [];
+      const item = items.find((it) => it.id === id);
+      if (!item) return prev;
+
+      const isLetter = typeof item.type === 'string' && (item.type.startsWith('center-letter') || item.type.startsWith('letter-'));
+      const isVariation = item.source === 'variation' || item.source?.startsWith('variation') || (typeof item.id === 'string' && item.id.startsWith('center-var-'));
+
+      let nextMode = 'decorations';
+      if (isVariation) {
+        nextMode = 'variations';
+      } else if (isLetter) {
+        nextMode = 'text';
+      }
+
+      const currentCenter = prev.center || {};
+      if (currentCenter.mode === nextMode) return prev;
+
+      return {
+        ...prev,
+        center: {
+          ...currentCenter,
+          mode: nextMode,
+          ...(nextMode === 'text' ? { textCategory: 'buttercream' } : {}),
+        },
+      };
+    });
+  }, []);
 
   const handleCenterTextColorModeChange = useCallback((nextMode) => {
     setConfig((prev) => {
@@ -1546,9 +1187,8 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
           <Link
             to={account ? (account.role?.startsWith('bakery') ? '/bakery' : '/client') : '/'}
             data-tutorial-home="true"
-            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-primary flex items-center justify-center shadow-md shadow-primary/20 hover:bg-primary/90 transition-colors cursor-pointer shrink-0 ${
-              isControlsInteractionStep ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''
-            }`}
+            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-primary flex items-center justify-center shadow-md shadow-primary/20 hover:bg-primary/90 transition-colors cursor-pointer shrink-0 ${tutorialOpen ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''
+              }`}
             title="Back to home"
           >
             <Home className="w-4 h-4 text-primary-foreground" />
@@ -1556,8 +1196,8 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
           <Input
             ref={titleRef}
             value={title}
-            readOnly={orderComplete || isStrawberryPickStep || isControlsInteractionStep}
-            disabled={orderComplete || isStrawberryPickStep || isControlsInteractionStep}
+            readOnly={orderComplete || tutorialOpen}
+            disabled={orderComplete || tutorialOpen}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
@@ -1606,12 +1246,10 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
           {!orderComplete && (
             <Button
               onClick={handleStartTutorial}
-              disabled={aiChatSession?.thinking || isStrawberryPickStep || isControlsInteractionStep}
+              disabled={aiChatSession?.thinking || tutorialOpen}
               variant="outline"
               size="sm"
-              className={`flex items-center gap-1.5 rounded-xl font-semibold text-muted-foreground hover:text-foreground hover:border-primary/50 ${
-                (isStrawberryPickStep || isControlsInteractionStep) ? 'opacity-40 cursor-not-allowed' : ''
-              }`}
+              className="flex items-center gap-1.5 rounded-xl font-semibold text-muted-foreground hover:text-foreground hover:border-primary/50"
               title="Interactive Designer Tutorial"
               aria-label="Interactive Designer Tutorial"
             >
@@ -1624,12 +1262,10 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
           {!account && !orderComplete && (
             <Button
               onClick={handleGuestLogin}
-              disabled={aiChatSession?.thinking || isStrawberryPickStep || isControlsInteractionStep}
+              disabled={aiChatSession?.thinking || tutorialOpen}
               variant="outline"
               size="sm"
-              className={`flex items-center gap-1.5 rounded-xl font-semibold text-primary border-primary/30 hover:bg-primary/10 ${
-                (isStrawberryPickStep || isControlsInteractionStep) ? 'opacity-40 cursor-not-allowed' : ''
-              }`}
+              className="flex items-center gap-1.5 rounded-xl font-semibold text-primary border-primary/30 hover:bg-primary/10"
               title="Log in to your account"
             >
               <LogIn className="w-4 h-4" />
@@ -1641,10 +1277,8 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
           {!orderComplete && (
             <Button
               onClick={handleSaveDesign}
-              disabled={saveStatus === 'saving' || aiChatSession?.thinking || isStrawberryPickStep || isControlsInteractionStep}
-              className={`flex items-center gap-2 rounded-xl font-semibold ${
-                (isStrawberryPickStep || isControlsInteractionStep) ? 'opacity-40 cursor-not-allowed' : ''
-              }`}
+              disabled={saveStatus === 'saving' || aiChatSession?.thinking || tutorialOpen}
+              className="flex items-center gap-2 rounded-xl font-semibold"
               size="sm"
               variant="outline"
               title={aiChatSession?.thinking ? 'AI is currently editing the cake' : undefined}
@@ -1669,11 +1303,9 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
           {!orderComplete && (
             <Button
               onClick={handleSendToBakery}
-              disabled={aiChatSession?.thinking || isStrawberryPickStep || isControlsInteractionStep}
+              disabled={aiChatSession?.thinking}
               data-tutorial="send-bakery"
-              className={`flex items-center gap-2 rounded-xl font-semibold ${
-                (isStrawberryPickStep || isControlsInteractionStep) ? 'opacity-40 cursor-not-allowed' : ''
-              }`}
+              className="flex items-center gap-2 rounded-xl font-semibold"
               size="sm"
               title={aiChatSession?.thinking ? 'AI is currently editing the cake' : undefined}
             >
@@ -1690,6 +1322,7 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
         {/* 3D View - Top screen on mobile, left workspace on desktop */}
         <motion.div
           ref={cakeContainerRef}
+          data-tutorial="cake-canvas"
           className="flex-1 min-h-0 relative h-1/2 md:h-full"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -1705,10 +1338,10 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
             onSelectTool={setActiveTool}
             onPlacementBlocked={handlePlacementBlocked}
             selectedCenterItemId={selectedCenterItemId}
-            onCenterItemSelect={setSelectedCenterItemId}
+            onCenterItemSelect={handleCenterItemSelect}
             onDeleteCenterItem={handleDeleteSelectedCenterItem}
             onPlacedItemsChange={setPlaceItems}
-            lockCameraAngle={tutorialOpen && Boolean(TUTORIAL_STEPS[tutorialStepIndex]?.id === 'center-strawberry-drop')}
+            lockCameraAngle={tutorialLockCamera}
           />
 
           <Button
@@ -1716,20 +1349,19 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
             data-tutorial="reset-view"
             variant="outline"
             size="sm"
-            disabled={isBreakdownOpen || isStrawberryPickStep || isControlsInteractionStep || (tutorialOpen && Boolean(TUTORIAL_STEPS[tutorialStepIndex]?.id === 'center-strawberry-drop'))}
+            disabled={isBreakdownOpen || tutorialLockCamera}
             onClick={() => cakeSceneRef.current?.resetCamera()}
             title="Reset camera perspective"
             aria-label="Reset camera perspective"
-            className={`absolute top-4 right-4 z-10 gap-2 rounded-xl border-border/70 bg-card/90 px-3 shadow-sm backdrop-blur-sm hover:bg-card ${
-              (isStrawberryPickStep || isControlsInteractionStep || (tutorialOpen && Boolean(TUTORIAL_STEPS[tutorialStepIndex]?.id === 'center-strawberry-drop'))) ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''
-            }`}
+            className={`absolute top-4 right-4 z-10 gap-2 rounded-xl border-border/70 bg-card/90 px-3 shadow-sm backdrop-blur-sm hover:bg-card ${tutorialLockCamera ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''
+              }`}
           >
             <RotateCcw className="h-4 w-4" />
             <span className="hidden sm:inline">Reset view</span>
           </Button>
 
           {/* Pricing panel */}
-          <div data-tutorial="price-breakdown" className={`absolute top-4 left-4 z-10 ${(isStrawberryPickStep || isControlsInteractionStep) ? 'pointer-events-none opacity-50' : ''}`}>
+          <div data-tutorial="price-breakdown" className="absolute top-4 left-4 z-10">
             <PricingPanel quote={quote} loading={quoteLoading} error={quoteError} onOpenChange={setIsBreakdownOpen} />
           </div>
 
@@ -1818,7 +1450,7 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
               canPlaceUndo={placeUndoStackRef.current.length > 0}
               canPlaceRedo={placeRedoStackRef.current.length > 0}
               selectedCenterItemId={selectedCenterItemId}
-              onCenterItemSelect={setSelectedCenterItemId}
+              onCenterItemSelect={handleCenterItemSelect}
               onDeleteSelectedCenterItem={handleDeleteSelectedCenterItem}
               onCenterTextColorModeChange={handleCenterTextColorModeChange}
               tab={activeTab}
@@ -1831,12 +1463,6 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
               onModeUiChange={handleModeUiChange}
               expandedSections={expandedSections}
               onExpandedSectionsChange={setExpandedSections}
-              isGlazeDeselectStep={isGlazeDeselectStep}
-              isStrawberryPickStep={isStrawberryPickStep}
-              isControlsInteractionStep={isControlsInteractionStep}
-              isSideCheckeredStep={isSideCheckeredStep}
-              isEdgeDesignStep={isEdgeDesignStep}
-              onControlsInteraction={() => setHasControlsInteracted(true)}
             />
           </div>
         )}
@@ -1872,14 +1498,10 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
       <DesignerTutorial
         isOpen={tutorialOpen}
         currentStepIndex={tutorialStepIndex}
-        isActionActive={tutorialActionActive}
-        hasPerformedAction={tutorialActionPerformed}
-        activeTool={activeTool}
-        hasControlsInteracted={hasControlsInteracted}
+        isStepDone={tutorialStepDone}
         onStepChange={handleTutorialStepChange}
-        onStartStepAction={() => setTutorialActionActive(true)}
-        onComplete={handleTutorialComplete}
-        onSkip={handleTutorialSkip}
+        onComplete={finishTutorial}
+        onSkip={finishTutorial}
       />
     </div>
   );

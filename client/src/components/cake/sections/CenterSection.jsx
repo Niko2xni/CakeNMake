@@ -56,23 +56,12 @@ function ArmedItemControls({
   onCancel,
   onDelete,
   canDelete = false,
-  isControlsInteractionStep = false,
-  onControlsInteraction,
 }) {
   if (!armedDesign) return null;
 
-  const handleSetRotation = (val) => {
-    onControlsInteraction?.();
-    setArmedRotation(val);
-  };
-  const handleSetTilt = (val) => {
-    onControlsInteraction?.();
-    setArmedTilt(val);
-  };
-  const handleSetRoll = (val) => {
-    onControlsInteraction?.();
-    setArmedRoll(val);
-  };
+  const handleSetRotation = setArmedRotation;
+  const handleSetTilt = setArmedTilt;
+  const handleSetRoll = setArmedRoll;
 
   return (
     <div data-tutorial="center-item-controls" className="flex flex-col md:flex-col gap-2.5">
@@ -97,11 +86,8 @@ function ArmedItemControls({
             <button
               type="button"
               onClick={onCancel}
-              disabled={isControlsInteractionStep}
               title="Cancel selection"
-              className={`flex-1 h-8 px-2 rounded-lg border border-border/80 bg-muted/60 hover:bg-muted text-xs font-semibold text-foreground flex items-center justify-center gap-1 transition-colors ${
-                isControlsInteractionStep ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''
-              }`}
+              className="flex-1 h-8 px-2 rounded-lg border border-border/80 bg-muted/60 hover:bg-muted text-xs font-semibold text-foreground flex items-center justify-center gap-1 transition-colors"
             >
               <X className="w-3.5 h-3.5" />
               <span>Cancel</span>
@@ -109,11 +95,9 @@ function ArmedItemControls({
             <button
               type="button"
               onClick={onDelete}
-              disabled={!canDelete || isControlsInteractionStep}
+              disabled={!canDelete}
               title={canDelete ? "Delete item" : "No placed item to delete"}
-              className={`flex-1 h-8 px-2 rounded-lg border border-destructive/30 bg-destructive/10 hover:bg-destructive/20 text-xs font-semibold text-destructive disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1 transition-colors ${
-                isControlsInteractionStep ? 'pointer-events-none' : ''
-              }`}
+              className="flex-1 h-8 px-2 rounded-lg border border-destructive/30 bg-destructive/10 hover:bg-destructive/20 text-xs font-semibold text-destructive disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1 transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span>Delete</span>
@@ -251,10 +235,10 @@ function LetterButton({ letter, isArmed, isArmedTool = false, disabled = false, 
       onContextMenu={onContextMenu}
       title={isArmedTool ? `Remove ${letter.label}` : letter.label}
       className={`aspect-square rounded-lg text-sm font-bold transition-all duration-150 border-2 ${disabled
-          ? 'opacity-40 cursor-not-allowed bg-muted border-transparent text-muted-foreground'
-          : isArmed
-            ? 'bg-primary text-primary-foreground border-primary shadow-md scale-[1.05]'
-            : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
+        ? 'opacity-40 cursor-not-allowed bg-muted border-transparent text-muted-foreground'
+        : isArmed
+          ? 'bg-primary text-primary-foreground border-primary shadow-md scale-[1.05]'
+          : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
         }`}
     >
       {/* armLetterTool deselects the armed tool when its own letter is
@@ -322,8 +306,8 @@ function LetterGroup({
                       type="button"
                       onClick={onToggleTextColorMode}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold border-2 transition-all duration-200 ${textColorMode === 'individual'
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
                         }`}
                     >
                       {textColorMode === 'individual'
@@ -458,13 +442,29 @@ export default function CenterSection({
   const selectedCenterItem = placedItems.find((item) => item.id === selectedItemId) || null;
   const isSelectedDecoration = Boolean(selectedCenterItem && !isLetterToolType(selectedCenterItem.type));
   const isSelectedLetter = Boolean(selectedCenterItem && isLetterToolType(selectedCenterItem.type));
+  const isSelectedVariation = Boolean(selectedCenterItem && selectedCenterItem.source === 'variation');
 
   const activeLetterToolId = (selectionMode === 'selection' && isSelectedLetter)
     ? selectedCenterItem?.type
     : (armedCenterType && isLetterToolType(armedCenterType) ? armedCenterType : null);
 
   const selectedDecorationDesign = isSelectedDecoration
-    ? CENTER_PLACEABLE_DESIGNS.find((d) => d.toolId === selectedCenterItem.type)
+    ? (
+        CENTER_PLACEABLE_DESIGNS.find((d) => d.toolId === selectedCenterItem.type)
+        || CENTER_PLACEABLE_DESIGNS.find((d) => d.designId === selectedCenterItem.type)
+        || CENTER_PLACEABLE_DESIGNS.find((d) => d.toolId === `center-${selectedCenterItem.type}-default`)
+        || (selectedCenterItem.variationType
+            ? CENTER_PLACEABLE_DESIGNS.find((d) => d.designId === selectedCenterItem.variationType)
+            : null)
+        || (selectedCenterItem.type?.startsWith('center-')
+            ? {
+                designId: selectedCenterItem.type.replace(/^center-/, '').replace(/-default$/, '').replace(/-standing$/, ''),
+                orientation: selectedCenterItem.type.includes('-standing') ? 'standing' : null,
+                label: 'Decoration',
+                toolId: selectedCenterItem.type,
+              }
+            : null)
+      )
     : null;
   const selectedLetterDesign = isSelectedLetter
     ? BUTTERCREAM_LETTERS.find((letter) => letter.toolId === selectedCenterItem.type)
@@ -477,18 +477,70 @@ export default function CenterSection({
   // Automatically switch tab if an item on the cake is selected
   React.useEffect(() => {
     if (selectedCenterItem) {
-      if (isLetterToolType(selectedCenterItem.type) && mode !== 'text') {
+      const isVariation = selectedCenterItem.source === 'variation' || selectedCenterItem.source?.startsWith('variation') || (typeof selectedCenterItem.id === 'string' && selectedCenterItem.id.startsWith('center-var-'));
+      const isLetter = isLetterToolType(selectedCenterItem.type);
+
+      if (isLetter && mode !== 'text') {
         onChange({ ...center, mode: 'text', textCategory: 'buttercream' });
-      } else if (
-        !isLetterToolType(selectedCenterItem.type) &&
-        !selectedCenterItem.source?.startsWith('variation') &&
-        mode !== 'decorations' &&
-        mode !== 'variations'
-      ) {
+      } else if (isVariation && mode !== 'variations') {
+        onChange({ ...center, mode: 'variations' });
+      } else if (!isLetter && !isVariation && mode !== 'decorations') {
         onChange({ ...center, mode: 'decorations' });
       }
     }
   }, [selectedCenterItem, mode]);
+
+  const resetVariationItems = () => {
+    onItemSelect?.(null);
+    const decorations = getCenterVariations(structure);
+    for (const decoration of decorations) {
+      const currentSetId = center.variations?.[decoration.id]?.setId || center.variations?.[decoration.id];
+      if (currentSetId) {
+        const variant = decoration.sets.find((s) => s.id === currentSetId);
+        if (variant) {
+          const newItems = variant.placements.map((p, idx) => ({
+            id: `center-var-${decoration.id}-${Date.now()}-${idx}`,
+            type: p.type || p.toolId || decoration.toolId,
+            x: p.x,
+            z: p.z,
+            rotation: p.rotation || 0,
+            tiltX: p.tiltX || 0,
+            tiltZ: p.tiltZ || 0,
+            source: 'variation',
+            variationType: decoration.id,
+            variationId: variant.id,
+          }));
+          onPlacedItemsChange?.((currentItems) => {
+            const withoutExisting = currentItems.filter((item) => item.source !== 'variation');
+            return [...withoutExisting, ...newItems];
+          });
+          break;
+        }
+      }
+    }
+  };
+
+  const hasMovedVariationItems = React.useMemo(() => {
+    if (!placedVariationItems.length) return false;
+    const decorations = getCenterVariations(structure);
+    for (const item of placedVariationItems) {
+      if (!item.variationType || !item.variationId) continue;
+      const dec = decorations.find((d) => d.id === item.variationType);
+      const variant = dec?.sets.find((s) => s.id === item.variationId);
+      if (!variant) continue;
+      const match = item.id.match(/-(\d+)$/);
+      if (match) {
+        const idx = parseInt(match[1], 10);
+        const origP = variant.placements[idx];
+        if (origP) {
+          if (Math.abs(item.x - origP.x) > 0.005 || Math.abs(item.z - origP.z) > 0.005) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }, [placedVariationItems, structure]);
 
   const clearVariationItems = () => {
     onItemSelect?.(null);
@@ -723,42 +775,33 @@ export default function CenterSection({
         <div className="flex gap-1 bg-muted/40 rounded-xl p-1">
           <button
             type="button"
-            disabled={isStrawberryPickStep || isControlsInteractionStep}
+            data-tutorial="center-tab-decorations"
             onClick={switchToDecorations}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
-              (isStrawberryPickStep || isControlsInteractionStep)
-                ? 'opacity-40 cursor-not-allowed bg-transparent text-muted-foreground'
-                : mode === 'decorations'
-                  ? 'bg-card shadow text-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
+            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${mode === 'decorations'
+                ? 'bg-card shadow text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
               }`}
           >
             Decorations
           </button>
           <button
             type="button"
-            disabled={isStrawberryPickStep || isControlsInteractionStep}
+            data-tutorial="center-tab-text"
             onClick={switchToText}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
-              (isStrawberryPickStep || isControlsInteractionStep)
-                ? 'opacity-40 cursor-not-allowed bg-transparent text-muted-foreground'
-                : mode === 'text'
-                  ? 'bg-card shadow text-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
+            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${mode === 'text'
+                ? 'bg-card shadow text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
               }`}
           >
             Text
           </button>
           <button
             type="button"
-            disabled={isStrawberryPickStep || isControlsInteractionStep}
+            data-tutorial="center-tab-variations"
             onClick={switchToVariations}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
-              (isStrawberryPickStep || isControlsInteractionStep)
-                ? 'opacity-40 cursor-not-allowed bg-transparent text-muted-foreground'
-                : mode === 'variations'
-                  ? 'bg-card shadow text-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
+            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${mode === 'variations'
+                ? 'bg-card shadow text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
               }`}
           >
             Variations
@@ -788,8 +831,6 @@ export default function CenterSection({
             onCancel={handleCancel}
             onDelete={handleDelete}
             canDelete={canDeleteDecor}
-            isControlsInteractionStep={isControlsInteractionStep}
-            onControlsInteraction={onControlsInteraction}
           />
 
           {placedDecorationItems.length > 0 && (
@@ -810,7 +851,7 @@ export default function CenterSection({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-2">
+          <div data-tutorial="center-decor-grid" className="grid grid-cols-2 gap-2">
             {CENTER_PLACEABLE_DESIGNS.map((design) => {
               const isArmed = armedCenterType === design.toolId;
               const limit = getCenterItemLimit(design.designId, structure);
@@ -837,10 +878,10 @@ export default function CenterSection({
                         : design.label
                   }
                   className={`flex flex-col items-center justify-between gap-1.5 rounded-xl p-3 text-center transition-all duration-200 border-2 ${isDisabled
-                      ? 'opacity-40 cursor-not-allowed bg-muted/40 border-dashed border-border/60 text-muted-foreground'
-                      : isArmed
-                        ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-[1.02]'
-                        : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
+                    ? 'opacity-40 cursor-not-allowed bg-muted/40 border-dashed border-border/60 text-muted-foreground'
+                    : isArmed
+                      ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-[1.02]'
+                      : 'bg-muted border-transparent hover:border-primary/30 text-foreground hover:bg-muted/80'
                     }`}
                 >
                   {/* armDecorationTool disarms the armed design when its own
@@ -860,10 +901,10 @@ export default function CenterSection({
                   {limit !== null && (
                     <span
                       className={`text-[10px] font-medium px-2 py-0.5 rounded-full transition-colors ${isMaxReached
-                          ? 'bg-destructive/15 text-destructive font-semibold'
-                          : isArmed
-                            ? 'bg-primary-foreground/20 text-primary-foreground'
-                            : 'bg-background/80 text-muted-foreground'
+                        ? 'bg-destructive/15 text-destructive font-semibold'
+                        : isArmed
+                          ? 'bg-primary-foreground/20 text-primary-foreground'
+                          : 'bg-background/80 text-muted-foreground'
                         }`}
                     >
                       {count} / {limit}{isMaxReached ? ' • Max' : ''}
@@ -950,18 +991,53 @@ export default function CenterSection({
 
       {mode === 'variations' && (
         <div className="space-y-4">
+          {selectionMode === 'selection' && selectedItemId && isSelectedDecoration && (
+            <div className="flex items-center gap-1.5 rounded-lg bg-primary/10 border border-primary/20 px-2.5 py-1.5 text-xs text-primary">
+              <MousePointer2 className="w-3.5 h-3.5 shrink-0" />
+              <span>{isSelectedVariation ? 'Variation item selected — drag to reposition' : 'Decoration selected on cake'}</span>
+            </div>
+          )}
+
+          <ArmedItemControls
+            armedDesign={decorControlsDesign}
+            previewColor={previewColor}
+            previewColorId={previewColorId}
+            armedRotation={decorControlsRotation}
+            armedTilt={decorControlsTilt}
+            armedRoll={decorControlsRoll}
+            setArmedRotation={setArmedRotation}
+            setArmedTilt={setArmedTilt}
+            setArmedRoll={setArmedRoll}
+            onCancel={handleCancel}
+            onDelete={handleDelete}
+            canDelete={canDeleteDecor}
+            isControlsInteractionStep={isControlsInteractionStep}
+            onControlsInteraction={onControlsInteraction}
+          />
+
           {placedVariationItems.length > 0 && (
             <div className="flex items-center justify-between pt-1">
               <span className="text-xs text-muted-foreground">
                 {placedVariationItems.length} placed
               </span>
-              <button
-                type="button"
-                onClick={clearVariationItems}
-                className="text-xs font-semibold text-destructive hover:underline"
-              >
-                Clear All
-              </button>
+              <div className="flex items-center gap-3">
+                {hasMovedVariationItems && (
+                  <button
+                    type="button"
+                    onClick={resetVariationItems}
+                    className="text-xs font-semibold text-primary hover:underline"
+                  >
+                    Reset Layout
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={clearVariationItems}
+                  className="text-xs font-semibold text-destructive hover:underline"
+                >
+                  Clear All
+                </button>
+              </div>
             </div>
           )}
 
@@ -1018,8 +1094,8 @@ function Circle({ active, canDeselect = false, onClick, title, children }) {
       onClick={onClick}
       title={title}
       className={`relative w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${active
-          ? 'bg-primary text-primary-foreground border-primary shadow-md'
-          : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
+        ? 'bg-primary text-primary-foreground border-primary shadow-md'
+        : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
         }`}
     >
       <OptionButtonContent selected={active} canDeselect={canDeselect} label={title}>

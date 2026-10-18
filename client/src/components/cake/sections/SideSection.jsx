@@ -91,7 +91,7 @@ export default function SideSection({ side, structure, activeLayer = 0, onChange
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-tutorial="side-options">
       {/* Side Treatment */}
       <div>
         <div className="space-y-4">
@@ -131,19 +131,19 @@ export default function SideSection({ side, structure, activeLayer = 0, onChange
                         sugarColor={activeChevronColorSlot === 'primary'
                           ? sugarColor
                           : {
-                              mode: activeSide.chevronPattern?.secondaryColorMode || 'colorOverride',
-                              colorId: activeSide.chevronPattern?.secondaryColorId || 'red',
-                            }}
+                            mode: activeSide.chevronPattern?.secondaryColorMode || 'colorOverride',
+                            colorId: activeSide.chevronPattern?.secondaryColorId || 'red',
+                          }}
                         onChange={activeChevronColorSlot === 'primary'
                           ? onSugarColorChange
                           : (nextSugarColor) => updateSide({
-                              ...activeSide,
-                              chevronPattern: {
-                                ...activeSide.chevronPattern,
-                                secondaryColorId: nextSugarColor.colorId || 'red',
-                                secondaryColorMode: nextSugarColor.mode || 'colorOverride',
-                              },
-                            })}
+                            ...activeSide,
+                            chevronPattern: {
+                              ...activeSide.chevronPattern,
+                              secondaryColorId: nextSugarColor.colorId || 'red',
+                              secondaryColorMode: nextSugarColor.mode || 'colorOverride',
+                            },
+                          })}
                       />
                     ) : (
                       <SugarColorSection
@@ -193,22 +193,20 @@ function ChevronTwoToneColorSection({ activeSlot, onSlotChange, sugarColor, onCh
         <button
           type="button"
           onClick={() => onSlotChange('primary')}
-          className={`py-2 px-3 rounded-lg text-left transition-all duration-150 border-2 ${
-            activeSlot === 'primary'
+          className={`py-2 px-3 rounded-lg text-left transition-all duration-150 border-2 ${activeSlot === 'primary'
               ? 'bg-primary text-primary-foreground border-primary shadow-md'
               : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
-          }`}
+            }`}
         >
           <span className="block text-xs font-semibold">1st Color</span>
         </button>
         <button
           type="button"
           onClick={() => onSlotChange('secondary')}
-          className={`py-2 px-3 rounded-lg text-left transition-all duration-150 border-2 ${
-            activeSlot === 'secondary'
+          className={`py-2 px-3 rounded-lg text-left transition-all duration-150 border-2 ${activeSlot === 'secondary'
               ? 'bg-primary text-primary-foreground border-primary shadow-md'
               : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
-          }`}
+            }`}
         >
           <span className="block text-xs font-semibold">2nd Color</span>
         </button>
@@ -240,11 +238,10 @@ function Circle({ active, canDeselect = false, onClick, title, children, ...rest
       onClick={onClick}
       title={title}
       {...rest}
-      className={`relative w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${
-        active
+      className={`relative w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${active
           ? 'bg-primary text-primary-foreground border-primary shadow-md'
           : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
-      }`}
+        }`}
     >
       <OptionButtonContent selected={active} canDeselect={canDeselect} label={title}>
         {children}
