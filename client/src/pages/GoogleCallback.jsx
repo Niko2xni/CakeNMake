@@ -1,7 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { signInWithCustomToken } from 'firebase/auth';
-import { auth, firebaseConfigured } from '@/lib/firebase';
 import { authApi } from '@/services/api';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -52,13 +50,24 @@ export default function GoogleCallback() {
 
     async function completeSignIn() {
       try {
-        if (!firebaseConfigured || !auth) {
-          throw new Error('Firebase is not configured for this application.');
+        const response = await authApi.exchangeGoogleCode(code, redirectUri);
+        const email = response?.email;
+        const expiresAt = response?.expiresAt;
+
+        if (!email) {
+          throw new Error('Could not retrieve email from Google verification.');
         }
 
-        const { token } = await authApi.exchangeGoogleCode(code, redirectUri);
-        await signInWithCustomToken(auth, token);
-        navigate(returnPath, { replace: true });
+        const targetDestination = (!returnPath || returnPath === '/login-success') ? '/login' : returnPath;
+        navigate(targetDestination, {
+          replace: true,
+          state: {
+            email,
+            expiresAt,
+            otpSent: true,
+            guestAuthOpen: true,
+          },
+        });
       } catch (err) {
         console.error('Google callback error:', err);
         setError(err.message || 'Google sign-in could not be completed.');
@@ -88,7 +97,7 @@ export default function GoogleCallback() {
       ) : (
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-9 h-9 animate-spin text-primary" />
-          <p className="text-sm font-medium text-muted-foreground">Completing Google sign-in…</p>
+          <p className="text-sm font-medium text-muted-foreground">Verifying Google account and sending verification code…</p>
         </div>
       )}
     </div>

@@ -1,4 +1,4 @@
-export function redirectToGoogleOAuth(returnPath = '/login-success') {
+export function redirectToGoogleOAuth(returnPath = '/login') {
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   if (!clientId) {
     throw new Error('Google Client ID is not configured. Add VITE_GOOGLE_CLIENT_ID to your client environment.');

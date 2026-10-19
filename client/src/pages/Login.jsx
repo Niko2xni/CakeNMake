@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,19 +19,27 @@ const providerOptions = [
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { account, isAuthenticated, isLoadingAuth, authError } = useAuth();
   useEffect(() => {
     if (isLoadingAuth || !isAuthenticated || !account) return;
     navigate(['bakery_staff', 'bakery_admin', 'platform_admin'].includes(account.role) ? '/bakery/orders' : '/client', { replace: true });
   }, [account, isAuthenticated, isLoadingAuth, navigate]);
-  const [email, setEmail] = useState("");
+
+  const initialEmail = location.state?.email || "";
+  const initialOtpSent = Boolean(location.state?.otpSent && initialEmail);
+  const initialExpiresAt = location.state?.expiresAt || null;
+
+  const [email, setEmail] = useState(initialEmail);
   const [otp, setOtp] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
+  const [otpSent, setOtpSent] = useState(initialOtpSent);
   const [error, setError] = useState("");
-  const [statusMessage, setStatusMessage] = useState("");
+  const [statusMessage, setStatusMessage] = useState(
+    initialOtpSent ? `A 6-digit verification code was sent to ${initialEmail}.` : ""
+  );
   const [otpExpiredMessage, setOtpExpiredMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const [otpExpiresAt, setOtpExpiresAt] = useState(null);
+  const [otpExpiresAt, setOtpExpiresAt] = useState(initialExpiresAt);
   const [otpTimeLeft, setOtpTimeLeft] = useState(0);
   const isOtpActive = otpSent && otpTimeLeft > 0;
 
@@ -177,7 +185,7 @@ export default function Login() {
     setOtpExpiredMessage("");
     setLoading(true);
     try {
-      redirectToGoogleOAuth("/login-success");
+      redirectToGoogleOAuth("/login");
     } catch (authError) {
       setError(authError.message || "Provider sign-in failed.");
       setLoading(false);

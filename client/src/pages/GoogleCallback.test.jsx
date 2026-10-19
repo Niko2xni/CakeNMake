@@ -59,10 +59,12 @@ describe('GoogleCallback', () => {
     expect(await screen.findByText('Authorization code missing from Google.')).toBeInTheDocument();
   });
 
-  it('exchanges code for custom token and navigates to saved returnPath', async () => {
+  it('exchanges code for OTP details and navigates to saved returnPath with OTP state', async () => {
     sessionStorage.setItem('cakenmake_oauth_state', JSON.stringify({ returnPath: '/designer' }));
-    authApiMock.exchangeGoogleCode.mockResolvedValueOnce({ token: 'mock-custom-token' });
-    firebaseAuth.signInWithCustomToken.mockResolvedValueOnce({});
+    authApiMock.exchangeGoogleCode.mockResolvedValueOnce({
+      email: 'mock-google@gmail.com',
+      expiresAt: Date.now() + 180000,
+    });
 
     render(
       <MemoryRouter initialEntries={['/auth/google/callback?code=mock-google-code']}>
@@ -77,10 +79,6 @@ describe('GoogleCallback', () => {
       expect(authApiMock.exchangeGoogleCode).toHaveBeenCalledWith(
         'mock-google-code',
         expect.stringContaining('/auth/google/callback')
-      );
-      expect(firebaseAuth.signInWithCustomToken).toHaveBeenCalledWith(
-        expect.anything(),
-        'mock-custom-token'
       );
     });
 

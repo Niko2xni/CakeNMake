@@ -103,8 +103,20 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
   const [activeLayer, setActiveLayer] = useState(0);
   const [activeEdgeSlot, setActiveEdgeSlot] = useState('top');
   const [toolPanelModeUi, setToolPanelModeUi] = useState('design');
-  const [guestAuthModalOpen, setGuestAuthModalOpen] = useState(false);
-  const [guestAuthAction, setGuestAuthAction] = useState('general');
+  const location = useLocation();
+  const [guestAuthModalOpen, setGuestAuthModalOpen] = useState(() => Boolean(location.state?.guestAuthOpen));
+  const [guestAuthAction, setGuestAuthAction] = useState(() => location.state?.action || 'general');
+  const [guestAuthInitialEmail, setGuestAuthInitialEmail] = useState(() => location.state?.email || '');
+  const [guestAuthInitialExpiresAt, setGuestAuthInitialExpiresAt] = useState(() => location.state?.expiresAt || null);
+
+  useEffect(() => {
+    if (location.state?.guestAuthOpen && location.state?.email) {
+      setGuestAuthInitialEmail(location.state.email);
+      setGuestAuthInitialExpiresAt(location.state.expiresAt || null);
+      if (location.state.action) setGuestAuthAction(location.state.action);
+      setGuestAuthModalOpen(true);
+    }
+  }, [location.state]);
 
 
   const [expandedSections, setExpandedSections] = useState({
@@ -1506,6 +1518,8 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
         isOpen={guestAuthModalOpen}
         onClose={() => {
           setGuestAuthModalOpen(false);
+          setGuestAuthInitialEmail('');
+          setGuestAuthInitialExpiresAt(null);
           if (!account) {
             try {
               localStorage.removeItem('cakenmake_draft_design');
@@ -1514,6 +1528,8 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
         }}
         actionType={guestAuthAction}
         onSuccess={handleGuestAuthSuccess}
+        initialEmail={guestAuthInitialEmail}
+        initialExpiresAt={guestAuthInitialExpiresAt}
       />
 
       <DesignerTutorial

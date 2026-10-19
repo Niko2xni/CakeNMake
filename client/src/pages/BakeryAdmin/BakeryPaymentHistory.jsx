@@ -29,22 +29,56 @@ export default function BakeryPaymentHistory({ payments, loading, onOpenReservat
       filtered.length === 0 ? <div className="py-12 text-center"><p className="text-sm font-semibold text-gray-700">No matching payments.</p><button type="button" onClick={() => { setSearch(''); setFilter('all'); }} className="mt-3 rounded-lg border px-3 py-2 text-sm text-pink-600">Clear filters</button></div> :
       <div className="space-y-2">{filtered.map((payment) => <button key={payment._id} type="button"
         onClick={() => onOpenReservation(payment)} aria-label={`Open reservation for ${payment.user?.displayName || payment.user?.name || 'Unknown customer'}`}
-        className="cn-payment-row w-full flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 px-4 py-4 text-left hover:border-pink-300 hover:bg-pink-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400">
-        <User className="h-5 w-5 shrink-0 text-gray-400" />
-        <div className="flex-1 min-w-[120px] space-y-1">
-          <p className="text-sm font-semibold text-gray-900">{payment.user?.displayName || payment.user?.name || 'Unknown customer'}</p>
-          <p className="text-xs text-gray-500">Reservation date: {date(payment.createdAt)}</p>
-          {payment.designName && <p className="text-xs text-gray-500">{payment.designName}</p>}
-          {payment.checkoutMode === 'simulated' && <p className="text-xs text-amber-700">Simulated checkout</p>}
-          {payment.downPayment?.isPaid && <p className="text-xs text-gray-500">Down payment date: {date(payment.downPayment.paidAt)}</p>}
-          {payment.downPayment?.paymentReference && <p className="break-all text-xs text-gray-500">Reference: {payment.downPayment.paymentReference}</p>}
+        className="w-full flex items-center gap-4 rounded-xl border border-gray-200 px-4 py-3 text-left hover:border-pink-300 hover:bg-pink-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 transition-colors">
+        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 text-gray-500 border border-gray-200/60">
+          <User className="w-5 h-5" />
         </div>
-        <div className="cn-payment-amounts space-y-1 text-xs text-gray-500">
-          <p className="text-sm font-semibold text-gray-900">Order total: {peso(payment.totalPrice)}</p>
-          <p>Down payment: {peso(payment.downPayment?.amount)} · <span className={payment.downPayment?.isPaid ? 'text-green-600' : 'text-yellow-700'}>{payment.downPayment?.isPaid ? 'Paid' : 'Unpaid'}</span></p>
-          <p>Order status: {STATUS_LABELS[payment.status] || payment.status}</p>
+        <div className="flex-1 min-w-[160px] space-y-0.5">
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className="text-sm font-semibold text-gray-900">{payment.user?.displayName || payment.user?.name || 'Unknown customer'}</span>
+            {payment.designName && (
+              <span className="text-xs text-pink-600 font-medium">· {payment.designName}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap text-xs text-gray-500">
+            <span>Reservation date: {date(payment.createdAt)}</span>
+            {payment.downPayment?.isPaid && (
+              <>
+                <span className="text-gray-300">·</span>
+                <span>Down payment date: {date(payment.downPayment.paidAt)}</span>
+              </>
+            )}
+            {payment.downPayment?.paymentReference && (
+              <>
+                <span className="text-gray-300">·</span>
+                <span className="font-mono text-[11px] text-gray-500 truncate max-w-[200px]" title={payment.downPayment.paymentReference}>
+                  Ref: {payment.downPayment.paymentReference}
+                </span>
+              </>
+            )}
+          </div>
         </div>
-        <ChevronRight className="h-4 w-4 shrink-0 text-gray-300" />
+        <div className="flex items-center gap-3.5 flex-shrink-0">
+          <div className="text-right text-xs text-gray-500 space-y-0.5 border-l border-pink-100 pl-4">
+            <p className="text-sm font-bold text-gray-900">Total: {peso(payment.totalPrice)}</p>
+            <p className="flex items-center justify-end gap-1">
+              <span>{peso(payment.downPayment?.amount)} · <strong className={payment.downPayment?.isPaid ? 'text-green-600' : 'text-yellow-700'}>{payment.downPayment?.isPaid ? 'Paid' : 'Unpaid'}</strong></span>
+              {payment.totalPrice != null && (
+                <span className="text-gray-400">· Balance: {peso(Math.max(0, (payment.totalPrice || 0) - (payment.downPayment?.amount || 0)))}</span>
+              )}
+            </p>
+          </div>
+          <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border flex-shrink-0 ${
+            payment.status === 'completed'
+              ? 'bg-green-50 text-green-700 border-green-200'
+              : payment.status === 'in_production'
+              ? 'bg-pink-50 text-pink-700 border-pink-200'
+              : 'bg-blue-50 text-blue-700 border-blue-200'
+          }`}>
+            {STATUS_LABELS[payment.status] || payment.status}
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-gray-300" />
+        </div>
       </button>)}</div>}
   </CustomScrollbar></div>;
 }

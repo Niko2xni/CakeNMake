@@ -22,6 +22,8 @@ beforeEach(() => {
   Object.assign(session, { isAuthenticated: false, isLoadingAuth: false, authError: null });
   firebase.custom.mockReset();
   googleAuthMock.redirectToGoogleOAuth.mockReset();
+  authApi.requestEmailOtp.mockClear();
+  authApi.verifyEmailOtp.mockClear();
 });
 
 vi.mock('@/services/api', () => ({
@@ -113,6 +115,22 @@ describe('GuestAuthModal', () => {
     );
 
     expect(authApi.requestEmailOtp).toHaveBeenCalledWith('returned-guest@google.com');
+    expect(await screen.findByText(/^Verification code$/i)).toBeInTheDocument();
+  });
+
+  it('uses initialExpiresAt directly without triggering duplicate OTP request', async () => {
+    render(
+      <GuestAuthModal
+        isOpen={true}
+        onClose={vi.fn()}
+        actionType="save"
+        onSuccess={vi.fn()}
+        initialEmail="returned-guest@google.com"
+        initialExpiresAt={Date.now() + 180000}
+      />
+    );
+
+    expect(authApi.requestEmailOtp).not.toHaveBeenCalled();
     expect(await screen.findByText(/^Verification code$/i)).toBeInTheDocument();
   });
 

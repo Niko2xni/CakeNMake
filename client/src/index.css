@@ -652,8 +652,6 @@ textarea {
 .cn-reservation-detail form input, .cn-reservation-detail form select, .cn-reservation-detail form button { min-height: 44px; }
 @media (min-width: 768px) {
   .cn-bakery-orders { max-width: 1600px; margin-inline: auto; }
-  .cn-payment-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) minmax(220px, .55fr) 16px; }
-  .cn-payment-amounts { border-left: 1px solid #f3e8ee; padding-left: 24px; }
   .cn-reservation-detail.is-open { margin: 12px 12px 12px 0; }
 }
 @media (max-width: 767px) {
@@ -662,7 +660,6 @@ textarea {
   .cn-bakery-orders .cn-order-summary > div > svg { width: 16px; height: 16px; padding: 6px; }
   .cn-bakery-orders .cn-order-summary > div p:first-child { font-size: 10px; line-height: 1.4; }
   .cn-bakery-orders .cn-order-summary > div p:last-child { font-size: 15px; overflow-wrap: anywhere; }
-  .cn-payment-amounts { flex-basis: 100%; border-top: 1px solid #f3e8ee; padding-top: 10px; }
 }
 
 @media (max-width: 767px) {

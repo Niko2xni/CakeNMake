@@ -135,7 +135,7 @@ describe('Orders', () => {
     await waitFor(() => expect(transactionApi.getTransactions).toHaveBeenCalledTimes(2));
     expect(screen.getByText('ana@example.com')).toBeVisible();
     fireEvent.click(tab('Payment History'));
-    expect(within(await screen.findByRole('button', { name: 'Open reservation for Ana Cruz' })).getByText('Order status: In Production')).toBeVisible();
+    expect(within(await screen.findByRole('button', { name: 'Open reservation for Ana Cruz' })).getByText('In Production')).toBeVisible();
   });
 
   it('shows a retryable payment error while reservations remain usable', async () => {
@@ -208,6 +208,27 @@ describe('Orders', () => {
     expect(screen.getByText('Unit 402, Pioneer Woodlands, Mandaluyong')).toBeVisible();
     expect(screen.getByText(/Tower 2 Lobby/)).toBeVisible();
     expect(screen.getByText('2:00 PM – 4:00 PM')).toBeVisible();
-    expect(screen.getByText('Pay-to-Bake Policy Status')).toBeVisible();
+    expect(screen.getByText('Payment Summary')).toBeVisible();
+  });
+
+  it('displays reservation schedule and chat coordination notice when order has no fulfillment method', async () => {
+    const streamlinedOrder = {
+      ...order,
+      _id: 'order-streamlined',
+      user: { displayName: 'David Lee', email: 'david@example.com' },
+      pickupDate: '2026-10-26',
+    };
+    bakeryApi.getReservations.mockResolvedValue([streamlinedOrder]);
+    setup();
+    const row = await within(screen.getByRole('tabpanel', { name: 'Reservations' })).findByText('David Lee');
+    expect(within(row.closest('button')).queryByText('🏪 Store Pickup')).not.toBeInTheDocument();
+    expect(within(row.closest('button')).queryByText('🛵 Courier Delivery')).not.toBeInTheDocument();
+    expect(within(row.closest('button')).getByText(/Reservation:/)).toBeVisible();
+    expect(within(row.closest('button')).getByText(/2026/)).toBeVisible();
+    fireEvent.click(row);
+    expect(screen.getByText('Reservation Schedule')).toBeVisible();
+    expect(screen.getByText('Reservation Date:')).toBeVisible();
+    expect(screen.getByText(/Pickup or delivery logistics are coordinated directly in customer chat/i)).toBeVisible();
+    expect(screen.queryByText('AH Tinaps Hub')).not.toBeInTheDocument();
   });
 });
