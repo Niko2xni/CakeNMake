@@ -1,6 +1,7 @@
 const { createHash } = require('node:crypto');
 const Blueprint = require('../models/Blueprint');
 const Platform = require('../models/Platform');
+const Reservation = require('../models/Reservation');
 const storage = require('../services/blueprintStorageService');
 const checkout = require('../services/checkoutReservationService');
 const pricing = require('../services/pricingService');
@@ -61,7 +62,31 @@ async function submitBlueprint(req, res) {
     record.status = 'ready';
     await record.save();
     readySaved = true;
-    await checkout.ensureCheckoutReservation(record);
+    const reservation = await checkout.ensureCheckoutReservation(record);
+    const io = req.app?.get ? req.app.get('io') : null;
+    if (io) {
+      io.to(`platform:${platform._id}`).emit('blueprint:created', {
+        id: record._id,
+        customerName: record.customerName,
+        designName: record.designName,
+        deliveryDate: record.deliveryDate,
+        totalMinor: record.quoteSnapshot?.totalMinor ?? null,
+        currency: record.quoteSnapshot?.currency || 'PHP',
+        status: record.status,
+        failureReason: record.failureReason,
+        createdAt: record.createdAt,
+      });
+      if (reservation?._id) {
+        try {
+          const populated = await Reservation.findById(reservation._id)
+            .populate('user', 'displayName email')
+            .populate('design', 'thumbnail');
+          io.to(`platform:${platform._id}`).emit('reservation:created', populated || reservation);
+        } catch {
+          io.to(`platform:${platform._id}`).emit('reservation:created', reservation);
+        }
+      }
+    }
     return res.status(201).json({ submissionId, status: 'ready', platformId: String(platform._id) });
   } catch (error) {
     if (error.code === 11000) return res.status(409).json({ message: 'Submission already in progress. Retry with the same submission ID.' });

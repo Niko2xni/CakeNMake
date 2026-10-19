@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, within, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, within, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { bakeryApi, transactionApi } from '@/services/api';
@@ -12,6 +12,16 @@ vi.mock('@/services/api', () => ({
   transactionApi: { getTransactions: vi.fn() },
 }));
 vi.mock('@/components/shared/CustomScrollbar', () => ({ default: ({ children, className }) => <div className={className}>{children}</div> }));
+
+const socketHandlers = new Map();
+const fakeSocket = {
+  on: vi.fn((event, cb) => { socketHandlers.set(event, cb); }),
+  off: vi.fn((event, cb) => { if (socketHandlers.get(event) === cb) socketHandlers.delete(event); }),
+};
+vi.mock('@/lib/chat-socket', () => ({
+  getChatSocket: vi.fn(),
+}));
+import { getChatSocket } from '@/lib/chat-socket';
 
 const order = {
   _id: 'order-1', user: { displayName: 'Ana Cruz', email: 'ana@example.com' },
@@ -32,6 +42,10 @@ const tab = (name) => screen.getByRole('tab', { name });
 
 beforeEach(() => {
   vi.resetAllMocks();
+  socketHandlers.clear();
+  fakeSocket.on = vi.fn((event, cb) => { socketHandlers.set(event, cb); });
+  fakeSocket.off = vi.fn((event, cb) => { if (socketHandlers.get(event) === cb) socketHandlers.delete(event); });
+  getChatSocket.mockResolvedValue(fakeSocket);
   bakeryApi.getReservations.mockResolvedValue([order, unpaid]);
   transactionApi.getTransactions.mockResolvedValue({ transactions: [order, unpaid], summary });
 });
@@ -230,5 +244,42 @@ describe('Orders', () => {
     expect(screen.getByText('Reservation Date:')).toBeVisible();
     expect(screen.getByText(/Pickup or delivery logistics are coordinated directly in customer chat/i)).toBeVisible();
     expect(screen.queryByText('AH Tinaps Hub')).not.toBeInTheDocument();
+  });
+
+  it('syncs new reservations in real-time when reservation:created socket event fires', async () => {
+    setup();
+    await within(screen.getByRole('tabpanel', { name: 'Reservations' })).findByText('Ana Cruz');
+    const newOrder = {
+      _id: 'order-realtime',
+      user: { displayName: 'Realtime Customer', email: 'realtime@example.com' },
+      status: 'confirmed',
+      totalPrice: 2500,
+      pickupDate: '2026-10-30',
+      createdAt: '2026-10-19',
+      downPayment: { amount: 1250, isPaid: true },
+    };
+    bakeryApi.getReservations.mockResolvedValue([newOrder, order, unpaid]);
+    await waitFor(() => expect(socketHandlers.has('reservation:created')).toBe(true));
+    act(() => {
+      socketHandlers.get('reservation:created')(newOrder);
+    });
+    expect(await within(screen.getByRole('tabpanel', { name: 'Reservations' })).findByText('Realtime Customer')).toBeVisible();
+  });
+
+  it('syncs updated reservations in real-time when reservation:updated socket event fires', async () => {
+    setup();
+    await within(screen.getByRole('tabpanel', { name: 'Reservations' })).findByText('Ana Cruz');
+    const updatedOrder = {
+      ...order,
+      status: 'completed',
+    };
+    bakeryApi.getReservations.mockResolvedValue([updatedOrder, unpaid]);
+    await waitFor(() => expect(socketHandlers.has('reservation:updated')).toBe(true));
+    act(() => {
+      socketHandlers.get('reservation:updated')(updatedOrder);
+    });
+    const panel = within(screen.getByRole('tabpanel', { name: 'Reservations' }));
+    fireEvent.click(panel.getByRole('button', { name: /^Completed/i }));
+    expect(await panel.findByText('Ana Cruz')).toBeVisible();
   });
 });
