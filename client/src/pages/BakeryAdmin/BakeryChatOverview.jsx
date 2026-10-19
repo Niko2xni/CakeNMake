@@ -3,6 +3,7 @@ import { moderationApi } from '@/services/chat-api';
 import { getChatSocket } from '@/lib/chat-socket';
 import { philippineTime, suspensionExpiry } from '@/lib/moderation';
 import SupportThread from '@/components/shared/SupportThread';
+import CustomScrollbar from '@/components/shared/CustomScrollbar';
 import { ShieldCheck, MessageSquareWarning, Clock3, Ban, LifeBuoy, Search, ChevronRight, RefreshCw, Users } from 'lucide-react';
 
 const button = 'rounded-lg border border-pink-200 px-3 py-2 text-sm hover:bg-pink-50 disabled:opacity-50';
@@ -68,37 +69,133 @@ function CustomerModeration({ id, revision, onChange, onClose }) {
   const reviewed = (data?.confirmedEvidence || data?.messages || []).filter((message) => message.moderation === 'rejected' && message.reviewedAt);
   let expiry = '';
   try { expiry = philippineTime(suspensionExpiry(days, custom)); } catch { /* No valid custom date yet. */ }
-  const field = 'mt-2 block w-full rounded-xl border border-gray-200 bg-white p-3 text-sm focus:border-pink-400 focus:outline-none focus:ring-2 focus:ring-pink-100';
-  return <section aria-label="Customer account review" className="overflow-hidden rounded-2xl border border-pink-200 bg-white shadow-sm">
-    <div className="flex items-start justify-between gap-3 border-b border-pink-100 bg-pink-50/50 p-5 sm:p-6"><div className="flex min-w-0 items-center gap-3"><span className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white text-pink-600 sm:flex"><ShieldCheck size={24} aria-hidden="true" /></span><div className="min-w-0"><p className="mb-1 text-xs font-medium text-pink-600">Customer account</p><h2 className="break-words text-lg font-semibold">Account review — {data?.customer.displayName || data?.customer.email || 'Loading…'}</h2>{data?.customer.email && <p className="mt-1 break-all text-xs text-gray-500">{data.customer.email}</p>}</div></div><button className={`${button} shrink-0 bg-white`} onClick={onClose}>Close</button></div>
+  const field = 'mt-2 block w-full rounded-xl border border-gray-200 bg-white p-3 text-sm focus:border-pink-400 focus:outline-none focus:ring-2 focus:ring-pink-100';  return <section aria-label="Customer account review" className="overflow-hidden rounded-2xl border border-pink-200 bg-white shadow-sm">
+    <div className="flex items-center justify-between gap-3 border-b border-pink-100 bg-pink-50/40 px-5 py-4 sm:px-6">
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-pink-600 border border-pink-100 shadow-xs">
+          <ShieldCheck size={20} aria-hidden="true" />
+        </span>
+        <div className="min-w-0">
+          <h2 className="break-words text-base font-bold text-gray-900 sm:text-lg">
+            Account review — {data?.customer.displayName || data?.customer.email || 'Loading…'}
+          </h2>
+          {data?.customer.displayName && data.customer.displayName !== data.customer.email && data.customer.email && (
+            <p className="mt-0.5 break-all text-xs text-gray-500">{data.customer.email}</p>
+          )}
+        </div>
+      </div>
+      <button className={`${button} shrink-0 bg-white font-medium`} onClick={onClose}>Close review</button>
+    </div>
     {error && <p role="alert" className="m-5 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {success && <p role="status" className="mx-5 mt-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{success}</p>}
     {!data && <p role="status" className="p-6 text-sm text-gray-500">Loading account details…</p>}
     {data && <>
       <div className="grid items-start gap-6 p-5 sm:p-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
       <div className="min-w-0 space-y-5">
-      <section className="overflow-hidden rounded-xl border border-gray-200"><div className="border-b border-gray-100 p-4"><h3 className="text-sm font-semibold">Recent customer messages (up to 50)</h3><p className="mt-1 text-xs leading-relaxed text-gray-500">Read the conversation first. Add a reason in Account actions to flag a message.</p></div>
-      <div className="max-h-[460px] overflow-y-auto space-y-3 bg-gray-50/50 p-4">{data.messages.length === 0 && <div className="py-8 text-center"><MessageSquareWarning size={24} aria-hidden="true" className="mx-auto mb-3 text-gray-400" /><p className="text-sm text-gray-500">No messages to review.</p></div>}{data.messages.map((message) => <article key={message._id} className="rounded-xl border border-gray-100 bg-white p-4 text-sm">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><p className="text-xs text-gray-500">{philippineTime(message.createdAt)}</p><span className={`rounded-full px-2 py-1 text-[11px] font-medium ${message.moderation === 'rejected' ? 'bg-rose-50 text-rose-700' : message.moderation === 'held' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>{message.moderation || 'approved'}</span></div><p className="whitespace-pre-wrap break-words leading-relaxed text-gray-800">{message.text}</p>
-        {message.reviewReason && <p className="text-xs mt-1">Review: {message.reviewReason}</p>}
-        {(message.moderationHistory || []).map((entry, index) => <p key={entry._id || index} className="text-xs text-gray-500">{philippineTime(entry.at)} · {entry.action} · {entry.reason} · {entry.staff ? `Staff ${String(entry.staff).slice(-8)}` : 'Automatic detector'}</p>)}
-        {!['held', 'rejected'].includes(message.moderation) && <button className={`${button} mt-2`} disabled={busy || !reason.trim()} onClick={() => flag(message)}>Flag for review</button>}
-        {message.moderation === 'held' && <div className="mt-3"><FlagReview flag={{ ...message, sender: data.customer }} onChange={async () => { await load(); await onChange(); setAcknowledged(false); }} onCustomer={() => {}} /></div>}
-      </article>)}</div></section>
-      <section className="rounded-xl border border-gray-200 p-4"><h3 className="mb-3 text-sm font-semibold">Moderation history</h3>{data.customer.moderationHistory.length === 0 ? <p className="text-xs text-gray-500">No account actions recorded.</p> : <div className="max-h-56 space-y-4 overflow-y-auto">{data.customer.moderationHistory.slice().reverse().map((entry) => <div key={entry._id} className="border-l-2 border-pink-200 pl-3"><p className="text-sm font-medium capitalize">{entry.action}</p><p className="mt-1 break-words text-sm text-gray-600">{entry.reason}</p><p className="mt-1 text-xs text-gray-500">{philippineTime(entry.at)} · Staff {String(entry.staff).slice(-8)}{entry.expiresAt && ` · Ends ${philippineTime(entry.expiresAt)}`}</p></div>)}</div>}</section>
+      <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <div className="border-b border-gray-100 p-4">
+          <h3 className="text-sm font-semibold text-gray-900">Recent customer messages (up to 50)</h3>
+          <p className="mt-1 text-xs leading-relaxed text-gray-500">Review conversation context before taking account actions.</p>
+        </div>
+        <div className="max-h-[440px] overflow-y-auto space-y-3 bg-gray-50/50 p-4">
+          {data.messages.length === 0 && <div className="py-8 text-center"><MessageSquareWarning size={24} aria-hidden="true" className="mx-auto mb-3 text-gray-400" /><p className="text-sm text-gray-500">No messages to review.</p></div>}
+          {data.messages.map((message) => <article key={message._id} className="rounded-xl border border-gray-200 bg-white p-3.5 text-sm space-y-2 shadow-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-gray-500">{philippineTime(message.createdAt)}</p>
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${message.moderation === 'rejected' ? 'bg-rose-50 text-rose-700' : message.moderation === 'held' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>{message.moderation || 'approved'}</span>
+            </div>
+            <p className="whitespace-pre-wrap break-words leading-relaxed text-gray-800">{message.text}</p>
+            {message.reviewReason && <p className="text-xs text-gray-500">Review note: {message.reviewReason}</p>}
+            {(message.moderationHistory || []).map((entry, index) => <p key={entry._id || index} className="text-xs text-gray-500">{philippineTime(entry.at)} · {entry.action} · {entry.reason} · {entry.staff ? `Staff ${String(entry.staff).slice(-8)}` : 'Automatic detector'}</p>)}
+            {!['held', 'rejected'].includes(message.moderation) && !message.text?.startsWith('🎂 Cake Order Submitted!') && (
+              <button className={`${button} mt-1 text-xs`} disabled={busy || !reason.trim()} onClick={() => flag(message)}>Flag for review</button>
+            )}
+            {message.moderation === 'held' && <div className="mt-2"><FlagReview flag={{ ...message, sender: data.customer }} onChange={async () => { await load(); await onChange(); setAcknowledged(false); }} onCustomer={() => {}} /></div>}
+          </article>)}
+        </div>
+      </section>
+      <section className="rounded-xl border border-gray-200 bg-white p-4">
+        <h3 className="mb-3 text-sm font-semibold text-gray-900">Moderation history</h3>
+        {data.customer.moderationHistory.length === 0 ? <p className="text-xs text-gray-500">No account actions recorded.</p> : <div className="max-h-52 space-y-3 overflow-y-auto">{data.customer.moderationHistory.slice().reverse().map((entry) => <div key={entry._id} className="border-l-2 border-pink-200 pl-3"><p className="text-sm font-medium capitalize text-gray-900">{entry.action}</p><p className="mt-0.5 break-words text-xs text-gray-600">{entry.reason}</p><p className="mt-1 text-[11px] text-gray-400">{philippineTime(entry.at)} · Staff {String(entry.staff).slice(-8)}{entry.expiresAt && ` · Ends ${philippineTime(entry.expiresAt)}`}</p></div>)}</div>}
+      </section>
       </div>
-      <section className="min-w-0 space-y-4 rounded-xl border border-gray-200 p-4 sm:p-5">
-      <div><h3 className="text-sm font-semibold">Account actions</h3><p className="mt-1 text-xs leading-relaxed text-gray-500">Only customers without reservation history can be suspended or banned.</p></div>
-      <div className={`rounded-xl p-3 text-sm ${data.customer.restriction ? 'bg-amber-50 text-amber-900' : 'bg-emerald-50 text-emerald-800'}`}><p className="font-medium">{data.customer.restriction ? (data.customer.restriction.type === 'banned' ? 'Account banned' : 'Account suspended') : 'No active restriction'}</p>{data.customer.restriction && <><p className="mt-1 break-words text-xs leading-relaxed">{data.customer.restriction.reason}</p><p className="mt-1 text-xs">{data.customer.restriction.expiresAt ? `Ends ${philippineTime(data.customer.restriction.expiresAt)}` : 'Indefinite restriction'}</p></>}</div>
-      {data.customer.hasReservation && <p role="status" className="rounded-xl bg-blue-50 p-3 text-sm text-blue-800">This customer has made a reservation and cannot be suspended or banned. Message review and restoring access remain available.</p>}<label className="block text-sm font-medium">Action / review reason<textarea rows={3} value={reason} onChange={(event) => setReason(event.target.value)} maxLength={1000} placeholder="Explain why this action is needed…" className={`${field} resize-y font-normal`} /></label>
-      <label className="block text-sm font-medium">Confirmed abuse evidence<select value={evidence} onChange={(event) => { setEvidence(event.target.value); setAcknowledged(false); }} className={`${field} font-normal`}><option value="">Select a reviewed message</option>{reviewed.map((message) => <option key={message._id} value={message._id}>{message.text.slice(0, 80)}</option>)}</select></label>
-      {reviewed.length === 0 && <p className="text-xs leading-relaxed text-gray-500">Confirm abuse in Messages awaiting review before restricting this account.</p>}
-      <label className="flex items-start gap-2 rounded-xl bg-gray-50 p-3 text-xs leading-relaxed text-gray-600"><input className="mt-0.5 accent-pink-600" type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />I reviewed the message evidence before taking account action.</label>
-      <div className="border-t border-gray-100 pt-4 space-y-3"><label className="block text-sm font-medium">Suspension duration<select value={days} onChange={(event) => setDays(event.target.value)} className={`${field} font-normal`}>{[1, 3, 7, 30].map((day) => <option key={day} value={day}>{day} {day === 1 ? 'day' : 'days'}</option>)}<option value="custom">Custom expiry</option></select></label>
-      {days === 'custom' && <label className="block text-sm">Expiry (Philippine time)<input aria-label="Custom suspension expiry" type="datetime-local" value={custom} onChange={(event) => setCustom(event.target.value)} className={field} /></label>}
-      <p className="text-xs leading-relaxed text-gray-500">Suspension will end: {expiry || 'Choose a valid future date'} (Philippine time)</p></div>
-      <div className="grid gap-2 sm:grid-cols-2"><button className="rounded-xl bg-pink-600 px-3 py-2.5 text-sm font-medium text-white hover:bg-pink-700 disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || data.customer.hasReservation || !reason.trim() || !evidence || !acknowledged || !expiry} onClick={() => act('suspend')}>Suspend</button><button className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm font-medium text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || data.customer.hasReservation || !reason.trim() || !evidence || !acknowledged} onClick={() => act('ban')}>Ban indefinitely</button></div>
-      <div className="border-t border-gray-100 pt-4"><button className={`${button} w-full text-emerald-700 disabled:cursor-not-allowed`} disabled={busy || !reason.trim() || !data.customer.restriction} onClick={() => act('restore')}>Restore access</button><p className="mt-2 text-xs leading-relaxed text-gray-500">To lift a restriction, enter a reason and restore access.</p></div>
+
+      <section className="min-w-0 space-y-4 rounded-xl border border-gray-200 p-4 sm:p-5 bg-white">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">Account status & actions</h3>
+        </div>
+
+        <div className={`rounded-xl border p-3.5 text-sm space-y-2.5 ${
+          data.customer.restriction
+            ? 'border-amber-200 bg-amber-50/70 text-amber-900'
+            : 'border-emerald-200 bg-emerald-50/60 text-emerald-900'
+        }`}>
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-semibold flex items-center gap-1.5">
+              <span className={`inline-block w-2 h-2 rounded-full ${data.customer.restriction ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+              {data.customer.restriction ? (data.customer.restriction.type === 'banned' ? 'Account banned' : 'Account suspended') : 'No active restriction'}
+            </span>
+            {data.customer.hasReservation && (
+              <span className="text-[11px] font-semibold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full border border-blue-200">
+                Reservation Protected
+              </span>
+            )}
+          </div>
+          {data.customer.restriction && (
+            <div className="text-xs space-y-1 pt-1.5 border-t border-amber-200/60">
+              <p className="break-words font-medium">{data.customer.restriction.reason}</p>
+              <p className="text-amber-800">{data.customer.restriction.expiresAt ? `Ends ${philippineTime(data.customer.restriction.expiresAt)}` : 'Indefinite restriction'}</p>
+            </div>
+          )}
+          {data.customer.hasReservation && (
+            <p role="status" className="text-xs text-blue-800 bg-blue-50/80 p-2.5 rounded-lg border border-blue-100 leading-relaxed">
+              This customer has made a reservation and cannot be suspended or banned. Message review and restoring access remain available.
+            </p>
+          )}
+        </div>
+
+        <label className="block text-sm font-medium text-gray-700">
+          Action / review reason
+          <textarea rows={2} value={reason} onChange={(event) => setReason(event.target.value)} maxLength={1000} placeholder="Explain why this action or message flag is needed…" className={`${field} resize-y font-normal`} />
+        </label>
+
+        <label className="block text-sm font-medium text-gray-700">
+          Confirmed abuse evidence
+          <select value={evidence} onChange={(event) => { setEvidence(event.target.value); setAcknowledged(false); }} className={`${field} font-normal`}>
+            <option value="">Select a reviewed message</option>
+            {reviewed.map((message) => <option key={message._id} value={message._id}>{message.text.slice(0, 80)}</option>)}
+          </select>
+        </label>
+        {reviewed.length === 0 && <p className="text-xs leading-relaxed text-gray-500">Confirm abuse in Messages awaiting review before restricting this account.</p>}
+
+        <label className="flex items-start gap-2 rounded-xl bg-gray-50 p-3 text-xs leading-relaxed text-gray-600">
+          <input className="mt-0.5 accent-pink-600" type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />
+          I reviewed the message evidence before taking account action.
+        </label>
+
+        <div className="border-t border-gray-100 pt-3 space-y-2.5">
+          <label className="block text-sm font-medium text-gray-700">
+            Suspension duration
+            <select value={days} onChange={(event) => setDays(event.target.value)} className={`${field} font-normal`}>
+              {[1, 3, 7, 30].map((day) => <option key={day} value={day}>{day} {day === 1 ? 'day' : 'days'}</option>)}
+              <option value="custom">Custom expiry</option>
+            </select>
+          </label>
+          {days === 'custom' && <label className="block text-sm text-gray-700">Expiry (Philippine time)<input aria-label="Custom suspension expiry" type="datetime-local" value={custom} onChange={(event) => setCustom(event.target.value)} className={field} /></label>}
+          <p className="text-xs leading-relaxed text-gray-500">Suspension will end: {expiry || 'Choose a valid future date'} (Philippine time)</p>
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-2 pt-1">
+          <button className="rounded-xl bg-pink-600 px-3 py-2.5 text-sm font-medium text-white hover:bg-pink-700 disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || data.customer.hasReservation || !reason.trim() || !evidence || !acknowledged || !expiry} onClick={() => act('suspend')}>Suspend</button>
+          <button className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm font-medium text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-40" disabled={busy || data.customer.hasReservation || !reason.trim() || !evidence || !acknowledged} onClick={() => act('ban')}>Ban indefinitely</button>
+        </div>
+
+        <div className="border-t border-gray-100 pt-3">
+          <button className={`${button} w-full text-emerald-700 font-medium disabled:cursor-not-allowed`} disabled={busy || !reason.trim() || !data.customer.restriction} onClick={() => act('restore')}>
+            Restore access
+          </button>
+          <p className="mt-1.5 text-xs text-center leading-relaxed text-gray-500">To lift an active restriction, enter a reason and click Restore access.</p>
+        </div>
       </section>
       </div>
     </>}
@@ -149,9 +246,18 @@ export default function BakeryChatOverview() {
     target.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
     target.current?.focus({ preventScroll: true });
   }
-  return <div className="cn-chat-overview h-full overflow-y-auto rounded-2xl border border-pink-100 bg-white shadow-sm">
-    <div className="mx-auto max-w-[1600px] space-y-4 p-4 sm:p-5 lg:p-6">
-    <header className="flex items-start justify-between gap-3"><div><p className="mb-1 text-xs font-semibold uppercase tracking-widest text-pink-600">Customer care</p><h1 className="text-xl font-bold sm:text-2xl">Chats Overview</h1><p className="mt-2 max-w-xl text-sm leading-relaxed text-gray-500">Keep conversations safe and help customers with their accounts and orders.</p></div><button className={`${button} flex shrink-0 items-center gap-2 bg-white`} onClick={load} disabled={refreshing} aria-label="Refresh"><RefreshCw size={15} aria-hidden="true" className={refreshing ? 'animate-spin' : ''} />{refreshing ? 'Refreshing…' : 'Refresh'}</button></header>
+  return <div className="cn-chat-overview h-full flex flex-col min-h-0 rounded-2xl border border-pink-100 bg-white shadow-sm overflow-hidden">
+    <CustomScrollbar className="flex-1 min-h-0" contentClassName="mx-auto max-w-[1600px] space-y-4 p-4 sm:p-5 lg:p-6">
+    <header className="flex items-start justify-between gap-3">
+      <div>
+        <h1 className="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">Chats Overview</h1>
+        <p className="mt-1 max-w-xl text-sm leading-relaxed text-gray-500">Keep conversations safe and manage customer accounts and orders.</p>
+      </div>
+      <button className={`${button} flex shrink-0 items-center gap-2 bg-white`} onClick={load} disabled={refreshing} aria-label="Refresh">
+        <RefreshCw size={15} aria-hidden="true" className={refreshing ? 'animate-spin' : ''} />
+        {refreshing ? 'Refreshing…' : 'Refresh'}
+      </button>
+    </header>
     {error && <p role="alert" className="text-red-700 text-sm">{error}</p>}
     {!data ? <p role="status">Loading overview…</p> : <>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">{[
@@ -162,25 +268,40 @@ export default function BakeryChatOverview() {
       ].map(([label, count, Icon, color]) => <button key={label} type="button" onClick={() => jump(label)} className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-3 sm:p-4 text-left transition-colors hover:border-pink-300 hover:bg-pink-50/40 focus-visible:outline-pink-500"><span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${color}`}><Icon size={20} aria-hidden="true" /></span><div><p className="text-2xl font-bold leading-none text-gray-900">{count}</p><p className="mt-2 text-xs leading-relaxed text-gray-500">{label}</p></div></button>)}</div>
       {selected && <div ref={reviewRef} tabIndex={-1} className="scroll-mt-4 outline-none"><CustomerModeration key={selected} id={selected} revision={data} onChange={load} onClose={() => { setSelected(null); customerRef.current?.focus({ preventScroll: true }); }} /></div>}
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-      <section ref={customerRef} tabIndex={-1} aria-label="Customer accounts" className="min-w-0 scroll-mt-4 overflow-hidden rounded-2xl border border-gray-200 bg-white outline-none">
-        <div className="space-y-4 border-b border-gray-100 p-4">
-          <div className="flex items-start justify-between gap-3"><div><h2 className="font-semibold">Customer account management</h2><p className="mt-1 text-xs leading-relaxed text-gray-500">Select a customer to review messages and manage access.</p></div><span className="rounded-full bg-pink-50 px-2.5 py-1 text-xs font-medium text-pink-700">{data.customers.length}</span></div>
+      <section ref={customerRef} tabIndex={-1} aria-label="Customer accounts" className="min-w-0 scroll-mt-4 overflow-hidden rounded-2xl border border-gray-200 bg-white outline-none flex flex-col">
+        <div className="space-y-4 border-b border-gray-100 p-4 shrink-0">
+          <div className="flex items-start justify-between gap-3"><div><h2 className="font-semibold text-gray-900">Customer account management</h2><p className="mt-1 text-xs leading-relaxed text-gray-500">Select a customer to review messages and manage access.</p></div><span className="rounded-full bg-pink-50 px-2.5 py-1 text-xs font-semibold text-pink-700">{data.customers.length}</span></div>
           <div className="relative"><Search size={17} aria-hidden="true" className="absolute left-3 top-3 text-gray-400" /><input type="search" aria-label="Search customer accounts" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name or email" className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-3 text-sm focus:border-pink-400 focus:outline-none focus:ring-2 focus:ring-pink-100" /></div>
           <div className="flex flex-wrap gap-2" role="group" aria-label="Filter customer accounts">{[['all', 'All customers'], ['suspended', 'Suspended'], ['banned', 'Banned']].map(([value, label]) => <button key={value} aria-pressed={filter === value} onClick={() => setFilter(value)} className={`min-h-10 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${filter === value ? 'bg-pink-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-pink-50'}`}>{label}</button>)}</div>
         </div>
-        <div className="max-h-[360px] overflow-y-auto divide-y divide-gray-100">{visible.map((customer) => <button key={customer._id} onClick={() => setSelected(customer._id)} aria-pressed={selected === customer._id} className={`group flex w-full items-center gap-3 px-4 py-3 ${selected === customer._id ? 'bg-pink-50' : ''} text-left text-sm transition-colors hover:bg-pink-50 focus-visible:outline-pink-500`}>
-          <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-pink-50 text-xs font-semibold text-pink-600">{(customer.displayName || customer.email || '?').split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()}</span>
-          <span className="min-w-0 flex-1"><span className="block truncate font-medium text-gray-800">{customer.displayName || customer.email}</span><span className="mt-1 block truncate text-xs text-gray-500">{customer.email}</span></span>
-          <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${customer.restriction?.type === 'banned' ? 'bg-rose-50 text-rose-700' : customer.restriction?.type === 'suspended' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>{customer.restriction?.type || 'Unrestricted'}</span><ChevronRight size={16} aria-hidden="true" className="hidden shrink-0 text-gray-400 group-hover:text-pink-600 sm:block" />
-        </button>)}{visible.length === 0 && <div className="flex flex-col items-center px-5 py-12 text-center"><Users size={24} aria-hidden="true" className="mb-3 text-gray-400" /><p className="text-sm font-medium text-gray-700">No customers found</p><p className="mt-1 text-xs text-gray-500">Try a different search or account filter.</p>{(search || filter !== 'all') && <button type="button" className={`${button} mt-3`} onClick={() => { setSearch(''); setFilter('all'); }}>Clear filters</button>}</div>}</div>
-        <div className="border-t border-gray-100 bg-gray-50/60 px-5 py-3 text-xs text-gray-500">Showing {visible.length} of {data.customers.length} customers</div>
+        <div className="max-h-[460px] overflow-y-auto divide-y divide-gray-100">
+          {visible.map((customer) => <button key={customer._id} onClick={() => setSelected(customer._id)} aria-pressed={selected === customer._id} className={`group flex w-full items-center gap-3.5 px-4 py-3.5 ${selected === customer._id ? 'bg-pink-50/70 border-l-4 border-l-pink-500 pl-3' : ''} text-left text-sm transition-colors hover:bg-pink-50/40 focus-visible:outline-pink-500`}>
+          <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-pink-100/70 text-xs font-semibold text-pink-700">{(customer.displayName || customer.email || '?').split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-medium text-gray-900">{customer.displayName || customer.email}</span>
+            {customer.displayName && customer.displayName !== customer.email && (
+              <span className="mt-0.5 block truncate text-xs text-gray-500">{customer.email}</span>
+            )}
+          </span>
+          {customer.restriction?.type ? (
+            <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold capitalize ${customer.restriction.type === 'banned' ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+              {customer.restriction.type}
+            </span>
+          ) : (
+            <span className="sr-only">Unrestricted</span>
+          )}
+          <ChevronRight size={16} aria-hidden="true" className="hidden shrink-0 text-gray-400 group-hover:text-pink-600 sm:block" />
+        </button>)}
+        {visible.length === 0 && <div className="flex flex-col items-center px-5 py-12 text-center"><Users size={24} aria-hidden="true" className="mb-3 text-gray-400" /><p className="text-sm font-medium text-gray-700">No customers found</p><p className="mt-1 text-xs text-gray-500">Try a different search or account filter.</p>{(search || filter !== 'all') && <button type="button" className={`${button} mt-3`} onClick={() => { setSearch(''); setFilter('all'); }}>Clear filters</button>}</div>}
+        </div>
+        <div className="shrink-0 border-t border-gray-100 bg-gray-50/60 px-5 py-3 text-xs text-gray-500">Showing {visible.length} of {data.customers.length} customers</div>
       </section>
       <div className="min-w-0 space-y-5">
-        <section ref={flagsRef} tabIndex={-1} aria-label="Flagged messages" className="scroll-mt-4 overflow-hidden rounded-2xl border border-gray-200 bg-white outline-none"><div className="border-b border-gray-100 p-4"><div className="flex items-center justify-between gap-3"><h2 className="font-semibold">Messages awaiting review</h2><span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">{data.flags.length}</span></div><p className="mt-1 text-xs leading-relaxed text-gray-500">Review flagged messages before deciding on account action.</p></div>{data.flags.length === 0 ? <EmptyQueue /> : <div className="max-h-[560px] space-y-3 overflow-y-auto p-4">{data.flags.map((flag) => <FlagReview key={flag._id} flag={flag} onChange={load} onCustomer={setSelected} />)}<p className="text-xs text-gray-500">Showing up to 100 oldest held messages. Account restrictions require a separate review.</p></div>}</section>
-        <section ref={supportRef} tabIndex={-1} aria-label="Support requests" className="scroll-mt-4 overflow-hidden rounded-2xl border border-gray-200 bg-white outline-none"><div className="border-b border-gray-100 p-4"><div className="flex items-start justify-between gap-3"><h2 className="font-semibold">Appeals & existing-order contact</h2><span className="rounded-full bg-pink-50 px-2.5 py-1 text-xs font-medium text-pink-700">{data.requests.length}</span></div><p className="mt-1 text-xs leading-relaxed text-gray-500">Help restricted customers with appeals and existing orders.</p></div>{data.requests.length === 0 ? <EmptyQueue support /> : <div className="max-h-[560px] space-y-3 overflow-y-auto p-4">{data.requests.map((request) => <SupportThread key={request._id} request={request} staff onChange={load} />)}<p className="text-xs text-gray-500">Showing up to 100 oldest requests. Restore account access separately after an appeal.</p></div>}</section>
+        <section ref={flagsRef} tabIndex={-1} aria-label="Flagged messages" className="scroll-mt-4 overflow-hidden rounded-2xl border border-gray-200 bg-white outline-none"><div className="border-b border-gray-100 p-4"><div className="flex items-center justify-between gap-3"><h2 className="font-semibold text-gray-900">Messages awaiting review</h2><span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${data.flags.length > 0 ? 'bg-amber-50 text-amber-700 border border-amber-200 font-semibold' : 'bg-gray-100 text-gray-500'}`}>{data.flags.length}</span></div><p className="mt-1 text-xs leading-relaxed text-gray-500">Review flagged messages before deciding on account action.</p></div>{data.flags.length === 0 ? <EmptyQueue /> : <div className="max-h-[560px] space-y-3 overflow-y-auto p-4">{data.flags.map((flag) => <FlagReview key={flag._id} flag={flag} onChange={load} onCustomer={setSelected} />)}<p className="text-xs text-gray-500">Showing up to 100 oldest held messages. Account restrictions require a separate review.</p></div>}</section>
+        <section ref={supportRef} tabIndex={-1} aria-label="Support requests" className="scroll-mt-4 overflow-hidden rounded-2xl border border-gray-200 bg-white outline-none"><div className="border-b border-gray-100 p-4"><div className="flex items-start justify-between gap-3"><h2 className="font-semibold text-gray-900">Appeals & existing-order contact</h2><span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${data.requests.length > 0 ? 'bg-pink-50 text-pink-700 border border-pink-200 font-semibold' : 'bg-gray-100 text-gray-500'}`}>{data.requests.length}</span></div><p className="mt-1 text-xs leading-relaxed text-gray-500">Help restricted customers with appeals and existing orders.</p></div>{data.requests.length === 0 ? <EmptyQueue support /> : <div className="max-h-[560px] space-y-3 overflow-y-auto p-4">{data.requests.map((request) => <SupportThread key={request._id} request={request} staff onChange={load} />)}<p className="text-xs text-gray-500">Showing up to 100 oldest requests. Restore account access separately after an appeal.</p></div>}</section>
       </div>
       </div>
     </>}
-    </div>
+    </CustomScrollbar>
   </div>;
 }
