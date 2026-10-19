@@ -9,7 +9,7 @@ import SendBakeryModal from '@/components/bakery/SendBakeryModal';
 import useDesignAiChat from '@/hooks/useDesignAiChat';
 import GuestAuthModal from '@/components/auth/GuestAuthModal';
 import DesignerTutorial, { TUTORIAL_STEPS } from '@/components/tutorial/DesignerTutorial';
-import { Home, X, Send, Cloud, CloudOff, Loader2, RotateCcw, SlidersHorizontal, HelpCircle, LogIn } from 'lucide-react';
+import { Home, X, Send, Cloud, CloudOff, Loader2, RotateCcw, SlidersHorizontal, HelpCircle, LogIn, Lock, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { blueprintApi, designApi, pricingApi, templateApi } from '@/services/api';
@@ -858,6 +858,7 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
 
     const savedId = await saveDesign({ sentToBakery: true });
     if (savedId) await saveThumbnail(savedId);
+    setOrderComplete(true);
 
     const convos = await chatApi.listConversations();
     let convoId = convos.conversations?.find(
@@ -891,7 +892,11 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
     } catch (err) {
       console.warn('Failed to send automated initial chat message:', err);
     }
-    await chatApi.sendOrderAcknowledgement(convoId, snapshot.submissionId);
+    try {
+      await chatApi.sendOrderAcknowledgement(convoId, snapshot.submissionId);
+    } catch (err) {
+      console.warn('Failed to send order acknowledgement:', err);
+    }
   }, [account, config, title, quote, quotedConfig, saveDesign, saveThumbnail]);
 
   const handleOrderComplete = useCallback(async (selectedDate) => {
@@ -1275,6 +1280,33 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Order Completed / Locked status and Chat action */}
+          {orderComplete && (
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs font-semibold text-amber-700 dark:text-amber-400">
+                <Lock className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Locked · Sent to Bakery</span>
+                <span className="sm:hidden">Locked</span>
+              </span>
+              <Button
+                size="sm"
+                className="flex items-center gap-1.5 rounded-xl font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
+                onClick={() => {
+                  const targetConvoId = activeOrderConvoIdRef.current || submittedBlueprintRef.current?.convoId;
+                  if (targetConvoId) {
+                    navigate(`/chats?conversation=${encodeURIComponent(targetConvoId)}`);
+                  } else {
+                    navigate('/chats');
+                  }
+                }}
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span className="hidden sm:inline">Open Bakery Chat</span>
+                <span className="sm:hidden">Chat</span>
+              </Button>
+            </div>
+          )}
+
           {/* Tutorial Tour button */}
           {!orderComplete && (
             <Button
