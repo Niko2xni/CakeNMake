@@ -1,7 +1,23 @@
 import * as options from './cakeConfig';
+import { FLAVORS } from '@/lib/cakeFlavors';
 
 const names = new Map(Object.values(options).filter(Array.isArray).flat()
   .filter((entry) => entry?.id).map((entry) => [entry.id, entry.label || entry.name || entry.id]));
+// Colour of a flavor's own chip in the designer, when the option list carries one.
+const entries = new Map(Object.values(options).filter(Array.isArray).flat().filter((entry) => entry?.id).map((entry) => [entry.id, entry]));
+export function flavorColorOf(id) {
+  // Same colour the ToolPanel chip uses (SpongeFlavorSection / FillingSection).
+  const chip = FLAVORS?.[id]?.colors?.crumbBase;
+  if (typeof chip === 'string' && chip) return chip;
+  const entry = entries.get(id);
+  if (!entry) return null;
+  for (const key of ['color', 'hex', 'swatch', 'colorHex', 'chipColor', 'iconColor', 'icon', 'bg', 'bgColor', 'dot', 'value']) {
+    const v = entry[key];
+    if (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v.trim())) return v.trim();
+  }
+  return null;
+}
+
 export const name = (value) => names.get(value) || String(value ?? '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[-_]/g, ' ').replace(/^./, (c) => c.toUpperCase());
 
 // Match selection rows to quote keys, keeping every quoted cent exactly once.

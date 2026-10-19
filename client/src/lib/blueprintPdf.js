@@ -383,10 +383,51 @@ function addFillingPages(doc, page, images, anchors, swatches, fillColors, desig
   });
 }
 
+// Fundamentals, in the Filling page's style: one picture of the cake in the
+// shared box, a FLAVOR bubble (the sponge flavor's colour icon) and a NAKED
+// FINISH bubble (a magnified look at the bare sponge), arrows to the sponge.
+function addFundamentalsPage(doc, page, images, anchors, designName, tierLabel) {
+  const top = tierHeader(doc, designName, tierLabel, 'FUNDAMENTALS');
+  const boxW = 96;
+  const boxH = 72;
+  const boxX = PAGE_W - MARGIN - boxW;
+  const boxY = top + 2;
+  placeImage(doc, images?.[page.image], boxX, boxY, boxW, boxH);
+  doc.setDrawColor(...INK);
+  doc.setLineWidth(0.6);
+  doc.roundedRect(boxX, boxY, boxW, boxH, 2, 2, 'S');
+
+  // Both bubbles describe the same spot, so they join into ONE arrow: a short
+  // line from each bubble to a shared bar, then a single arrow to the cake.
+  const r = 14;
+  const cx = MARGIN + r + 2;
+  const hits = anchors?.[page.image] || {};
+  const flavor = (page.crops || [])[0];
+  const target = hits[flavor?.anchorId] || { x: 0.5, y: 0.5 };
+  const cy1 = boxY + 16;
+  const cy2 = cy1 + 50;
+  drawFlavorBubble(doc, { cx, cy: cy1, r, color: flavor?.chipColor || target.color });
+  drawBubbleLabel(doc, { cx, y: cy1 + r + 7, title: flavor?.label || 'FLAVOR', sub: flavor?.sub });
+  drawCropBubble(doc, { src: images?.[page.image], ax: target.x, ay: target.y, imgW: boxW, imgH: boxH, cx, cy: cy2, r, zoom: 3 });
+  drawBubbleLabel(doc, { cx, y: cy2 + r + 7, title: page.naked?.label || 'NAKED FINISH', sub: page.naked?.sub });
+
+  const joinX = cx + r + 9;
+  const midY = (cy1 + cy2) / 2;
+  doc.setDrawColor(...ACCENT);
+  doc.setLineWidth(0.5);
+  doc.line(cx + r + 0.5, cy1, joinX, cy1);
+  doc.line(cx + r + 0.5, cy2, joinX, cy2);
+  doc.line(joinX, cy1, joinX, cy2);
+  arrow(doc, joinX, midY, boxX + target.x * boxW, boxY + target.y * boxH);
+
+  detailBlock(doc, MARGIN, boxY + boxH + 36, PAGE_W - 2 * MARGIN, page);
+}
+
 export function addTierPages(doc, { groups = [], images = {}, anchors = {}, swatches = {}, fillColors = {}, designName = '' } = {}) {
   for (const group of groups) {
     for (const page of group.pages) {
-      if (page.kind === 'filling') addFillingPages(doc, page, images, anchors, swatches, fillColors, designName, group.tierLabel);
+      if (page.kind === 'fundamentals') addFundamentalsPage(doc, page, images, anchors, designName, group.tierLabel);
+      else if (page.kind === 'filling') addFillingPages(doc, page, images, anchors, swatches, fillColors, designName, group.tierLabel);
       else addStagePage(doc, page, images, anchors, designName, group.tierLabel);
     }
   }

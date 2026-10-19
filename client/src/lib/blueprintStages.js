@@ -1,5 +1,5 @@
 import { getSurfaceTreatmentPattern, isPetitsFourStructure } from './cakeConfig';
-import { name } from './blueprintDetails';
+import { name, flavorColorOf } from './blueprintDetails';
 
 // Blueprint "DETAILS:" tier pages -- the plan.
 //
@@ -181,17 +181,22 @@ export function buildBlueprintTierPlan(config = {}) {
             ['Size', petit ? name(sizeKey) : `${config.realSize?.diameter || ''} in diameter · ${config.realSize?.height || ''} in height`],
         ];
         if (shape) fundamentals.push(['Shape', name(shape)]);
-        fundamentals.push(['Sponge Flavor', name(t.sponge)]);
+        // Same look as the Filling page: one picture of the cake, a FLAVOR bubble
+        // (the sponge flavor's colour icon) and a NAKED FINISH bubble (a magnified
+        // look at the bare sponge), both pointing at the real sponge in the picture.
+        const spongeAnchor = { role: 'sponge', tier: individual ? t.i : 0, tiers: individual ? count : 1 };
         pages.push({
             kind: 'fundamentals', section: 'FUNDAMENTALS', image: 'base',
             title: 'Cake Format, Size, Tier, Shape & Sponge',
-            callouts: [callout('base', `fund-${t.i}`, 'FLAVOR', midHy, -0.45, 0.4, anchorY)],
+            crops: [
+                { kind: 'flavor', label: 'FLAVOR', sub: name(t.sponge), chipColor: flavorColorOf(t.sponge), ...callout('base', `sponge-${t.i}`, 'FLAVOR', midHy, -0.3, 0.4, anchorY, { ...spongeAnchor, color: true }), anchorId: `sponge-${t.i}` },
+            ],
+            naked: { label: 'NAKED FINISH', sub: 'Bare sponge, no frosting', ...callout('base', `naked-${t.i}`, 'NAKED FINISH', midHy, 0.3, 0.6, anchorY, spongeAnchor), anchorId: `naked-${t.i}` },
             details: fundamentals,
             highlights: [
-                `${name(t.sponge)} sponge, baked fresh for your order`,
+                'Naked finish: the sponge is left unfrosted',
                 petit ? 'Four individually decorated petit fours' : `${tiers} tier${tiers > 1 ? 's' : ''} built to the size above`,
             ],
-            flavor: null,
         });
 
         if (t.fillingOn) {

@@ -1767,6 +1767,8 @@ const CakeScene = React.forwardRef(function CakeScene({
           };
           const withDiff = Boolean(stage.diffConfig) && (stage.anchors || []).some((a) => a.refine);
           const afterPixels = withDiff ? grab() : null;
+          // Rendered colours, for anchors that report what colour a part looks like.
+          const mainPixels = (stage.anchors || []).some((a) => a.color) ? grab() : null;
 
           // Arrow targets: ray from the camera at each requested spot,
           // first visible mesh it meets, projected back into the picture.
@@ -1797,23 +1799,37 @@ const CakeScene = React.forwardRef(function CakeScene({
             // A point inside the part: side picks how far left/right along it
             // (0 = middle); `edge` aims low in the column, on its front rim,
             // which is where a piped edge shows.
-            const pointOnMask = (px, side = 0, edge = false) => {
+            const pointOnMask = (px, side = 0, edge = false, tier = 0, tiers = 1, colorPx = null) => {
               const on = (x, y) => px[(y * MW + x) * 4] > 100;
-              let minX = MW; let maxX = -1;
-              for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) if (on(x, y)) { if (x < minX) minX = x; if (x > maxX) maxX = x; }
+              let minX = MW; let maxX = -1; let minY = MH; let maxY = -1;
+              for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) if (on(x, y)) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; }
               if (maxX < 0 || maxX - minX < 4) return null;
+              // With several tiers, only look at this tier's share of the part's height (tier 0 = bottom).
+              const span = maxY - minY + 1;
+              const bandLo = tiers > 1 ? Math.round(maxY - ((tier + 1) / tiers) * span) : 0;
+              const bandHi = tiers > 1 ? Math.round(maxY - (tier / tiers) * span) : MH - 1;
+              const inBand = (y) => y >= bandLo && y <= bandHi;
+              let color = null;
+              if (colorPx) {
+                let r = 0; let g = 0; let b = 0; let n = 0;
+                for (let y = Math.max(0, bandLo); y <= Math.min(MH - 1, bandHi); y++) for (let x = minX; x <= maxX; x++) {
+                  if (!on(x, y)) continue;
+                  const o = (y * MW + x) * 4; r += colorPx[o]; g += colorPx[o + 1]; b += colorPx[o + 2]; n++;
+                }
+                if (n) color = `#${[r, g, b].map((v) => Math.round(v / n).toString(16).padStart(2, '0')).join('')}`;
+              }
               const frac = Math.min(0.88, Math.max(0.12, 0.5 + (side || 0)));
               const tx = Math.round(minX + frac * (maxX - minX));
               for (let d = 0; d < MW; d++) {
                 for (const x of d === 0 ? [tx] : [tx - d, tx + d]) {
                   if (x < 0 || x >= MW) continue;
                   const ys = [];
-                  for (let y = 0; y < MH; y++) if (on(x, y)) ys.push(y);
+                  for (let y = 0; y < MH; y++) if (inBand(y) && on(x, y)) ys.push(y);
                   if (ys.length < 3) continue;
                   const bottom = ys[ys.length - 1];
                   const top = ys[0];
                   const y = edge ? bottom - Math.min(6, Math.max(1, (bottom - top) * 0.3)) : ys[Math.floor(ys.length / 2)];
-                  return { x: (x + 0.5) / MW, y: (y + 0.5) / MH };
+                  return { x: (x + 0.5) / MW, y: (y + 0.5) / MH, ...(color ? { color } : {}) };
                 }
               }
               return null;
@@ -1827,7 +1843,7 @@ const CakeScene = React.forwardRef(function CakeScene({
                 // Exact: render ONLY this part in flat white from the same camera
                 // and aim at its real pixels, whatever the cake's size or format.
                 if (!roleMask[a.role]) roleMask[a.role] = renderRoleMask(a.role);
-                const mp = roleMask[a.role] && pointOnMask(roleMask[a.role], a.side, a.edge);
+                const mp = roleMask[a.role] && pointOnMask(roleMask[a.role], a.side, a.edge, a.tier, a.tiers, a.color ? mainPixels : null);
                 if (mp) { out[a.id] = mp; continue; }
                 // Aim at the middle of that part itself, offset sideways, and hit only it.
                 const bb = new THREE.Box3();
@@ -2403,6 +2419,7 @@ const CakeScene = React.forwardRef(function CakeScene({
             bevelBottom: !(pieceFillingEnabled && s > 0),
           });
           const spongeMesh = new THREE.Mesh(spongeGeom, spongeMat || new THREE.MeshStandardMaterial({ color: '#F6DEAB' }));
+          spongeMesh.userData.blueprintRole = 'sponge';
           spongeMesh.position.y = spongeCurrentY + currentSectionH / 2;
           spongeMesh.castShadow = true;
           spongeMesh.receiveShadow = true;
@@ -3460,6 +3477,7 @@ const CakeScene = React.forwardRef(function CakeScene({
 
         if (spongeMat && !(fillingOnTop && tierFillingEnabled && s === tierFillingLayers)) {
           const spongeSection = new THREE.Mesh(spongeGeo, spongeMat);
+          spongeSection.userData.blueprintRole = 'sponge';
           spongeSection.position.y = spongeCurrentY + spongeSectionHeight / 2;
           spongeSection.castShadow = true;
           spongeSection.receiveShadow = true;
