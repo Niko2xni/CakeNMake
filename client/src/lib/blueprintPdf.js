@@ -1,4 +1,5 @@
 import { jsPDF } from 'jspdf';
+import { INK, ACCENT, BODY, arrow, drawFlavorBubble, drawCropBubble, drawBubbleLabel, describeColor } from './blueprintBubbles';
 
 // Cake Blueprint — draft. Page order (each name is what we call the page):
 //
@@ -15,8 +16,8 @@ import { jsPDF } from 'jspdf';
 //                   nothing selected is skipped. May run several pages.
 //   N. Tier 2 Page(s)   the same sequence for the second tier.
 //
-// Only pages 1-3 exist so far; the tier pages get appended to the same
-// document by their own builders.
+// Tier pages are planned by blueprintStages.js and photographed by
+// CakeScene.captureBlueprintStages().
 //
 // Captures come from CakeScene.captureBlueprintViews(): hero is A4 portrait
 // (1240x1754); front/back/top/side are portrait 930x1315 — exactly one grid
@@ -185,12 +186,219 @@ export function addDetailsPages(doc, { sections = [], totalMinor = null, currenc
   }
 }
 
-export function buildBlueprintPdf({ views, details }) {
+// ─── Tier "DETAILS:" pages ─────────────────────────────────────────────────
+// One page per stage of how the cake is made. Layout: picture of our cake on
+// the right, labelled pills on the left with arrows into the picture, then
+// the details and highlight points, and the flavor (when there is one) in a
+// pill underneath with an arrow pointing up at what it flavors.
+// Filling is a stack of slices with arrows pointing down.
+
+
+function pill(doc, text, x, y, { w, fontSize = 8 } = {}) {
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(fontSize);
+  const width = w || doc.getTextWidth(text) + 7;
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(...ACCENT);
+  doc.setLineWidth(0.5);
+  doc.roundedRect(x, y - 4, width, 8, 4, 4, 'FD');
+  doc.setTextColor(...INK);
+  doc.text(text, x + width / 2, y + 1.1, { align: 'center' });
+  return width;
+}
+
+function tierHeader(doc, designName, tierLabel, section) {
+  doc.addPage();
+  // The page's own name is the title (FILLING, SIDE, EDGE...); only the
+  // design's name sits at the right, plus the tier when there are several.
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(20);
+  doc.setTextColor(...INK);
+  doc.text(String(section || 'DETAILS').toUpperCase(), MARGIN, 26);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(140, 120, 120);
+  if (designName) doc.text(designName, PAGE_W - MARGIN, 24, { align: 'right' });
+  if (tierLabel) {
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...ACCENT);
+    doc.text(String(tierLabel).toUpperCase(), PAGE_W - MARGIN, 30, { align: 'right' });
+  }
+  doc.setDrawColor(230, 215, 210);
+  doc.setLineWidth(0.3);
+  doc.line(MARGIN, 33, PAGE_W - MARGIN, 33);
+  return 40;
+}
+
+function placeImage(doc, src, x, y, w, h) {
+  doc.setFillColor(248, 244, 241);
+  doc.roundedRect(x, y, w, h, 3, 3, 'F');
+  if (src) doc.addImage(src, imageFormat(src), x, y, w, h, undefined, 'FAST');
+}
+
+function detailBlock(doc, x, y, width, { details = [], highlights = [], flavor = null }) {
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(...ACCENT);
+  doc.text('DETAILS', x, y);
+  y += 6;
+  for (const [label, value] of details) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...BODY);
+    doc.text(`${label}${value ? ':' : ''}`, x, y);
+    if (value) {
+      const labelW = doc.getTextWidth(`${label}: `) + 1; // measured in bold, as drawn
+      doc.setFont('helvetica', 'normal');
+      const lines = doc.splitTextToSize(String(value), Math.max(20, width - labelW));
+      doc.text(lines, x + labelW, y);
+      y += 6 * lines.length;
+    } else {
+      y += 6;
+    }
+  }
+  if (highlights.length) {
+    y += 3;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...ACCENT);
+    doc.text('HIGHLIGHTS', x, y);
+    y += 6;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(...BODY);
+    for (const point of highlights) {
+      const lines = doc.splitTextToSize(point, width - 6);
+      doc.setFillColor(...ACCENT);
+      doc.circle(x + 1.2, y - 1.2, 0.8, 'F');
+      doc.text(lines, x + 5, y);
+      y += 5.5 * lines.length;
+    }
+  }
+  if (flavor) {
+    y += 6;
+    // Pill under the details, arrow pointing back up at them.
+    arrow(doc, x + 14, y - 1, x + 14, y - 6);
+    pill(doc, `FLAVOR: ${String(flavor).toUpperCase()}`, x, y + 5, { fontSize: 8.5 });
+    y += 10;
+  }
+  return y;
+}
+
+// Pills stacked down the left column; each arrow ends on the spot the
+// capture measured (or the plan's fallback guess when it could not).
+function drawCallouts(doc, callouts, anchors, imgX, imgY, imgW, imgH) {
+  const placed = [];
+  (callouts || []).forEach((c) => {
+    const hit = anchors?.[c.anchorId];
+    const tx = imgX + (hit ? hit.x : c.ax) * imgW;
+    const ty = imgY + (hit ? hit.y : c.ay) * imgH;
+    let py = Math.min(imgY + imgH - 6, Math.max(imgY + 6, ty));
+    for (const prev of placed) if (Math.abs(py - prev) < 11) py = prev + 11; // keep pills apart
+    placed.push(py);
+    const w = pill(doc, c.label, MARGIN, py, { w: 38, fontSize: c.label.length > 12 ? 6.5 : 8 });
+    arrow(doc, MARGIN + w, py, tx, ty);
+  });
+}
+
+function addStagePage(doc, page, images, anchors, designName, tierLabel) {
+  const top = tierHeader(doc, designName, tierLabel, page.section);
+  const imgX = 60;
+  const imgW = PAGE_W - MARGIN - imgX;
+  const imgH = (imgW * 3) / 4;
+  placeImage(doc, images?.[page.image], imgX, top, imgW, imgH);
+  drawCallouts(doc, page.callouts, anchors?.[page.image], imgX, top, imgW, imgH);
+  detailBlock(doc, MARGIN, top + imgH + 12, PAGE_W - 2 * MARGIN, page);
+}
+
+// Filling, as sketched: the cake layer with its filling on top in a framed
+// picture, a round close-up on each side with arrows into the exact spot
+// (FILLING = the flavor's own color), then an arrow down to a closer view
+// with a PATTERN bubble: a magnified look at the piping design.
+function addFillingPages(doc, page, images, anchors, swatches, fillColors, designName, tierLabel) {
+  const top = tierHeader(doc, designName, tierLabel, 'FILLING');
+
+  // Both pictures share one size and one column so they line up, and both get
+  // the same border.
+  const boxW = 96;
+  const boxH = 72;
+  const boxX = PAGE_W - MARGIN - boxW;
+  const boxY = top + 2;
+  placeImage(doc, images?.[page.image], boxX, boxY, boxW, boxH);
+  doc.setDrawColor(...INK);
+  doc.setLineWidth(0.6);
+  doc.roundedRect(boxX, boxY, boxW, boxH, 2, 2, 'S');
+
+  const r = 16;
+  const midY = boxY + boxH / 2 - 4;
+  const topAnchors = anchors?.[page.image] || {};
+  const zoomAnchors = anchors?.[page.zoomImage] || {};
+  for (const crop of page.crops || []) {
+    const left = crop.side !== 'right';
+    const cx = left ? MARGIN + r : PAGE_W - MARGIN - r;
+    let sub = crop.sub;
+    if (crop.kind === 'color') {
+      // The colour the filling really is, named in plain words.
+      const actual = fillColors?.[crop.colorKey];
+      drawFlavorBubble(doc, { cx, cy: midY, r, color: actual || swatches?.[crop.colorKey] });
+      sub = actual ? describeColor(actual) : crop.fallbackName || '';
+    } else {
+      drawFlavorBubble(doc, { cx, cy: midY, r, color: swatches?.[crop.swatchKey] });
+    }
+    // Arrow from the bubble's edge to the filling it describes.
+    const hit = topAnchors[crop.anchorId] || { x: 0.35, y: 0.3 };
+    const tx = boxX + hit.x * boxW;
+    const ty = boxY + hit.y * boxH;
+    const ang = Math.atan2(ty - midY, tx - cx);
+    arrow(doc, cx + Math.cos(ang) * (r + 0.5), midY + Math.sin(ang) * (r + 0.5), tx, ty);
+    drawBubbleLabel(doc, { cx, y: midY + r + 7, title: crop.label, sub });
+  }
+
+  // Down to the closer view, with a magnified bubble of its piping design.
+  const slabW = boxW;
+  const slabH = boxH;
+  const slabX = boxX;
+  const slabY = boxY + boxH + 16;
+  arrow(doc, boxX + boxW / 2, boxY + boxH + 2, boxX + boxW / 2, slabY - 1);
+  placeImage(doc, images?.[page.zoomImage], slabX, slabY, slabW, slabH);
+  doc.setDrawColor(...INK);
+  doc.setLineWidth(0.6);
+  doc.roundedRect(slabX, slabY, slabW, slabH, 2, 2, 'S');
+  if (page.pattern) {
+    const spot = zoomAnchors[page.pattern.anchorId] || { x: 0.4, y: 0.3 };
+    const cx = MARGIN + r;
+    const cy = slabY + slabH / 2 - 4;
+    drawCropBubble(doc, { src: images?.[page.zoomImage], ax: spot.x, ay: spot.y, imgW: slabW, imgH: slabH, cx, cy, r, zoom: 3 });
+    const tx = slabX + spot.x * slabW;
+    const ty = slabY + spot.y * slabH;
+    const ang = Math.atan2(ty - cy, tx - cx);
+    arrow(doc, cx + Math.cos(ang) * (r + 0.5), cy + Math.sin(ang) * (r + 0.5), tx, ty);
+    drawBubbleLabel(doc, { cx, y: cy + r + 7, title: page.pattern.label, sub: page.pattern.sub });
+  }
+
+  const rows = [['Filling Layers', String(page.layers)], ['Pattern', page.piping || 'Plain edge (no piping)']];
+  detailBlock(doc, MARGIN, slabY + slabH + 10, PAGE_W - 2 * MARGIN, {
+    details: rows,
+    highlights: ['Filling spread on top of the cake layer'],
+  });
+}
+
+export function addTierPages(doc, { groups = [], images = {}, anchors = {}, swatches = {}, fillColors = {}, designName = '' } = {}) {
+  for (const group of groups) {
+    for (const page of group.pages) {
+      if (page.kind === 'filling') addFillingPages(doc, page, images, anchors, swatches, fillColors, designName, group.tierLabel);
+      else addStagePage(doc, page, images, anchors, designName, group.tierLabel);
+    }
+  }
+}
+
+export function buildBlueprintPdf({ views, details, tiers }) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
   addStartPage(doc, views?.hero); // page 1
   doc.addPage();
   addAnglePage(doc, views); // page 2
   addDetailsPages(doc, details); // page 3 (+ overflow)
+  if (tiers?.groups?.length) addTierPages(doc, { ...tiers, designName: details?.designName }); // Tier page(s)
   return doc;
 }
 

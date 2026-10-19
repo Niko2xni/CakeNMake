@@ -17,6 +17,7 @@ import { chatApi } from '@/services/chat-api';
 import { format } from 'date-fns';
 import { buildBlueprintDetails } from '@/lib/blueprintDetails';
 import { buildBlueprintPdfBlob } from '@/lib/blueprintPdf';
+import { buildBlueprintTierPlan } from '@/lib/blueprintStages';
 import { DEFAULT_CONFIG, getCenterItemLimit, getCenterItemCount } from '@/lib/cakeConfig';
 import { adaptConfigToLegacy, adaptConfigFromLegacy } from '@/lib/configAdapter';
 import useCakeQuote from '@/hooks/use-cake-quote';
@@ -183,6 +184,7 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
   const titleRef = useRef(null);
   const cakeSceneRef = useRef(null);
   const mainAreaRef = useRef(null);
+  const blueprintTiersRef = useRef(null); // { groups, images } for the Tier "DETAILS:" pages
   const blueprintViewsRef = useRef(null); // { hero, front, back, top, side } JPEG data URLs, set once on order complete
   const submittedBlueprintRef = useRef(null);
   const activeOrderConvoIdRef = useRef(null);
@@ -775,13 +777,32 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
       }
     }
 
+    // Tier "DETAILS:" pages: photograph the cake as it is built up (plain
+    // sponge, filling slices, finish, surface, side, edges, center). Same
+    // rule as above -- taken once, before any await. A failure here only
+    // costs those pages, never the order.
+    if (!blueprintTiersRef.current && cakeSceneRef.current) {
+      try {
+        const plan = buildBlueprintTierPlan(config);
+        const stages = plan.stages.map(({ key, config: stageConfig, slice, anchors, zoom, diffConfig }) => {
+          const legacy = adaptConfigToLegacy(stageConfig);
+          return { key, anchors, zoom, diffConfig: diffConfig ? adaptConfigToLegacy(diffConfig) : undefined, config: slice ? { ...legacy, __slice: slice, __fillingOnTop: true } : legacy };
+        });
+        const shots = cakeSceneRef.current.captureBlueprintStages(stages);
+        blueprintTiersRef.current = shots ? { groups: plan.groups, images: shots.images, anchors: shots.anchors, swatches: shots.swatches, fillColors: shots.fillColors } : { groups: [], images: {}, anchors: {}, swatches: {}, fillColors: {} };
+      } catch (err) {
+        console.warn('Failed to capture blueprint tier stages:', err);
+        blueprintTiersRef.current = { groups: [], images: {}, anchors: {}, swatches: {}, fillColors: {} };
+      }
+    }
+
     // Internal artifact for future bakery handoff. Never expose a customer URL.
     if (!submittedBlueprintRef.current) {
       const submittedConfig = structuredClone(config);
       const submittedName = title;
       const submittedQuote = quotedConfig === config && quote ? structuredClone(quote) : null;
       const snapshot = {
-        config: submittedConfig, designName: submittedName, views: blueprintViewsRef.current, quote: submittedQuote, pdf: null,
+        config: submittedConfig, designName: submittedName, views: blueprintViewsRef.current, tiers: blueprintTiersRef.current, quote: submittedQuote, pdf: null,
         submissionId: crypto.randomUUID(),
         deliveryDate: `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`,
         customerName: account?.displayName || 'Guest',
@@ -799,7 +820,7 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
     if (!snapshot.views) throw new Error('Could not capture the cake. Please reload and try again.');
     if (!snapshot.pdf) {
       snapshot.details = buildBlueprintDetails(snapshot.config, snapshot.quote, snapshot.designName);
-      snapshot.pdf = buildBlueprintPdfBlob({ views: snapshot.views, details: snapshot.details });
+      snapshot.pdf = buildBlueprintPdfBlob({ views: snapshot.views, details: snapshot.details, tiers: snapshot.tiers });
     }
     if (!snapshot.pdfBase64) {
       snapshot.pdfBase64 = await new Promise((resolve, reject) => {

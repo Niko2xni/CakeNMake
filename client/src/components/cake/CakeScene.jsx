@@ -1126,6 +1126,10 @@ const CakeScene = React.forwardRef(function CakeScene({
   const handleResizeRef = useRef(null);
   const cameraAnimRef = useRef(null);
   const wasLockedRef = useRef(false);
+  // Lets imperative capture methods (defined before buildCake) rebuild the
+  // scene from a temporary config and then restore the real one.
+  const buildCakeRef = useRef(null);
+  const propsCakeConfig = cakeConfig;
 
   // Lock camera to top-down placement angle and disable rotation/zoom when requested (Tutorial Step 7)
   useEffect(() => {
@@ -1586,6 +1590,336 @@ const CakeScene = React.forwardRef(function CakeScene({
       return result;
     },
 
+    // Cake Blueprint "how it is made" captures. `stages` is a list of
+    //   { key, config, fit?, azimuth?, tilt? }
+    // where `config` is a LEGACY-format cake config (already run through
+    // adaptConfigToLegacy by the caller) describing the cake with only some
+    // of its layers applied -- e.g. plain sponge, then + filling, then +
+    // frosting, and so on. For each stage the scene is rebuilt from that
+    // config, framed with the same measured fit as captureBlueprintViews,
+    // and rendered at width x height. Afterwards the live cake is rebuilt
+    // from the real config, synchronously, so the customer never sees any
+    // of it. Returns { images: { [key]: JPEG data URL }, anchors: { [key]: { [id]: {x,y} } } }.
+    //
+    // Optional per-stage fields:
+    //   zoom:    { band }  close-up of the front of the cake's top `band`
+    //            fraction (e.g. 0.4) instead of the whole cake -- used to
+    //            show the filling's piping up close.
+    //   diffConfig: legacy config of the SAME cake without what this stage
+    //            adds. When given, anchors flagged `refine` are moved onto
+    //            the pixels that really changed between the two renders
+    //            (the design itself), so arrows land on the design and not
+    //            on bare cake beside it.
+    //   anchors: [{ id, hy, side, refine? }]  points the PDF's arrows should hit.
+    //            hy = height up the cake (0 bottom .. 1 top), side = how far
+    //            left (-) / right (+) of centre as a fraction of the radius.
+    //            Each is found by casting a ray from the camera at that
+    //            spot and projecting the real surface it hits back into the
+    //            picture, returned as x,y in 0..1 of the image (y down).
+    captureBlueprintStages: (stages = [], { width = 900, height = 675, quality = 0.92 } = {}) => {
+      const renderer = rendererRef.current;
+      const scene = sceneRef.current;
+      const cakeGroup = cakeGroupRef.current;
+      const build = buildCakeRef.current;
+      if (!renderer || !scene || !cakeGroup || !build) return null;
+
+      const deg = THREE.MathUtils.degToRad;
+      const prevSlotsVisible = slotsGroupRef.current ? slotsGroupRef.current.visible : true;
+      const prevGhostVisible = ghostGroupRef.current ? ghostGroupRef.current.visible : true;
+      const prevSize = renderer.getSize(new THREE.Vector2());
+      const prevPixelRatio = renderer.getPixelRatio();
+      const images = {};
+      const anchorsOut = {};
+      const swatches = {};
+      const fillColors = {};
+
+      try {
+        if (slotsGroupRef.current) slotsGroupRef.current.visible = false;
+        if (ghostGroupRef.current) ghostGroupRef.current.visible = false;
+        renderer.setPixelRatio(1);
+        renderer.setSize(width, height, false);
+
+        for (const stage of stages) {
+          if (!stage?.key || !stage.config) continue;
+          // Never clip a stage: Interior Preview must not leak in.
+          build({ ...stage.config, interiorPreview: false });
+          cakeGroup.rotation.set(0, 0, 0);
+          cakeGroup.updateMatrixWorld(true);
+
+          const tiers = Math.max(1, Number(stage.config.layers) || 1);
+          const tilt = deg(stage.tilt ?? (tiers <= 1 ? 24 : tiers === 2 ? 19 : 14));
+          const azimuth = deg(stage.azimuth ?? 18);
+          const FIT = stage.fit ?? (stage.zoom ? 0.8 : 0.58);
+
+          const box = new THREE.Box3().setFromObject(cakeGroup);
+          if (box.isEmpty()) continue;
+          const center = box.getCenter(new THREE.Vector3());
+          const dims = box.getSize(new THREE.Vector3());
+          const ringRadius = Math.max(dims.x, dims.z) / 2;
+          const minRadius = Math.max(dims.x, dims.y, dims.z) / 2;
+          const points = [];
+          let lookAt = center;
+          let zoomTilt = null;
+          let latRadius = ringRadius; // how far 'side' offsets reach sideways
+          if (stage.zoom) {
+            // Close-up. Default: the front arc of the cake's top band. When the
+            // filling can be found (tagged in buildCake) the camera frames the
+            // filling band itself -- its own radius and height, not the plate
+            // or the tier below -- so the piping design fills the picture.
+            const fillMeshes = [];
+            cakeGroup.traverse((o) => { if (o.isMesh && o.userData?.blueprintRole === 'filling') fillMeshes.push(o); });
+            let yHi = box.max.y;
+            let yLo = box.max.y - Math.max(0.05, Math.min(1, stage.zoom.band ?? 0.4)) * dims.y;
+            let zr = ringRadius;
+            if (fillMeshes.length) {
+              const fb = new THREE.Box3();
+              fillMeshes.forEach((m) => fb.expandByObject(m));
+              const fh = Math.max(0.05, fb.max.y - fb.min.y);
+              zr = Math.max(fb.max.x - fb.min.x, fb.max.z - fb.min.z) / 2;
+              yHi = fb.max.y + (stage.zoom.above ?? 0.5) * fh;
+              yLo = fb.min.y - (stage.zoom.below ?? 0.6) * fh;
+              latRadius = zr;
+            }
+            // Several separate pieces (Petit Fours): frame all of the filling.
+            let multi = false;
+            if (fillMeshes.length > 1) {
+              const c0 = new THREE.Box3().setFromObject(fillMeshes[0]).getCenter(new THREE.Vector3());
+              multi = fillMeshes.some((m) => {
+                const c = new THREE.Box3().setFromObject(m).getCenter(new THREE.Vector3());
+                return Math.hypot(c.x - c0.x, c.z - c0.z) > zr * 0.25;
+              });
+            }
+            if (multi) {
+              const fb = new THREE.Box3();
+              fillMeshes.forEach((m) => fb.expandByObject(m));
+              for (const x of [fb.min.x, fb.max.x]) for (const z of [fb.min.z, fb.max.z]) for (const y of [yLo, yHi]) points.push(new THREE.Vector3(x, y, z));
+              lookAt = new THREE.Vector3((fb.min.x + fb.max.x) / 2, (yLo + yHi) / 2, (fb.min.z + fb.max.z) / 2);
+              latRadius = Math.max(fb.max.x - fb.min.x, fb.max.z - fb.min.z) / 2;
+            } else {
+              const half = deg(stage.zoom.arc ?? (fillMeshes.length ? 24 : 38));
+              for (let k = 0; k <= 12; k++) {
+                const a = azimuth - half + (k / 12) * 2 * half;
+                for (const y of [yLo, yHi]) {
+                  points.push(new THREE.Vector3(center.x + Math.sin(a) * zr, y, center.z + Math.cos(a) * zr));
+                }
+              }
+              lookAt = new THREE.Vector3(center.x + Math.sin(azimuth) * zr, (yLo + yHi) / 2, center.z + Math.cos(azimuth) * zr);
+            }
+            zoomTilt = deg(stage.zoom.tilt ?? (fillMeshes.length ? 22 : 12));
+          } else {
+            for (let i = 0; i < 32; i++) {
+              const a = (i / 32) * Math.PI * 2;
+              for (const y of [box.min.y, box.max.y]) {
+                points.push(new THREE.Vector3(center.x + Math.cos(a) * ringRadius, y, center.z + Math.sin(a) * ringRadius));
+              }
+            }
+          }
+
+          const camera = new THREE.PerspectiveCamera(30, width / height, 0.1, 300);
+          const projected = new THREE.Vector3();
+          const useTilt = zoomTilt ?? tilt;
+          const horizontal = Math.cos(useTilt);
+          const dir = new THREE.Vector3(Math.sin(azimuth) * horizontal, Math.sin(useTilt), Math.cos(azimuth) * horizontal);
+          const place = (d) => {
+            camera.position.copy(lookAt).addScaledVector(dir, d);
+            camera.lookAt(lookAt);
+            camera.updateProjectionMatrix();
+            camera.updateMatrixWorld(true);
+          };
+          const fits = (d) => {
+            place(d);
+            return points.every((pt) => {
+              projected.copy(pt).project(camera);
+              return Math.abs(projected.x) <= FIT && Math.abs(projected.y) <= FIT && projected.z < 1;
+            });
+          };
+          let lo = stage.zoom ? 0.05 : minRadius;
+          let hi = minRadius * 40;
+          for (let i = 0; i < 28; i++) {
+            const mid = (lo + hi) / 2;
+            if (fits(mid)) hi = mid; else lo = mid;
+          }
+          place(hi);
+
+          renderer.render(scene, camera);
+          images[stage.key] = renderer.domElement.toDataURL('image/jpeg', quality);
+          // The filling flavor's own color (what the designer's flavor chip shows).
+          try {
+            const fillingKey = stage.config.fillingColor;
+            const flavorColor = fillingKey ? FILLING_COLORS[fillingKey] : null;
+            if (flavorColor != null) swatches[stage.key] = `#${new THREE.Color(flavorColor).getHexString()}`;
+          } catch (err) { /* swatch is optional */ }
+          // What colour the filling actually is on screen (its material's own
+          // colour, free of lighting) -- may differ from the flavor's colour.
+          try {
+            let mat = null;
+            cakeGroup.traverse((o) => { if (!mat && o.isMesh && o.userData?.blueprintRole === 'filling') mat = Array.isArray(o.material) ? o.material[0] : o.material; });
+            if (mat?.color?.isColor) fillColors[stage.key] = `#${mat.color.getHexString()}`;
+          } catch (err) { /* optional */ }
+          const MW = 300;
+          const MH = Math.round((MW * height) / width);
+          const grab = () => {
+            const c = document.createElement('canvas');
+            c.width = MW; c.height = MH;
+            const ctx = c.getContext('2d', { willReadFrequently: true });
+            ctx.drawImage(renderer.domElement, 0, 0, MW, MH);
+            return ctx.getImageData(0, 0, MW, MH).data;
+          };
+          const withDiff = Boolean(stage.diffConfig) && (stage.anchors || []).some((a) => a.refine);
+          const afterPixels = withDiff ? grab() : null;
+
+          // Arrow targets: ray from the camera at each requested spot,
+          // first visible mesh it meets, projected back into the picture.
+          if (Array.isArray(stage.anchors) && stage.anchors.length) {
+            camera.updateMatrixWorld(true);
+            const raycaster = new THREE.Raycaster();
+            const camRight = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0).setY(0).normalize();
+            const visibleAll = (o) => { for (let n = o; n; n = n.parent) if (n.visible === false) return false; return true; };
+            const out = {};
+            const roleMask = {};
+            const renderRoleMask = (role) => {
+              const hidden = [];
+              scene.traverse((o) => {
+                if ((o.isMesh || o.isPoints || o.isLine || o.isSprite) && o.visible && o.userData?.blueprintRole !== role) { o.visible = false; hidden.push(o); }
+              });
+              const prev = { bg: scene.background, fog: scene.fog, ov: scene.overrideMaterial, clear: renderer.getClearColor(new THREE.Color()), alpha: renderer.getClearAlpha() };
+              scene.background = null; scene.fog = null;
+              scene.overrideMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+              renderer.setClearColor(0x000000, 1);
+              renderer.render(scene, camera);
+              const px = grab();
+              scene.overrideMaterial.dispose();
+              scene.background = prev.bg; scene.fog = prev.fog; scene.overrideMaterial = prev.ov;
+              renderer.setClearColor(prev.clear, prev.alpha);
+              hidden.forEach((o) => { o.visible = true; });
+              return px;
+            };
+            // A point inside the part: side picks how far left/right along it
+            // (0 = middle); `edge` aims low in the column, on its front rim,
+            // which is where a piped edge shows.
+            const pointOnMask = (px, side = 0, edge = false) => {
+              const on = (x, y) => px[(y * MW + x) * 4] > 100;
+              let minX = MW; let maxX = -1;
+              for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) if (on(x, y)) { if (x < minX) minX = x; if (x > maxX) maxX = x; }
+              if (maxX < 0 || maxX - minX < 4) return null;
+              const frac = Math.min(0.88, Math.max(0.12, 0.5 + (side || 0)));
+              const tx = Math.round(minX + frac * (maxX - minX));
+              for (let d = 0; d < MW; d++) {
+                for (const x of d === 0 ? [tx] : [tx - d, tx + d]) {
+                  if (x < 0 || x >= MW) continue;
+                  const ys = [];
+                  for (let y = 0; y < MH; y++) if (on(x, y)) ys.push(y);
+                  if (ys.length < 3) continue;
+                  const bottom = ys[ys.length - 1];
+                  const top = ys[0];
+                  const y = edge ? bottom - Math.min(6, Math.max(1, (bottom - top) * 0.3)) : ys[Math.floor(ys.length / 2)];
+                  return { x: (x + 0.5) / MW, y: (y + 0.5) / MH };
+                }
+              }
+              return null;
+            };
+            // Meshes tagged by buildCake (e.g. the filling body / its piping pattern).
+            const roleMeshes = {};
+            cakeGroup.traverse((o) => { if (o.isMesh && o.userData?.blueprintRole && visibleAll(o)) (roleMeshes[o.userData.blueprintRole] ||= []).push(o); });
+            for (const a of stage.anchors) {
+              const tagged = a.role && roleMeshes[a.role];
+              if (tagged && tagged.length) {
+                // Exact: render ONLY this part in flat white from the same camera
+                // and aim at its real pixels, whatever the cake's size or format.
+                if (!roleMask[a.role]) roleMask[a.role] = renderRoleMask(a.role);
+                const mp = roleMask[a.role] && pointOnMask(roleMask[a.role], a.side, a.edge);
+                if (mp) { out[a.id] = mp; continue; }
+                // Aim at the middle of that part itself, offset sideways, and hit only it.
+                const bb = new THREE.Box3();
+                tagged.forEach((m) => bb.expandByObject(m));
+                const bc = bb.getCenter(new THREE.Vector3());
+                const aimAt = (stage.zoom ? lookAt.clone() : new THREE.Vector3(center.x, 0, center.z)).setY(bc.y).addScaledVector(camRight, (a.side ?? 0) * latRadius);
+                raycaster.set(camera.position, aimAt.clone().sub(camera.position).normalize());
+                const roleHit = raycaster.intersectObjects(tagged, false)[0];
+                projected.copy(roleHit ? roleHit.point : aimAt).project(camera);
+                out[a.id] = { x: Math.min(1, Math.max(0, (projected.x + 1) / 2)), y: Math.min(1, Math.max(0, (1 - projected.y) / 2)) };
+                continue;
+              }
+              const aim = stage.zoom
+                ? lookAt.clone().setY(box.min.y + (a.hy ?? 0.5) * dims.y)
+                : new THREE.Vector3(center.x, box.min.y + (a.hy ?? 0.5) * dims.y, center.z);
+              aim.addScaledVector(camRight, (a.side ?? 0) * latRadius);
+              raycaster.set(camera.position, aim.clone().sub(camera.position).normalize());
+              const hit = raycaster.intersectObject(cakeGroup, true).find((h) => h.object.isMesh && visibleAll(h.object));
+              projected.copy(hit ? hit.point : aim).project(camera);
+              out[a.id] = { x: Math.min(1, Math.max(0, (projected.x + 1) / 2)), y: Math.min(1, Math.max(0, (1 - projected.y) / 2)) };
+            }
+            // Refine: re-render the same view without this stage's addition
+            // and find where the picture changed.
+            if (withDiff) {
+              try {
+                build({ ...stage.diffConfig, interiorPreview: false });
+                cakeGroup.rotation.set(0, 0, 0);
+                cakeGroup.updateMatrixWorld(true);
+                renderer.render(scene, camera);
+                const before = grab();
+                const mask = new Uint8Array(MW * MH);
+                let changed = 0;
+                for (let k = 0; k < MW * MH; k++) {
+                  const o = k * 4;
+                  const d = Math.abs(afterPixels[o] - before[o]) + Math.abs(afterPixels[o + 1] - before[o + 1]) + Math.abs(afterPixels[o + 2] - before[o + 2]);
+                  if (d > 45) { mask[k] = 1; changed++; }
+                }
+                // "Deep" pixels: changed pixels whose whole r-neighbourhood changed too,
+                // so the tip lands inside the design, not on its fringe or a shadow.
+                const deepAt = (x, y, r) => {
+                  for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+                    const xx = x + dx; const yy = y + dy;
+                    if (xx < 0 || yy < 0 || xx >= MW || yy >= MH || !mask[yy * MW + xx]) return false;
+                  }
+                  return true;
+                };
+                if (changed > 40) {
+                  for (const a of stage.anchors) {
+                    if (!a.refine || !out[a.id]) continue;
+                    const cy = Math.round(out[a.id].y * (MH - 1));
+                    const band = Math.round(MH * 0.09);
+                    let pick = null;
+                    for (const r of [3, 2, 1, 0]) {
+                      for (let x = 0; x < MW && !pick; x++) {
+                        for (let y = Math.max(0, cy - band); y <= Math.min(MH - 1, cy + band); y++) {
+                          if (mask[y * MW + x] && deepAt(x, y, r)) { pick = { x, y }; break; }
+                        }
+                      }
+                      if (pick) {
+                        // Nudge a little inward (to the right) so the tip sits within the shape.
+                        let x = pick.x;
+                        let y = pick.y;
+                        let steps = 0;
+                        while (steps < 4 && x + 1 < MW && mask[y * MW + x + 1]) { x++; steps++; }
+                        pick = { x, y };
+                        break;
+                      }
+                    }
+                    if (pick) out[a.id] = { x: (pick.x + 0.5) / MW, y: (pick.y + 0.5) / MH };
+                  }
+                }
+              } catch (err) {
+                console.warn('Anchor refinement skipped:', err);
+              }
+            }
+            anchorsOut[stage.key] = out;
+          }
+        }
+      } catch (err) {
+        console.warn('Blueprint stage capture failed:', err);
+        return null;
+      } finally {
+        // Put the customer's real cake back before anything paints.
+        try { build(); } catch (err) { console.warn('Could not restore cake after stage capture:', err); }
+        renderer.setPixelRatio(prevPixelRatio);
+        renderer.setSize(prevSize.x, prevSize.y, false);
+        if (slotsGroupRef.current) slotsGroupRef.current.visible = prevSlotsVisible;
+        if (ghostGroupRef.current) ghostGroupRef.current.visible = prevGhostVisible;
+      }
+      return { images, anchors: anchorsOut, swatches, fillColors };
+    },
+
     // 8-Angle Template Camera Screenshot Engine
     // Captures exactly 8 high-definition multi-angle views around the cake
     // for use in template catalogs, slideshows, and details modals.
@@ -1818,8 +2152,20 @@ const CakeScene = React.forwardRef(function CakeScene({
     }
   }, [cakeConfig, updateSlotVisuals]);
 
-  const buildCake = useCallback(() => {
+  const buildCake = useCallback((configOverride) => {
     if (!sceneRef.current || !cakeGroupRef.current) return;
+    // Blueprint stage captures build the scene from a temporary config
+    // (a cake with only some of its layers applied). Normal renders pass
+    // nothing and use the live prop.
+    const cakeConfig = configOverride || propsCakeConfig;
+    // Only set by blueprint capture: renders a short single-tier slice.
+    const sliceScale = cakeConfig?.__sliceScale || 1;
+    // Blueprint filling slice: { tier, layers } of the REAL cake this slab stands for,
+    // so its cake layer is exactly as tall as one of that cake's own layers.
+    const sliceSpec = cakeConfig?.__slice || null;
+    // Blueprint filling slices: leave off the sponge that would cover the
+    // top filling, so the picture is a cake layer with its filling on top.
+    const fillingOnTop = Boolean(cakeConfig?.__fillingOnTop);
 
     const group = cakeGroupRef.current;
     while (group.children.length > 0) {
@@ -2060,7 +2406,7 @@ const CakeScene = React.forwardRef(function CakeScene({
           spongeMesh.position.y = spongeCurrentY + currentSectionH / 2;
           spongeMesh.castShadow = true;
           spongeMesh.receiveShadow = true;
-          pieceGroup.add(spongeMesh);
+          if (!(fillingOnTop && pieceFillingEnabled && s === pieceFillingLayers)) pieceGroup.add(spongeMesh);
           spongeCurrentY += currentSectionH;
 
           if (pieceFillingEnabled && s < pieceFillingLayers) {
@@ -2080,6 +2426,7 @@ const CakeScene = React.forwardRef(function CakeScene({
             }
             const fillMesh = new THREE.Mesh(fillGeom, fillMat);
             fillMesh.position.y = spongeCurrentY + fillingH / 2;
+            fillMesh.userData.blueprintRole = 'filling';
             pieceGroup.add(fillMesh);
             spongeCurrentY += fillingH;
           }
@@ -2434,7 +2781,19 @@ const CakeScene = React.forwardRef(function CakeScene({
       if (i === 0) {
         // Bottom layer
         radius = BASE_RADIUS;
-        height = renderDims.height;  // Selected size's base-tier height
+        height = renderDims.height * sliceScale;  // Selected size's base-tier height (scaled for blueprint slices)
+        if (sliceSpec) {
+          // The real tier splits its height into (layers + 1) sponge sections
+          // separated by `layers` filling bands. One section is
+          // (H - layers*F) / (layers + 1). The slab is one section plus one
+          // filling band (+ the hidden top section), so use that same section
+          // height instead of the tier's full height.
+          const real = sliceSpec.tier > 0 ? getRenderDimensions(cakeSize, sliceSpec.tier) : renderDims;
+          const n = Math.max(1, sliceSpec.layers || 1);
+          const section = (real.height - n * FILLING_H) / (n + 1);
+          height = 2 * section + FILLING_H;
+          if (sliceSpec.tier > 0) radius = real.diameter / 2;
+        }
       } else {
         // Top layer (second layer) -- real per-size dimensions from
         // cakeConstants.js: big's second tier is 6x4, small's is 4x3.
@@ -3099,7 +3458,7 @@ const CakeScene = React.forwardRef(function CakeScene({
           bevelBottom: !(fillingActive && s > 0),
         });
 
-        if (spongeMat) {
+        if (spongeMat && !(fillingOnTop && tierFillingEnabled && s === tierFillingLayers)) {
           const spongeSection = new THREE.Mesh(spongeGeo, spongeMat);
           spongeSection.position.y = spongeCurrentY + spongeSectionHeight / 2;
           spongeSection.castShadow = true;
@@ -3206,6 +3565,7 @@ const CakeScene = React.forwardRef(function CakeScene({
             mashedFilling.position.y = fillingY;
             mashedFilling.castShadow = true;
             mashedFilling.receiveShadow = true;
+            mashedFilling.userData.blueprintRole = 'filling';
             group.add(mashedFilling);
             // Recorded for Glaze's hugging profile below — see
             // lastFillingBands' declaration above. isSwirl/bumpJitter are
@@ -3240,6 +3600,7 @@ const CakeScene = React.forwardRef(function CakeScene({
             fillingSection.position.y = fillingY;
             fillingSection.castShadow = true;
             fillingSection.receiveShadow = true;
+            fillingSection.userData.blueprintRole = 'filling';
             group.add(fillingSection);
 
             // No separate piping trim here: this branch only ever runs
@@ -4662,7 +5023,8 @@ const CakeScene = React.forwardRef(function CakeScene({
     // Interior Preview's cutaway is now real geometric clipping, applied
     // directly to covering materials (currently just frostMat) at the point
     // they're created above — nothing left to do here.
-  }, [cakeConfig, fontsReady]);
+  }, [propsCakeConfig, fontsReady]);
+  buildCakeRef.current = buildCake;
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -5933,12 +6295,12 @@ const CakeScene = React.forwardRef(function CakeScene({
       <div
         ref={mountRef}
         className={`w-full h-full ${disabled
-            ? 'pointer-events-none'
-            : isFreeformArmed
-              ? 'cursor-none'
-              : isToolActive
-                ? 'cursor-crosshair'
-                : 'cursor-grab active:cursor-grabbing'
+          ? 'pointer-events-none'
+          : isFreeformArmed
+            ? 'cursor-none'
+            : isToolActive
+              ? 'cursor-crosshair'
+              : 'cursor-grab active:cursor-grabbing'
           }`}
       />
     </div>

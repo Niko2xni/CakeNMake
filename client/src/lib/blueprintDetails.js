@@ -2,7 +2,7 @@ import * as options from './cakeConfig';
 
 const names = new Map(Object.values(options).filter(Array.isArray).flat()
   .filter((entry) => entry?.id).map((entry) => [entry.id, entry.label || entry.name || entry.id]));
-const name = (value) => names.get(value) || String(value ?? '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[-_]/g, ' ').replace(/^./, (c) => c.toUpperCase());
+export const name = (value) => names.get(value) || String(value ?? '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[-_]/g, ' ').replace(/^./, (c) => c.toUpperCase());
 
 // Match selection rows to quote keys, keeping every quoted cent exactly once.
 export function buildBlueprintDetails(config, quote, designName = '') {
@@ -66,7 +66,7 @@ export function buildBlueprintDetails(config, quote, designName = '') {
   }
   addSection('Side', sideItems);
   const center = [];
-  (config.place?.items || []).forEach((item) => center.push(['Placed Decoration', `${name(item.designId || item.type)} · position ${JSON.stringify(item.position || { x: item.x, y: item.y, z: item.z })}`, [`placed.${item.type || item.designId}`]]));
+  (config.place?.items || []).forEach((item) => center.push(['Placed Decoration', `${name(item.designId || item.type)}, placed on top of the cake`, [`placed.${item.type || item.designId}`]]));
   addSection('Center', center);
   const edges = [];
   const slots = config.edge?.mode === 'both' ? ['both', ...(layers > 1 ? ['middle'] : [])] : ['top', ...(layers > 1 ? ['middle'] : []), 'bottom'];
