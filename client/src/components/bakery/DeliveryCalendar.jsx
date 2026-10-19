@@ -101,7 +101,7 @@ export default function DeliveryCalendar({ config, selectedDate, onSelect }) {
     <div>
       <p className="font-heading font-bold text-base mb-1">Select cake needed date</p>
       <p className="text-xs text-muted-foreground mb-4">
-        Choose when you need your cake ready. You will select Store Pickup or Courier Delivery next.
+        Choose when you need your cake ready. Fulfillment details will be coordinated in chat after checkout.
       </p>
 
       <div className="flex items-start gap-2 bg-primary/5 border border-primary/20 rounded-xl px-3 py-2.5 mb-4">
