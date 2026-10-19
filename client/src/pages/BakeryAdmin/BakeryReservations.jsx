@@ -175,14 +175,20 @@ export default function BakeryReservations({ reservations, loading, selected, se
                       </p>
                       <p className="mt-1 truncate text-xs text-gray-600">{r.designName || 'Custom cake'} · #{r._id.slice(-6)}</p>
                       <div className="mt-1 flex items-center gap-1.5 flex-wrap text-xs text-gray-500">
-                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                          r.fulfillment?.type === 'delivery'
-                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                            : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                        }`}>
-                          {r.fulfillment?.type === 'delivery' ? '🛵 Courier Delivery' : '🏪 Store Pickup'}
+                        {r.fulfillment?.type && (
+                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                            r.fulfillment.type === 'delivery'
+                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                              : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          }`}>
+                            {r.fulfillment.type === 'delivery' ? '🛵 Courier Delivery' : '🏪 Store Pickup'}
+                          </span>
+                        )}
+                        <span className="inline-flex items-center gap-1 font-medium text-gray-700">
+                          <Calendar className="w-3 h-3 text-pink-500" />
+                          Reservation: {formatDate(r.pickupDate)}
                         </span>
-                        <span>Pickup {formatDate(r.pickupDate)} · {formatPeso(r.totalPrice)}</span>
+                        <span>· {formatPeso(r.totalPrice)}</span>
                       </div>
                       <p className="mt-1 text-xs text-gray-500">
                         Down payment: {formatPeso(r.downPayment?.amount)} ·{' '}
@@ -282,7 +288,7 @@ export default function BakeryReservations({ reservations, loading, selected, se
               {blueprintError && <p role="alert" className="text-xs text-red-700">{blueprintError}</p>}
               {chatError && <p role="alert" className="text-xs text-red-700">{chatError}</p>}
 
-              {/* Fulfillment Logistics Card */}
+              {/* Reservation Schedule & Fulfillment Logistics Card */}
               <div className="rounded-xl border border-pink-100 bg-pink-50/30 p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
@@ -291,22 +297,38 @@ export default function BakeryReservations({ reservations, loading, selected, se
                         <Truck className="w-4 h-4 text-pink-600" />
                         Client-Booked Courier Delivery
                       </>
-                    ) : (
+                    ) : selected.fulfillment?.type === 'pickup' ? (
                       <>
                         <Store className="w-4 h-4 text-pink-600" />
                         Store Pickup
                       </>
+                    ) : (
+                      <>
+                        <Calendar className="w-4 h-4 text-pink-600" />
+                        Reservation Schedule
+                      </>
                     )}
                   </span>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-white border border-pink-200 font-semibold text-pink-700">
-                    {selected.fulfillment?.type === 'delivery' ? 'Grab / Lalamove Car' : 'AH Tinaps Hub'}
+                    {selected.fulfillment?.type === 'delivery'
+                      ? 'Grab / Lalamove Car'
+                      : selected.fulfillment?.type === 'pickup'
+                      ? 'AH Tinaps Hub'
+                      : 'Scheduled Date'}
                   </span>
                 </div>
 
                 <div className="text-xs text-gray-600 space-y-1.5">
                   <div className="flex items-center gap-1.5 font-medium text-gray-800">
                     <Calendar className="w-3.5 h-3.5 text-pink-500 shrink-0" />
-                    <span>{selected.fulfillment?.type === 'delivery' ? 'Delivery Date:' : 'Pickup Date:'} <strong>{formatDate(selected.pickupDate)}</strong></span>
+                    <span>
+                      {selected.fulfillment?.type === 'delivery'
+                        ? 'Delivery Date:'
+                        : selected.fulfillment?.type === 'pickup'
+                        ? 'Pickup Date:'
+                        : 'Reservation Date:'}{' '}
+                      <strong>{formatDate(selected.pickupDate)}</strong>
+                    </span>
                   </div>
 
                   {selected.fulfillment?.type === 'delivery' ? (
@@ -334,7 +356,7 @@ export default function BakeryReservations({ reservations, loading, selected, se
                         </div>
                       )}
                     </>
-                  ) : (
+                  ) : selected.fulfillment?.type === 'pickup' ? (
                     <>
                       <div className="flex items-start gap-1.5">
                         <MapPin className="w-3.5 h-3.5 text-gray-400 mt-0.5 shrink-0" />
@@ -343,11 +365,26 @@ export default function BakeryReservations({ reservations, loading, selected, se
                           <span className="text-[11px] text-gray-500 block">Hours: 9:00 AM – 7:00 PM daily</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                        <span>Pickup slot: <strong className="text-gray-700">{selected.fulfillment?.timeSlot || '9:00 AM – 12:00 PM (Morning)'}</strong></span>
-                      </div>
+                      {selected.fulfillment.timeSlot && (
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                          <span>Pickup slot: <strong className="text-gray-700">{selected.fulfillment.timeSlot}</strong></span>
+                        </div>
+                      )}
                     </>
+                  ) : (
+                    <div className="pt-1.5 border-t border-pink-100/70 text-xs">
+                      <div className="flex items-start gap-1.5 text-gray-700">
+                        <Info className="w-3.5 h-3.5 text-pink-500 mt-0.5 shrink-0" />
+                        <div>
+                          <span className="font-semibold text-gray-800">Fulfillment Method: </span>
+                          <span className="text-gray-600">Coordinated in chat</span>
+                          <p className="text-[11px] text-gray-500 mt-0.5">
+                            Specific pickup time or courier delivery arrangement is coordinated directly with the customer in order chat.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   )}
 
                   {selected.fulfillment?.notes && (
