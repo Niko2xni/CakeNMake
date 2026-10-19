@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Banknote, TrendingUp, Clock } from 'lucide-react';
 import { bakeryApi, transactionApi } from '@/services/api';
+import { getChatSocket } from '@/lib/chat-socket';
 import { Skeleton } from '@/components/ui/skeleton';
 import BakeryReservations from './BakeryReservations';
 import BakeryPaymentHistory from './BakeryPaymentHistory';
@@ -27,8 +28,8 @@ export default function BakeryOrders() {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [statusError, setStatusError] = useState('');
 
-  async function loadReservations() {
-    setReservationsLoading(true);
+  async function loadReservations({ silent = false } = {}) {
+    if (!silent) setReservationsLoading(true);
     setReservationsError('');
     try {
       const data = await bakeryApi.getReservations('all');
@@ -36,29 +37,73 @@ export default function BakeryOrders() {
       setReservations(rows);
       setSelected((current) => current ? rows.find((row) => row._id === current._id) || current : null);
     } catch {
-      setReservationsError('Could not load reservations. Please try again.');
+      if (!silent) setReservationsError('Could not load reservations. Please try again.');
     } finally {
-      setReservationsLoading(false);
+      if (!silent) setReservationsLoading(false);
     }
   }
 
-  async function loadPayments() {
-    setPaymentsLoading(true);
+  async function loadPayments({ silent = false } = {}) {
+    if (!silent) setPaymentsLoading(true);
     setPaymentsError('');
     try {
       const data = await transactionApi.getTransactions();
       setPayments(data.transactions || []);
       setSummary(data.summary || null);
     } catch {
-      setPaymentsError('Could not load payment information. Please try again.');
+      if (!silent) setPaymentsError('Could not load payment information. Please try again.');
     } finally {
-      setPaymentsLoading(false);
+      if (!silent) setPaymentsLoading(false);
     }
   }
 
   useEffect(() => {
+    let active = true;
+    let socket;
+
     void loadReservations();
     void loadPayments();
+
+    const handleCreated = (newReservation) => {
+      if (!active) return;
+      if (newReservation?._id) {
+        setReservations((prev) => {
+          if (prev.some((row) => row._id === newReservation._id)) return prev;
+          return [newReservation, ...prev];
+        });
+      }
+      void loadReservations({ silent: true });
+      void loadPayments({ silent: true });
+    };
+
+    const handleUpdated = (updated) => {
+      if (!active) return;
+      if (updated?._id) {
+        const merge = (row) => ({ ...row, ...updated, user: row.user || updated.user, design: row.design || updated.design });
+        setReservations((rows) => rows.map((row) => (row._id === updated._id ? merge(row) : row)));
+        setPayments((rows) => rows.map((row) => (row._id === updated._id ? merge(row) : row)));
+        setSelected((row) => (row?._id === updated._id ? merge(row) : row));
+      }
+      void loadReservations({ silent: true });
+      void loadPayments({ silent: true });
+    };
+
+    Promise.resolve()
+      .then(() => getChatSocket?.())
+      .then((s) => {
+        if (active && s) {
+          socket = s;
+          socket.on('reservation:created', handleCreated);
+          socket.on('reservation:updated', handleUpdated);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+      socket?.off('reservation:created', handleCreated);
+      socket?.off('reservation:updated', handleUpdated);
+    };
   }, []);
 
   function changeTab(tab) {
@@ -74,11 +119,11 @@ export default function BakeryOrders() {
     try {
       const updated = await bakeryApi.updateReservationStatus(id, status);
       // PATCH returns raw references; retain populated customer/design details.
-      const merge = (row) => ({ ...row, ...updated, user: row.user, design: row.design });
+      const merge = (row) => ({ ...row, ...updated, user: row.user || updated.user, design: row.design || updated.design });
       setReservations((rows) => rows.map((row) => row._id === id ? merge(row) : row));
       setPayments((rows) => rows.map((row) => row._id === id ? merge(row) : row));
       setSelected((row) => row?._id === id ? merge(row) : row);
-      await Promise.all([loadReservations(), loadPayments()]);
+      await Promise.all([loadReservations({ silent: true }), loadPayments({ silent: true })]);
     } catch {
       setStatusError('Could not update the order status. Please try again.');
     } finally {
@@ -88,7 +133,7 @@ export default function BakeryOrders() {
 
   async function recordPayment(id, payment) {
     await bakeryApi.recordDownPayment(id, payment);
-    await Promise.all([loadReservations(), loadPayments()]);
+    await Promise.all([loadReservations({ silent: true }), loadPayments({ silent: true })]);
   }
 
   const remainingBalance = summary

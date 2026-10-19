@@ -14,6 +14,7 @@ export default function SendBakeryModal({ config, total, onClose, onOrderComplet
   const [step, setStep] = useState('calendar'); // 'calendar' | 'pay'
   const [selectedDate, setSelectedDate] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
   const { account } = useAuth();
   const [accessError, setAccessError] = useState('');
   const restricted = Boolean(activeRestriction(account));
@@ -27,6 +28,15 @@ export default function SendBakeryModal({ config, total, onClose, onOrderComplet
     } catch (error) { setAccessError(error.message); }
     finally { setBusy(false); }
   }
+
+  const handlePayment = async (date, fulfillment) => {
+    if (fulfillment !== undefined) {
+      await onPaymentComplete?.(date, fulfillment);
+    } else {
+      await onPaymentComplete?.(date);
+    }
+    setIsSubmitted(true);
+  };
 
   const close = () => { if (!busy) onClose(); };
 
@@ -52,7 +62,7 @@ export default function SendBakeryModal({ config, total, onClose, onOrderComplet
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between px-5 sm:px-6 pt-3.5 sm:pt-4 pb-3 border-b border-border/40">
           <div className="flex items-center gap-2.5">
-            {step !== 'calendar' ? (
+            {step !== 'calendar' && !isSubmitted ? (
               <button
                 type="button"
                 onClick={() => setStep('calendar')}
@@ -71,12 +81,13 @@ export default function SendBakeryModal({ config, total, onClose, onOrderComplet
               <div className="flex items-center gap-2">
                 <h2 className="font-heading font-bold text-sm sm:text-base">Send to Bakery</h2>
                 <span className="text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
-                  {step === 'calendar' ? 'Step 1 of 2: Reservation Date' : 'Step 2 of 2: Payment'}
+                  {isSubmitted ? 'Order Confirmed' : step === 'calendar' ? 'Step 1 of 2: Reservation Date' : 'Step 2 of 2: Payment'}
                 </span>
               </div>
               <div className="flex gap-1.5 mt-1">
                 {['calendar', 'pay'].map((s, i) => (
                   <div key={s} className={`h-1 w-10 rounded-full transition-colors ${
+                    isSubmitted ? 'bg-primary' :
                     step === s ? 'bg-primary' :
                     (step === 'pay' && i === 0) ? 'bg-primary/50' : 'bg-muted'
                   }`} />
@@ -114,7 +125,7 @@ export default function SendBakeryModal({ config, total, onClose, onOrderComplet
                   total={total}
                   selectedDate={selectedDate}
                   onPaid={async () => { await onOrderComplete?.(selectedDate); onClose(); }}
-                  onPaymentComplete={onPaymentComplete}
+                  onPaymentComplete={handlePayment}
                   onBusyChange={setBusy}
                   onBack={() => setStep('calendar')}
                 />

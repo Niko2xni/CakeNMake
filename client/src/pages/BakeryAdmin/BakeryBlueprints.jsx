@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { bakeryApi } from '@/services/api';
+import { getChatSocket } from '@/lib/chat-socket';
 import { safeExternalUrl } from '@/lib/safe-url';
 import CustomScrollbar from '@/components/shared/CustomScrollbar';
 import { AdminRowsSkeleton } from '@/components/shared/PageLoadingSkeleton';
@@ -13,6 +14,7 @@ export default function BakeryBlueprints() {
   const [preview, setPreview] = useState(null);
   useEffect(() => {
     let active = true;
+    let socket;
     async function load() {
       try {
         const result = await bakeryApi.getBlueprints();
@@ -21,8 +23,23 @@ export default function BakeryBlueprints() {
       finally { if (active) setLoading(false); }
     }
     void load();
+    Promise.resolve()
+      .then(() => getChatSocket?.())
+      .then((s) => {
+        if (active && s) {
+          socket = s;
+          socket.on('blueprint:created', load);
+          socket.on('blueprint:updated', load);
+        }
+      })
+      .catch(() => {});
     const timer = setInterval(load, 30000);
-    return () => { active = false; clearInterval(timer); };
+    return () => {
+      active = false;
+      clearInterval(timer);
+      socket?.off('blueprint:created', load);
+      socket?.off('blueprint:updated', load);
+    };
   }, [refresh]);
   async function access(record, download) {
     setBusy(record.id);

@@ -22,6 +22,8 @@ async function recordDownPayment(req, res) {
         ...(reservation.status === 'pending_payment' ? { status: 'confirmed' } : {}) },
     }, { new: true, runValidators: true });
     if (!updated) return res.status(409).json({ message: 'Order changed. Refresh before recording payment.' });
+    const io = req.app?.get ? req.app.get('io') : null;
+    io?.to(`platform:${req.platformId}`).emit('reservation:updated', updated);
     return res.json(updated);
   } catch (error) { return res.status(500).json({ message: 'Could not record down payment.' }); }
 }
@@ -97,6 +99,8 @@ async function updateStatus(req, res) {
     );
 
     if (!reservation) return res.status(404).json({ message: 'Reservation not found' });
+    const io = req.app?.get ? req.app.get('io') : null;
+    io?.to(`platform:${req.platformId}`).emit('reservation:updated', reservation);
     res.json(reservation);
   } catch (err) {
     res.status(500).json({ message: 'Failed to update status', error: err.message });

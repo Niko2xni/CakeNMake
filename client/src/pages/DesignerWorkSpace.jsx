@@ -858,6 +858,7 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
 
     const savedId = await saveDesign({ sentToBakery: true });
     if (savedId) await saveThumbnail(savedId);
+    setOrderComplete(true);
 
     const convos = await chatApi.listConversations();
     let convoId = convos.conversations?.find(
@@ -891,7 +892,11 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
     } catch (err) {
       console.warn('Failed to send automated initial chat message:', err);
     }
-    await chatApi.sendOrderAcknowledgement(convoId, snapshot.submissionId);
+    try {
+      await chatApi.sendOrderAcknowledgement(convoId, snapshot.submissionId);
+    } catch (err) {
+      console.warn('Failed to send order acknowledgement:', err);
+    }
   }, [account, config, title, quote, quotedConfig, saveDesign, saveThumbnail]);
 
   const handleOrderComplete = useCallback(async (selectedDate) => {

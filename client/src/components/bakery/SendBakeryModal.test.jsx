@@ -109,4 +109,40 @@ describe('SendBakeryModal 2-step flow', () => {
 
     expect(screen.getByText('Step 1 of 2: Reservation Date')).toBeInTheDocument();
   });
+
+  it('updates header to Order Confirmed and disables back navigation once payment is submitted', async () => {
+    const onPaymentComplete = vi.fn().mockResolvedValue();
+    render(
+      <MemoryRouter>
+        <SendBakeryModal config={{}} total={2000} onClose={vi.fn()} onPaymentComplete={onPaymentComplete} />
+      </MemoryRouter>
+    );
+
+    const dateButtons = screen.getAllByRole('button').filter(b => !b.disabled && /^\d{1,2}$/.test(b.textContent || ''));
+    fireEvent.click(dateButtons[0]);
+
+    const continueBtn = await screen.findByRole('button', { name: 'Continue to Payment' });
+    await act(async () => {
+      fireEvent.click(continueBtn);
+    });
+
+    expect(await screen.findByText('Step 2 of 2: Payment')).toBeInTheDocument();
+
+    // Trigger payment
+    const checkoutBtn = screen.getByRole('button', { name: /Continue simulated checkout/i });
+    fireEvent.click(checkoutBtn);
+
+    const confirmModalBtn = await screen.findByRole('button', { name: /Submit demo order/i });
+    await act(async () => {
+      fireEvent.click(confirmModalBtn);
+    });
+
+    // Wait for the simulated checkout timer & submission
+    await vi.waitFor(() => {
+      expect(onPaymentComplete).toHaveBeenCalled();
+    }, { timeout: 3000 });
+
+    expect(await screen.findByText('Order Confirmed')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Back to calendar' })).not.toBeInTheDocument();
+  });
 });
