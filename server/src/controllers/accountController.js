@@ -202,10 +202,68 @@ async function verifyEmailLinkOtp(req, res) {
     }
 }
 
+async function payRegistrationFee(req, res) {
+    try {
+        const { paymentReference, agreedToTerms, method } = req.body || {};
+        if (!agreedToTerms) {
+            return res.status(400).json({
+                code: 'TERMS_REQUIRED',
+                message: 'You must agree to the Terms of Service & Registration Policy to continue.',
+            });
+        }
+
+        const user = await User.findOne({ firebaseUid: req.auth.uid });
+        if (!user) {
+            return res.status(404).json({
+                code: 'ACCOUNT_NOT_FOUND',
+                message: 'Application account not found.',
+            });
+        }
+
+        if (user.role !== 'customer') {
+            return res.status(400).json({
+                code: 'NOT_CUSTOMER',
+                message: 'Registration fee is only applicable to customer accounts.',
+            });
+        }
+
+        const now = new Date();
+        const ref = typeof paymentReference === 'string' && paymentReference.trim()
+            ? paymentReference.trim().slice(0, 100)
+            : `DEMO-REG-25-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+        user.registrationFee = {
+            isPaid: true,
+            amount: 25,
+            paidAt: now,
+            paymentReference: ref,
+            method: method === 'other' ? 'other' : 'gcash',
+            paymentMode: 'simulated',
+            agreedToTerms: true,
+            agreedToTermsAt: now,
+        };
+
+        await user.save();
+        await user.populate('platform', 'name slug isActive');
+
+        return res.json({
+            message: 'Registration fee successfully processed.',
+            user,
+        });
+    } catch (error) {
+        console.error('Registration fee payment failed:', error);
+        return res.status(500).json({
+            code: 'REGISTRATION_FEE_FAILED',
+            message: 'Could not process the registration fee payment.',
+        });
+    }
+}
+
 module.exports = {
     syncAccount,
     getCurrentAccount,
     updateCurrentAccount,
     requestEmailLinkOtp,
     verifyEmailLinkOtp,
+    payRegistrationFee,
 };

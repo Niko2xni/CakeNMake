@@ -59,6 +59,16 @@ const userSchema = new mongoose.Schema(
             expiresAt: { type: Date, default: null },
             staff: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
         },
+        registrationFee: {
+            isPaid: { type: Boolean, default: null },
+            amount: { type: Number, default: 25 },
+            paidAt: { type: Date, default: null },
+            paymentReference: { type: String, default: null },
+            method: { type: String, enum: ['gcash', 'other'], default: 'gcash' },
+            paymentMode: { type: String, enum: ['simulated', 'live'], default: 'simulated' },
+            agreedToTerms: { type: Boolean, default: false },
+            agreedToTermsAt: { type: Date, default: null },
+        },
         moderationHistory: { type: [{
             action: String, reason: String, at: Date, expiresAt: Date,
             staff: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

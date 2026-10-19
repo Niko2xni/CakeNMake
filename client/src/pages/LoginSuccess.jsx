@@ -14,7 +14,11 @@ export default function LoginSuccess() {
   useEffect(() => {
     if (isLoadingAuth) return;
     if (isAuthenticated && account) {
-      navigate(['bakery_staff', 'bakery_admin', 'platform_admin'].includes(account.role) ? '/bakery/orders' : '/client', { replace: true });
+      const isBakery = ['bakery_staff', 'bakery_admin', 'platform_admin'].includes(account.role);
+      const feeEnabled = import.meta.env.VITE_REGISTRATION_FEE_ENABLED !== 'false';
+      const needsActivation = feeEnabled && account.role === 'customer' && account.registrationFee?.isPaid === false;
+      const target = isBakery ? '/bakery/orders' : (needsActivation ? '/activate-account' : '/client');
+      navigate(target, { replace: true });
     } else if (authError) {
       setError(authError.message || 'Your account could not be loaded. Please try signing in again.');
     } else if (auth && !auth.currentUser && !isSignInWithEmailLink(auth, window.location.href)) {

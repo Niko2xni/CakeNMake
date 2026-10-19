@@ -6,6 +6,7 @@ const {
     updateCurrentAccount,
     requestEmailLinkOtp,
     verifyEmailLinkOtp,
+    payRegistrationFee,
 } = require('../controllers/accountController');
 
 const router = express.Router();
@@ -17,5 +18,6 @@ router.get('/me', getCurrentAccount);
 router.patch('/me', updateCurrentAccount);
 router.post('/email/request-otp', requestEmailLinkOtp);
 router.post('/email/verify-otp', verifyEmailLinkOtp);
+router.post('/pay-registration-fee', payRegistrationFee);
 
 module.exports = router;

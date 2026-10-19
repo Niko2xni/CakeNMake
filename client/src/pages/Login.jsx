@@ -23,7 +23,11 @@ export default function Login() {
   const { account, isAuthenticated, isLoadingAuth, authError } = useAuth();
   useEffect(() => {
     if (isLoadingAuth || !isAuthenticated || !account) return;
-    navigate(['bakery_staff', 'bakery_admin', 'platform_admin'].includes(account.role) ? '/bakery/orders' : '/client', { replace: true });
+    const isBakery = ['bakery_staff', 'bakery_admin', 'platform_admin'].includes(account.role);
+    const feeEnabled = import.meta.env.VITE_REGISTRATION_FEE_ENABLED !== 'false';
+    const needsActivation = feeEnabled && account.role === 'customer' && account.registrationFee?.isPaid === false;
+    const target = isBakery ? '/bakery/orders' : (needsActivation ? '/activate-account' : '/client');
+    navigate(target, { replace: true });
   }, [account, isAuthenticated, isLoadingAuth, navigate]);
 
   const initialEmail = location.state?.email || "";

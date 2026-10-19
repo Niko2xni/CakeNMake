@@ -161,6 +161,10 @@ export const accountApi = {
     method: 'POST',
     body: JSON.stringify({ email, code }),
   }),
+  payRegistrationFee: (payment) => requestAuthenticatedJson(`${API_BASE_URL}/account/pay-registration-fee`, {
+    method: 'POST',
+    body: JSON.stringify(payment),
+  }),
 };
 
 // Design API calls

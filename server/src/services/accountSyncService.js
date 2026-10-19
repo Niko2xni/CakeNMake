@@ -114,6 +114,16 @@ async function synchronizeAccount(claims) {
       $setOnInsert: {
         role: 'customer',
         status: 'active',
+        registrationFee: {
+          isPaid: false,
+          amount: 25,
+          paidAt: null,
+          paymentReference: null,
+          method: 'gcash',
+          paymentMode: 'simulated',
+          agreedToTerms: false,
+          agreedToTermsAt: null,
+        },
       },
     },
     {

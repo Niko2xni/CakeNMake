@@ -10,5 +10,10 @@ export default function RoleRoute({ allowedRoles, fallbackPath }) {
     return <Navigate to={destination} replace />;
   }
 
+  const feeEnabled = import.meta.env.VITE_REGISTRATION_FEE_ENABLED !== 'false';
+  if (feeEnabled && account.role === 'customer' && account.registrationFee?.isPaid === false) {
+    return <Navigate to="/activate-account" replace />;
+  }
+
   return <Outlet />;
 }

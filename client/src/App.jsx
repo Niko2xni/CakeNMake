@@ -16,6 +16,7 @@ import ClientHome from '@/pages/Client/Home';
 import Profile from '@/pages/Client/Profile';
 import Settings from '@/pages/Settings';
 import Login from '@/pages/Login';
+import ActivateAccount from '@/pages/ActivateAccount';
 import ForgotPassword from '@/pages/ForgotPassword';
 import ResetPassword from '@/pages/ResetPassword';
 import LoginSuccess from '@/pages/LoginSuccess';
@@ -85,6 +86,7 @@ const AuthenticatedApp = () => {
       <Route path="/guest-designer" element={<Designer />} />
 
       <Route path="/login" element={<Login />} />
+      <Route path="/activate-account" element={<ActivateAccount />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/login-success" element={<LoginSuccess />} />

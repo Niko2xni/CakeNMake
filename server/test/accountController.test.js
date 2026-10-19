@@ -6,6 +6,7 @@ const {
   getCurrentAccount,
   syncAccount,
   updateCurrentAccount,
+  payRegistrationFee,
 } = require('../src/controllers/accountController');
 
 function createResponse() {
@@ -178,3 +179,60 @@ test('updateCurrentAccount only writes the supported display name field', async 
     $set: { displayName: 'Updated Name' },
   });
 });
+
+test('payRegistrationFee rejects when agreedToTerms is false', async () => {
+  const req = createRequest();
+  req.body = { agreedToTerms: false };
+  const res = createResponse();
+
+  await payRegistrationFee(req, res);
+
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.code, 'TERMS_REQUIRED');
+});
+
+test('payRegistrationFee rejects non-customer accounts', async () => {
+  mock.method(User, 'findOne', async () => ({
+    firebaseUid: 'firebase-user-1',
+    role: 'bakery_admin',
+  }));
+
+  const req = createRequest();
+  req.body = { agreedToTerms: true };
+  const res = createResponse();
+
+  await payRegistrationFee(req, res);
+
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.code, 'NOT_CUSTOMER');
+});
+
+test('payRegistrationFee marks customer registration fee as paid', async () => {
+  const user = {
+    firebaseUid: 'firebase-user-1',
+    role: 'customer',
+    save: async function () { return this; },
+    populate: async function () { return this; },
+  };
+
+  mock.method(User, 'findOne', async () => user);
+
+  const req = createRequest();
+  req.body = {
+    agreedToTerms: true,
+    paymentReference: 'DEMO-REG-12345',
+    method: 'gcash',
+  };
+  const res = createResponse();
+
+  await payRegistrationFee(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.message, 'Registration fee successfully processed.');
+  assert.equal(user.registrationFee.isPaid, true);
+  assert.equal(user.registrationFee.amount, 25);
+  assert.equal(user.registrationFee.paymentReference, 'DEMO-REG-12345');
+  assert.equal(user.registrationFee.paymentMode, 'simulated');
+  assert.equal(user.registrationFee.agreedToTerms, true);
+});
+
