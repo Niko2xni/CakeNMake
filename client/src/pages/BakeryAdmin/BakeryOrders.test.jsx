@@ -208,7 +208,7 @@ describe('Orders', () => {
     expect(screen.getByText('Unit 402, Pioneer Woodlands, Mandaluyong')).toBeVisible();
     expect(screen.getByText(/Tower 2 Lobby/)).toBeVisible();
     expect(screen.getByText('2:00 PM – 4:00 PM')).toBeVisible();
-    expect(screen.getByText('Pay-to-Bake Policy Status')).toBeVisible();
+    expect(screen.getByText('Payment Summary')).toBeVisible();
   });
 
   it('displays reservation schedule and chat coordination notice when order has no fulfillment method', async () => {

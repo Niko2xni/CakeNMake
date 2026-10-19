@@ -91,10 +91,14 @@ export default function BakeryOrders() {
     await Promise.all([loadReservations(), loadPayments()]);
   }
 
+  const remainingBalance = summary
+    ? Math.max(0, (summary.totalRevenueExpected || 0) - (summary.totalDownPaymentsCollected || 0))
+    : 0;
+
   const cards = summary ? [
     { label: 'Down Payments Collected', value: `₱${Number(summary.totalDownPaymentsCollected || 0).toLocaleString()}`, icon: Banknote },
     { label: 'Total Order Value', value: `₱${Number(summary.totalRevenueExpected || 0).toLocaleString()}`, icon: TrendingUp },
-    { label: 'Pending Down Payments', value: summary.pendingCount, icon: Clock },
+    { label: 'Remaining Balance Due', value: `₱${Number(remainingBalance).toLocaleString()}`, icon: Clock },
   ] : [];
 
   return <div className="cn-bakery-orders h-full min-h-0 rounded-2xl border border-pink-100 bg-white shadow-sm flex flex-col overflow-hidden">

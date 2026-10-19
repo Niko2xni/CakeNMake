@@ -93,6 +93,11 @@ export default function BakeryReservations({ reservations, loading, selected, se
     finally { setOpeningChat(false); }
   }
 
+  const hasUnpaid = reservations.some((r) => r.status === 'pending_payment');
+  const availableTabs = hasUnpaid
+    ? [...STATUS_TABS, { key: 'pending_payment', label: 'Unpaid Deposit' }]
+    : STATUS_TABS;
+
   const filtered = reservations.filter((r) => {
     if (activeTab !== 'all' && r.status !== activeTab) return false;
     if (!search.trim()) return true;
@@ -129,7 +134,7 @@ export default function BakeryReservations({ reservations, loading, selected, se
           </div>
 
           <div className="flex gap-1 overflow-x-auto pb-px">
-            {STATUS_TABS.map((tab) => (
+            {availableTabs.map((tab) => (
               <button
                 key={tab.key}
                 aria-pressed={activeTab === tab.key}
@@ -193,16 +198,21 @@ export default function BakeryReservations({ reservations, loading, selected, se
                           <Calendar className="w-3 h-3 text-pink-500" />
                           Reservation: {formatDate(r.pickupDate)}
                         </span>
-                        <span>· {formatPeso(r.totalPrice)}</span>
+                        <span className="text-gray-300">·</span>
+                        <span className="font-semibold text-gray-800">{formatPeso(r.totalPrice)} total</span>
+                        <span className="text-gray-300">·</span>
+                        {r.downPayment?.isPaid ? (
+                          <span className="text-gray-600">
+                            <span className="text-green-600 font-medium">Deposit paid</span>
+                            {' · '}
+                            <span>Balance: <strong>{formatPeso(Math.max(0, (r.totalPrice || 0) - (r.downPayment?.amount || 0)))}</strong></span>
+                          </span>
+                        ) : (
+                          <span className="text-yellow-700 font-medium bg-yellow-50 px-1.5 py-0.5 rounded border border-yellow-200 text-[11px]">
+                            Deposit unpaid ({formatPeso(r.downPayment?.amount)})
+                          </span>
+                        )}
                       </div>
-                      <p className="mt-1 text-xs text-gray-500">
-                        Down payment: {formatPeso(r.downPayment?.amount)} ·{' '}
-                        <span className={r.downPayment?.isPaid ? 'text-green-600 font-medium' : 'text-yellow-600'}>
-                          {r.downPayment?.isPaid ? 'Paid' : 'Unpaid'}
-                        </span>
-                        {' · '}
-                        Balance: {formatPeso(r.totalPrice ? Math.max(0, r.totalPrice - (r.downPayment?.amount || 0)) : 0)}
-                      </p>
                     </div>
 
                     <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full border flex-shrink-0 ${meta.color}`}>
@@ -238,7 +248,7 @@ export default function BakeryReservations({ reservations, loading, selected, se
               </div>
             </div>
 
-            <CustomScrollbar className="flex-1" contentClassName="p-3.5 space-y-3">
+            <CustomScrollbar className="flex-1" contentClassName="p-3 space-y-2.5">
               {/* Customer & Cake Header */}
               <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-gray-50/80 border border-gray-100">
                 <div className="w-9 h-9 rounded-full bg-pink-500 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
@@ -261,10 +271,11 @@ export default function BakeryReservations({ reservations, loading, selected, se
                   type="button"
                   onClick={openChat}
                   disabled={openingChat}
+                  aria-label="Open chat with customer"
                   className="flex items-center justify-center gap-1.5 rounded-xl border border-pink-200 bg-pink-50/70 hover:bg-pink-100 px-2 py-2 text-xs font-semibold text-pink-700 transition-colors"
                 >
                   <MessageCircle className="w-3.5 h-3.5 text-pink-600 shrink-0" />
-                  <span className="truncate">Open chat with customer</span>
+                  <span className="truncate">Chat with customer</span>
                 </button>
 
                 {selected.blueprint ? (
@@ -356,35 +367,46 @@ export default function BakeryReservations({ reservations, loading, selected, se
                 )}
               </div>
 
-              {/* Financial & Pay-to-Bake Summary */}
+              {/* Financial & Payment Summary */}
               <div className="rounded-xl border border-gray-200 bg-gray-50/50 p-2.5 space-y-2">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-semibold text-gray-800 flex items-center gap-1.5">
                     <ShieldCheck className="w-3.5 h-3.5 text-pink-600 shrink-0" />
-                    <span>Pay-to-Bake Policy Status</span>
+                    <span>Payment Summary</span>
                   </span>
                   <span className="font-bold text-gray-900 text-sm">Total: {formatPeso(selected.totalPrice)}</span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="p-2 rounded-lg bg-white border border-gray-200/80">
-                    <span className="text-[10px] text-gray-500 block uppercase font-medium">1. Downpayment (50%)</span>
-                    <p className="font-bold text-gray-900 mt-0.5">
-                      {formatPeso(selected.downPayment?.amount || Math.round(selected.totalPrice * 0.5))}
-                    </p>
-                    <span className={`inline-block mt-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                      selected.downPayment?.isPaid ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                    }`}>
-                      {selected.downPayment?.isPaid ? 'Paid' : 'Unpaid'}
-                    </span>
+                  <div className="p-2 rounded-lg bg-white border border-gray-200/80 flex flex-col justify-between">
+                    <div>
+                      <span className="text-[10px] text-gray-500 block uppercase font-medium">1. Downpayment (50%)</span>
+                      <div className="flex items-baseline gap-1.5 mt-0.5">
+                        <span className="font-bold text-gray-900">
+                          {formatPeso(selected.downPayment?.amount || Math.round(selected.totalPrice * 0.5))}
+                        </span>
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.2 rounded ${
+                          selected.downPayment?.isPaid ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {selected.downPayment?.isPaid ? 'Paid' : 'Unpaid'}
+                        </span>
+                      </div>
+                    </div>
+                    {selected.downPayment?.isPaid && (
+                      <p className="text-[10px] text-gray-500 mt-1 truncate" title={`${selected.downPayment.method || 'paid'}${selected.downPayment.paymentReference ? ` · Ref: ${selected.downPayment.paymentReference}` : ''}`}>
+                        {selected.downPayment.method || 'paid'}{selected.downPayment.paymentReference ? ` · Ref: ${selected.downPayment.paymentReference}` : ''}
+                      </p>
+                    )}
                   </div>
 
-                  <div className="p-2 rounded-lg bg-white border border-gray-200/80">
-                    <span className="text-[10px] text-gray-500 block uppercase font-medium">2. Remaining Balance</span>
-                    <p className="font-bold text-gray-900 mt-0.5">
-                      {formatPeso(Math.max(0, (selected.totalPrice || 0) - (selected.downPayment?.amount || Math.round(selected.totalPrice * 0.5))))}
-                    </p>
-                    <span className="inline-block mt-0.5 text-[10px] text-gray-500">
+                  <div className="p-2 rounded-lg bg-white border border-gray-200/80 flex flex-col justify-between">
+                    <div>
+                      <span className="text-[10px] text-gray-500 block uppercase font-medium">2. Remaining Balance</span>
+                      <p className="font-bold text-gray-900 mt-0.5">
+                        {formatPeso(Math.max(0, (selected.totalPrice || 0) - (selected.downPayment?.amount || Math.round(selected.totalPrice * 0.5))))}
+                      </p>
+                    </div>
+                    <span className="text-[10px] text-gray-500 mt-1 block">
                       Due 48h before baking
                     </span>
                   </div>
@@ -395,16 +417,6 @@ export default function BakeryReservations({ reservations, loading, selected, se
                   <p className="text-[11px] text-amber-700 bg-amber-50 p-1.5 rounded border border-amber-200">
                     Simulated checkout · Payment requires staff verification below
                   </p>
-                )}
-
-                {/* Paid notification if payment recorded */}
-                {selected.downPayment?.isPaid && (
-                  <div className="p-2 rounded-lg border border-green-200 bg-green-50/60 text-xs text-green-800">
-                    <p className="font-semibold text-[11px]">✓ Down payment recorded ({formatPeso(selected.downPayment.amount)})</p>
-                    <p className="text-[10px] text-green-700 mt-0.5">
-                      {formatDate(selected.downPayment.paidAt)}{selected.downPayment.method && ` · Method: ${selected.downPayment.method}`}{selected.downPayment.paymentReference && ` · Ref: ${selected.downPayment.paymentReference}`}
-                    </p>
-                  </div>
                 )}
               </div>
 
