@@ -135,7 +135,7 @@ describe('Orders', () => {
     await waitFor(() => expect(transactionApi.getTransactions).toHaveBeenCalledTimes(2));
     expect(screen.getByText('ana@example.com')).toBeVisible();
     fireEvent.click(tab('Payment History'));
-    expect(within(await screen.findByRole('button', { name: 'Open reservation for Ana Cruz' })).getByText('Order status: In Production')).toBeVisible();
+    expect(within(await screen.findByRole('button', { name: 'Open reservation for Ana Cruz' })).getByText('In Production')).toBeVisible();
   });
 
   it('shows a retryable payment error while reservations remain usable', async () => {

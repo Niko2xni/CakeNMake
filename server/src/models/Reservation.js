@@ -62,11 +62,13 @@ const reservationSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: ['pending_payment', 'confirmed', 'in_production', 'completed'],
-      default: 'pending_payment',
+      default: 'confirmed',
     },
   },
   { timestamps: true }
 );
 reservationSchema.index({ blueprint: 1 }, { unique: true, sparse: true });
+reservationSchema.index({ platform: 1, createdAt: -1 });
+reservationSchema.index({ platform: 1, status: 1 });
 
 module.exports = mongoose.model('Reservation', reservationSchema);

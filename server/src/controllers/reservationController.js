@@ -85,7 +85,7 @@ async function updateStatus(req, res) {
   try {
     const { status } = req.body;
 
-    const allowed = ['pending_payment', 'confirmed', 'in_production', 'completed'];
+    const allowed = ['confirmed', 'in_production', 'completed'];
     if (!allowed.includes(status)) {
       return res.status(400).json({ message: 'Invalid status value' });
     }

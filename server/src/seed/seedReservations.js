@@ -41,8 +41,8 @@ async function seed() {
       design: new mongoose.Types.ObjectId(),
       pickupDate: new Date(Date.now() + day),
       totalPrice: 1700,
-      downPayment: { amount: 850, isPaid: false },
-      status: 'pending_payment',
+      downPayment: { amount: 850, isPaid: true, paymentReference: 'pm_test_004', paidAt: new Date(), method: 'gcash' },
+      status: 'confirmed',
     },
     {
       platform: platform._id,
