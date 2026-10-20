@@ -1718,6 +1718,10 @@ const CakeScene = React.forwardRef(function CakeScene({
           const camera = new THREE.PerspectiveCamera(30, width / height, 0.1, 300);
           const projected = new THREE.Vector3();
           const useTilt = zoomTilt ?? tilt;
+          if (useTilt >= Math.PI / 2 - 0.01) {
+            camera.up.set(0, 0, -1);
+            lookAt = new THREE.Vector3(center.x, box.max.y, center.z);
+          }
           const horizontal = Math.cos(useTilt);
           const dir = new THREE.Vector3(Math.sin(azimuth) * horizontal, Math.sin(useTilt), Math.cos(azimuth) * horizontal);
           const place = (d) => {

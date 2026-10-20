@@ -115,15 +115,69 @@ export function buildBlueprintTierPlan(config = {}) {
         runningKey = 'finish';
     }
     if (anySurface) {
-        const prevRunning = running;
+        const surfaceBase = anyFinish ? { ...clone(plain), exteriorFinish: clone(finishCfg) } : clone(plain);
+        const surfaceConfig = {
+            ...clone(surfaceBase),
+            surfaceTreatment: clone(config.surfaceTreatment),
+            side: { mode: null },
+        };
+        if (surfaceConfig.side && Array.isArray(surfaceConfig.side.layerTreatments)) {
+            surfaceConfig.side.layerTreatments = surfaceConfig.side.layerTreatments.map((t) => ({ ...(t || {}), mode: null }));
+        }
+
+        // Close front screenshot (tilted to highlight top surface treatment & drips)
+        stages.push({
+            key: 'surface-front',
+            config: surfaceConfig,
+            diffConfig: surfaceBase,
+            azimuth: 18,
+            tilt: 26,
+            fit: 0.86,
+        });
+        // Close back screenshot (180 deg opposite)
+        stages.push({
+            key: 'surface-back',
+            config: surfaceConfig,
+            azimuth: 198,
+            tilt: 26,
+            fit: 0.86,
+        });
+
         running = { ...clone(running), surfaceTreatment: clone(config.surfaceTreatment) };
-        stages.push({ key: 'surface', config: running, diffConfig: prevRunning });
         runningKey = 'surface';
     }
     if (anySide) {
-        const beforeSide = running;
+        // Base for SIDE: strictly excludes any surface treatment!
+        // Display as Naked + SIDE or Frosted/Texture + SIDE
+        const sideBase = anyFinish ? { ...clone(plain), exteriorFinish: clone(finishCfg) } : clone(plain);
+        const sideConfig = {
+            ...clone(sideBase),
+            side: clone(config.side),
+            surfaceTreatment: { mode: null },
+        };
+        if (sideConfig.surfaceTreatment && Array.isArray(sideConfig.surfaceTreatment.layerTreatments)) {
+            sideConfig.surfaceTreatment.layerTreatments = sideConfig.surfaceTreatment.layerTreatments.map((t) => ({ ...(t || {}), mode: null }));
+        }
+
+        // Close front screenshot (flatter tilt to showcase side design)
+        stages.push({
+            key: 'side-front',
+            config: sideConfig,
+            diffConfig: sideBase,
+            azimuth: 18,
+            tilt: 14,
+            fit: 0.86,
+        });
+        // Close back screenshot (180 deg opposite)
+        stages.push({
+            key: 'side-back',
+            config: sideConfig,
+            azimuth: 198,
+            tilt: 14,
+            fit: 0.86,
+        });
+
         running = { ...clone(running), side: clone(config.side) };
-        stages.push({ key: 'side', config: running, diffConfig: beforeSide });
     }
     slots.forEach(([slot, edge]) => {
         const only = clone(running);
@@ -137,7 +191,14 @@ export function buildBlueprintTierPlan(config = {}) {
     if (placed.length) {
         const withoutCenter = clone(config);
         withoutCenter.place = { ...(withoutCenter.place || {}), items: [] };
-        stages.push({ key: 'center', config: clone(config), diffConfig: withoutCenter });
+        stages.push({
+            key: 'center',
+            config: clone(config),
+            diffConfig: withoutCenter,
+            tilt: 90,
+            azimuth: 0,
+            fit: 0.85,
+        });
     }
 
     // One short single-tier slab per filling layer, for the stacked slices.
@@ -202,6 +263,12 @@ export function buildBlueprintTierPlan(config = {}) {
         if (t.fillingOn) {
             // One slice is enough however many filling layers there are: a cake
             // layer with the filling on top, then a close-up of its piping.
+            const fillingSugarOverride = config.sugarColorOverrides?.[`filling-${t.i}`] || config.sugarColorOverrides?.filling;
+            const hasSugarOverride = fillingSugarOverride?.mode === 'colorOverride' && fillingSugarOverride.colorId;
+            const fillingColorId = hasSugarOverride ? fillingSugarOverride.colorId : t.fillingFlavor;
+            const fillingChipColor = flavorColorOf(fillingColorId) || flavorColorOf(t.fillingFlavor);
+            const fillingSub = hasSugarOverride ? name(fillingColorId) : name(t.fillingFlavor);
+
             pages.push({
                 kind: 'filling', section: 'FILLING', title: 'Filling',
                 image: `filling-${t.i}`, zoomImage: `filling-zoom-${t.i}`,
@@ -209,10 +276,19 @@ export function buildBlueprintTierPlan(config = {}) {
                 layers: t.fillingLayers,
                 piping: t.piping?.tip ? name(t.piping.tip) : null,
                 pipingColor: t.piping?.tip ? name(t.piping.colorId) : null,
-                // Top picture: FILLING = the colour the filling really is on the cake
-                // (measured from the render, named in plain words).
+                // Top picture: FILLING icon directly takes the ToolPanel chip color and name
                 crops: [
-                    { kind: 'color', label: 'FILLING', side: 'left', colorKey: `filling-${t.i}`, fallbackName: t.piping?.colorId ? name(t.piping.colorId) : null, ...callout(`filling-${t.i}`, `fill-${t.i}`, 'FILLING', 0.99, -0.3, 0.35, 0.3, { role: 'filling' }), anchorId: `fill-${t.i}` },
+                    {
+                        kind: 'color',
+                        label: 'FILLING',
+                        side: 'left',
+                        sub: fillingSub,
+                        chipColor: fillingChipColor,
+                        colorKey: `filling-${t.i}`,
+                        fallbackName: fillingSub,
+                        ...callout(`filling-${t.i}`, `fill-${t.i}`, 'FILLING', 0.99, -0.3, 0.35, 0.3, { role: 'filling' }),
+                        anchorId: `fill-${t.i}`,
+                    },
                 ],
                 // Bottom (closer) picture: a magnified round look at the filling's edge,
                 // i.e. the piping design (or a plain edge when none was chosen).
@@ -238,23 +314,112 @@ export function buildBlueprintTierPlan(config = {}) {
         }
 
         if (t.surface?.mode) {
+            const surfaceSugarOverride = config.sugarColorOverrides?.[`surface-${t.i}`] || config.sugarColorOverrides?.surface;
+            const surfaceColorId = (surfaceSugarOverride?.mode === 'colorOverride' && surfaceSugarOverride.colorId)
+              ? surfaceSugarOverride.colorId
+              : (surfaceSugarOverride?.colorId || 'vanilla');
+            const surfaceChipColor = flavorColorOf(surfaceColorId) || '#F6DEAB';
+            const surfaceFlavorName = name(surfaceColorId);
+            const patternId = getSurfaceTreatmentPattern(t.surface, config.structure);
+            const patternName = name(patternId);
+
             pages.push({
-                kind: 'surface', section: 'SURFACE TREATMENT', image: 'surface', title: 'Surface Treatment',
-                callouts: [callout('surface', `surface-${t.i}`, 'SURFACE TREATMENT', Math.min(0.97, midHy + 0.2 / count), -0.45, 0.4, Math.max(0.28, anchorY - 0.1))],
-                details: [['Treatment', name(t.surface.mode)], ['Pattern', name(getSurfaceTreatmentPattern(t.surface, config.structure))]],
-                highlights: [`${name(t.surface.mode)} finish applied to the surface`],
-                flavor: null,
+                kind: 'surface',
+                section: 'SURFACE TREATMENT',
+                title: 'Surface Treatment',
+                image: 'surface-front',
+                zoomImage: 'surface-back',
+                frontImage: 'surface-front',
+                backImage: 'surface-back',
+                flavorName: surfaceFlavorName,
+                flavorChipColor: surfaceChipColor,
+                patternName,
+                mode: t.surface.mode,
+                crops: [
+                    {
+                        kind: 'flavor',
+                        label: 'FLAVOR',
+                        side: 'left',
+                        sub: surfaceFlavorName,
+                        chipColor: surfaceChipColor,
+                        anchorId: `surface-flavor-${t.i}`,
+                        ...callout('surface-front', `surface-flavor-${t.i}`, 'FLAVOR', 0.95, -0.3, 0.45, 0.28),
+                    },
+                ],
+                pattern: {
+                    label: 'PATTERN',
+                    sub: patternName,
+                    anchorId: `surface-pattern-${t.i}`,
+                    ...callout('surface-back', `surface-pattern-${t.i}`, 'PATTERN', 0.85, -0.3, 0.45, 0.42),
+                },
+                details: [
+                    ['Treatment', name(t.surface.mode)],
+                    ['Pattern', patternName],
+                    ['Flavor', surfaceFlavorName],
+                ],
+                highlights: [`${name(t.surface.mode)} finish applied to the surface (Front and Back views)`],
             });
         }
 
         if (t.side?.mode) {
             const choice = t.side[t.side.mode] || {};
+            const sideSugarOverride = config.sugarColorOverrides?.[`side-${t.i}`] || config.sugarColorOverrides?.side;
+            const sideColorId = (sideSugarOverride?.mode === 'colorOverride' && sideSugarOverride.colorId)
+              ? sideSugarOverride.colorId
+              : (choice.colorId || choice.flavorId || sideSugarOverride?.colorId || 'vanilla');
+            const sideChipColor = flavorColorOf(sideColorId) || '#F6DEAB';
+            const sideColorName = name(sideColorId);
+            const sidePatternName = name(choice.setId || t.side.mode);
+
+            const isTextured = t.style === 'texturedButtercream';
+            const isFrosted = t.style && t.style !== 'naked';
+            const baseFinishName = isTextured
+                ? `Textured (${name(t.texture || 'Buttercream')})`
+                : isFrosted
+                    ? `Frosted (${name(t.frost || 'Buttercream')})`
+                    : 'Naked';
+            const baseTypeDisplay = isTextured ? 'TEXTURE + SIDE' : isFrosted ? 'FROSTED + SIDE' : 'NAKED + SIDE';
+
             pages.push({
-                kind: 'side', section: 'SIDE', image: 'side', title: 'Side Design',
-                callouts: [callout('side', `side-${t.i}`, 'SIDE DESIGN', midHy, -0.45, 0.4, anchorY)],
-                details: [['Design', name(t.side.mode)], ['Set', name(choice.setId)], ['Color', name(choice.colorId)]],
-                highlights: [`${name(t.side.mode)} wrapped around the cake's side`],
-                flavor: choice.flavorId ? name(choice.flavorId) : null,
+                kind: 'side',
+                section: 'SIDE',
+                title: 'Side Design',
+                image: 'side-front',
+                zoomImage: 'side-back',
+                frontImage: 'side-front',
+                backImage: 'side-back',
+                flavorName: sideColorName,
+                flavorChipColor: sideChipColor,
+                patternName: sidePatternName,
+                mode: t.side.mode,
+                baseFinish: baseFinishName,
+                baseTypeDisplay,
+                crops: [
+                    {
+                        kind: 'flavor',
+                        label: 'FLAVOR',
+                        side: 'left',
+                        sub: sideColorName,
+                        chipColor: sideChipColor,
+                        anchorId: `side-flavor-${t.i}`,
+                        ...callout('side-front', `side-flavor-${t.i}`, 'FLAVOR', midHy, -0.3, 0.45, anchorY),
+                    },
+                ],
+                pattern: {
+                    label: 'PATTERN',
+                    sub: sidePatternName,
+                    anchorId: `side-pattern-${t.i}`,
+                    ...callout('side-back', `side-pattern-${t.i}`, 'PATTERN', midHy, -0.3, 0.45, anchorY),
+                },
+                details: [
+                    ['Base Finish', baseFinishName],
+                    ['Design', name(t.side.mode)],
+                    ['Set', sidePatternName],
+                    ['Color', sideColorName],
+                ],
+                highlights: [
+                    `${baseTypeDisplay}: ${name(t.side.mode)} design with ${baseFinishName.toLowerCase()} base (Front and Back views)`,
+                ],
             });
         }
 
@@ -274,22 +439,108 @@ export function buildBlueprintTierPlan(config = {}) {
         });
     });
 
+    function cleanDecorName(rawType) {
+        if (!rawType) return 'Decoration';
+        let s = String(rawType)
+            .replace(/^center-/, '')
+            .replace(/-default$/, '')
+            .replace(/-standing$/, ' (Standing)')
+            .replace(/-/g, ' ');
+        const letterMatch = s.match(/^letter(Upper|Lower)([A-Za-z0-9])/i);
+        if (letterMatch) {
+            return `Letter '${letterMatch[2]}'`;
+        }
+        return s.replace(/([a-z])([A-Z])/g, '$1 $2')
+            .replace(/^./, (c) => c.toUpperCase())
+            .trim();
+    }
+
+    function getItemZone(item) {
+        const x = Number(item.x) || 0;
+        const z = Number(item.z) || 0;
+        const r = Math.hypot(x, z);
+        if (r < 0.35) return 'Center';
+
+        const deg = (Math.atan2(z, x) * 180) / Math.PI;
+        if (deg >= -22.5 && deg < 22.5) return 'Right';
+        if (deg >= 22.5 && deg < 67.5) return 'Front-Right';
+        if (deg >= 67.5 && deg < 112.5) return 'Front';
+        if (deg >= 112.5 && deg < 157.5) return 'Front-Left';
+        if (deg >= 157.5 || deg < -157.5) return 'Left';
+        if (deg >= -157.5 && deg < -112.5) return 'Back-Left';
+        if (deg >= -112.5 && deg < -67.5) return 'Back';
+        return 'Back-Right';
+    }
+
+    function describeGroupPlacement(items) {
+        if (!items || items.length === 0) return 'Top surface';
+        if (items.length === 1) {
+            const zone = getItemZone(items[0]);
+            return zone === 'Center' ? 'Center of cake' : `${zone} edge`;
+        }
+
+        const zones = items.map(getItemZone);
+        const uniqueZones = [...new Set(zones)];
+
+        const allBack = items.every((it) => (Number(it.z) || 0) < -0.2);
+        const allFront = items.every((it) => (Number(it.z) || 0) > 0.2);
+
+        if (items.length >= 6) {
+            if (allBack) return 'Circular arc along rear perimeter';
+            if (allFront) return 'Circular arc along front perimeter';
+            if (uniqueZones.length >= 5) return 'Full perimeter ring arrangement';
+        }
+
+        if (uniqueZones.length <= 3) {
+            return `Placed at ${uniqueZones.join(', ')}`;
+        }
+
+        if (allBack) return `Rear arrangement across ${uniqueZones.slice(0, 3).join(', ')}`;
+        if (allFront) return `Front arrangement across ${uniqueZones.slice(0, 3).join(', ')}`;
+        return `Arranged across ${uniqueZones.slice(0, 4).join(', ')}`;
+    }
+
     if (placed.length) {
-        const rows = [];
+        const groupsByType = new Map();
         placed.forEach((item) => {
             const textValue = item.text ?? item.content ?? item.value;
-            if (item.type === 'text' || textValue != null) {
-                const color = item.colorId || item.color;
-                rows.push(['Writing', `"${textValue ?? ''}"${color ? `, in ${String(name(color)).toLowerCase()}` : ''}${item.fontId || item.font ? `, ${String(name(item.fontId || item.font)).toLowerCase()} lettering` : ''}`]);
+            const key = (item.type === 'text' || textValue != null)
+                ? `text_${textValue}_${item.colorId || item.color || ''}`
+                : (item.designId || item.type || 'decor');
+            if (!groupsByType.has(key)) groupsByType.set(key, []);
+            groupsByType.get(key).push(item);
+        });
+
+        const rows = [];
+        groupsByType.forEach((groupItems) => {
+            const first = groupItems[0];
+            const textValue = first.text ?? first.content ?? first.value;
+            if (first.type === 'text' || textValue != null) {
+                const color = first.colorId || first.color;
+                const font = first.fontId || first.font;
+                const zone = getItemZone(first);
+                const colorStr = color ? `${name(color)} ` : '';
+                const fontStr = font ? `${name(font)} ` : '';
+                rows.push(['Writing', `"${textValue ?? ''}" · ${zone} · ${colorStr}${fontStr}lettering`.trim()]);
             } else {
-                rows.push(['Decoration', `${name(item.designId || item.type)}, placed on top of the cake`]);
+                const decorName = cleanDecorName(first.designId || first.type);
+                const count = groupItems.length;
+                const label = count > 1 ? `${decorName} (×${count})` : decorName;
+                const placementText = describeGroupPlacement(groupItems);
+                rows.push([label, placementText]);
             }
         });
+
         shared.push({
-            kind: 'center', section: 'CENTER', image: 'center', title: 'Center',
-            callouts: [callout('center', 'center', 'CENTER', 0.99, 0, 0.5, 0.3)],
+            kind: 'center',
+            section: 'CENTER',
+            image: 'center',
+            title: 'Center Decorations',
+            callouts: [], // Remove CENTER pointing arrow & pill
             details: rows,
-            highlights: [`${placed.length} item${placed.length > 1 ? 's' : ''} placed on top of the cake`],
+            highlights: [
+                `Top-view placement layout for ${placed.length} center decoration${placed.length > 1 ? 's' : ''}`,
+            ],
             flavor: null,
         });
     }

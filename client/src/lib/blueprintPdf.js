@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import { INK, ACCENT, BODY, arrow, drawFlavorBubble, drawCropBubble, drawBubbleLabel, describeColor } from './blueprintBubbles';
+import { name } from './blueprintDetails';
 
 // Cake Blueprint — draft. Page order (each name is what we call the page):
 //
@@ -340,10 +341,11 @@ function addFillingPages(doc, page, images, anchors, swatches, fillColors, desig
     if (crop.kind === 'color') {
       // The colour the filling really is, named in plain words.
       const actual = fillColors?.[crop.colorKey];
-      drawFlavorBubble(doc, { cx, cy: midY, r, color: actual || swatches?.[crop.colorKey] });
-      sub = actual ? describeColor(actual) : crop.fallbackName || '';
+      const bubbleColor = crop.chipColor || actual || swatches?.[crop.colorKey];
+      drawFlavorBubble(doc, { cx, cy: midY, r, color: bubbleColor });
+      sub = crop.sub || (actual ? describeColor(actual) : crop.fallbackName || '');
     } else {
-      drawFlavorBubble(doc, { cx, cy: midY, r, color: swatches?.[crop.swatchKey] });
+      drawFlavorBubble(doc, { cx, cy: midY, r, color: crop.chipColor || swatches?.[crop.swatchKey] });
     }
     // Arrow from the bubble's edge to the filling it describes.
     const hit = topAnchors[crop.anchorId] || { x: 0.35, y: 0.3 };
@@ -423,11 +425,203 @@ function addFundamentalsPage(doc, page, images, anchors, designName, tierLabel) 
   detailBlock(doc, MARGIN, boxY + boxH + 36, PAGE_W - 2 * MARGIN, page);
 }
 
+function drawViewBadge(doc, label, x, y) {
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  const text = String(label).toUpperCase();
+  const tw = doc.getTextWidth(text);
+  const bw = tw + 7;
+  const bh = 5;
+  doc.setFillColor(35, 30, 30);
+  doc.roundedRect(x, y, bw, bh, 1.2, 1.2, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.text(text, x + bw / 2, y + bh - 1.4, { align: 'center' });
+}
+
+// Surface Treatment, in the Filling page's style:
+// Top framed box with FRONT close-up screenshot and arrow pointing from FLAVOR bubble to the surface coat,
+// connecting arrow down to a bottom framed box with BACK close-up screenshot and arrow pointing from PATTERN bubble to the drips.
+function addSurfaceTreatmentPages(doc, page, images, anchors, swatches, fillColors, designName, tierLabel) {
+  const top = tierHeader(doc, designName, tierLabel, 'SURFACE TREATMENT');
+
+  const boxW = 96;
+  const boxH = 72;
+  const boxX = PAGE_W - MARGIN - boxW;
+  const boxY = top + 2;
+  const frontImage = images?.[page.frontImage] || images?.[page.image] || images?.['surface-front'] || images?.surface;
+  placeImage(doc, frontImage, boxX, boxY, boxW, boxH);
+  doc.setDrawColor(...INK);
+  doc.setLineWidth(0.6);
+  doc.roundedRect(boxX, boxY, boxW, boxH, 2, 2, 'S');
+  drawViewBadge(doc, 'FRONT', boxX + 3, boxY + 3);
+
+  const r = 16;
+  const midY = boxY + boxH / 2 - 4;
+  const frontKey = page.frontImage || page.image || 'surface-front';
+  const backKey = page.backImage || page.zoomImage || 'surface-back';
+  const topAnchors = anchors?.[frontKey] || anchors?.surface || {};
+  const backAnchors = anchors?.[backKey] || anchors?.['surface-zoom'] || topAnchors;
+
+  // Arrow 1: FLAVOR bubble with ToolPanel chip pointing to the front surface
+  const cx = MARGIN + r;
+  const flavor = (page.crops || [])[0] || {};
+  const flavorColor = page.flavorChipColor || flavor.chipColor || '#F6DEAB';
+  const flavorName = page.flavorName || flavor.sub || '';
+  drawFlavorBubble(doc, { cx, cy: midY, r, color: flavorColor });
+  drawBubbleLabel(doc, { cx, y: midY + r + 7, title: flavor.label || 'FLAVOR', sub: flavorName });
+
+  const hit1 = topAnchors[flavor.anchorId] || { x: 0.45, y: 0.28 };
+  const tx1 = boxX + hit1.x * boxW;
+  const ty1 = boxY + hit1.y * boxH;
+  const ang1 = Math.atan2(ty1 - midY, tx1 - cx);
+  arrow(doc, cx + Math.cos(ang1) * (r + 0.5), midY + Math.sin(ang1) * (r + 0.5), tx1, ty1);
+
+  // Down arrow to the back view of the pattern
+  const slabW = boxW;
+  const slabH = boxH;
+  const slabX = boxX;
+  const slabY = boxY + boxH + 16;
+  arrow(doc, boxX + boxW / 2, boxY + boxH + 2, boxX + boxW / 2, slabY - 1);
+  const backImage = images?.[page.backImage] || images?.[page.zoomImage] || images?.['surface-back'] || images?.['surface-zoom'] || frontImage;
+  placeImage(doc, backImage, slabX, slabY, slabW, slabH);
+  doc.setDrawColor(...INK);
+  doc.setLineWidth(0.6);
+  doc.roundedRect(slabX, slabY, slabW, slabH, 2, 2, 'S');
+  drawViewBadge(doc, 'BACK', slabX + 3, slabY + 3);
+
+  // Arrow 2: PATTERN bubble pointing to the pattern drips
+  if (page.pattern) {
+    const spot = backAnchors[page.pattern.anchorId] || { x: 0.45, y: 0.42 };
+    const cy2 = slabY + slabH / 2 - 4;
+    drawCropBubble(doc, { src: backImage, ax: spot.x, ay: spot.y, imgW: slabW, imgH: slabH, cx, cy: cy2, r, zoom: 3 });
+    const tx2 = slabX + spot.x * slabW;
+    const ty2 = slabY + spot.y * slabH;
+    const ang2 = Math.atan2(ty2 - cy2, tx2 - cx);
+    arrow(doc, cx + Math.cos(ang2) * (r + 0.5), cy2 + Math.sin(ang2) * (r + 0.5), tx2, ty2);
+    drawBubbleLabel(doc, { cx, y: cy2 + r + 7, title: page.pattern.label || 'PATTERN', sub: page.pattern.sub });
+  }
+
+  const rows = [
+    ['Treatment', name(page.mode || 'glaze')],
+    ['Pattern', page.patternName || name(page.pattern?.sub || '')],
+  ];
+  if (flavorName) rows.push(['Flavor', flavorName]);
+
+  detailBlock(doc, MARGIN, slabY + slabH + 10, PAGE_W - 2 * MARGIN, {
+    details: rows,
+    highlights: [`${name(page.mode || 'glaze')} finish applied to the surface (Front and Back close-up views)`],
+  });
+}
+
+// Side Design, in the Filling page's style:
+// Top framed box with FRONT close-up screenshot and arrow pointing from FLAVOR/COLOR bubble to the side design,
+// connecting arrow down to a bottom framed box with BACK close-up screenshot and arrow pointing from PATTERN bubble to the pattern.
+function addSidePages(doc, page, images, anchors, swatches, fillColors, designName, tierLabel) {
+  const top = tierHeader(doc, designName, tierLabel, 'SIDE');
+
+  const boxW = 96;
+  const boxH = 72;
+  const boxX = PAGE_W - MARGIN - boxW;
+  const boxY = top + 2;
+  const frontImage = images?.[page.frontImage] || images?.[page.image] || images?.['side-front'] || images?.side;
+  placeImage(doc, frontImage, boxX, boxY, boxW, boxH);
+  doc.setDrawColor(...INK);
+  doc.setLineWidth(0.6);
+  doc.roundedRect(boxX, boxY, boxW, boxH, 2, 2, 'S');
+  drawViewBadge(doc, 'FRONT', boxX + 3, boxY + 3);
+
+  const r = 16;
+  const midY = boxY + boxH / 2 - 4;
+  const frontKey = page.frontImage || page.image || 'side-front';
+  const backKey = page.backImage || page.zoomImage || 'side-back';
+  const topAnchors = anchors?.[frontKey] || anchors?.side || {};
+  const backAnchors = anchors?.[backKey] || anchors?.['side-zoom'] || topAnchors;
+
+  // Arrow 1: FLAVOR / COLOR bubble with ToolPanel chip pointing to the side design
+  const cx = MARGIN + r;
+  const flavor = (page.crops || [])[0] || {};
+  const flavorColor = page.flavorChipColor || flavor.chipColor || '#F6DEAB';
+  const flavorName = page.flavorName || flavor.sub || '';
+  drawFlavorBubble(doc, { cx, cy: midY, r, color: flavorColor });
+  drawBubbleLabel(doc, { cx, y: midY + r + 7, title: flavor.label || 'FLAVOR', sub: flavorName });
+
+  const hit1 = topAnchors[flavor.anchorId] || { x: 0.45, y: 0.5 };
+  const tx1 = boxX + hit1.x * boxW;
+  const ty1 = boxY + hit1.y * boxH;
+  const ang1 = Math.atan2(ty1 - midY, tx1 - cx);
+  arrow(doc, cx + Math.cos(ang1) * (r + 0.5), midY + Math.sin(ang1) * (r + 0.5), tx1, ty1);
+
+  // Down arrow to the back view of the pattern
+  const slabW = boxW;
+  const slabH = boxH;
+  const slabX = boxX;
+  const slabY = boxY + boxH + 16;
+  arrow(doc, boxX + boxW / 2, boxY + boxH + 2, boxX + boxW / 2, slabY - 1);
+  const backImage = images?.[page.backImage] || images?.[page.zoomImage] || images?.['side-back'] || images?.['side-zoom'] || frontImage;
+  placeImage(doc, backImage, slabX, slabY, slabW, slabH);
+  doc.setDrawColor(...INK);
+  doc.setLineWidth(0.6);
+  doc.roundedRect(slabX, slabY, slabW, slabH, 2, 2, 'S');
+  drawViewBadge(doc, 'BACK', slabX + 3, slabY + 3);
+
+  // Arrow 2: PATTERN bubble pointing to the side pattern
+  if (page.pattern) {
+    const spot = backAnchors[page.pattern.anchorId] || { x: 0.45, y: 0.5 };
+    const cy2 = slabY + slabH / 2 - 4;
+    drawCropBubble(doc, { src: backImage, ax: spot.x, ay: spot.y, imgW: slabW, imgH: slabH, cx, cy: cy2, r, zoom: 3 });
+    const tx2 = slabX + spot.x * slabW;
+    const ty2 = slabY + spot.y * slabH;
+    const ang2 = Math.atan2(ty2 - cy2, tx2 - cx);
+    arrow(doc, cx + Math.cos(ang2) * (r + 0.5), cy2 + Math.sin(ang2) * (r + 0.5), tx2, ty2);
+    drawBubbleLabel(doc, { cx, y: cy2 + r + 7, title: page.pattern.label || 'PATTERN', sub: page.pattern.sub });
+  }
+
+  const rows = [];
+  if (page.baseFinish) rows.push(['Base Finish', page.baseFinish]);
+  rows.push(['Design', name(page.mode || 'Side Design')]);
+  rows.push(['Set', page.patternName || name(page.pattern?.sub || '')]);
+  if (flavorName) rows.push(['Color', flavorName]);
+
+  const highlightText = page.baseTypeDisplay
+    ? `${page.baseTypeDisplay}: ${name(page.mode || 'Side Design')} (Front & Back close-up views)`
+    : `${name(page.mode || 'Side Design')} wrapped around the cake's side (Front & Back close-up views)`;
+
+  detailBlock(doc, MARGIN, slabY + slabH + 10, PAGE_W - 2 * MARGIN, {
+    details: rows,
+    highlights: [highlightText],
+  });
+}
+
+// Center Decorations: Top-view diagram showing where designs are placed.
+// Top view is framed and centered horizontally on the page with a "TOP VIEW" badge,
+// with no pointing arrows or bubbles, and concise, detailed placement details below.
+function addCenterPage(doc, page, images, anchors, designName, tierLabel) {
+  const top = tierHeader(doc, designName, tierLabel, 'CENTER');
+
+  // Centered framed box for the top view diagram
+  const imgW = 126;
+  const imgH = 94;
+  const imgX = (PAGE_W - imgW) / 2;
+  const imgY = top + 2;
+
+  placeImage(doc, images?.[page.image], imgX, imgY, imgW, imgH);
+  doc.setDrawColor(...INK);
+  doc.setLineWidth(0.6);
+  doc.roundedRect(imgX, imgY, imgW, imgH, 2, 2, 'S');
+  drawViewBadge(doc, 'TOP VIEW', imgX + 3, imgY + 3);
+
+  // Details and highlights below the framed top view
+  detailBlock(doc, MARGIN, imgY + imgH + 12, PAGE_W - 2 * MARGIN, page);
+}
+
 export function addTierPages(doc, { groups = [], images = {}, anchors = {}, swatches = {}, fillColors = {}, designName = '' } = {}) {
   for (const group of groups) {
     for (const page of group.pages) {
       if (page.kind === 'fundamentals') addFundamentalsPage(doc, page, images, anchors, designName, group.tierLabel);
       else if (page.kind === 'filling') addFillingPages(doc, page, images, anchors, swatches, fillColors, designName, group.tierLabel);
+      else if (page.kind === 'surface') addSurfaceTreatmentPages(doc, page, images, anchors, swatches, fillColors, designName, group.tierLabel);
+      else if (page.kind === 'side') addSidePages(doc, page, images, anchors, swatches, fillColors, designName, group.tierLabel);
+      else if (page.kind === 'center') addCenterPage(doc, page, images, anchors, designName, group.tierLabel);
       else addStagePage(doc, page, images, anchors, designName, group.tierLabel);
     }
   }

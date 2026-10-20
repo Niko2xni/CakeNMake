@@ -44,18 +44,15 @@ export function arrow(doc, x1, y1, x2, y2) {
     );
 }
 
-// A solid circle in `color` (hex). Slightly darker rim so pale flavors
-// (vanilla, cream) still read against a white page.
+// A solid circle in `color` (hex) matching ToolPanel's flat flavor/color chips.
+// Subtle rim so pale colors (white, vanilla, cream) still read cleanly against a white page.
 export function drawFlavorBubble(doc, { cx, cy, r, color }) {
     const rgb = hexToRgb(color);
     doc.setFillColor(...rgb);
     doc.circle(cx, cy, r, 'F');
     doc.setDrawColor(...BUBBLE_RIM);
-    doc.setLineWidth(0.7);
+    doc.setLineWidth(0.4);
     doc.circle(cx, cy, r, 'S');
-    // Soft highlight so it reads as a round swatch rather than a flat dot.
-    doc.setFillColor(...rgb.map((v) => Math.min(255, v + 28)));
-    doc.circle(cx - r * 0.28, cy - r * 0.3, r * 0.3, 'F');
 }
 
 // Magnified round crop of `src`, which is drawn imgW x imgH elsewhere.

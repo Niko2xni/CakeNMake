@@ -777,6 +777,11 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
   }, [account?._id, account?.id, captureThumbnail]);
 
   const handlePaymentComplete = useCallback(async (selectedDate, fulfillmentDetails) => {
+    // Reset blueprint captures so this submission always photographs the current design
+    blueprintViewsRef.current = null;
+    blueprintTiersRef.current = null;
+    submittedBlueprintRef.current = null;
+
     // Blueprint captures: Start Page hero + Angle Page (Front / Back / Top / Side). Taken exactly once, right
     // when Send to Bakery succeeds and before any awaits, so the scene is
     // still exactly what the customer ordered. Kept in a ref for the
@@ -796,9 +801,9 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
     if (!blueprintTiersRef.current && cakeSceneRef.current) {
       try {
         const plan = buildBlueprintTierPlan(config);
-        const stages = plan.stages.map(({ key, config: stageConfig, slice, anchors, zoom, diffConfig }) => {
+        const stages = plan.stages.map(({ key, config: stageConfig, slice, anchors, zoom, diffConfig, tilt, azimuth, fit }) => {
           const legacy = adaptConfigToLegacy(stageConfig);
-          return { key, anchors, zoom, diffConfig: diffConfig ? adaptConfigToLegacy(diffConfig) : undefined, config: slice ? { ...legacy, __slice: slice, __fillingOnTop: true } : legacy };
+          return { key, anchors, zoom, diffConfig: diffConfig ? adaptConfigToLegacy(diffConfig) : undefined, tilt, azimuth, fit, config: slice ? { ...legacy, __slice: slice, __fillingOnTop: true } : legacy };
         });
         const shots = cakeSceneRef.current.captureBlueprintStages(stages);
         blueprintTiersRef.current = shots ? { groups: plan.groups, images: shots.images, anchors: shots.anchors, swatches: shots.swatches, fillColors: shots.fillColors } : { groups: [], images: {}, anchors: {}, swatches: {}, fillColors: {} };
