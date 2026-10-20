@@ -6,19 +6,55 @@ const names = new Map(Object.values(options).filter(Array.isArray).flat()
 // Colour of a flavor's own chip in the designer, when the option list carries one.
 const entries = new Map(Object.values(options).filter(Array.isArray).flat().filter((entry) => entry?.id).map((entry) => [entry.id, entry]));
 export function flavorColorOf(id) {
-  // Same colour the ToolPanel chip uses (SpongeFlavorSection / FillingSection).
-  const chip = FLAVORS?.[id]?.colors?.crumbBase;
-  if (typeof chip === 'string' && chip) return chip;
-  const entry = entries.get(id);
-  if (!entry) return null;
-  for (const key of ['color', 'hex', 'swatch', 'colorHex', 'chipColor', 'iconColor', 'icon', 'bg', 'bgColor', 'dot', 'value']) {
-    const v = entry[key];
-    if (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v.trim())) return v.trim();
+  if (!id) return null;
+  const str = String(id).trim();
+  if (/^#[0-9a-f]{3,8}$/i.test(str)) return str;
+
+  // 1. ToolPanel sugar color palette (SUGAR_COLORS)
+  const sugar = options.SUGAR_COLORS?.find((c) => c.id === str);
+  if (sugar?.hex) return sugar.hex;
+
+  // 2. Flavor palette (FLAVORS)
+  const flavor = FLAVORS?.[str];
+  if (flavor?.colors) {
+    return flavor.colors.crumbBase || flavor.colors.frosting || flavor.colors.filling;
+  }
+
+  // 3. Any entry in options with a hex property
+  const entry = entries.get(str);
+  if (entry) {
+    for (const key of ['color', 'hex', 'swatch', 'colorHex', 'chipColor', 'iconColor', 'icon', 'bg', 'bgColor', 'dot', 'value']) {
+      const v = entry[key];
+      if (typeof v === 'string' && /^#[0-9a-f]{3,8}$/i.test(v.trim())) return v.trim();
+    }
   }
   return null;
 }
 
 export const name = (value) => names.get(value) || String(value ?? '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[-_]/g, ' ').replace(/^./, (c) => c.toUpperCase());
+
+export function cleanDecorName(rawType, designId) {
+  if (designId && names.has(designId)) return names.get(designId);
+  const placeable = options.CENTER_PLACEABLE_DESIGNS?.find((d) => d.designId === designId || d.toolId === rawType);
+  if (placeable?.label) return placeable.label;
+  if (!rawType) return 'Decoration';
+  let s = String(rawType)
+    .replace(/^center-/, '')
+    .replace(/-default$/, '')
+    .replace(/-standing$/, ' (Standing)')
+    .replace(/-/g, ' ');
+  const letterMatch = s.match(/^letter(Upper|Lower)([A-Za-z0-9])/i);
+  if (letterMatch) {
+    return `Letter '${letterMatch[2]}'`;
+  }
+  const numberMatch = s.match(/^number([0-9])/i);
+  if (numberMatch) {
+    return `Number '${numberMatch[1]}'`;
+  }
+  return s.replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/^./, (c) => c.toUpperCase())
+    .trim();
+}
 
 // Match selection rows to quote keys, keeping every quoted cent exactly once.
 export function buildBlueprintDetails(config, quote, designName = '') {
@@ -82,7 +118,55 @@ export function buildBlueprintDetails(config, quote, designName = '') {
   }
   addSection('Side', sideItems);
   const center = [];
-  (config.place?.items || []).forEach((item) => center.push(['Placed Decoration', `${name(item.designId || item.type)}, placed on top of the cake`, [`placed.${item.type || item.designId}`]]));
+  const placedItems = config.place?.items || [];
+  if (placedItems.length) {
+    const groups = new Map();
+    placedItems.forEach((item) => {
+      const textVal = item.text ?? item.content ?? item.value;
+      const key = (item.type === 'text' || textVal != null)
+        ? `text_${textVal}_${item.colorId || item.color || ''}`
+        : (item.designId || item.type || 'decor');
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(item);
+    });
+
+    groups.forEach((items) => {
+      const first = items[0];
+      const textVal = first.text ?? first.content ?? first.value;
+      const count = items.length;
+      const allKeys = items.flatMap((it) => [
+        `placed.${it.type}`,
+        `placed.${it.designId}`,
+        'center-decorations',
+        'center.decorations',
+        'center.place',
+        'placed.decorations',
+        'placed.items',
+      ]).filter(Boolean);
+      const uniqueKeys = [...new Set(allKeys)];
+
+      if (first.type === 'text' || textVal != null) {
+        const color = first.colorId || first.color;
+        const colorStr = color ? ` · ${name(color)}` : '';
+        const timesText = count > 1 ? ` (${count}×)` : '';
+        center.push([
+          'Writing',
+          `"${textVal}"${colorStr}${timesText}, placed on top of the cake`,
+          uniqueKeys,
+          count,
+        ]);
+      } else {
+        const decorName = cleanDecorName(first.type, first.designId);
+        const timesText = count > 1 ? `${count}×, ` : '';
+        center.push([
+          decorName,
+          `${timesText}placed on top of the cake`,
+          uniqueKeys,
+          count,
+        ]);
+      }
+    });
+  }
   addSection('Center', center);
   const edges = [];
   const slots = config.edge?.mode === 'both' ? ['both', ...(layers > 1 ? ['middle'] : [])] : ['top', ...(layers > 1 ? ['middle'] : []), 'bottom'];

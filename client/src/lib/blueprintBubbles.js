@@ -86,6 +86,24 @@ export function drawBubbleLabel(doc, { cx, y, title, sub }) {
     }
 }
 
+// Dedicated pattern information block (used beside pattern close-up screenshots)
+export function drawPatternInfoBlock(doc, { cx, cy, title = 'PATTERN', sub = '' }) {
+    const badgeW = 30;
+    const badgeH = 7.5;
+    doc.setFillColor(35, 30, 30);
+    doc.roundedRect(cx - badgeW / 2, cy - 10, badgeW, badgeH, 1.5, 1.5, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(255, 255, 255);
+    doc.text(String(title).toUpperCase(), cx, cy - 5, { align: 'center' });
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...INK);
+    const subLines = doc.splitTextToSize(String(sub || '').trim(), 46);
+    doc.text(subLines, cx, cy + 2, { align: 'center' });
+}
+
 // Plain-language name for a colour ("White", "Light Pink", "Dark Brown"...),
 // so a bubble can say what colour something really is on screen.
 export function describeColor(hex) {

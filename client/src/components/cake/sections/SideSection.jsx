@@ -14,6 +14,7 @@ import {
 import OptionButtonContent from '../OptionButtonContent';
 import SugarColorSection from './SugarColorSection';
 import { flatTreatment } from '@/lib/treatmentConfig';
+import SideDesignIcon from './SideDesignIcons';
 
 export default function SideSection({ side, structure, activeLayer = 0, onChange, sugarColor, onSugarColorChange }) {
   const [activeChevronColorSlot, setActiveChevronColorSlot] = useState('primary');
@@ -119,7 +120,7 @@ export default function SideSection({ side, structure, activeLayer = 0, onChange
                             : isBento && variant.bentoLabel ? variant.bentoLabel : variant.label
                         }
                       >
-                        {i + 1}
+                        <SideDesignIcon treatmentId={t.id} variantId={variant.id} index={i} />
                       </Circle>
                     ))}
                   </OptionRow>
@@ -166,7 +167,7 @@ export default function SideSection({ side, structure, activeLayer = 0, onChange
                     onClick={() => selectTreatment(t.id)}
                     title={activeSide.mode === t.id ? `Remove ${t.label}` : t.label}
                   >
-                    1
+                    <SideDesignIcon treatmentId={t.id} variantId="default" index={0} />
                   </Circle>
                 </OptionRow>
                 {activeSide.mode === t.id && (
@@ -238,7 +239,7 @@ function Circle({ active, canDeselect = false, onClick, title, children, ...rest
       onClick={onClick}
       title={title}
       {...rest}
-      className={`relative w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${active
+      className={`relative w-9 h-9 rounded-full p-0 flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${active
           ? 'bg-primary text-primary-foreground border-primary shadow-md'
           : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
         }`}

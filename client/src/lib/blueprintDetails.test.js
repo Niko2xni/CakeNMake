@@ -53,6 +53,10 @@ describe('internal blueprint', () => {
     expect(sidePage.image).toBe('side-front');
     expect(sidePage.zoomImage).toBe('side-back');
     expect(sidePage.baseTypeDisplay).toBe('NAKED + SIDE');
+    expect(sidePage.treatmentId).toBe('sunshinePlay');
+    expect(sidePage.variantId).toBe('skyChumps');
+    expect(sidePage.pattern.treatmentId).toBe('sunshinePlay');
+    expect(sidePage.pattern.variantId).toBe('skyChumps');
 
     // When exterior finish is frosted
     const frostedConfig = structuredClone(config);
@@ -124,6 +128,31 @@ describe('internal blueprint', () => {
     expect(doc.getNumberOfPages()).toBeGreaterThan(3);
   });
 
+  it('renders exterior finish page just like fundamentals with flavor and finish bubbles', () => {
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.exteriorFinish = { style: 'texturedButtercream', flavor: 'chocolate', buttercreamTexture: 'horizontalStripes' };
+    config.sugarColorOverrides = { exterior: { mode: 'colorOverride', colorId: 'pink' } };
+
+    const plan = buildBlueprintTierPlan(config);
+    const finishPage = plan.groups[0].pages.find((p) => p.kind === 'finish');
+    expect(finishPage).toBeDefined();
+    expect(finishPage.section).toBe('EXTERIOR FINISH');
+    expect(finishPage.flavorName).toBe('Pink');
+    expect(finishPage.crops[0].label).toBe('FLAVOR');
+    expect(finishPage.crops[0].sub).toBe('Pink');
+    expect(finishPage.crops[0].chipColor).toBe('#F5A9C0'); // Pink sugar color
+    expect(finishPage.finish.label).toBe('EXTERIOR FINISH');
+    expect(finishPage.finish.sub).toContain('Textured');
+    expect(finishPage.finish.sub).toContain('Horizontal Stripes');
+
+    const details = buildBlueprintDetails(config, null);
+    const doc = buildBlueprintPdf({
+      details,
+      tiers: { groups: plan.groups, images: {}, anchors: {} },
+    });
+    expect(doc.getNumberOfPages()).toBeGreaterThan(3);
+  });
+
   it('preserves quote charges and total without assigning invented decoration prices', () => {
     const config = structuredClone(DEFAULT_CONFIG);
     config.side.mode = 'sunshinePlay';
@@ -135,11 +164,44 @@ describe('internal blueprint', () => {
     const details = buildBlueprintDetails(config, quote, 'Actual design');
     expect(details.totalMinor).toBe(195000);
     expect(details.sections.find((s) => s.title === 'Side').items[0].detail).toContain('Sky Chumps');
-    expect(details.sections.find((s) => s.title === 'Center').items[0].detail).toContain('letter Upper H');
+    expect(details.sections.find((s) => s.title === 'Center').items[0].label).toBe("Letter 'H'");
+    expect(details.sections.find((s) => s.title === 'Center').items[0].detail).toContain('placed on top of the cake');
     expect(details.sections[0].items[0].priceMinor).toBe(195000);
     expect(details.sections.some((s) => s.title.startsWith('Pricing quote'))).toBe(false);
     expect(details.sections.flatMap((s) => s.items).some((r) => r.priceText === 'See quote')).toBe(false);
     expect(buildBlueprintPdf({ details }).getNumberOfPages()).toBe(3);
+  });
+
+  it('compacts repeated center decorations by decoration kind and shows N times count', () => {
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.place.items = Array.from({ length: 10 }, () => ({
+      type: 'center-strawberry-default',
+      designId: 'strawberry',
+      x: 0,
+      z: 0,
+    }));
+    const details = buildBlueprintDetails(config, null);
+    const centerSection = details.sections.find((s) => s.title === 'Center');
+    expect(centerSection).toBeDefined();
+    expect(centerSection.items).toHaveLength(1);
+    expect(centerSection.items[0].label).toBe('Strawberry');
+    expect(centerSection.items[0].detail).toBe('10×, placed on top of the cake');
+  });
+
+  it('groups multiple center decoration kinds separately with their respective counts', () => {
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.place.items = [
+      ...Array.from({ length: 6 }, () => ({ type: 'center-strawberry-default', designId: 'strawberry', x: 0, z: 0 })),
+      ...Array.from({ length: 4 }, () => ({ type: 'center-blueberry-default', designId: 'blueberry', x: 0, z: 0 })),
+    ];
+    const details = buildBlueprintDetails(config, null);
+    const centerSection = details.sections.find((s) => s.title === 'Center');
+    expect(centerSection).toBeDefined();
+    expect(centerSection.items).toHaveLength(2);
+    expect(centerSection.items[0].label).toBe('Strawberry');
+    expect(centerSection.items[0].detail).toBe('6×, placed on top of the cake');
+    expect(centerSection.items[1].label).toBe('Blueberry');
+    expect(centerSection.items[1].detail).toBe('4×, placed on top of the cake');
   });
   it('combines structure charges and splits shared piping without losing cents', () => {
     const config = structuredClone(DEFAULT_CONFIG);
@@ -189,4 +251,211 @@ describe('internal blueprint', () => {
     const details = { sections: [{ title: 'Center', items: Array.from({ length: 60 }, () => ({ label: 'Decoration', detail: 'Long selected design detail '.repeat(10), priceText: 'See quote' })) }] };
     expect(buildBlueprintPdf({ details }).getNumberOfPages()).toBeGreaterThan(3);
   });
+  it('configures close-up pattern zoom focusing from top to bottom on pattern stages', () => {
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.side = { mode: 'chevronPattern', chevronPattern: { setId: 'singleColor', colorId: 'vanilla' } };
+    config.surfaceTreatment = { mode: 'glaze', pattern: 'longGaps' };
+    config.filling = { enabled: true, layers: 1, flavor: 'vanilla', piping: { tip: 'mashedCircles' } };
+    const plan = buildBlueprintTierPlan(config);
+
+    const sideBack = plan.stages.find((s) => s.key === 'side-back');
+    expect(sideBack?.zoom).toBeDefined();
+    expect(sideBack.zoom.mode).toBe('pattern');
+    expect(sideBack.zoom.fullHeight).toBe(true);
+    expect(sideBack.zoom.fit).toBe(1.0);
+
+    const surfaceBack = plan.stages.find((s) => s.key === 'surface-back');
+    expect(surfaceBack?.zoom).toBeDefined();
+    expect(surfaceBack.zoom.mode).toBe('pattern');
+    expect(surfaceBack.zoom.fullHeight).toBe(true);
+    expect(surfaceBack.zoom.fit).toBe(1.0);
+
+    const fillingZoom = plan.stages.find((s) => s.key === 'filling-zoom-0');
+    expect(fillingZoom?.zoom).toBeDefined();
+    expect(fillingZoom.zoom.fit).toBe(1.0);
+
+    const details = buildBlueprintDetails(config, null);
+    const doc = buildBlueprintPdf({
+      details,
+      tiers: { groups: plan.groups, images: {}, anchors: {} },
+    });
+    expect(doc.getNumberOfPages()).toBeGreaterThan(3);
+  });
+
+  it('renders pattern icon bubbles representing each side design cleanly in blueprint PDF', () => {
+    const treatments = [
+      { mode: 'checkeredPattern', set: 'rightDiagonal' },
+      { mode: 'trianglePattern', set: 'xPattern' },
+      { mode: 'chevronPattern', set: 'wideZigzag' },
+      { mode: 'scatterPearls', set: 'diamondGrid' },
+      { mode: 'pipingScrolls', set: 'fleurDeLisRow' },
+      { mode: 'sunshinePlay', set: 'starBurst' },
+      { mode: 'victorianLambeth', set: 'doubleBand' },
+    ];
+
+    for (const t of treatments) {
+      const config = structuredClone(DEFAULT_CONFIG);
+      config.side = { mode: t.mode, [t.mode]: { setId: t.set, colorId: 'chocolate' } };
+      const plan = buildBlueprintTierPlan(config);
+      const sidePage = plan.groups[0].pages.find((p) => p.kind === 'side');
+      expect(sidePage).toBeDefined();
+      expect(sidePage.treatmentId).toBe(t.mode);
+      expect(sidePage.variantId).toBe(t.set);
+      expect(sidePage.pattern.treatmentId).toBe(t.mode);
+      expect(sidePage.pattern.variantId).toBe(t.set);
+
+      const details = buildBlueprintDetails(config, null);
+      const doc = buildBlueprintPdf({
+        details,
+        tiers: { groups: plan.groups, images: {}, anchors: {} },
+      });
+      expect(doc.getNumberOfPages()).toBeGreaterThan(3);
+    }
+  });
+
+  it('resolves actual flavor color for drip surface treatment, side design, and exterior finish', () => {
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.surfaceTreatment = { mode: 'glaze', pattern: 'longGaps' };
+    config.sugarColorOverrides = { surface: { mode: 'default', colorId: 'chocolate' } };
+    config.side = { mode: 'checkeredPattern', checkeredPattern: { setId: 'straightGrid', colorId: 'strawberry' } };
+    config.exteriorFinish = { style: 'smoothButtercream', flavor: 'ube' };
+
+    const plan = buildBlueprintTierPlan(config);
+    const surfacePage = plan.groups[0].pages.find((p) => p.kind === 'surface');
+    const sidePage = plan.groups[0].pages.find((p) => p.kind === 'side');
+    const finishPage = plan.groups[0].pages.find((p) => p.kind === 'finish');
+
+    expect(surfacePage.flavorName).toBe('Chocolate');
+    expect(surfacePage.flavorChipColor).toMatch(/^#[0-9a-f]{6}$/i);
+    expect(surfacePage.flavorChipColor).not.toBe('#F6DEAB');
+
+    expect(sidePage.flavorName).toBe('Strawberry');
+    expect(sidePage.flavorChipColor).toMatch(/^#[0-9a-f]{6}$/i);
+    expect(sidePage.flavorChipColor).not.toBe('#F6DEAB');
+
+    expect(finishPage.flavorName).toBe('Ube');
+    expect(finishPage.flavorChipColor).toMatch(/^#[0-9a-f]{6}$/i);
+    expect(finishPage.flavorChipColor).not.toBe('#F6DEAB');
+
+    const details = buildBlueprintDetails(config, null);
+    const doc = buildBlueprintPdf({
+      details,
+      tiers: {
+        groups: plan.groups,
+        images: {},
+        anchors: {
+          'surface-front': { [surfacePage.crops[0].anchorId]: { color: '#3D2314', x: 0.5, y: 0.3 } },
+        },
+        fillColors: {
+          'surface-front': '#3D2314',
+          'side-front': '#E85B7A',
+          finish: '#7D4194',
+        },
+      },
+    });
+    expect(doc.getNumberOfPages()).toBeGreaterThan(3);
+  });
+
+  it('renders side-by-side 2D schematics vs 3D render across all side design treatments and drip patterns', () => {
+    const treatments = [
+      { mode: 'checkeredPattern', set: 'straightGrid', drip: 'longGaps' },
+      { mode: 'trianglePattern', set: 'rightDiagonal', drip: 'naturalTear2' },
+      { mode: 'chevronPattern', set: 'tightZigzag', drip: 'shortWave' },
+      { mode: 'scatterPearls', set: 'diamondGrid', drip: 'draped' },
+      { mode: 'pipingScrolls', set: 'fleurDeLisRow', drip: 'tinyTip' },
+      { mode: 'sunshinePlay', set: 'skyChumps', drip: 'longGaps' },
+      { mode: 'victorianLambeth', set: 'classic', drip: 'shortWave' },
+    ];
+
+    for (const t of treatments) {
+      const config = structuredClone(DEFAULT_CONFIG);
+      config.side = { mode: t.mode, [t.mode]: { setId: t.set, colorId: 'chocolate' } };
+      config.surfaceTreatment = { mode: 'glaze', pattern: t.drip };
+      config.sugarColorOverrides = {
+        surface: { mode: 'default', colorId: 'chocolate' },
+        side: { mode: 'colorOverride', colorId: 'strawberry' },
+      };
+
+      const plan = buildBlueprintTierPlan(config);
+      const details = buildBlueprintDetails(config, null);
+      const doc = buildBlueprintPdf({
+        details,
+        tiers: {
+          groups: plan.groups,
+          images: {
+            'surface-front': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+            'side-front': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+          },
+          anchors: {},
+          fillColors: { 'surface-front': '#3D2314', 'side-front': '#E85B7A' },
+        },
+      });
+
+      expect(doc.getNumberOfPages()).toBeGreaterThan(4);
+    }
+  });
+
+  it('renders 2D pattern drawing based on actual 3D render contour array', () => {
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.surfaceTreatment = { mode: 'glaze', pattern: 'longGaps' };
+    config.sugarColorOverrides = { surface: { mode: 'default', colorId: 'chocolate' } };
+
+    const plan = buildBlueprintTierPlan(config);
+    const details = buildBlueprintDetails(config, null);
+
+    // Simulate 3D render contour points extracted from roleMask['pattern']
+    const mock3DRenderContour = [];
+    for (let i = 0; i <= 50; i++) {
+      const x = i / 50;
+      // Wavy drip profile with crests and drops
+      const y = 0.2 + 0.35 * Math.sin(x * Math.PI * 4) ** 2;
+      mock3DRenderContour.push({ x, y });
+    }
+
+    const doc = buildBlueprintPdf({
+      details,
+      tiers: {
+        groups: plan.groups,
+        images: {
+          'surface-front': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        },
+        anchors: {},
+        fillColors: { 'surface-front': '#3D2314' },
+        contours: { 'surface-front': mock3DRenderContour },
+      },
+    });
+
+    expect(doc.getNumberOfPages()).toBeGreaterThan(3);
+  });
+
+  it('uses rich dark chocolate drip color for chocolate surface treatment in 2D pattern drawing', () => {
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.surfaceTreatment = { mode: 'glaze', pattern: 'longGaps' };
+    config.sugarColorOverrides = { surface: { mode: 'colorOverride', colorId: 'chocolate' } };
+
+    const plan = buildBlueprintTierPlan(config);
+    const surfacePage = plan.groups[0].pages.find((p) => p.kind === 'surface');
+    expect(surfacePage).toBeDefined();
+    expect(surfacePage.flavorName).toBe('Chocolate');
+    // Dark chocolate color #3D2314 instead of crumbBase #7A4433
+    expect(surfacePage.flavorChipColor).toBe('#3D2314');
+    expect(surfacePage.crops[0].chipColor).toBe('#3D2314');
+
+    const details = buildBlueprintDetails(config, null);
+    // When 3D render samples actual dark drip pixel #301009
+    const doc = buildBlueprintPdf({
+      details,
+      tiers: {
+        groups: plan.groups,
+        images: {
+          'surface-front': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        },
+        anchors: {},
+        fillColors: { 'surface-front': '#301009' },
+      },
+    });
+
+    expect(doc.getNumberOfPages()).toBeGreaterThan(3);
+  });
 });
+

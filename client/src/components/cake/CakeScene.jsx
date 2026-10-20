@@ -1632,6 +1632,7 @@ const CakeScene = React.forwardRef(function CakeScene({
       const anchorsOut = {};
       const swatches = {};
       const fillColors = {};
+      const contoursOut = {};
 
       try {
         if (slotsGroupRef.current) slotsGroupRef.current.visible = false;
@@ -1649,7 +1650,7 @@ const CakeScene = React.forwardRef(function CakeScene({
           const tiers = Math.max(1, Number(stage.config.layers) || 1);
           const tilt = deg(stage.tilt ?? (tiers <= 1 ? 24 : tiers === 2 ? 19 : 14));
           const azimuth = deg(stage.azimuth ?? 18);
-          const FIT = stage.fit ?? (stage.zoom ? 0.8 : 0.58);
+          const FIT = stage.zoom?.fit ?? stage.fit ?? (stage.zoom ? 0.8 : 0.58);
 
           const box = new THREE.Box3().setFromObject(cakeGroup);
           if (box.isEmpty()) continue;
@@ -1662,50 +1663,116 @@ const CakeScene = React.forwardRef(function CakeScene({
           let zoomTilt = null;
           let latRadius = ringRadius; // how far 'side' offsets reach sideways
           if (stage.zoom) {
-            // Close-up. Default: the front arc of the cake's top band. When the
-            // filling can be found (tagged in buildCake) the camera frames the
-            // filling band itself -- its own radius and height, not the plate
-            // or the tier below -- so the piping design fills the picture.
-            const fillMeshes = [];
-            cakeGroup.traverse((o) => { if (o.isMesh && o.userData?.blueprintRole === 'filling') fillMeshes.push(o); });
             let yHi = box.max.y;
             let yLo = box.max.y - Math.max(0.05, Math.min(1, stage.zoom.band ?? 0.4)) * dims.y;
             let zr = ringRadius;
-            if (fillMeshes.length) {
-              const fb = new THREE.Box3();
-              fillMeshes.forEach((m) => fb.expandByObject(m));
-              const fh = Math.max(0.05, fb.max.y - fb.min.y);
-              zr = Math.max(fb.max.x - fb.min.x, fb.max.z - fb.min.z) / 2;
-              yHi = fb.max.y + (stage.zoom.above ?? 0.5) * fh;
-              yLo = fb.min.y - (stage.zoom.below ?? 0.6) * fh;
-              latRadius = zr;
-            }
-            // Several separate pieces (Petit Fours): frame all of the filling.
-            let multi = false;
-            if (fillMeshes.length > 1) {
-              const c0 = new THREE.Box3().setFromObject(fillMeshes[0]).getCenter(new THREE.Vector3());
-              multi = fillMeshes.some((m) => {
-                const c = new THREE.Box3().setFromObject(m).getCenter(new THREE.Vector3());
-                return Math.hypot(c.x - c0.x, c.z - c0.z) > zr * 0.25;
-              });
-            }
-            if (multi) {
-              const fb = new THREE.Box3();
-              fillMeshes.forEach((m) => fb.expandByObject(m));
-              for (const x of [fb.min.x, fb.max.x]) for (const z of [fb.min.z, fb.max.z]) for (const y of [yLo, yHi]) points.push(new THREE.Vector3(x, y, z));
-              lookAt = new THREE.Vector3((fb.min.x + fb.max.x) / 2, (yLo + yHi) / 2, (fb.min.z + fb.max.z) / 2);
-              latRadius = Math.max(fb.max.x - fb.min.x, fb.max.z - fb.min.z) / 2;
-            } else {
-              const half = deg(stage.zoom.arc ?? (fillMeshes.length ? 24 : 38));
-              for (let k = 0; k <= 12; k++) {
-                const a = azimuth - half + (k / 12) * 2 * half;
-                for (const y of [yLo, yHi]) {
-                  points.push(new THREE.Vector3(center.x + Math.sin(a) * zr, y, center.z + Math.cos(a) * zr));
-                }
+            let targetCenter = center;
+
+            if (stage.zoom.mode === 'pattern' || stage.zoom.fullHeight) {
+              // Focus directly on the Pattern wall with NO background showing.
+              // We frame the inner portion of the pattern so that the pattern
+              // completely fills the camera viewport from edge to edge.
+              const fillMeshes = [];
+              if (stage.key.startsWith('filling')) {
+                cakeGroup.traverse((o) => { if (o.isMesh && o.userData?.blueprintRole === 'filling') fillMeshes.push(o); });
               }
-              lookAt = new THREE.Vector3(center.x + Math.sin(azimuth) * zr, (yLo + yHi) / 2, center.z + Math.cos(azimuth) * zr);
+
+              if (fillMeshes.length) {
+                const fb = new THREE.Box3();
+                fillMeshes.forEach((m) => fb.expandByObject(m));
+                const fh = Math.max(0.05, fb.max.y - fb.min.y);
+                zr = Math.max(fb.max.x - fb.min.x, fb.max.z - fb.min.z) / 2;
+                const yMid = (fb.min.y + fb.max.y) / 2;
+                const ySpan = fh * 0.75;
+                const half = deg(12);
+                for (let k = 0; k <= 10; k++) {
+                  const a = azimuth - half + (k / 10) * 2 * half;
+                  for (const y of [yMid - ySpan, yMid + ySpan]) {
+                    points.push(new THREE.Vector3(targetCenter.x + Math.sin(a) * zr, y, targetCenter.z + Math.cos(a) * zr));
+                  }
+                }
+                lookAt = new THREE.Vector3(targetCenter.x + Math.sin(azimuth) * zr, yMid, targetCenter.z + Math.cos(azimuth) * zr);
+                zoomTilt = 0;
+              } else {
+                if (stage.zoom.tier != null) {
+                  const tb = new THREE.Box3();
+                  let foundTier = false;
+                  cakeGroup.traverse((o) => {
+                    if (o.isMesh && o.userData?.tier === stage.zoom.tier) {
+                      tb.expandByObject(o);
+                      foundTier = true;
+                    }
+                  });
+                  if (foundTier) {
+                    yLo = tb.min.y;
+                    yHi = tb.max.y;
+                    zr = Math.max(tb.max.x - tb.min.x, tb.max.z - tb.min.z) / 2;
+                    targetCenter = tb.getCenter(new THREE.Vector3());
+                  } else {
+                    yLo = box.min.y;
+                    yHi = box.max.y;
+                  }
+                } else {
+                  yLo = box.min.y;
+                  yHi = box.max.y;
+                }
+                latRadius = zr;
+
+                const H = Math.max(0.05, yHi - yLo);
+                const yMid = (yLo + yHi) / 2;
+                // Frame inner 55% of the pattern height to guarantee neither top nor bottom rim or background is visible
+                const ySpan = H * 0.275;
+                const half = deg(12);
+                for (let k = 0; k <= 10; k++) {
+                  const a = azimuth - half + (k / 10) * 2 * half;
+                  for (const y of [yMid - ySpan, yMid + ySpan]) {
+                    points.push(new THREE.Vector3(targetCenter.x + Math.sin(a) * zr, y, targetCenter.z + Math.cos(a) * zr));
+                  }
+                }
+                lookAt = new THREE.Vector3(targetCenter.x + Math.sin(azimuth) * zr, yMid, targetCenter.z + Math.cos(azimuth) * zr);
+                zoomTilt = 0;
+              }
+            } else {
+              // Standard filling zoom or band zoom:
+              // The front arc of the cake's top band / filling band
+              const fillMeshes = [];
+              cakeGroup.traverse((o) => { if (o.isMesh && o.userData?.blueprintRole === 'filling') fillMeshes.push(o); });
+              if (fillMeshes.length) {
+                const fb = new THREE.Box3();
+                fillMeshes.forEach((m) => fb.expandByObject(m));
+                const fh = Math.max(0.05, fb.max.y - fb.min.y);
+                zr = Math.max(fb.max.x - fb.min.x, fb.max.z - fb.min.z) / 2;
+                yHi = fb.max.y + (stage.zoom.above ?? 0.5) * fh;
+                yLo = fb.min.y - (stage.zoom.below ?? 0.6) * fh;
+                latRadius = zr;
+              }
+              // Several separate pieces (Petit Fours): frame all of the filling.
+              let multi = false;
+              if (fillMeshes.length > 1) {
+                const c0 = new THREE.Box3().setFromObject(fillMeshes[0]).getCenter(new THREE.Vector3());
+                multi = fillMeshes.some((m) => {
+                  const c = new THREE.Box3().setFromObject(m).getCenter(new THREE.Vector3());
+                  return Math.hypot(c.x - c0.x, c.z - c0.z) > zr * 0.25;
+                });
+              }
+              if (multi) {
+                const fb = new THREE.Box3();
+                fillMeshes.forEach((m) => fb.expandByObject(m));
+                for (const x of [fb.min.x, fb.max.x]) for (const z of [fb.min.z, fb.max.z]) for (const y of [yLo, yHi]) points.push(new THREE.Vector3(x, y, z));
+                lookAt = new THREE.Vector3((fb.min.x + fb.max.x) / 2, (yLo + yHi) / 2, (fb.min.z + fb.max.z) / 2);
+                latRadius = Math.max(fb.max.x - fb.min.x, fb.max.z - fb.min.z) / 2;
+              } else {
+                const half = deg(stage.zoom.arc ?? (fillMeshes.length ? 24 : 38));
+                for (let k = 0; k <= 12; k++) {
+                  const a = azimuth - half + (k / 12) * 2 * half;
+                  for (const y of [yLo, yHi]) {
+                    points.push(new THREE.Vector3(center.x + Math.sin(a) * zr, y, center.z + Math.cos(a) * zr));
+                  }
+                }
+                lookAt = new THREE.Vector3(center.x + Math.sin(azimuth) * zr, (yLo + yHi) / 2, center.z + Math.cos(azimuth) * zr);
+              }
+              zoomTilt = deg(stage.zoom.tilt ?? (fillMeshes.length ? 22 : 12));
             }
-            zoomTilt = deg(stage.zoom.tilt ?? (fillMeshes.length ? 22 : 12));
           } else {
             for (let i = 0; i < 32; i++) {
               const a = (i / 32) * Math.PI * 2;
@@ -1753,11 +1820,22 @@ const CakeScene = React.forwardRef(function CakeScene({
             const flavorColor = fillingKey ? FILLING_COLORS[fillingKey] : null;
             if (flavorColor != null) swatches[stage.key] = `#${new THREE.Color(flavorColor).getHexString()}`;
           } catch (err) { /* swatch is optional */ }
-          // What colour the filling actually is on screen (its material's own
+          // What colour the part actually is on screen (its material's own
           // colour, free of lighting) -- may differ from the flavor's colour.
           try {
             let mat = null;
-            cakeGroup.traverse((o) => { if (!mat && o.isMesh && o.userData?.blueprintRole === 'filling') mat = Array.isArray(o.material) ? o.material[0] : o.material; });
+            const targetRole = (stage.key.startsWith('surface') || stage.key.startsWith('side'))
+              ? 'pattern'
+              : stage.key.startsWith('finish')
+                ? 'finish'
+                : stage.key === 'base'
+                  ? 'sponge'
+                  : 'filling';
+            cakeGroup.traverse((o) => {
+              if (!mat && o.isMesh && o.userData?.blueprintRole === targetRole) {
+                mat = Array.isArray(o.material) ? o.material[0] : o.material;
+              }
+            });
             if (mat?.color?.isColor) fillColors[stage.key] = `#${mat.color.getHexString()}`;
           } catch (err) { /* optional */ }
           const MW = 300;
@@ -1771,8 +1849,29 @@ const CakeScene = React.forwardRef(function CakeScene({
           };
           const withDiff = Boolean(stage.diffConfig) && (stage.anchors || []).some((a) => a.refine);
           const afterPixels = withDiff ? grab() : null;
-          // Rendered colours, for anchors that report what colour a part looks like.
-          const mainPixels = (stage.anchors || []).some((a) => a.color) ? grab() : null;
+          // Rendered colours, for anchors that report what colour a part looks like,
+          // and for surface treatment stages to sample the true rendered drip color.
+          const mainPixels = ((stage.anchors || []).some((a) => a.color) || stage.key.startsWith('surface')) ? grab() : null;
+
+          const visibleAll = (o) => { for (let n = o; n; n = n.parent) if (n.visible === false) return false; return true; };
+          const roleMask = {};
+          const renderRoleMask = (role) => {
+            const hidden = [];
+            scene.traverse((o) => {
+              if ((o.isMesh || o.isPoints || o.isLine || o.isSprite) && o.visible && o.userData?.blueprintRole !== role) { o.visible = false; hidden.push(o); }
+            });
+            const prev = { bg: scene.background, fog: scene.fog, ov: scene.overrideMaterial, clear: renderer.getClearColor(new THREE.Color()), alpha: renderer.getClearAlpha() };
+            scene.background = null; scene.fog = null;
+            scene.overrideMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            renderer.setClearColor(0x000000, 1);
+            renderer.render(scene, camera);
+            const px = grab();
+            scene.overrideMaterial.dispose();
+            scene.background = prev.bg; scene.fog = prev.fog; scene.overrideMaterial = prev.ov;
+            renderer.setClearColor(prev.clear, prev.alpha);
+            hidden.forEach((o) => { o.visible = true; });
+            return px;
+          };
 
           // Arrow targets: ray from the camera at each requested spot,
           // first visible mesh it meets, projected back into the picture.
@@ -1780,26 +1879,7 @@ const CakeScene = React.forwardRef(function CakeScene({
             camera.updateMatrixWorld(true);
             const raycaster = new THREE.Raycaster();
             const camRight = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0).setY(0).normalize();
-            const visibleAll = (o) => { for (let n = o; n; n = n.parent) if (n.visible === false) return false; return true; };
             const out = {};
-            const roleMask = {};
-            const renderRoleMask = (role) => {
-              const hidden = [];
-              scene.traverse((o) => {
-                if ((o.isMesh || o.isPoints || o.isLine || o.isSprite) && o.visible && o.userData?.blueprintRole !== role) { o.visible = false; hidden.push(o); }
-              });
-              const prev = { bg: scene.background, fog: scene.fog, ov: scene.overrideMaterial, clear: renderer.getClearColor(new THREE.Color()), alpha: renderer.getClearAlpha() };
-              scene.background = null; scene.fog = null;
-              scene.overrideMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
-              renderer.setClearColor(0x000000, 1);
-              renderer.render(scene, camera);
-              const px = grab();
-              scene.overrideMaterial.dispose();
-              scene.background = prev.bg; scene.fog = prev.fog; scene.overrideMaterial = prev.ov;
-              renderer.setClearColor(prev.clear, prev.alpha);
-              hidden.forEach((o) => { o.visible = true; });
-              return px;
-            };
             // A point inside the part: side picks how far left/right along it
             // (0 = middle); `edge` aims low in the column, on its front rim,
             // which is where a piped edge shows.
@@ -1815,12 +1895,22 @@ const CakeScene = React.forwardRef(function CakeScene({
               const inBand = (y) => y >= bandLo && y <= bandHi;
               let color = null;
               if (colorPx) {
-                let r = 0; let g = 0; let b = 0; let n = 0;
+                const samples = [];
+                const allSamples = [];
                 for (let y = Math.max(0, bandLo); y <= Math.min(MH - 1, bandHi); y++) for (let x = minX; x <= maxX; x++) {
                   if (!on(x, y)) continue;
-                  const o = (y * MW + x) * 4; r += colorPx[o]; g += colorPx[o + 1]; b += colorPx[o + 2]; n++;
+                  const o = (y * MW + x) * 4;
+                  const r = colorPx[o]; const g = colorPx[o + 1]; const b = colorPx[o + 2];
+                  const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+                  allSamples.push({ r, g, b, lum });
+                  if (lum < 220) samples.push({ r, g, b, lum });
                 }
-                if (n) color = `#${[r, g, b].map((v) => Math.round(v / n).toString(16).padStart(2, '0')).join('')}`;
+                const pool = samples.length ? samples : allSamples;
+                if (pool.length) {
+                  pool.sort((a, b) => a.lum - b.lum);
+                  const med = pool[Math.floor(pool.length * 0.5)];
+                  color = `#${[med.r, med.g, med.b].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+                }
               }
               const frac = Math.min(0.88, Math.max(0.12, 0.5 + (side || 0)));
               const tx = Math.round(minX + frac * (maxX - minX));
@@ -1925,6 +2015,73 @@ const CakeScene = React.forwardRef(function CakeScene({
             }
             anchorsOut[stage.key] = out;
           }
+
+          // Extract the exact 2D drip contour from the 3D render of the surface stage
+          if (stage.key.startsWith('surface')) {
+            try {
+              const patternMeshes = [];
+              cakeGroup.traverse((o) => { if (o.isMesh && o.userData?.blueprintRole === 'pattern' && visibleAll(o)) patternMeshes.push(o); });
+              if (patternMeshes.length) {
+                if (!roleMask['pattern']) roleMask['pattern'] = renderRoleMask('pattern');
+                const px = roleMask['pattern'];
+                if (px) {
+                  // Sample the true rendered body color of the drip from mainPixels
+                  if (mainPixels) {
+                    const dripPixels = [];
+                    const allDripPixels = [];
+                    for (let y = 0; y < MH; y++) {
+                      for (let x = 0; x < MW; x++) {
+                        const idx = (y * MW + x) * 4;
+                        if (px[idx] > 100) {
+                          const r = mainPixels[idx];
+                          const g = mainPixels[idx + 1];
+                          const b = mainPixels[idx + 2];
+                          const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+                          allDripPixels.push({ r, g, b, lum });
+                          // Exclude bright specular reflection glare highlights
+                          if (lum < 220) dripPixels.push({ r, g, b, lum });
+                        }
+                      }
+                    }
+                    const pool = dripPixels.length ? dripPixels : allDripPixels;
+                    if (pool.length > 0) {
+                      pool.sort((a, b) => a.lum - b.lum);
+                      const median = pool[Math.floor(pool.length * 0.5)];
+                      const hex = `#${[median.r, median.g, median.b].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+                      fillColors[stage.key] = hex;
+                    }
+                  }
+
+                  const rawContour = [];
+                  for (let x = 0; x < MW; x++) {
+                    let bottomY = -1;
+                    for (let y = MH - 1; y >= 0; y--) {
+                      if (px[(y * MW + x) * 4] > 100) {
+                        bottomY = y;
+                        break;
+                      }
+                    }
+                    rawContour.push(bottomY >= 0 ? (bottomY + 0.5) / MH : 0.05);
+                  }
+                  // 5-point moving average to eliminate pixel stepping from 300px grab
+                  const smoothed = [];
+                  const kRad = 2;
+                  for (let x = 0; x < MW; x++) {
+                    let sum = 0;
+                    let cnt = 0;
+                    for (let k = Math.max(0, x - kRad); k <= Math.min(MW - 1, x + kRad); k++) {
+                      sum += rawContour[k];
+                      cnt++;
+                    }
+                    smoothed.push({ x: (x + 0.5) / MW, y: sum / cnt });
+                  }
+                  contoursOut[stage.key] = smoothed;
+                }
+              }
+            } catch (err) {
+              console.warn('Contour extraction failed for stage:', stage.key, err);
+            }
+          }
         }
       } catch (err) {
         console.warn('Blueprint stage capture failed:', err);
@@ -1937,7 +2094,7 @@ const CakeScene = React.forwardRef(function CakeScene({
         if (slotsGroupRef.current) slotsGroupRef.current.visible = prevSlotsVisible;
         if (ghostGroupRef.current) ghostGroupRef.current.visible = prevGhostVisible;
       }
-      return { images, anchors: anchorsOut, swatches, fillColors };
+      return { images, anchors: anchorsOut, swatches, fillColors, contours: contoursOut };
     },
 
     // 8-Angle Template Camera Screenshot Engine
@@ -2476,6 +2633,7 @@ const CakeScene = React.forwardRef(function CakeScene({
           applyVerticalGradientUV(frostGeom);
           pieceFrostGeom = frostGeom;
           const frostMesh = new THREE.Mesh(frostGeom, frostMat);
+          frostMesh.userData.blueprintRole = 'finish';
           frostMesh.position.y = 0;
           frostMesh.castShadow = true;
           frostMesh.receiveShadow = true;
@@ -3482,6 +3640,7 @@ const CakeScene = React.forwardRef(function CakeScene({
         if (spongeMat && !(fillingOnTop && tierFillingEnabled && s === tierFillingLayers)) {
           const spongeSection = new THREE.Mesh(spongeGeo, spongeMat);
           spongeSection.userData.blueprintRole = 'sponge';
+          spongeSection.userData.tier = i;
           spongeSection.position.y = spongeCurrentY + spongeSectionHeight / 2;
           spongeSection.castShadow = true;
           spongeSection.receiveShadow = true;
@@ -3588,6 +3747,7 @@ const CakeScene = React.forwardRef(function CakeScene({
             mashedFilling.castShadow = true;
             mashedFilling.receiveShadow = true;
             mashedFilling.userData.blueprintRole = 'filling';
+            mashedFilling.userData.tier = i;
             group.add(mashedFilling);
             // Recorded for Glaze's hugging profile below — see
             // lastFillingBands' declaration above. isSwirl/bumpJitter are
@@ -3623,6 +3783,7 @@ const CakeScene = React.forwardRef(function CakeScene({
             fillingSection.castShadow = true;
             fillingSection.receiveShadow = true;
             fillingSection.userData.blueprintRole = 'filling';
+            fillingSection.userData.tier = i;
             group.add(fillingSection);
 
             // No separate piping trim here: this branch only ever runs
@@ -3683,6 +3844,8 @@ const CakeScene = React.forwardRef(function CakeScene({
         applyVerticalGradientUV(frostGeo);
 
         const frost = new THREE.Mesh(frostGeo, frostMat);
+        frost.userData.blueprintRole = 'finish';
+        frost.userData.tier = i;
         frost.position.y = currentY - FROST_CAP_H - tierSeamOverlap;
         frost.castShadow = true;
         group.add(frost);
@@ -3818,6 +3981,8 @@ const CakeScene = React.forwardRef(function CakeScene({
         checkerSide.material.clipIntersection = tierClipConfig.side.clipIntersection;
         checkerSide.material.clipShadows = true;
         coveringMaterialsRef.current.push(checkerSide.material);
+        checkerSide.userData.tier = i;
+        checkerSide.userData.blueprintRole = 'pattern';
         group.add(checkerSide);
       }
 
@@ -3878,6 +4043,8 @@ const CakeScene = React.forwardRef(function CakeScene({
         triangleSide.material.clipIntersection = tierClipConfig.side.clipIntersection;
         triangleSide.material.clipShadows = true;
         coveringMaterialsRef.current.push(triangleSide.material);
+        triangleSide.userData.tier = i;
+        triangleSide.userData.blueprintRole = 'pattern';
         group.add(triangleSide);
       }
 
@@ -3930,11 +4097,14 @@ const CakeScene = React.forwardRef(function CakeScene({
           coatThickness: tierDripCoatThickness,
         });
         pearls.position.y = currentY + height / 2;
+        pearls.userData.tier = i;
+        pearls.userData.blueprintRole = 'pattern';
         group.add(pearls);
         registerNewChildrenForClipping(group, startIdx, coveringMaterialsRef, interiorPreview, tierClipConfig.side.planes, tierClipConfig.side.clipIntersection);
       }
 
       layerGlazeDescriptors.push({
+        tier: i,
         radius,
         height,
         currentY,
@@ -4001,6 +4171,8 @@ const CakeScene = React.forwardRef(function CakeScene({
           // and cloning them dropped the color/pattern handling.
         }
 
+        scrolls.userData.tier = i;
+        scrolls.userData.blueprintRole = 'pattern';
         group.add(scrolls);
         registerNewChildrenForClipping(group, startIdx, coveringMaterialsRef, interiorPreview, tierClipConfig.side.planes, tierClipConfig.side.clipIntersection);
       }
@@ -4031,6 +4203,8 @@ const CakeScene = React.forwardRef(function CakeScene({
           },
         );
         sunshine.position.y = currentY + height / 2;
+        sunshine.userData.tier = i;
+        sunshine.userData.blueprintRole = 'pattern';
         group.add(sunshine);
         registerNewChildrenForClipping(group, startIdx, coveringMaterialsRef, interiorPreview, tierClipConfig.side.planes, tierClipConfig.side.clipIntersection);
       }
@@ -4055,6 +4229,8 @@ const CakeScene = React.forwardRef(function CakeScene({
           { hasDrip: tierHasDrip, coatThickness: tierDripCoatThickness, maxCarveDepth: 0.50 }
         );
         lambeth.position.y = currentY + height / 2 + lambethVerticalOffset;
+        lambeth.userData.tier = i;
+        lambeth.userData.blueprintRole = 'pattern';
         group.add(lambeth);
         registerNewChildrenForClipping(group, startIdx, coveringMaterialsRef, interiorPreview, tierClipConfig.side.planes, tierClipConfig.side.clipIntersection);
       }
@@ -4074,6 +4250,8 @@ const CakeScene = React.forwardRef(function CakeScene({
           embedOverride: exteriorFinishStyle === 'texturedButtercream' ? 0.02 : undefined,
         });
         chevron.position.y = currentY + height / 2;
+        chevron.userData.tier = i;
+        chevron.userData.blueprintRole = 'pattern';
         group.add(chevron);
         registerNewChildrenForClipping(group, startIdx, coveringMaterialsRef, interiorPreview, tierClipConfig.side.planes, tierClipConfig.side.clipIntersection);
       }
@@ -4407,6 +4585,8 @@ const CakeScene = React.forwardRef(function CakeScene({
       const glaze = new THREE.Mesh(glazeGeo, glazeMat);
       glaze.position.y = lastFrostMeshY;
       glaze.castShadow = true;
+      glaze.userData.blueprintRole = 'pattern';
+      glaze.userData.tier = layerCount - 1;
       group.add(glaze);
     }
 
@@ -4474,6 +4654,8 @@ const CakeScene = React.forwardRef(function CakeScene({
         const glaze = new THREE.Mesh(glazeGeo, glazeMat);
         glaze.position.y = descriptor.frostMeshY;
         glaze.castShadow = true;
+        glaze.userData.blueprintRole = 'pattern';
+        glaze.userData.tier = descriptor.tier;
         group.add(glaze);
       }
     }
@@ -4525,6 +4707,8 @@ const CakeScene = React.forwardRef(function CakeScene({
         const glaze = new THREE.Mesh(glazeGeo, glazeMat);
         glaze.position.y = descriptor.frostMeshY;
         glaze.castShadow = true;
+        glaze.userData.blueprintRole = 'pattern';
+        glaze.userData.tier = descriptor.tier;
         group.add(glaze);
       }
     }

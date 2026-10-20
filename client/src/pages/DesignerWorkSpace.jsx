@@ -806,10 +806,10 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
           return { key, anchors, zoom, diffConfig: diffConfig ? adaptConfigToLegacy(diffConfig) : undefined, tilt, azimuth, fit, config: slice ? { ...legacy, __slice: slice, __fillingOnTop: true } : legacy };
         });
         const shots = cakeSceneRef.current.captureBlueprintStages(stages);
-        blueprintTiersRef.current = shots ? { groups: plan.groups, images: shots.images, anchors: shots.anchors, swatches: shots.swatches, fillColors: shots.fillColors } : { groups: [], images: {}, anchors: {}, swatches: {}, fillColors: {} };
+        blueprintTiersRef.current = shots ? { groups: plan.groups, images: shots.images, anchors: shots.anchors, swatches: shots.swatches, fillColors: shots.fillColors, contours: shots.contours } : { groups: [], images: {}, anchors: {}, swatches: {}, fillColors: {}, contours: {} };
       } catch (err) {
         console.warn('Failed to capture blueprint tier stages:', err);
-        blueprintTiersRef.current = { groups: [], images: {}, anchors: {}, swatches: {}, fillColors: {} };
+        blueprintTiersRef.current = { groups: [], images: {}, anchors: {}, swatches: {}, fillColors: {}, contours: {} };
       }
     }
 

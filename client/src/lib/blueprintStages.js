@@ -1,5 +1,5 @@
 import { getSurfaceTreatmentPattern, isPetitsFourStructure } from './cakeConfig';
-import { name, flavorColorOf } from './blueprintDetails';
+import { name, flavorColorOf, cleanDecorName } from './blueprintDetails';
 
 // Blueprint "DETAILS:" tier pages -- the plan.
 //
@@ -111,7 +111,7 @@ export function buildBlueprintTierPlan(config = {}) {
     let runningKey = 'base';
     if (anyFinish) {
         running = { ...clone(running), exteriorFinish: clone(finishCfg) };
-        stages.push({ key: 'finish', config: running, diffConfig: plain });
+        stages.push({ key: 'finish', config: running });
         runningKey = 'finish';
     }
     if (anySurface) {
@@ -126,21 +126,35 @@ export function buildBlueprintTierPlan(config = {}) {
         }
 
         // Close front screenshot (tilted to highlight top surface treatment & drips)
+        // Close front screenshot (no background, only surface pattern)
         stages.push({
             key: 'surface-front',
             config: surfaceConfig,
             diffConfig: surfaceBase,
             azimuth: 18,
-            tilt: 26,
+            tilt: 0,
             fit: 0.86,
+            zoom: {
+                mode: 'pattern',
+                fullHeight: true,
+                tilt: 0,
+                arc: 28,
+                fit: 1.0,
+            },
         });
-        // Close back screenshot (180 deg opposite)
+        // Close back screenshot (no background, only surface pattern)
         stages.push({
             key: 'surface-back',
             config: surfaceConfig,
             azimuth: 198,
-            tilt: 26,
             fit: 0.86,
+            zoom: {
+                mode: 'pattern',
+                fullHeight: true,
+                tilt: 0,
+                arc: 28,
+                fit: 1.0,
+            },
         });
 
         running = { ...clone(running), surfaceTreatment: clone(config.surfaceTreatment) };
@@ -159,22 +173,35 @@ export function buildBlueprintTierPlan(config = {}) {
             sideConfig.surfaceTreatment.layerTreatments = sideConfig.surfaceTreatment.layerTreatments.map((t) => ({ ...(t || {}), mode: null }));
         }
 
-        // Close front screenshot (flatter tilt to showcase side design)
+        // Close front screenshot (no background, only side pattern)
         stages.push({
             key: 'side-front',
             config: sideConfig,
             diffConfig: sideBase,
             azimuth: 18,
-            tilt: 14,
+            tilt: 0,
             fit: 0.86,
+            zoom: {
+                mode: 'pattern',
+                fullHeight: true,
+                tilt: 0,
+                arc: 28,
+                fit: 1.0,
+            },
         });
-        // Close back screenshot (180 deg opposite)
+        // Close back screenshot (no background, only side pattern)
         stages.push({
             key: 'side-back',
             config: sideConfig,
             azimuth: 198,
-            tilt: 14,
             fit: 0.86,
+            zoom: {
+                mode: 'pattern',
+                fullHeight: true,
+                tilt: 0,
+                arc: 28,
+                fit: 1.0,
+            },
         });
 
         running = { ...clone(running), side: clone(config.side) };
@@ -213,7 +240,7 @@ export function buildBlueprintTierPlan(config = {}) {
         const sliceOf = { tier: individual ? t.i : 0, layers: t.fillingLayers };
         stages.push({ key: `filling-${t.i}`, config: slab, slice: sliceOf });
         // Close-up of the same slab: the top band, where the piping sits.
-        stages.push({ key: `filling-zoom-${t.i}`, config: slab, slice: sliceOf, zoom: { band: 0.45 } });
+        stages.push({ key: `filling-zoom-${t.i}`, config: slab, slice: sliceOf, zoom: { mode: 'pattern', band: 0.45, fit: 1.0 } });
     });
 
     // Callouts carry an anchor id; the capture finds where that spot really
@@ -302,14 +329,50 @@ export function buildBlueprintTierPlan(config = {}) {
         }
 
         if (t.style && t.style !== 'naked') {
+            const exteriorSugarOverride = config.sugarColorOverrides?.[`exterior-${t.i}`] || config.sugarColorOverrides?.exterior || config.sugarColor;
+            const finishColorId = exteriorSugarOverride?.colorId || t.frost || 'vanilla';
+            const finishChipColor = flavorColorOf(finishColorId) || flavorColorOf(t.frost) || '#F6DEAB';
+            const finishFlavorSub = name(finishColorId);
+
+            const finishSub = t.style === 'texturedButtercream' && t.texture
+                ? `${name(t.style)} · ${name(t.texture)}`
+                : `${name(t.style)} · Smooth coating`;
+
             const rows = [['Finish', name(t.style)]];
             if (t.style === 'texturedButtercream' && t.texture) rows.push(['Texture', name(t.texture)]);
+            rows.push(['Flavor', finishFlavorSub]);
+
+            const finishAnchor = { role: 'finish', tier: individual ? t.i : 0, tiers: individual ? count : 1 };
+
             pages.push({
-                kind: 'finish', section: 'EXTERIOR FINISH', image: 'finish', title: 'Exterior Finish',
-                callouts: [callout('finish', `finish-${t.i}`, 'EXTERIOR FINISH', midHy, -0.45, 0.4, anchorY)],
+                kind: 'finish',
+                section: 'EXTERIOR FINISH',
+                image: 'finish',
+                title: 'Exterior Finish',
+                flavorName: finishFlavorSub,
+                flavorChipColor: finishChipColor,
+                crops: [
+                    {
+                        kind: 'flavor',
+                        label: 'FLAVOR',
+                        sub: finishFlavorSub,
+                        chipColor: finishChipColor,
+                        ...callout('finish', `finish-flavor-${t.i}`, 'FLAVOR', midHy, -0.3, 0.4, anchorY, { ...finishAnchor, color: true }),
+                        anchorId: `finish-flavor-${t.i}`,
+                    },
+                ],
+                finish: {
+                    label: 'EXTERIOR FINISH',
+                    sub: finishSub,
+                    ...callout('finish', `finish-texture-${t.i}`, 'EXTERIOR FINISH', midHy, 0.3, 0.6, anchorY, finishAnchor),
+                    anchorId: `finish-texture-${t.i}`,
+                },
                 details: rows,
-                highlights: [`${name(t.style)} coating over the whole cake`],
-                flavor: t.frost ? name(t.frost) : null,
+                highlights: [
+                    t.style === 'texturedButtercream' && t.texture
+                        ? `${name(t.style)} applied with ${name(t.texture).toLowerCase()} texture across the whole cake`
+                        : `${name(t.style)} coating spread smoothly over the whole cake`,
+                ],
             });
         }
 
@@ -317,8 +380,12 @@ export function buildBlueprintTierPlan(config = {}) {
             const surfaceSugarOverride = config.sugarColorOverrides?.[`surface-${t.i}`] || config.sugarColorOverrides?.surface;
             const surfaceColorId = (surfaceSugarOverride?.mode === 'colorOverride' && surfaceSugarOverride.colorId)
               ? surfaceSugarOverride.colorId
-              : (surfaceSugarOverride?.colorId || 'vanilla');
-            const surfaceChipColor = flavorColorOf(surfaceColorId) || '#F6DEAB';
+              : (surfaceSugarOverride?.colorId
+                 || t.surface?.colorId
+                 || config.surfaceTreatment?.colorId
+                 || (surfaceSugarOverride?.mode === 'default' ? (t.frost || 'vanilla') : 'vanilla'));
+            const isChoc = String(surfaceColorId || '').toLowerCase().includes('choc');
+            const surfaceChipColor = isChoc ? '#3D2314' : (flavorColorOf(surfaceColorId) || '#F6DEAB');
             const surfaceFlavorName = name(surfaceColorId);
             const patternId = getSurfaceTreatmentPattern(t.surface, config.structure);
             const patternName = name(patternId);
@@ -333,6 +400,7 @@ export function buildBlueprintTierPlan(config = {}) {
                 backImage: 'surface-back',
                 flavorName: surfaceFlavorName,
                 flavorChipColor: surfaceChipColor,
+                patternId,
                 patternName,
                 mode: t.surface.mode,
                 crops: [
@@ -343,14 +411,14 @@ export function buildBlueprintTierPlan(config = {}) {
                         sub: surfaceFlavorName,
                         chipColor: surfaceChipColor,
                         anchorId: `surface-flavor-${t.i}`,
-                        ...callout('surface-front', `surface-flavor-${t.i}`, 'FLAVOR', 0.95, -0.3, 0.45, 0.28),
+                        ...callout('surface-front', `surface-flavor-${t.i}`, 'FLAVOR', 0.95, -0.3, 0.45, 0.28, { role: 'pattern', color: true }),
                     },
                 ],
                 pattern: {
                     label: 'PATTERN',
                     sub: patternName,
                     anchorId: `surface-pattern-${t.i}`,
-                    ...callout('surface-back', `surface-pattern-${t.i}`, 'PATTERN', 0.85, -0.3, 0.45, 0.42),
+                    ...callout('surface-back', `surface-pattern-${t.i}`, 'PATTERN', 0.85, -0.3, 0.45, 0.42, { role: 'pattern' }),
                 },
                 details: [
                     ['Treatment', name(t.surface.mode)],
@@ -366,7 +434,7 @@ export function buildBlueprintTierPlan(config = {}) {
             const sideSugarOverride = config.sugarColorOverrides?.[`side-${t.i}`] || config.sugarColorOverrides?.side;
             const sideColorId = (sideSugarOverride?.mode === 'colorOverride' && sideSugarOverride.colorId)
               ? sideSugarOverride.colorId
-              : (choice.colorId || choice.flavorId || sideSugarOverride?.colorId || 'vanilla');
+              : (sideSugarOverride?.colorId || choice.colorId || choice.flavorId || config.sugarColor?.colorId || 'vanilla');
             const sideChipColor = flavorColorOf(sideColorId) || '#F6DEAB';
             const sideColorName = name(sideColorId);
             const sidePatternName = name(choice.setId || t.side.mode);
@@ -392,6 +460,8 @@ export function buildBlueprintTierPlan(config = {}) {
                 flavorChipColor: sideChipColor,
                 patternName: sidePatternName,
                 mode: t.side.mode,
+                treatmentId: t.side.mode,
+                variantId: choice.setId || null,
                 baseFinish: baseFinishName,
                 baseTypeDisplay,
                 crops: [
@@ -402,14 +472,16 @@ export function buildBlueprintTierPlan(config = {}) {
                         sub: sideColorName,
                         chipColor: sideChipColor,
                         anchorId: `side-flavor-${t.i}`,
-                        ...callout('side-front', `side-flavor-${t.i}`, 'FLAVOR', midHy, -0.3, 0.45, anchorY),
+                        ...callout('side-front', `side-flavor-${t.i}`, 'FLAVOR', midHy, -0.3, 0.45, anchorY, { role: 'pattern', color: true }),
                     },
                 ],
                 pattern: {
                     label: 'PATTERN',
                     sub: sidePatternName,
+                    treatmentId: t.side.mode,
+                    variantId: choice.setId || null,
                     anchorId: `side-pattern-${t.i}`,
-                    ...callout('side-back', `side-pattern-${t.i}`, 'PATTERN', midHy, -0.3, 0.45, anchorY),
+                    ...callout('side-back', `side-pattern-${t.i}`, 'PATTERN', midHy, -0.3, 0.45, anchorY, { role: 'pattern' }),
                 },
                 details: [
                     ['Base Finish', baseFinishName],
@@ -439,21 +511,6 @@ export function buildBlueprintTierPlan(config = {}) {
         });
     });
 
-    function cleanDecorName(rawType) {
-        if (!rawType) return 'Decoration';
-        let s = String(rawType)
-            .replace(/^center-/, '')
-            .replace(/-default$/, '')
-            .replace(/-standing$/, ' (Standing)')
-            .replace(/-/g, ' ');
-        const letterMatch = s.match(/^letter(Upper|Lower)([A-Za-z0-9])/i);
-        if (letterMatch) {
-            return `Letter '${letterMatch[2]}'`;
-        }
-        return s.replace(/([a-z])([A-Z])/g, '$1 $2')
-            .replace(/^./, (c) => c.toUpperCase())
-            .trim();
-    }
 
     function getItemZone(item) {
         const x = Number(item.x) || 0;

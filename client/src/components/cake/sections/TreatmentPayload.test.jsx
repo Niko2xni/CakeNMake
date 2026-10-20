@@ -139,12 +139,12 @@ describe('treatment payload growth', () => {
     const view = render(<SideSection {...props()} />);
     const selectedButton = () => view.container.querySelector('button[title="Remove Full Pattern"]');
 
-    expect(selectedButton()?.querySelector('svg')).not.toBeNull();
+    expect(selectedButton()?.querySelector('svg.lucide-x')).not.toBeNull();
     fireEvent.click(selectedButton());
     view.rerender(<SideSection {...props()} />);
 
     expect(side.mode).toBeNull();
-    expect(view.container.querySelector('button[title="Full Pattern"]')?.querySelector('svg')).toBeNull();
+    expect(view.container.querySelector('button[title="Full Pattern"]')?.querySelector('svg.lucide-x')).toBeNull();
     view.unmount();
   });
 
@@ -158,7 +158,7 @@ describe('treatment payload growth', () => {
     const view = render(<SideSection {...props()} />);
     const selectedButton = view.container.querySelector('button[title="Remove Full Pattern"]');
 
-    expect(selectedButton?.querySelector('svg')).not.toBeNull();
+    expect(selectedButton?.querySelector('svg.lucide-x')).not.toBeNull();
     fireEvent.click(selectedButton);
     view.rerender(<SideSection {...props()} />);
 
