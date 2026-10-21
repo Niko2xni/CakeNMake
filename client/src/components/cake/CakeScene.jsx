@@ -1663,8 +1663,12 @@ const CakeScene = React.forwardRef(function CakeScene({
           let zoomTilt = null;
           let latRadius = ringRadius; // how far 'side' offsets reach sideways
           if (stage.zoom) {
-            let yHi = box.max.y;
-            let yLo = box.max.y - Math.max(0.05, Math.min(1, stage.zoom.band ?? 0.4)) * dims.y;
+            let yHi = stage.zoom.position === 'bottom'
+              ? box.min.y + Math.max(0.05, Math.min(1, stage.zoom.band ?? 0.4)) * dims.y
+              : box.max.y;
+            let yLo = stage.zoom.position === 'bottom'
+              ? box.min.y
+              : box.max.y - Math.max(0.05, Math.min(1, stage.zoom.band ?? 0.4)) * dims.y;
             let zr = ringRadius;
             let targetCenter = center;
 
@@ -1733,11 +1737,32 @@ const CakeScene = React.forwardRef(function CakeScene({
                 zoomTilt = 0;
               }
             } else {
-              // Standard filling zoom or band zoom:
-              // The front arc of the cake's top band / filling band
+              // Standard filling zoom, edge piping zoom, or band zoom:
               const fillMeshes = [];
               cakeGroup.traverse((o) => { if (o.isMesh && o.userData?.blueprintRole === 'filling') fillMeshes.push(o); });
-              if (fillMeshes.length) {
+              const edgeMeshes = [];
+              if (stage.key.startsWith('edge') || stage.zoom.mode === 'edge') {
+                cakeGroup.traverse((o) => { if (o.isMesh && o.userData?.blueprintRole === 'edge') edgeMeshes.push(o); });
+              }
+
+              if (edgeMeshes.length) {
+                const eb = new THREE.Box3();
+                edgeMeshes.forEach((m) => eb.expandByObject(m));
+                const eh = Math.max(0.04, eb.max.y - eb.min.y);
+                zr = Math.max(eb.max.x - eb.min.x, eb.max.z - eb.min.z) / 2;
+                const yMid = (eb.min.y + eb.max.y) / 2;
+                const ySpan = Math.max(eh * 0.9, 0.35);
+                const half = deg(stage.zoom.arc ?? 20);
+                for (let k = 0; k <= 10; k++) {
+                  const a = azimuth - half + (k / 10) * 2 * half;
+                  for (const y of [yMid - ySpan, yMid + ySpan]) {
+                    points.push(new THREE.Vector3(targetCenter.x + Math.sin(a) * zr, y, targetCenter.z + Math.cos(a) * zr));
+                  }
+                }
+                lookAt = new THREE.Vector3(targetCenter.x + Math.sin(azimuth) * zr, yMid, targetCenter.z + Math.cos(azimuth) * zr);
+                zoomTilt = deg(stage.zoom.tilt ?? 14);
+                latRadius = zr;
+              } else if (fillMeshes.length) {
                 const fb = new THREE.Box3();
                 fillMeshes.forEach((m) => fb.expandByObject(m));
                 const fh = Math.max(0.05, fb.max.y - fb.min.y);
@@ -1828,15 +1853,21 @@ const CakeScene = React.forwardRef(function CakeScene({
               ? 'pattern'
               : stage.key.startsWith('finish')
                 ? 'finish'
-                : stage.key === 'base'
-                  ? 'sponge'
-                  : 'filling';
+                : stage.key.startsWith('edge')
+                  ? 'edge'
+                  : stage.key === 'base'
+                    ? 'sponge'
+                    : 'filling';
             cakeGroup.traverse((o) => {
               if (!mat && o.isMesh && o.userData?.blueprintRole === targetRole) {
                 mat = Array.isArray(o.material) ? o.material[0] : o.material;
               }
             });
-            if (mat?.color?.isColor) fillColors[stage.key] = `#${mat.color.getHexString()}`;
+            if (mat?.color?.isColor) {
+              const hex = `#${mat.color.getHexString()}`;
+              const isChoc = stage.key.startsWith('surface') && hex.toLowerCase().startsWith('#7a4');
+              fillColors[stage.key] = isChoc ? '#301009' : hex;
+            }
           } catch (err) { /* optional */ }
           const MW = 300;
           const MH = Math.round((MW * height) / width);
@@ -1959,6 +1990,75 @@ const CakeScene = React.forwardRef(function CakeScene({
               projected.copy(hit ? hit.point : aim).project(camera);
               out[a.id] = { x: Math.min(1, Math.max(0, (projected.x + 1) / 2)), y: Math.min(1, Math.max(0, (1 - projected.y) / 2)) };
             }
+
+            // Extract the exact 2D drip contour and sampled drip color from the 3D render of the surface stage
+            // (Captured BEFORE withDiff rebuilds the cake without this stage's treatment!)
+            if (stage.key.startsWith('surface')) {
+              try {
+                const patternMeshes = [];
+                cakeGroup.traverse((o) => { if (o.isMesh && o.userData?.blueprintRole === 'pattern' && visibleAll(o)) patternMeshes.push(o); });
+                if (patternMeshes.length) {
+                  if (!roleMask['pattern']) roleMask['pattern'] = renderRoleMask('pattern');
+                  const px = roleMask['pattern'];
+                  if (px) {
+                    // Sample the true rendered body color of the drip from mainPixels
+                    if (mainPixels) {
+                      const dripPixels = [];
+                      const allDripPixels = [];
+                      for (let y = 0; y < MH; y++) {
+                        for (let x = 0; x < MW; x++) {
+                          const idx = (y * MW + x) * 4;
+                          if (px[idx] > 100) {
+                            const r = mainPixels[idx];
+                            const g = mainPixels[idx + 1];
+                            const b = mainPixels[idx + 2];
+                            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+                            allDripPixels.push({ r, g, b, lum });
+                            // Exclude bright specular reflection glare highlights
+                            if (lum < 220) dripPixels.push({ r, g, b, lum });
+                          }
+                        }
+                      }
+                      const pool = dripPixels.length ? dripPixels : allDripPixels;
+                      if (pool.length > 0) {
+                        pool.sort((a, b) => a.lum - b.lum);
+                        const median = pool[Math.floor(pool.length * 0.5)];
+                        const hex = `#${[median.r, median.g, median.b].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+                        fillColors[stage.key] = hex;
+                      }
+                    }
+
+                    const rawContour = [];
+                    for (let x = 0; x < MW; x++) {
+                      let bottomY = -1;
+                      for (let y = MH - 1; y >= 0; y--) {
+                        if (px[(y * MW + x) * 4] > 100) {
+                          bottomY = y;
+                          break;
+                        }
+                      }
+                      rawContour.push(bottomY >= 0 ? (bottomY + 0.5) / MH : 0.05);
+                    }
+                    // 5-point moving average to eliminate pixel stepping from 300px grab
+                    const smoothed = [];
+                    const kRad = 2;
+                    for (let x = 0; x < MW; x++) {
+                      let sum = 0;
+                      let cnt = 0;
+                      for (let k = Math.max(0, x - kRad); k <= Math.min(MW - 1, x + kRad); k++) {
+                        sum += rawContour[k];
+                        cnt++;
+                      }
+                      smoothed.push({ x: (x + 0.5) / MW, y: sum / cnt });
+                    }
+                    contoursOut[stage.key] = smoothed;
+                  }
+                }
+              } catch (err) {
+                console.warn('Contour extraction failed for stage:', stage.key, err);
+              }
+            }
+
             // Refine: re-render the same view without this stage's addition
             // and find where the picture changed.
             if (withDiff) {
@@ -2016,72 +2116,6 @@ const CakeScene = React.forwardRef(function CakeScene({
             anchorsOut[stage.key] = out;
           }
 
-          // Extract the exact 2D drip contour from the 3D render of the surface stage
-          if (stage.key.startsWith('surface')) {
-            try {
-              const patternMeshes = [];
-              cakeGroup.traverse((o) => { if (o.isMesh && o.userData?.blueprintRole === 'pattern' && visibleAll(o)) patternMeshes.push(o); });
-              if (patternMeshes.length) {
-                if (!roleMask['pattern']) roleMask['pattern'] = renderRoleMask('pattern');
-                const px = roleMask['pattern'];
-                if (px) {
-                  // Sample the true rendered body color of the drip from mainPixels
-                  if (mainPixels) {
-                    const dripPixels = [];
-                    const allDripPixels = [];
-                    for (let y = 0; y < MH; y++) {
-                      for (let x = 0; x < MW; x++) {
-                        const idx = (y * MW + x) * 4;
-                        if (px[idx] > 100) {
-                          const r = mainPixels[idx];
-                          const g = mainPixels[idx + 1];
-                          const b = mainPixels[idx + 2];
-                          const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-                          allDripPixels.push({ r, g, b, lum });
-                          // Exclude bright specular reflection glare highlights
-                          if (lum < 220) dripPixels.push({ r, g, b, lum });
-                        }
-                      }
-                    }
-                    const pool = dripPixels.length ? dripPixels : allDripPixels;
-                    if (pool.length > 0) {
-                      pool.sort((a, b) => a.lum - b.lum);
-                      const median = pool[Math.floor(pool.length * 0.5)];
-                      const hex = `#${[median.r, median.g, median.b].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
-                      fillColors[stage.key] = hex;
-                    }
-                  }
-
-                  const rawContour = [];
-                  for (let x = 0; x < MW; x++) {
-                    let bottomY = -1;
-                    for (let y = MH - 1; y >= 0; y--) {
-                      if (px[(y * MW + x) * 4] > 100) {
-                        bottomY = y;
-                        break;
-                      }
-                    }
-                    rawContour.push(bottomY >= 0 ? (bottomY + 0.5) / MH : 0.05);
-                  }
-                  // 5-point moving average to eliminate pixel stepping from 300px grab
-                  const smoothed = [];
-                  const kRad = 2;
-                  for (let x = 0; x < MW; x++) {
-                    let sum = 0;
-                    let cnt = 0;
-                    for (let k = Math.max(0, x - kRad); k <= Math.min(MW - 1, x + kRad); k++) {
-                      sum += rawContour[k];
-                      cnt++;
-                    }
-                    smoothed.push({ x: (x + 0.5) / MW, y: sum / cnt });
-                  }
-                  contoursOut[stage.key] = smoothed;
-                }
-              }
-            } catch (err) {
-              console.warn('Contour extraction failed for stage:', stage.key, err);
-            }
-          }
         }
       } catch (err) {
         console.warn('Blueprint stage capture failed:', err);
@@ -4996,6 +5030,8 @@ const CakeScene = React.forwardRef(function CakeScene({
             }
           );
           trim.position.y = edgeTrimY;
+          trim.userData.blueprintRole = 'edge';
+          trim.traverse?.((c) => { if (c.isMesh) c.userData.blueprintRole = 'edge'; });
           group.add(trim);
         } else if (fruitRimBuilder) {
           const trim = fruitRimBuilder(edgeTrimRadius, edgeTrimY, rand, {
@@ -5003,7 +5039,11 @@ const CakeScene = React.forwardRef(function CakeScene({
             shape: cakeShape,
             baseRadius: BASE_RADIUS,
           });
-          group.add(trim);
+          if (trim) {
+            trim.userData.blueprintRole = 'edge';
+            trim.traverse?.((c) => { if (c.isMesh) c.userData.blueprintRole = 'edge'; });
+            group.add(trim);
+          }
         } else if (slot?.pipingTip) {
           const isAltTip = typeof slot.pipingTip === 'string' && slot.pipingTip.includes('Alt');
           const pipingMat = getFrostingMaterial(slot?.pipingColor || lastFrostColor, slot?.pipingColorId);
@@ -5021,6 +5061,8 @@ const CakeScene = React.forwardRef(function CakeScene({
           });
           if (edgePiping) {
             edgePiping.receiveShadow = true;
+            edgePiping.userData.blueprintRole = 'edge';
+            edgePiping.traverse?.((c) => { if (c.isMesh) c.userData.blueprintRole = 'edge'; });
             group.add(edgePiping);
           }
         }
@@ -5070,13 +5112,20 @@ const CakeScene = React.forwardRef(function CakeScene({
           );
           middleTrim.position.y = middleY;
           middleTrim.receiveShadow = true;
+          middleTrim.userData.blueprintRole = 'edge';
+          middleTrim.traverse?.((c) => { if (c.isMesh) c.userData.blueprintRole = 'edge'; });
           group.add(middleTrim);
         } else if (middleFruitRimBuilder) {
-          group.add(middleFruitRimBuilder(middleRadius, middleY, rand, {
+          const middleTrim = middleFruitRimBuilder(middleRadius, middleY, rand, {
             isBottom: true,
             shape: cakeShape,
             baseRadius: BASE_RADIUS,
-          }));
+          });
+          if (middleTrim) {
+            middleTrim.userData.blueprintRole = 'edge';
+            middleTrim.traverse?.((c) => { if (c.isMesh) c.userData.blueprintRole = 'edge'; });
+            group.add(middleTrim);
+          }
         } else {
           const middlePipingMat = getFrostingMaterial(
             activeMiddleSlot.pipingColor || lastFrostColor,
@@ -5100,6 +5149,8 @@ const CakeScene = React.forwardRef(function CakeScene({
           });
           if (middlePiping) {
             middlePiping.receiveShadow = true;
+            middlePiping.userData.blueprintRole = 'edge';
+            middlePiping.traverse?.((c) => { if (c.isMesh) c.userData.blueprintRole = 'edge'; });
             group.add(middlePiping);
           }
         }

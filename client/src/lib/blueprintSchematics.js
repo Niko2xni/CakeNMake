@@ -62,14 +62,8 @@ export function drawSidePatternSchematic(doc, {
   const wallY = wallTopY;
 
   // Background of unrolled wall (subtle frosted base)
-  doc.setFillColor(248, 245, 242);
+  doc.setFillColor(255, 255, 255);
   doc.rect(wallX, wallY, wallW, wallH, 'F');
-
-  // Top rim & base borders
-  doc.setDrawColor(120, 105, 105);
-  doc.setLineWidth(0.5);
-  doc.line(wallX, wallY, wallX + wallW, wallY);
-  doc.line(wallX, wallY + wallH, wallX + wallW, wallY + wallH);
 
   // 3. Render dumbed down geometric pattern shapes
   const rgb = hexToRgb(color);
@@ -136,17 +130,11 @@ export function drawSurfaceTreatmentSchematic(doc, {
   const wallX = x + wallMarginX;
   const wallY = wallTopY;
 
-  // Background of unrolled wall (representing base cake frosting underneath)
-  doc.setFillColor(250, 247, 244);
+  // Background of unrolled wall (clean white base)
+  doc.setFillColor(255, 255, 255);
   doc.rect(wallX, wallY, wallW, wallH, 'F');
 
-  // Top rim & base borders
-  doc.setDrawColor(140, 125, 125);
-  doc.setLineWidth(0.5);
-  doc.line(wallX, wallY, wallX + wallW, wallY);
-  doc.line(wallX, wallY + wallH, wallX + wallW, wallY + wallH);
-
-  // 3. Render 2D drawing based on the actual 3D render contour (or fallback wave)
+  // 3. Render 2D drawing depicting the 3D render design
   const rgb = hexToRgb(color);
   renderDripDrawing(doc, {
     wallX,
@@ -155,7 +143,6 @@ export function drawSurfaceTreatmentSchematic(doc, {
     wallH,
     patternId,
     rgb,
-    contour,
   });
 
   // 4. Bottom footer of card
@@ -231,8 +218,9 @@ function renderSideShapes(doc, { wallX, wallY, wallW, wallH, treatmentId, varian
     }
 
     case 'trianglePattern': {
-      const cols = 9;
-      const rows = 4;
+      // Replicate 3D render: broad, spread-out equilateral triangles in a 3-2-3 staggered pattern
+      const cols = 5;
+      const rows = 3;
       const cellW = wallW / cols;
       const cellH = wallH / rows;
 
@@ -246,22 +234,25 @@ function renderSideShapes(doc, { wallX, wallY, wallW, wallH, treatmentId, varian
 
           let shouldFill = false;
           if (str.includes('right') || str.includes('diag')) {
-            shouldFill = (c + r) % 3 === 0;
+            shouldFill = (c + r) % 2 === 0;
           } else if (str.includes('outer')) {
-            shouldFill = r === 0 || r === rows - 1;
+            shouldFill = (r === 0 || r === rows - 1) && (c % 2 === 0);
           } else if (str.includes('inner')) {
-            shouldFill = r === 1 || r === 2;
+            shouldFill = r === 1 && (c % 2 === 1);
           } else {
+            // standard full pattern / checkerboard: alternating 3-2-3 staggered layout
             shouldFill = (c + r) % 2 === 0;
           }
 
           if (shouldFill) {
-            const pointUp = (c + r) % 2 === 0;
-            if (pointUp) {
-              doc.triangle(cx1 + 0.5, cy2 - 0.5, cx2 - 0.5, cy2 - 0.5, midX, cy1 + 0.5, 'F');
-            } else {
-              doc.triangle(cx1 + 0.5, cy1 + 0.5, cx2 - 0.5, cy1 + 0.5, midX, cy2 - 0.5, 'F');
-            }
+            // Broad base and comfortable horizontal spreading directly replicating 3D render
+            const padX = cellW * 0.08;
+            const padY = cellH * 0.16;
+            doc.setFillColor(...rgb);
+            doc.triangle(cx1 + padX, cy2 - padY, cx2 - padX, cy2 - padY, midX, cy1 + padY, 'F');
+            doc.setDrawColor(25, 20, 20);
+            doc.setLineWidth(0.85);
+            doc.triangle(cx1 + padX, cy2 - padY, cx2 - padX, cy2 - padY, midX, cy1 + padY, 'S');
           }
         }
       }
@@ -424,41 +415,21 @@ function renderSideShapes(doc, { wallX, wallY, wallW, wallH, treatmentId, varian
 // Recreates the organic continuous wavy drip curve (matching user reference sketch)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function renderDripDrawing(doc, { wallX, wallY, wallW, wallH, patternId, rgb, contour }) {
-  // If actual 3D render contour was captured from the scene, draw it directly!
-  if (Array.isArray(contour) && contour.length > 10) {
-    // 1. Fill the glaze curtain from top of cake down to the actual 3D render drip contour
-    doc.setFillColor(...rgb);
-    for (let i = 0; i < contour.length - 1; i++) {
-      const p1 = contour[i];
-      const p2 = contour[i + 1];
-      const x1 = wallX + p1.x * wallW;
-      const x2 = wallX + p2.x * wallW;
-      const y1 = wallY + Math.max(0.04, p1.y) * wallH;
-      const y2 = wallY + Math.max(0.04, p2.y) * wallH;
-      const stripW = Math.max(0.35, x2 - x1 + 0.12);
-      const bottomY = Math.max(y1, y2);
-      doc.rect(x1, wallY, stripW, bottomY - wallY, 'F');
-    }
-
-    // 2. Bold 2D hand-drawn style outline tracing the actual 3D render drip contour
-    doc.setDrawColor(25, 20, 20); // Bold black ink stroke
-    doc.setLineWidth(1.1); // Marker stroke weight
-    for (let i = 0; i < contour.length - 1; i++) {
-      const x1 = wallX + contour[i].x * wallW;
-      const y1 = wallY + Math.max(0.04, contour[i].y) * wallH;
-      const x2 = wallX + contour[i + 1].x * wallW;
-      const y2 = wallY + Math.max(0.04, contour[i + 1].y) * wallH;
-      doc.line(x1, y1, x2, y2);
-    }
-    return;
-  }
-
+function renderDripDrawing(doc, { wallX, wallY, wallW, wallH, patternId, rgb }) {
   const str = String(patternId || '').toLowerCase();
 
   let keyNodes;
-  if (str.includes('short') && !str.includes('alt')) {
-    // Short wave / short drips: evenly length short drips
+  if (str.includes('alt')) {
+    // Long & Short Drips: alternating tall and short fingers
+    keyNodes = [
+      [0.00, 0.20],
+      [0.125, 0.86], [0.25, 0.20],
+      [0.375, 0.52], [0.50, 0.20],
+      [0.625, 0.86], [0.75, 0.20],
+      [0.875, 0.52], [1.00, 0.20],
+    ];
+  } else if (str.includes('short') && !str.includes('wave')) {
+    // Short Drips: uniform ring of equal short drips
     const dripY = 0.52;
     const crestY = 0.20;
     keyNodes = [
@@ -472,50 +443,61 @@ function renderDripDrawing(doc, { wallX, wallY, wallW, wallH, patternId, rgb, co
       [0.875, dripY],
       [1.00, crestY],
     ];
-  } else if (str.includes('wave')) {
-    // Wave: rhythmic gentle ripples of equal amplitude
-    const dripY = 0.50;
-    const crestY = 0.26;
+  } else if (str.includes('longwave') || (str.includes('full') && str.includes('wave'))) {
+    // Full Coverage / Long Wave: soft ripple near base
+    const dripY = 0.86;
+    const crestY = 0.76;
     keyNodes = [
-      [0.00, 0.38],
+      [0.00, (dripY + crestY) / 2],
       [0.10, dripY], [0.20, crestY],
       [0.30, dripY], [0.40, crestY],
       [0.50, dripY], [0.60, crestY],
       [0.70, dripY], [0.80, crestY],
-      [0.90, dripY], [1.00, 0.38],
+      [0.90, dripY], [1.00, (dripY + crestY) / 2],
     ];
-  } else if (str.includes('drape')) {
-    // Draped swags of equal depth
-    const dripY = 0.72;
-    const crestY = 0.24;
+  } else if (str.includes('midwave') || (str.includes('mid') && str.includes('wave'))) {
+    // Mid Coverage / Mid Wave: soft ripple midway down
+    const dripY = 0.54;
+    const crestY = 0.44;
     keyNodes = [
-      [0.00, crestY],
-      [0.125, dripY], [0.25, crestY],
-      [0.375, dripY], [0.50, crestY],
-      [0.625, dripY], [0.75, crestY],
-      [0.875, dripY], [1.00, crestY],
+      [0.00, (dripY + crestY) / 2],
+      [0.10, dripY], [0.20, crestY],
+      [0.30, dripY], [0.40, crestY],
+      [0.50, dripY], [0.60, crestY],
+      [0.70, dripY], [0.80, crestY],
+      [0.90, dripY], [1.00, (dripY + crestY) / 2],
     ];
-  } else if (str.includes('tiny')) {
-    // Tiny tip scallops of equal depth
+  } else if (str.includes('shortwave') || (str.includes('short') && str.includes('wave'))) {
+    // Short Coverage / Short Wave: soft ripple near top
+    const dripY = 0.26;
+    const crestY = 0.16;
+    keyNodes = [
+      [0.00, (dripY + crestY) / 2],
+      [0.10, dripY], [0.20, crestY],
+      [0.30, dripY], [0.40, crestY],
+      [0.50, dripY], [0.60, crestY],
+      [0.70, dripY], [0.80, crestY],
+      [0.90, dripY], [1.00, (dripY + crestY) / 2],
+    ];
+  } else if (str.includes('tinytip') || str.includes('curve')) {
+    // Wave Curve: soft undulating edge
     const dripY = 0.40;
     const crestY = 0.20;
     keyNodes = [];
-    const count = 8;
+    const count = 6;
     for (let i = 0; i < count; i++) {
-      const u0 = i / count;
-      const uMid = (i + 0.5) / count;
-      keyNodes.push([u0, crestY]);
-      keyNodes.push([uMid, dripY]);
+      keyNodes.push([i / count, crestY]);
+      keyNodes.push([(i + 0.5) / count, dripY]);
     }
     keyNodes.push([1.00, crestY]);
-  } else if (str.includes('alt')) {
-    // Explicit alternating pattern only
+  } else if (str.includes('uneven') || str.includes('fall')) {
+    // Tear Fall: organic ganache coverage with varied teardrop drips
     keyNodes = [
-      [0.00, 0.20],
-      [0.125, 0.86], [0.25, 0.20],
-      [0.375, 0.52], [0.50, 0.20],
-      [0.625, 0.86], [0.75, 0.20],
-      [0.875, 0.52], [1.00, 0.20],
+      [0.00, 0.22],
+      [0.125, 0.88], [0.25, 0.28],
+      [0.375, 0.55], [0.50, 0.22],
+      [0.625, 0.82], [0.75, 0.32],
+      [0.875, 0.60], [1.00, 0.25],
     ];
   } else {
     // Natural Tear / Long Gaps (Default):
@@ -525,13 +507,13 @@ function renderDripDrawing(doc, { wallX, wallY, wallW, wallH, patternId, rgb, co
     const crestY = 0.20; // Consistent upper arch height
     keyNodes = [
       [0.00, crestY],
-      [0.125, dripY], // Drip 1 (evenly length)
+      [0.125, dripY], // Drip 1 (equal long)
       [0.25, crestY],  // Crest 1
-      [0.375, dripY], // Drip 2 (evenly length)
+      [0.375, dripY], // Drip 2 (equal long)
       [0.50, crestY],  // Crest 2
-      [0.625, dripY], // Drip 3 (evenly length)
+      [0.625, dripY], // Drip 3 (equal long)
       [0.75, crestY],  // Crest 3
-      [0.875, dripY], // Drip 4 (evenly length)
+      [0.875, dripY], // Drip 4 (equal long)
       [1.00, crestY],  // Crest 4
     ];
   }
@@ -575,4 +557,472 @@ function renderDripDrawing(doc, { wallX, wallY, wallW, wallH, patternId, rgb, co
   for (let i = 0; i < curvePoints.length - 1; i++) {
     doc.line(curvePoints[i].x, curvePoints[i].y, curvePoints[i + 1].x, curvePoints[i + 1].y);
   }
+}
+
+/**
+ * Renders the 2D Pattern Drawing for Textured Buttercream Finish (Exterior Finish)
+ */
+export function drawTexturedFinishSchematic(doc, {
+  x,
+  y,
+  w = 88,
+  h = 74,
+  texture = 'ridged',
+  textureName = 'Ridged Comb',
+  color = '#F5E6C8',
+  colorName = 'Vanilla',
+}) {
+  doc.saveGraphicsState?.();
+
+  // 1. Framed outer container (crisp white card)
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(x, y, w, h, 2, 2, 'F');
+  doc.setDrawColor(...INK);
+  doc.setLineWidth(0.6);
+  doc.roundedRect(x, y, w, h, 2, 2, 'S');
+
+  // Badge: 2D PATTERN DRAWING
+  drawBadge(doc, '2D PATTERN DRAWING', x + 3, y + 3, [35, 30, 30]);
+
+  // 2. Unrolled Cake Wall Box (representing the circumference wall)
+  const wallMarginX = 8;
+  const wallTopY = y + 14;
+  const wallW = w - wallMarginX * 2;
+  const wallH = h - 25;
+  const wallX = x + wallMarginX;
+  const wallY = wallTopY;
+
+  const rgb = hexToRgb(color);
+  const highlightRgb = [
+    Math.min(255, Math.round(rgb[0] + (255 - rgb[0]) * 0.32)),
+    Math.min(255, Math.round(rgb[1] + (255 - rgb[1]) * 0.32)),
+    Math.min(255, Math.round(rgb[2] + (255 - rgb[2]) * 0.32)),
+  ];
+  const upperMidRgb = [
+    Math.min(255, Math.round(rgb[0] + (255 - rgb[0]) * 0.16)),
+    Math.min(255, Math.round(rgb[1] + (255 - rgb[1]) * 0.16)),
+    Math.min(255, Math.round(rgb[2] + (255 - rgb[2]) * 0.16)),
+  ];
+  const crownRgb = rgb;
+  const lowerMidRgb = [
+    Math.max(0, Math.round(rgb[0] * 0.86)),
+    Math.max(0, Math.round(rgb[1] * 0.86)),
+    Math.max(0, Math.round(rgb[2] * 0.86)),
+  ];
+  const shadowRgb = [
+    Math.max(0, Math.round(rgb[0] * 0.70)),
+    Math.max(0, Math.round(rgb[1] * 0.70)),
+    Math.max(0, Math.round(rgb[2] * 0.70)),
+  ];
+  const creaseRgb = [
+    Math.max(0, Math.round(rgb[0] * 0.48)),
+    Math.max(0, Math.round(rgb[1] * 0.48)),
+    Math.max(0, Math.round(rgb[2] * 0.48)),
+  ];
+  const specularColor = [
+    Math.min(255, Math.round(rgb[0] + (255 - rgb[0]) * 0.65)),
+    Math.min(255, Math.round(rgb[1] + (255 - rgb[1]) * 0.65)),
+    Math.min(255, Math.round(rgb[2] + (255 - rgb[2]) * 0.65)),
+  ];
+
+  // Base coat
+  doc.setFillColor(...crownRgb);
+  doc.rect(wallX, wallY, wallW, wallH, 'F');
+
+  const str = String(texture || '').toLowerCase();
+  if (str.includes('ribbon')) {
+    // Ribbon Wrap: stacked horizontal convex ribbon bumps with upper highlight & lower groove shadow
+    const bands = 5;
+    const bandH = wallH / bands;
+    for (let b = 0; b < bands; b++) {
+      const by = wallY + b * bandH;
+      // 1. Upper convex highlight band
+      doc.setFillColor(...highlightRgb);
+      doc.rect(wallX, by, wallW, bandH * 0.22, 'F');
+      // 2. Upper transition swell
+      doc.setFillColor(...upperMidRgb);
+      doc.rect(wallX, by + bandH * 0.22, wallW, bandH * 0.20, 'F');
+      // 3. Central crown body
+      doc.setFillColor(...crownRgb);
+      doc.rect(wallX, by + bandH * 0.42, wallW, bandH * 0.33, 'F');
+      // 4. Lower curve bevel
+      doc.setFillColor(...lowerMidRgb);
+      doc.rect(wallX, by + bandH * 0.75, wallW, bandH * 0.17, 'F');
+      // 5. Underside groove shadow
+      doc.setFillColor(...shadowRgb);
+      doc.rect(wallX, by + bandH * 0.92, wallW, bandH * 0.08, 'F');
+      // 6. Specular crest glint line
+      doc.setDrawColor(...specularColor);
+      doc.setLineWidth(0.35);
+      doc.line(wallX, by + bandH * 0.14, wallX + wallW, by + bandH * 0.14);
+      // 7. Dark crease seam between bumps
+      if (b < bands - 1) {
+        doc.setDrawColor(...creaseRgb);
+        doc.setLineWidth(0.65);
+        doc.line(wallX, by + bandH, wallX + wallW, by + bandH);
+      }
+    }
+  } else if (str.includes('vertical')) {
+    // Vertical Piping: fluted vertical column bumps with side highlight & groove shadow
+    const columns = 12;
+    const colW = wallW / columns;
+    for (let c = 0; c < columns; c++) {
+      const cx = wallX + c * colW;
+      doc.setFillColor(...highlightRgb);
+      doc.rect(cx, wallY, colW * 0.30, wallH, 'F');
+      doc.setFillColor(...crownRgb);
+      doc.rect(cx + colW * 0.30, wallY, colW * 0.40, wallH, 'F');
+      doc.setFillColor(...shadowRgb);
+      doc.rect(cx + colW * 0.70, wallY, colW * 0.30, wallH, 'F');
+      doc.setDrawColor(...specularColor);
+      doc.setLineWidth(0.25);
+      doc.line(cx + colW * 0.16, wallY, cx + colW * 0.16, wallY + wallH);
+      if (c < columns - 1) {
+        doc.setDrawColor(...creaseRgb);
+        doc.setLineWidth(0.5);
+        doc.line(cx + colW, wallY, cx + colW, wallY + wallH);
+      }
+    }
+  } else {
+    // Ridged Comb (default): horizontal combed ridges with upper highlight & lower groove shadow
+    const ridgeCount = 8;
+    const ridgeH = wallH / ridgeCount;
+    for (let r = 0; r < ridgeCount; r++) {
+      const ry = wallY + r * ridgeH;
+      // 1. Upper ridge highlight
+      doc.setFillColor(...highlightRgb);
+      doc.rect(wallX, ry, wallW, ridgeH * 0.30, 'F');
+      // 2. Central ridge crown
+      doc.setFillColor(...crownRgb);
+      doc.rect(wallX, ry + ridgeH * 0.30, wallW, ridgeH * 0.40, 'F');
+      // 3. Lower trough shadow
+      doc.setFillColor(...shadowRgb);
+      doc.rect(wallX, ry + ridgeH * 0.70, wallW, ridgeH * 0.30, 'F');
+      // 4. Specular glint line
+      doc.setDrawColor(...specularColor);
+      doc.setLineWidth(0.28);
+      doc.line(wallX, ry + ridgeH * 0.16, wallX + wallW, ry + ridgeH * 0.16);
+      // 5. Trough crease seam
+      if (r < ridgeCount - 1) {
+        doc.setDrawColor(...creaseRgb);
+        doc.setLineWidth(0.5);
+        doc.line(wallX, ry + ridgeH, wallX + wallW, ry + ridgeH);
+      }
+    }
+  }
+
+  // Crisp black outer boundary outline
+  doc.setDrawColor(25, 20, 20);
+  doc.setLineWidth(0.7);
+  doc.rect(wallX, wallY, wallW, wallH, 'S');
+
+  // 4. Bottom footer of card
+  const footerY = y + h - 5;
+  doc.setFillColor(...rgb);
+  doc.circle(x + 5, footerY, 2.2, 'F');
+  doc.setDrawColor(...INK);
+  doc.setLineWidth(0.3);
+  doc.circle(x + 5, footerY, 2.2, 'S');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.8);
+  doc.setTextColor(...INK);
+  const titleText = `${String(textureName).toUpperCase()} · ${String(colorName).toUpperCase()}`;
+  doc.text(titleText, x + 9, footerY + 1.2);
+
+  doc.restoreGraphicsState?.();
+}
+
+/**
+ * Renders the 2D Pattern Drawing for Filling Piping Design (Mashed Circles / Mashed Swirls)
+ */
+export function drawFillingPipingSchematic(doc, {
+  x,
+  y,
+  w = 88,
+  h = 74,
+  piping = 'mashedCircles',
+  pipingName = 'Mashed Circles',
+  color = '#F6E8D5',
+  colorName = 'Vanilla',
+  layers = 1,
+}) {
+  doc.saveGraphicsState?.();
+
+  // 1. Framed outer container (crisp white card)
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(x, y, w, h, 2, 2, 'F');
+  doc.setDrawColor(...INK);
+  doc.setLineWidth(0.6);
+  doc.roundedRect(x, y, w, h, 2, 2, 'S');
+
+  // Badge: 2D PATTERN DRAWING
+  drawBadge(doc, '2D PATTERN DRAWING', x + 3, y + 3, [35, 30, 30]);
+
+  // 2. Sponge Slab Section Box
+  const wallMarginX = 8;
+  const wallTopY = y + 14;
+  const wallW = w - wallMarginX * 2;
+  const wallH = h - 25;
+  const wallX = x + wallMarginX;
+  const wallY = wallTopY;
+
+  // Background of cake cross-section
+  const spongeH = wallH * 0.28;
+  const fillH = wallH * 0.44;
+  const topSpongeY = wallY;
+  const fillY = topSpongeY + spongeH;
+  const botSpongeY = fillY + fillH;
+
+  // Top sponge slab (warm golden sponge crumb)
+  doc.setFillColor(245, 226, 190);
+  doc.rect(wallX, topSpongeY, wallW, spongeH, 'F');
+  // Bottom sponge slab (warm golden sponge crumb)
+  doc.setFillColor(245, 226, 190);
+  doc.rect(wallX, botSpongeY, wallW, spongeH, 'F');
+
+  // Crumb specks on sponge
+  doc.setFillColor(212, 184, 150);
+  for (let s = 0; s < 10; s++) {
+    const rx = wallX + 4 + s * ((wallW - 8) / 9);
+    doc.circle(rx, topSpongeY + spongeH * 0.5, 0.4, 'F');
+    doc.circle(rx + 2, botSpongeY + spongeH * 0.5, 0.4, 'F');
+  }
+
+  // Crust seam lines
+  doc.setDrawColor(180, 140, 95);
+  doc.setLineWidth(0.6);
+  doc.line(wallX, fillY, wallX + wallW, fillY);
+  doc.line(wallX, botSpongeY, wallX + wallW, botSpongeY);
+
+  // Background between sponges for filling
+  const rgb = hexToRgb(color);
+  doc.setFillColor(
+    Math.max(0, Math.round(rgb[0] * 0.95)),
+    Math.max(0, Math.round(rgb[1] * 0.95)),
+    Math.max(0, Math.round(rgb[2] * 0.95)),
+  );
+  doc.rect(wallX, fillY, wallW, fillH, 'F');
+
+  // Piped Rounds (Mashed Circles or Swirls)
+  const isSwirls = String(piping || '').toLowerCase().includes('swirl');
+  const count = 7;
+  const circleD = (wallW + 4) / count;
+  const radius = circleD / 2;
+  const centerY = fillY + fillH / 2;
+
+  for (let c = 0; c < count; c++) {
+    const cx = wallX + c * circleD + radius - 2;
+
+    // 1. Solid dollop body
+    doc.setFillColor(...rgb);
+    doc.circle(cx, centerY, radius, 'F');
+
+    // 2. Bold black ink outline
+    doc.setDrawColor(25, 20, 20);
+    doc.setLineWidth(1.0);
+    doc.circle(cx, centerY, radius, 'S');
+
+    if (isSwirls) {
+      // Mashed Swirls: diagonal spiral slashes across each dollop
+      doc.setDrawColor(25, 20, 20);
+      doc.setLineWidth(0.8);
+      doc.line(cx - radius * 0.5, centerY - radius * 0.4, cx + radius * 0.2, centerY + radius * 0.6);
+      doc.line(cx - radius * 0.2, centerY - radius * 0.7, cx + radius * 0.6, centerY + radius * 0.3);
+      // Small highlight spiral
+      doc.setDrawColor(255, 255, 255);
+      doc.setLineWidth(0.5);
+      doc.line(cx - radius * 0.4, centerY - radius * 0.5, cx, centerY + radius * 0.3);
+    } else {
+      // Mashed Circles: crescent specular highlight on top-left of circle
+      doc.setDrawColor(255, 255, 255);
+      doc.setLineWidth(0.7);
+      doc.line(cx - radius * 0.5, centerY - radius * 0.3, cx - radius * 0.2, centerY - radius * 0.6);
+    }
+  }
+
+  // Outer cake boundary
+  doc.setDrawColor(25, 20, 20);
+  doc.setLineWidth(0.8);
+  doc.line(wallX, wallY, wallX + wallW, wallY);
+  doc.line(wallX, wallY + wallH, wallX + wallW, wallY + wallH);
+
+  // 4. Bottom footer of card
+  const footerY = y + h - 5;
+  doc.setFillColor(...rgb);
+  doc.circle(x + 5, footerY, 2.2, 'F');
+  doc.setDrawColor(...INK);
+  doc.setLineWidth(0.3);
+  doc.circle(x + 5, footerY, 2.2, 'S');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.8);
+  doc.setTextColor(...INK);
+  const titleText = `${String(pipingName).toUpperCase()} · ${String(colorName).toUpperCase()}`;
+  doc.text(titleText, x + 9, footerY + 1.2);
+
+  doc.restoreGraphicsState?.();
+}
+
+/**
+ * Renders the 2D Pattern Drawing for Edge Border (Top or Bottom Edge)
+ */
+export function drawEdgePatternSchematic(doc, {
+  x,
+  y,
+  w = 88,
+  h = 74,
+  slot = 'top',
+  designId = 'shell',
+  designName = 'Shell Border',
+  color = '#F5E6C8',
+  colorName = 'Vanilla',
+  secondaryColor = null,
+}) {
+  doc.saveGraphicsState?.();
+
+  // 1. Framed outer container (crisp white card)
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(x, y, w, h, 2, 2, 'F');
+  doc.setDrawColor(...INK);
+  doc.setLineWidth(0.6);
+  doc.roundedRect(x, y, w, h, 2, 2, 'S');
+
+  // Badge: 2D PATTERN DRAWING
+  drawBadge(doc, '2D PATTERN DRAWING', x + 3, y + 3, [35, 30, 30]);
+
+  // 2. Unrolled Rim Box
+  const wallMarginX = 8;
+  const wallTopY = y + 14;
+  const wallW = w - wallMarginX * 2;
+  const wallH = h - 25;
+  const wallX = x + wallMarginX;
+  const wallY = wallTopY;
+
+  const isTop = String(slot).toLowerCase().includes('top');
+  const rimY = isTop ? wallY + 12 : wallY + wallH - 12;
+
+  const str = String(designId || '').toLowerCase();
+  const isAlt = (str.endsWith('alt') || str.includes('alternat')) && Boolean(secondaryColor);
+  const rgb = hexToRgb(color);
+  const rgb2 = isAlt ? hexToRgb(secondaryColor) : rgb;
+
+  if (str.includes('bead') || str.includes('bracelet')) {
+    // Bead Piping / Beaded Trim / Bracelet Beads
+    const beadCount = 14;
+    const step = (wallW - 4) / (beadCount - 1);
+    const beadR = 2.4;
+    for (let b = 0; b < beadCount; b++) {
+      const bx = wallX + 2 + b * step;
+      const useAlt = isAlt && b % 2 === 1;
+      const beadRgb = useAlt ? rgb2 : rgb;
+
+      doc.setFillColor(...beadRgb);
+      doc.circle(bx, rimY, beadR, 'F');
+
+      doc.setDrawColor(25, 20, 20);
+      doc.setLineWidth(0.8);
+      doc.circle(bx, rimY, beadR, 'S');
+
+      doc.setFillColor(255, 255, 255);
+      doc.circle(bx - 0.7, rimY - 0.7, 0.5, 'F');
+    }
+  } else if (str.includes('rope')) {
+    // Rope Twist: authentic braided cord made of interlocking diagonal rounded segments
+    const coilCount = 14;
+    const step = (wallW - 6) / (coilCount - 1);
+    const coilW = step * 1.3;
+    const coilH = 6.4;
+    for (let c = 0; c < coilCount; c++) {
+      const cx = wallX + 3 + c * step;
+      const useAlt = isAlt && c % 2 === 1;
+      const coilRgb = useAlt ? rgb2 : rgb;
+
+      // Base overlapping diagonal rounded segment
+      doc.setFillColor(...coilRgb);
+      doc.ellipse(cx, rimY, coilW * 0.52, coilH * 0.5, 'F');
+
+      // Crisp hand-drawn outline
+      doc.setDrawColor(25, 20, 20);
+      doc.setLineWidth(0.85);
+      doc.ellipse(cx, rimY, coilW * 0.52, coilH * 0.5, 'S');
+
+      // Internal braided star-tip fluting ridge highlights and folds
+      doc.setDrawColor(255, 255, 255);
+      doc.setLineWidth(0.4);
+      doc.line(cx - coilW * 0.25, rimY - coilH * 0.2, cx + coilW * 0.15, rimY + coilH * 0.25);
+
+      doc.setDrawColor(25, 20, 20);
+      doc.setLineWidth(0.5);
+      doc.line(cx - coilW * 0.1, rimY - coilH * 0.35, cx + coilW * 0.3, rimY + coilH * 0.1);
+    }
+  } else if (str.includes('curtain')) {
+    // Curtain: draped scalloped swag border
+    const swags = 6;
+    const swagW = wallW / swags;
+    for (let s = 0; s < swags; s++) {
+      const sx = wallX + s * swagW;
+      const midX = sx + swagW / 2;
+      const dropY = isTop ? rimY + 8 : rimY - 8;
+
+      doc.setFillColor(...rgb);
+      doc.triangle(sx, rimY, sx + swagW, rimY, midX, dropY, 'F');
+
+      doc.setDrawColor(25, 20, 20);
+      doc.setLineWidth(0.9);
+      doc.line(sx, rimY, midX, dropY);
+      doc.line(midX, dropY, sx + swagW, rimY);
+
+      doc.circle(midX, dropY, 1.2, 'F');
+      doc.circle(midX, dropY, 1.2, 'S');
+    }
+  } else {
+    // Shell Border (default): overlapping piped shells with fan ridges
+    const shellCount = 10;
+    const shellW = (wallW - 4) / shellCount;
+    for (let s = 0; s < shellCount; s++) {
+      const sx = wallX + 2 + s * shellW;
+      const useAlt = isAlt && s % 2 === 1;
+      const shellRgb = useAlt ? rgb2 : rgb;
+
+      doc.setFillColor(...shellRgb);
+      doc.ellipse(sx + shellW * 0.4, rimY, shellW * 0.48, 3.2, 'F');
+
+      doc.setDrawColor(25, 20, 20);
+      doc.setLineWidth(0.9);
+      doc.ellipse(sx + shellW * 0.4, rimY, shellW * 0.48, 3.2, 'S');
+
+      doc.setDrawColor(255, 255, 255);
+      doc.setLineWidth(0.4);
+      doc.line(sx + shellW * 0.1, rimY, sx + shellW * 0.7, rimY - 1.2);
+      doc.line(sx + shellW * 0.1, rimY, sx + shellW * 0.7, rimY + 1.2);
+    }
+  }
+
+  // 4. Bottom footer of card
+  const footerY = y + h - 5;
+  if (isAlt && secondaryColor) {
+    doc.setFillColor(...rgb);
+    doc.circle(x + 4.2, footerY, 2.0, 'F');
+    doc.setFillColor(...rgb2);
+    doc.circle(x + 7.2, footerY, 2.0, 'F');
+    doc.setDrawColor(...INK);
+    doc.setLineWidth(0.3);
+    doc.circle(x + 4.2, footerY, 2.0, 'S');
+    doc.circle(x + 7.2, footerY, 2.0, 'S');
+  } else {
+    doc.setFillColor(...rgb);
+    doc.circle(x + 5, footerY, 2.2, 'F');
+    doc.setDrawColor(...INK);
+    doc.setLineWidth(0.3);
+    doc.circle(x + 5, footerY, 2.2, 'S');
+  }
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.8);
+  doc.setTextColor(...INK);
+  const titleText = `${String(slot).toUpperCase()} BORDER · ${String(designName).toUpperCase()} · ${String(colorName).toUpperCase()}`;
+  doc.text(titleText, x + (isAlt && secondaryColor ? 11 : 9), footerY + 1.2);
+
+  doc.restoreGraphicsState?.();
 }

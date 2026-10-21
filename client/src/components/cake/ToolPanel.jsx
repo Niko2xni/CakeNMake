@@ -910,7 +910,7 @@ export default function ToolPanel({
                                   });
                                 }}
                               />
-                              {(activeSurfaceTreatment?.mode === 'glaze' || config.surfaceTreatment?.mode === 'glaze') && (
+                              {activeSurfaceTreatment?.mode === 'glaze' && (
                                 <div data-tutorial="surface-sugar-color">
                                   {renderSugarColor('surface')}
                                 </div>

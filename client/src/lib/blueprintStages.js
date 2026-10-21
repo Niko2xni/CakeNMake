@@ -60,8 +60,10 @@ function edgeSlots(config) {
 function edgeDetails(edge) {
     const rows = [];
     if (edge.piping?.tip) {
+        const isAlt = String(edge.piping.tip).endsWith('Alt') || String(edge.piping.tip).toLowerCase().includes('alternat');
+        const hasSecondary = isAlt && Boolean(edge.piping.secondaryColorId);
         rows.push(['Piping', name(edge.piping.tip)]);
-        rows.push(['Piping Color', [name(edge.piping.colorId), edge.piping.secondaryColorId && name(edge.piping.secondaryColorId)].filter(Boolean).join(' / ')]);
+        rows.push(['Piping Color', [name(edge.piping.colorId), hasSecondary && name(edge.piping.secondaryColorId)].filter(Boolean).join(' / ')]);
     }
     if (edge.decorations?.setId) {
         rows.push(['Decoration', name(edge.decorations.setId)]);
@@ -111,7 +113,25 @@ export function buildBlueprintTierPlan(config = {}) {
     let runningKey = 'base';
     if (anyFinish) {
         running = { ...clone(running), exteriorFinish: clone(finishCfg) };
-        stages.push({ key: 'finish', config: running });
+        const hasTexturedFinish = info.some((t) => t.style === 'texturedButtercream');
+        if (hasTexturedFinish) {
+            stages.push({
+                key: 'finish',
+                config: running,
+                azimuth: 18,
+                tilt: 0,
+                fit: 0.86,
+                zoom: {
+                    mode: 'pattern',
+                    fullHeight: true,
+                    tilt: 0,
+                    arc: 28,
+                    fit: 1.0,
+                },
+            });
+        } else {
+            stages.push({ key: 'finish', config: running });
+        }
         runningKey = 'finish';
     }
     if (anySurface) {
@@ -207,13 +227,41 @@ export function buildBlueprintTierPlan(config = {}) {
         running = { ...clone(running), side: clone(config.side) };
     }
     slots.forEach(([slot, edge]) => {
-        const only = clone(running);
+        // Edge screenshot strictly isolates the edge design:
+        // Excludes side decorations and surface treatments so it focuses on edge piping.
+        const edgeBase = anyFinish ? { ...clone(plain), exteriorFinish: clone(finishCfg) } : clone(plain);
+        const only = {
+            ...clone(edgeBase),
+            side: { mode: null },
+            surfaceTreatment: { mode: null },
+        };
+        if (only.side && Array.isArray(only.side.layerTreatments)) {
+            only.side.layerTreatments = only.side.layerTreatments.map((t) => ({ ...(t || {}), mode: null }));
+        }
+        if (only.surfaceTreatment && Array.isArray(only.surfaceTreatment.layerTreatments)) {
+            only.surfaceTreatment.layerTreatments = only.surfaceTreatment.layerTreatments.map((t) => ({ ...(t || {}), mode: null }));
+        }
         const e = { ...(only.edge || {}) };
         ['top', 'middle', 'bottom', 'both'].forEach((s) => { delete e[s]; });
         e.mode = slot;
         e[slot] = clone(edge);
         only.edge = e;
-        stages.push({ key: `edge-${slot}`, config: only, diffConfig: running });
+        stages.push({
+            key: `edge-${slot}`,
+            config: only,
+            diffConfig: edgeBase,
+            azimuth: 18,
+            tilt: slot === 'top' ? 14 : 10,
+            fit: 0.95,
+            zoom: {
+                mode: 'edge',
+                position: slot === 'top' ? 'top' : 'bottom',
+                tilt: slot === 'top' ? 14 : 10,
+                arc: 24,
+                band: 0.18,
+                fit: 0.98,
+            },
+        });
     });
     if (placed.length) {
         const withoutCenter = clone(config);
@@ -300,7 +348,10 @@ export function buildBlueprintTierPlan(config = {}) {
                 kind: 'filling', section: 'FILLING', title: 'Filling',
                 image: `filling-${t.i}`, zoomImage: `filling-zoom-${t.i}`,
                 flavor: name(t.fillingFlavor),
+                flavorName: fillingSub,
+                flavorChipColor: fillingChipColor,
                 layers: t.fillingLayers,
+                pipingTip: t.piping?.tip || null,
                 piping: t.piping?.tip ? name(t.piping.tip) : null,
                 pipingColor: t.piping?.tip ? name(t.piping.colorId) : null,
                 // Top picture: FILLING icon directly takes the ToolPanel chip color and name
@@ -349,6 +400,10 @@ export function buildBlueprintTierPlan(config = {}) {
                 section: 'EXTERIOR FINISH',
                 image: 'finish',
                 title: 'Exterior Finish',
+                style: t.style,
+                texture: t.texture,
+                isTextured: t.style === 'texturedButtercream',
+                textureName: t.texture ? name(t.texture) : '',
                 flavorName: finishFlavorSub,
                 flavorChipColor: finishChipColor,
                 crops: [
@@ -377,15 +432,17 @@ export function buildBlueprintTierPlan(config = {}) {
         }
 
         if (t.surface?.mode) {
-            const surfaceSugarOverride = config.sugarColorOverrides?.[`surface-${t.i}`] || config.sugarColorOverrides?.surface;
+            const surfaceSugarOverride = config.sugarColorOverrides?.[`surface-${t.i}`]
+              || config.sugarColorOverrides?.surface
+              || config.sugarColor;
             const surfaceColorId = (surfaceSugarOverride?.mode === 'colorOverride' && surfaceSugarOverride.colorId)
               ? surfaceSugarOverride.colorId
               : (surfaceSugarOverride?.colorId
                  || t.surface?.colorId
                  || config.surfaceTreatment?.colorId
-                 || (surfaceSugarOverride?.mode === 'default' ? (t.frost || 'vanilla') : 'vanilla'));
+                 || (surfaceSugarOverride?.mode === 'default' ? (surfaceSugarOverride.colorId || t.frost || 'vanilla') : 'vanilla'));
             const isChoc = String(surfaceColorId || '').toLowerCase().includes('choc');
-            const surfaceChipColor = isChoc ? '#3D2314' : (flavorColorOf(surfaceColorId) || '#F6DEAB');
+            const surfaceChipColor = isChoc ? '#301009' : (flavorColorOf(surfaceColorId) || '#F6DEAB');
             const surfaceFlavorName = name(surfaceColorId);
             const patternId = getSurfaceTreatmentPattern(t.surface, config.structure);
             const patternName = name(patternId);
@@ -502,11 +559,29 @@ export function buildBlueprintTierPlan(config = {}) {
     // tier's own pages once (edges are Top then Bottom, only those chosen).
     const shared = groups[groups.length - 1].pages;
     slots.forEach(([slot, edge]) => {
+        const edgePipingTip = edge.piping?.tip || edge.decorations?.setId || 'shell';
+        const isAlt = String(edgePipingTip).endsWith('Alt') || String(edgePipingTip).toLowerCase().includes('alternat');
+        const edgeColorId = edge.piping?.colorId || edge.decorations?.colorId || config.sugarColor?.colorId || 'vanilla';
+        const edgeColorHex = flavorColorOf(edgeColorId) || '#F6DEAB';
+        const hasSecondary = isAlt && Boolean(edge.piping?.secondaryColorId);
+        const edgeSecondaryColorHex = hasSecondary ? (flavorColorOf(edge.piping.secondaryColorId) || null) : null;
+        const edgeDesignName = name(edgePipingTip);
+        const edgeColorName = [name(edgeColorId), hasSecondary && name(edge.piping.secondaryColorId)].filter(Boolean).join(' / ');
+
         shared.push({
-            kind: 'edge', section: 'EDGE', image: `edge-${slot}`, title: `Edge ${name(slot)}`,
+            kind: 'edge',
+            section: 'EDGE',
+            image: `edge-${slot}`,
+            title: `Edge ${name(slot)}`,
+            slot,
+            designId: edgePipingTip,
+            designName: edgeDesignName,
+            color: edgeColorHex,
+            colorName: edgeColorName,
+            secondaryColor: edgeSecondaryColorHex,
             callouts: [callout(`edge-${slot}`, `edge-${slot}`, `EDGE ${slot.toUpperCase()}`, slot === 'top' ? 0.97 : 0.04, -0.7, 0.3, slot === 'top' ? 0.34 : 0.84)],
             details: edgeDetails(edge),
-            highlights: [`${name(slot)} border only`],
+            highlights: [`${name(slot)} border (${edgeDesignName}) - 2D pattern schematic vs. 3D render`],
             flavor: null,
         });
     });

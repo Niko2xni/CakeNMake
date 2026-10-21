@@ -172,7 +172,11 @@ export function buildBlueprintDetails(config, quote, designName = '') {
   const slots = config.edge?.mode === 'both' ? ['both', ...(layers > 1 ? ['middle'] : [])] : ['top', ...(layers > 1 ? ['middle'] : []), 'bottom'];
   slots.forEach((slot) => {
     const edge = config.edge?.[slot];
-    if (edge?.piping?.tip) edges.push([`${name(slot)} Border Piping`, `${name(edge.piping.tip)} · ${name(edge.piping.colorId)}${edge.piping.secondaryColorId ? ` / ${name(edge.piping.secondaryColorId)}` : ''}`, ['edge.piping'], slot === 'both' ? 2 : 1]);
+    if (edge?.piping?.tip) {
+      const isAlt = String(edge.piping.tip).endsWith('Alt') || String(edge.piping.tip).toLowerCase().includes('alternat');
+      const hasSecondary = isAlt && Boolean(edge.piping.secondaryColorId);
+      edges.push([`${name(slot)} Border Piping`, `${name(edge.piping.tip)} · ${name(edge.piping.colorId)}${hasSecondary ? ` / ${name(edge.piping.secondaryColorId)}` : ''}`, ['edge.piping'], slot === 'both' ? 2 : 1]);
+    }
     if (edge?.decorations?.setId) edges.push([`${name(slot)} Edge Decoration`, `${name(edge.decorations.setId)} · ${name(edge.decorations.colorId)}`, ['edge.decorationSet'], slot === 'both' ? 2 : 1]);
   });
   addSection('Edge', edges);

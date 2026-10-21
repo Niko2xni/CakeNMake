@@ -1,7 +1,13 @@
 import { jsPDF } from 'jspdf';
 import { INK, ACCENT, BODY, arrow, drawFlavorBubble, drawCropBubble, drawBubbleLabel, drawPatternInfoBlock, describeColor } from './blueprintBubbles';
 import { drawPatternIconBubble } from './blueprintIcons';
-import { drawSidePatternSchematic, drawSurfaceTreatmentSchematic } from './blueprintSchematics';
+import {
+  drawSidePatternSchematic,
+  drawSurfaceTreatmentSchematic,
+  drawTexturedFinishSchematic,
+  drawFillingPipingSchematic,
+  drawEdgePatternSchematic,
+} from './blueprintSchematics';
 import { name } from './blueprintDetails';
 
 // Cake Blueprint — draft. Page order (each name is what we call the page):
@@ -107,10 +113,42 @@ function money(minor, currency = 'PHP') {
 }
 
 function pageHeader(doc, designName, continued) {
+  const title = continued ? 'Details & Prices (cont.)' : 'Details & Prices';
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(18);
   doc.setTextColor(90, 60, 60);
-  doc.text(continued ? 'Details & Prices (cont.)' : 'Details & Prices', MARGIN, 26);
+  const titleW = doc.getTextWidth(title);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  const nameW = designName ? doc.getTextWidth(designName) : 0;
+  const availOnRight = PAGE_W - MARGIN - (MARGIN + titleW + 10);
+
+  if (designName && nameW > availOnRight) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.setTextColor(90, 60, 60);
+    doc.text(title, MARGIN, 24);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(140, 120, 120);
+    const lines = doc.splitTextToSize(designName, PAGE_W - 2 * MARGIN);
+    const textStartY = 29.5;
+    doc.text(lines, MARGIN, textStartY);
+    const endY = textStartY + (lines.length - 1) * 4.2;
+
+    const lineY = Math.max(34, endY + 3.5);
+    doc.setDrawColor(230, 215, 210);
+    doc.setLineWidth(0.3);
+    doc.line(MARGIN, lineY, PAGE_W - MARGIN, lineY);
+    return lineY + 7;
+  }
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.setTextColor(90, 60, 60);
+  doc.text(title, MARGIN, 26);
   if (designName) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
@@ -212,12 +250,49 @@ function pill(doc, text, x, y, { w, fontSize = 8 } = {}) {
 
 function tierHeader(doc, designName, tierLabel, section) {
   doc.addPage();
-  // The page's own name is the title (FILLING, SIDE, EDGE...); only the
-  // design's name sits at the right, plus the tier when there are several.
+  const secTitle = String(section || 'DETAILS').toUpperCase();
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(20);
   doc.setTextColor(...INK);
-  doc.text(String(section || 'DETAILS').toUpperCase(), MARGIN, 26);
+  const secW = doc.getTextWidth(secTitle);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  const nameW = designName ? doc.getTextWidth(designName) : 0;
+  const availOnRight = PAGE_W - MARGIN - (MARGIN + secW + 10);
+
+  if (designName && nameW > availOnRight) {
+    // When design name is too long to share the top row without overlapping the section title,
+    // place section title and tierLabel on top, and render designName below with ample room
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.setTextColor(...INK);
+    doc.text(secTitle, MARGIN, 24);
+
+    if (tierLabel) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(...ACCENT);
+      doc.text(String(tierLabel).toUpperCase(), PAGE_W - MARGIN, 24, { align: 'right' });
+    }
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(140, 120, 120);
+    const lines = doc.splitTextToSize(designName, PAGE_W - 2 * MARGIN);
+    const textStartY = 29.5;
+    doc.text(lines, MARGIN, textStartY);
+    const endY = textStartY + (lines.length - 1) * 4.2;
+
+    const lineY = Math.max(34, endY + 3.5);
+    doc.setDrawColor(230, 215, 210);
+    doc.setLineWidth(0.3);
+    doc.line(MARGIN, lineY, PAGE_W - MARGIN, lineY);
+    return lineY + 7;
+  }
+
+  // Normal compact single-line layout
+  doc.text(secTitle, MARGIN, 26);
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(140, 120, 120);
@@ -314,15 +389,63 @@ function addStagePage(doc, page, images, anchors, designName, tierLabel) {
   detailBlock(doc, MARGIN, top + imgH + 12, PAGE_W - 2 * MARGIN, page);
 }
 
-// Filling, as sketched: the cake layer with its filling on top in a framed
-// picture, a round close-up on each side with arrows into the exact spot
-// (FILLING = the flavor's own color), then an arrow down to a closer view
-// with a PATTERN bubble: a magnified look at the piping design.
+// Filling:
+// - If Piping Design is Mashed Circles or Mashed Swirls (or active piping): Side-by-side layout (2D Pattern Schematic vs. 3D Render)
+// - If None / Plain: Display like Fundamentals (single 3D render with FLAVOR bubble)
 function addFillingPages(doc, page, images, anchors, swatches, fillColors, designName, tierLabel) {
   const top = tierHeader(doc, designName, tierLabel, 'FILLING');
 
-  // Both pictures share one size and one column so they line up, and both get
-  // the same border.
+  const pipingTip = page.pipingTip || (page.piping && !page.piping.toLowerCase().includes('plain') && !page.piping.toLowerCase().includes('none') ? page.piping : null);
+
+  if (pipingTip) {
+    const boxW = 88;
+    const boxH = 74;
+    const gap = 6;
+    const leftX = MARGIN;
+    const rightX = MARGIN + boxW + gap;
+    const boxY = top + 2;
+
+    const crop = (page.crops || [])[0] || {};
+    const fillingColor = page.flavorChipColor || crop.chipColor || '#F6E8D5';
+    const fillingSub = page.flavorName || crop.sub || page.flavor || '';
+    const pipingName = page.piping || name(pipingTip);
+
+    // 1. LEFT SIDE: 2D Pattern Drawing
+    drawFillingPipingSchematic(doc, {
+      x: leftX,
+      y: boxY,
+      w: boxW,
+      h: boxH,
+      piping: pipingTip,
+      pipingName,
+      color: fillingColor,
+      colorName: fillingSub,
+      layers: page.layers,
+    });
+
+    // 2. RIGHT SIDE: 3D Render
+    const renderImg = images?.[page.zoomImage] || images?.[page.image];
+    placeImage(doc, renderImg, rightX, boxY, boxW, boxH);
+    doc.setDrawColor(...INK);
+    doc.setLineWidth(0.6);
+    doc.roundedRect(rightX, boxY, boxW, boxH, 2, 2, 'S');
+    drawViewBadge(doc, '3D RENDER', rightX + 3, boxY + 3);
+
+    // 3. Details table & Highlights below
+    const rows = [
+      ['Filling Layers', String(page.layers || 1)],
+      ['Piping Design', pipingName],
+    ];
+    if (fillingSub) rows.push(['Flavor', fillingSub]);
+
+    detailBlock(doc, MARGIN, boxY + boxH + 8, PAGE_W - 2 * MARGIN, {
+      details: rows,
+      highlights: [`${pipingName} piping design applied between layers (2D pattern schematic vs. 3D render)`],
+    });
+    return;
+  }
+
+  // Plain / None: Fundamentals style (one 3D render of the filling layer with FLAVOR bubble on the left)
   const boxW = 96;
   const boxH = 72;
   const boxX = PAGE_W - MARGIN - boxW;
@@ -333,52 +456,27 @@ function addFillingPages(doc, page, images, anchors, swatches, fillColors, desig
   doc.roundedRect(boxX, boxY, boxW, boxH, 2, 2, 'S');
 
   const r = 16;
-  const midY = boxY + boxH / 2 - 4;
+  const midY = boxY + boxH / 2;
   const topAnchors = anchors?.[page.image] || {};
-  const zoomAnchors = anchors?.[page.zoomImage] || {};
-  for (const crop of page.crops || []) {
-    const left = crop.side !== 'right';
-    const cx = left ? MARGIN + r : PAGE_W - MARGIN - r;
-    let sub = crop.sub;
-    if (crop.kind === 'color') {
-      // The colour the filling really is, named in plain words.
-      const actual = fillColors?.[crop.colorKey];
-      const bubbleColor = crop.chipColor || actual || swatches?.[crop.colorKey];
-      drawFlavorBubble(doc, { cx, cy: midY, r, color: bubbleColor });
-      sub = crop.sub || (actual ? describeColor(actual) : crop.fallbackName || '');
-    } else {
-      drawFlavorBubble(doc, { cx, cy: midY, r, color: crop.chipColor || swatches?.[crop.swatchKey] });
-    }
-    // Arrow from the bubble's edge to the filling it describes.
-    const hit = topAnchors[crop.anchorId] || { x: 0.35, y: 0.3 };
-    const tx = boxX + hit.x * boxW;
-    const ty = boxY + hit.y * boxH;
-    const ang = Math.atan2(ty - midY, tx - cx);
-    arrow(doc, cx + Math.cos(ang) * (r + 0.5), midY + Math.sin(ang) * (r + 0.5), tx, ty);
-    drawBubbleLabel(doc, { cx, y: midY + r + 7, title: crop.label, sub });
-  }
+  const crop = (page.crops || [])[0] || {};
+  const cx = MARGIN + r + 2;
+  const sub = page.flavorName || crop.sub || page.flavor || '';
+  const fillingColor = page.flavorChipColor || crop.chipColor || '#F6E8D5';
+  drawFlavorBubble(doc, { cx, cy: midY, r, color: fillingColor });
+  drawBubbleLabel(doc, { cx, y: midY + r + 7, title: crop.label || 'FILLING', sub });
 
-  // Down to the closer view, with a magnified bubble of its piping design.
-  const slabW = boxW;
-  const slabH = boxH;
-  const slabX = boxX;
-  const slabY = boxY + boxH + 16;
-  arrow(doc, boxX + boxW / 2, boxY + boxH + 2, boxX + boxW / 2, slabY - 1);
-  placeImage(doc, images?.[page.zoomImage], slabX, slabY, slabW, slabH);
-  doc.setDrawColor(...INK);
-  doc.setLineWidth(0.6);
-  doc.roundedRect(slabX, slabY, slabW, slabH, 2, 2, 'S');
-  drawViewBadge(doc, 'PATTERN', slabX + 3, slabY + 3);
-  if (page.pattern) {
-    const cx = MARGIN + r;
-    const cy = slabY + slabH / 2;
-    drawPatternInfoBlock(doc, { cx, cy, title: page.pattern.label || 'PATTERN', sub: page.pattern.sub || page.piping || '' });
-  }
+  const hit = topAnchors[crop.anchorId] || { x: 0.35, y: 0.3 };
+  const tx = boxX + hit.x * boxW;
+  const ty = boxY + hit.y * boxH;
+  const ang = Math.atan2(ty - midY, tx - cx);
+  arrow(doc, cx + Math.cos(ang) * (r + 0.5), midY + Math.sin(ang) * (r + 0.5), tx, ty);
 
-  const rows = [['Filling Layers', String(page.layers)], ['Pattern', page.piping || 'Plain edge (no piping)']];
-  detailBlock(doc, MARGIN, slabY + slabH + 10, PAGE_W - 2 * MARGIN, {
+  const rows = [['Filling Layers', String(page.layers || 1)], ['Pattern', 'Plain edge (no piping)']];
+  if (sub) rows.push(['Flavor', sub]);
+
+  detailBlock(doc, MARGIN, boxY + boxH + 20, PAGE_W - 2 * MARGIN, {
     details: rows,
-    highlights: ['Filling spread on top of the cake layer'],
+    highlights: ['Filling spread smoothly on top of the cake layer'],
   });
 }
 
@@ -423,12 +521,62 @@ function addFundamentalsPage(doc, page, images, anchors, fillColors, designName,
   detailBlock(doc, MARGIN, boxY + boxH + 36, PAGE_W - 2 * MARGIN, page);
 }
 
-// Exterior Finish, exactly in Fundamentals style:
-// One framed picture of the frosted cake in the box,
-// a FLAVOR bubble (the frosting flavor's colour icon) and an EXTERIOR
-// FINISH bubble (a magnified look at the exterior frosting texture), arrows to the finish.
+// Exterior Finish:
+// - If Textured Buttercream: Side-by-side layout (2D Pattern Schematic vs. 3D Render)
+// - If Naked or Fully Frosted: Display like Fundamentals (single 3D render with FLAVOR and FINISH crop bubbles)
 function addExteriorFinishPage(doc, page, images, anchors, fillColors, designName, tierLabel) {
   const top = tierHeader(doc, designName, tierLabel, 'EXTERIOR FINISH');
+
+  const isTextured = Boolean(page.isTextured) || page.style === 'texturedButtercream' || (Boolean(page.texture) && page.style !== 'naked' && page.style !== 'fullyFrosted' && !String(page.style || '').toLowerCase().includes('frosted'));
+
+  if (isTextured) {
+    const boxW = 88;
+    const boxH = 74;
+    const gap = 6;
+    const leftX = MARGIN;
+    const rightX = MARGIN + boxW + gap;
+    const boxY = top + 2;
+
+    const flavor = (page.crops || [])[0] || {};
+    const finishColor = page.flavorChipColor || flavor.chipColor || '#F6DEAB';
+    const finishFlavorSub = page.flavorName || flavor.sub || '';
+    const texture = page.texture || 'ridged';
+    const textureName = page.textureName || name(texture);
+
+    // 1. LEFT SIDE: 2D Pattern Drawing
+    drawTexturedFinishSchematic(doc, {
+      x: leftX,
+      y: boxY,
+      w: boxW,
+      h: boxH,
+      texture,
+      textureName,
+      color: finishColor,
+      colorName: finishFlavorSub,
+    });
+
+    // 2. RIGHT SIDE: 3D Render
+    placeImage(doc, images?.[page.image], rightX, boxY, boxW, boxH);
+    doc.setDrawColor(...INK);
+    doc.setLineWidth(0.6);
+    doc.roundedRect(rightX, boxY, boxW, boxH, 2, 2, 'S');
+    drawViewBadge(doc, '3D RENDER', rightX + 3, boxY + 3);
+
+    // 3. Details table & Highlights below
+    const rows = [
+      ['Finish', name(page.style || 'texturedButtercream')],
+      ['Texture', textureName],
+    ];
+    if (finishFlavorSub) rows.push(['Flavor', finishFlavorSub]);
+
+    detailBlock(doc, MARGIN, boxY + boxH + 8, PAGE_W - 2 * MARGIN, {
+      details: rows,
+      highlights: [`Textured finish (${textureName}) applied across the cake (2D pattern schematic vs. 3D render)`],
+    });
+    return;
+  }
+
+  // Non-textured (Naked or Fully Frosted): Fundamentals style
   const boxW = 96;
   const boxH = 72;
   const boxX = PAGE_W - MARGIN - boxW;
@@ -503,9 +651,9 @@ function addSurfaceTreatmentPages(doc, page, images, anchors, swatches, fillColo
   const flavor = (page.crops || [])[0] || {};
   const hit1 = topAnchors[flavor.anchorId] || { x: 0.45, y: 0.28 };
   const isChoc = String(page.flavorName || flavor.sub || '').toLowerCase().includes('choc');
-  const flavorColor = fillColors?.[frontKey]
-    || hit1.color
-    || (isChoc ? '#3D2314' : (page.flavorChipColor || flavor.chipColor || '#F6DEAB'));
+  let flavorColor = isChoc
+    ? '#301009'
+    : (page.flavorChipColor || flavor.chipColor || fillColors?.[frontKey] || hit1.color || '#F6DEAB');
   const flavorName = page.flavorName || flavor.sub || '';
   const patternId = page.patternId || page.pattern?.sub || page.patternName || 'longGaps';
   const patternName = page.patternName || name(page.pattern?.sub || '');
@@ -562,7 +710,10 @@ function addSidePages(doc, page, images, anchors, swatches, fillColors, designNa
   const topAnchors = anchors?.[frontKey] || anchors?.side || {};
   const flavor = (page.crops || [])[0] || {};
   const hit1 = topAnchors[flavor.anchorId] || { x: 0.45, y: 0.5 };
-  const flavorColor = hit1.color || fillColors?.[frontKey] || page.flavorChipColor || flavor.chipColor || '#F6DEAB';
+  const isChoc = String(page.flavorName || flavor.sub || '').toLowerCase().includes('choc');
+  const flavorColor = isChoc
+    ? '#301009'
+    : (page.flavorChipColor || flavor.chipColor || (fillColors?.[frontKey] && fillColors[frontKey] !== '#ffffff' ? fillColors[frontKey] : null) || hit1.color || '#F6DEAB');
   const flavorName = page.flavorName || flavor.sub || '';
   const treatmentId = page.treatmentId || page.mode;
   const variantId = page.variantId || page.pattern?.variantId;
@@ -607,6 +758,60 @@ function addSidePages(doc, page, images, anchors, swatches, fillColors, designNa
   });
 }
 
+// Edge Border: Side-by-side layout!
+// Left-side: 2D Pattern Schematic (dumbed down mock copy of border along cake rim)
+// Right-side: 3D Render Screenshot (actual 3D cake render)
+function addEdgePages(doc, page, images, anchors, fillColors, designName, tierLabel) {
+  const top = tierHeader(doc, designName, tierLabel, 'EDGE');
+
+  const boxW = 88;
+  const boxH = 74;
+  const gap = 6;
+  const leftX = MARGIN;
+  const rightX = MARGIN + boxW + gap;
+  const boxY = top + 2;
+
+  // 1. LEFT SIDE: 2D Pattern Drawing
+  drawEdgePatternSchematic(doc, {
+    x: leftX,
+    y: boxY,
+    w: boxW,
+    h: boxH,
+    slot: page.slot || 'top',
+    designId: page.designId || 'shell',
+    designName: page.designName || 'Shell Border',
+    color: page.color || '#F6DEAB',
+    colorName: page.colorName || 'Vanilla',
+    secondaryColor: page.secondaryColor || null,
+  });
+
+  // 2. RIGHT SIDE: Actual 3D Render Screenshot
+  placeImage(doc, images?.[page.image], rightX, boxY, boxW, boxH);
+  doc.setDrawColor(...INK);
+  doc.setLineWidth(0.6);
+  doc.roundedRect(rightX, boxY, boxW, boxH, 2, 2, 'S');
+  drawViewBadge(doc, '3D RENDER', rightX + 3, boxY + 3);
+
+  // 3. Details table & Highlights below the side-by-side boxes
+  const rows = [
+    ['Edge Position', `${name(page.slot || 'top')} Rim`],
+    ['Border Design', page.designName || 'Shell Border'],
+    ['Color', page.colorName || 'Vanilla'],
+  ];
+  if (page.details && Array.isArray(page.details)) {
+    for (const [k, v] of page.details) {
+      if (!rows.some(([rk]) => rk.toLowerCase() === k.toLowerCase())) {
+        rows.push([k, v]);
+      }
+    }
+  }
+
+  detailBlock(doc, MARGIN, boxY + boxH + 8, PAGE_W - 2 * MARGIN, {
+    details: rows,
+    highlights: page.highlights || [`${name(page.slot || 'top')} border (${page.designName || 'Shell Border'}) - 2D pattern schematic vs. 3D render`],
+  });
+}
+
 // Center Decorations: Top-view diagram showing where designs are placed.
 // Top view is framed and centered horizontally on the page with a "TOP VIEW" badge,
 // with no pointing arrows or bubbles, and concise, detailed placement details below.
@@ -637,6 +842,7 @@ export function addTierPages(doc, { groups = [], images = {}, anchors = {}, swat
       else if (page.kind === 'filling') addFillingPages(doc, page, images, anchors, swatches, fillColors, designName, group.tierLabel);
       else if (page.kind === 'surface') addSurfaceTreatmentPages(doc, page, images, anchors, swatches, fillColors, contours, designName, group.tierLabel);
       else if (page.kind === 'side') addSidePages(doc, page, images, anchors, swatches, fillColors, designName, group.tierLabel);
+      else if (page.kind === 'edge') addEdgePages(doc, page, images, anchors, fillColors, designName, group.tierLabel);
       else if (page.kind === 'center') addCenterPage(doc, page, images, anchors, designName, group.tierLabel);
       else addStagePage(doc, page, images, anchors, designName, group.tierLabel);
     }

@@ -437,9 +437,9 @@ describe('internal blueprint', () => {
     const surfacePage = plan.groups[0].pages.find((p) => p.kind === 'surface');
     expect(surfacePage).toBeDefined();
     expect(surfacePage.flavorName).toBe('Chocolate');
-    // Dark chocolate color #3D2314 instead of crumbBase #7A4433
-    expect(surfacePage.flavorChipColor).toBe('#3D2314');
-    expect(surfacePage.crops[0].chipColor).toBe('#3D2314');
+    // Dark chocolate color #301009 instead of crumbBase #7A4433
+    expect(surfacePage.flavorChipColor).toBe('#301009');
+    expect(surfacePage.crops[0].chipColor).toBe('#301009');
 
     const details = buildBlueprintDetails(config, null);
     // When 3D render samples actual dark drip pixel #301009
@@ -457,5 +457,191 @@ describe('internal blueprint', () => {
 
     expect(doc.getNumberOfPages()).toBeGreaterThan(3);
   });
+
+  it('accurately resolves every selected color in surface treatment for the 2D pattern drawing', () => {
+    const testCases = [
+      { mode: 'default', colorId: 'strawberry', expectedName: 'Strawberry', expectedHex: '#F4A8A0' },
+      { mode: 'default', colorId: 'ube', expectedName: 'Ube', expectedHex: '#6B4F82' },
+      { mode: 'default', colorId: 'cheese', expectedName: 'Cheese', expectedHex: '#FFF4C2' },
+      { mode: 'default', colorId: 'vanilla', expectedName: 'Vanilla', expectedHex: '#F5E6C8' },
+      { mode: 'default', colorId: 'mocha', expectedName: 'Mocha', expectedHex: '#C08A5C' },
+      { mode: 'colorOverride', colorId: 'pink', expectedName: 'Pink', expectedHex: '#F5A9C0' },
+      { mode: 'colorOverride', colorId: 'red', expectedName: 'Red', expectedHex: '#D6293E' },
+      { mode: 'colorOverride', colorId: 'black', expectedName: 'Black', expectedHex: '#2B2B2B' },
+      { mode: 'colorOverride', colorId: 'gold', expectedName: 'Gold', expectedHex: '#C9A24B' },
+      { mode: 'colorOverride', colorId: '#FF69B4', expectedName: '#FF69B4', expectedHex: '#FF69B4' },
+    ];
+
+    for (const tc of testCases) {
+      const config = structuredClone(DEFAULT_CONFIG);
+      config.surfaceTreatment = { mode: 'glaze', pattern: 'longGaps' };
+      config.sugarColorOverrides = { surface: { mode: tc.mode, colorId: tc.colorId } };
+
+      const plan = buildBlueprintTierPlan(config);
+      const surfacePage = plan.groups[0].pages.find((p) => p.kind === 'surface');
+      expect(surfacePage).toBeDefined();
+      expect(surfacePage.flavorName).toBe(tc.expectedName);
+      expect(surfacePage.flavorChipColor).toBe(tc.expectedHex);
+      expect(surfacePage.crops[0].chipColor).toBe(tc.expectedHex);
+      expect(surfacePage.patternId).toBe('longGaps');
+
+      const details = buildBlueprintDetails(config, null);
+      const doc = buildBlueprintPdf({
+        details,
+        tiers: {
+          groups: plan.groups,
+          images: {
+            'surface-front': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+          },
+          anchors: {},
+          fillColors: {},
+        },
+      });
+
+      expect(doc.getNumberOfPages()).toBeGreaterThan(3);
+    }
+  });
+
+  it('applies 2D pattern schematic for exterior finish only when textured, fundamentals style otherwise', () => {
+    // 1. Textured Buttercream: should have isTextured = true
+    const texturedConfig = structuredClone(DEFAULT_CONFIG);
+    texturedConfig.exteriorFinish = { style: 'texturedButtercream', buttercreamTexture: 'ribbonWrap', flavor: 'strawberry' };
+    const texturedPlan = buildBlueprintTierPlan(texturedConfig);
+    const texturedFinishPage = texturedPlan.groups[0].pages.find((p) => p.kind === 'finish');
+    expect(texturedFinishPage.isTextured).toBe(true);
+    expect(texturedFinishPage.textureName).toBe('Ribbon Wrap');
+
+    const texturedDoc = buildBlueprintPdf({
+      details: buildBlueprintDetails(texturedConfig, null),
+      tiers: { groups: texturedPlan.groups, images: {}, anchors: {} },
+    });
+    expect(texturedDoc.getNumberOfPages()).toBeGreaterThan(3);
+
+    // 2. Fully Frosted: non-textured, displayed like Fundamentals
+    const frostedConfig = structuredClone(DEFAULT_CONFIG);
+    frostedConfig.exteriorFinish = { style: 'fullyFrosted', flavor: 'chocolate' };
+    const frostedPlan = buildBlueprintTierPlan(frostedConfig);
+    const frostedFinishPage = frostedPlan.groups[0].pages.find((p) => p.kind === 'finish');
+    expect(frostedFinishPage.isTextured).toBe(false);
+
+    const frostedDoc = buildBlueprintPdf({
+      details: buildBlueprintDetails(frostedConfig, null),
+      tiers: { groups: frostedPlan.groups, images: {}, anchors: {} },
+    });
+    expect(frostedDoc.getNumberOfPages()).toBeGreaterThan(3);
+  });
+
+  it('applies 2D pattern schematic for filling when piping is mashedCircles or mashedSwirls, fundamentals style when none', () => {
+    // 1. Mashed Circles piping: 2D pattern schematic
+    const circlesConfig = structuredClone(DEFAULT_CONFIG);
+    circlesConfig.filling = { enabled: true, layers: 2, flavor: 'chocolate', piping: { tip: 'mashedCircles', colorId: 'vanilla' } };
+    const circlesPlan = buildBlueprintTierPlan(circlesConfig);
+    const circlesFillingPage = circlesPlan.groups[0].pages.find((p) => p.kind === 'filling');
+    expect(circlesFillingPage.pipingTip).toBe('mashedCircles');
+
+    const circlesDoc = buildBlueprintPdf({
+      details: buildBlueprintDetails(circlesConfig, null),
+      tiers: { groups: circlesPlan.groups, images: {}, anchors: {} },
+    });
+    expect(circlesDoc.getNumberOfPages()).toBeGreaterThan(3);
+
+    // 2. Mashed Swirls piping: 2D pattern schematic
+    const swirlsConfig = structuredClone(DEFAULT_CONFIG);
+    swirlsConfig.filling = { enabled: true, layers: 1, flavor: 'ube', piping: { tip: 'mashedSwirls', colorId: 'strawberry' } };
+    const swirlsPlan = buildBlueprintTierPlan(swirlsConfig);
+    const swirlsFillingPage = swirlsPlan.groups[0].pages.find((p) => p.kind === 'filling');
+    expect(swirlsFillingPage.pipingTip).toBe('mashedSwirls');
+
+    const swirlsDoc = buildBlueprintPdf({
+      details: buildBlueprintDetails(swirlsConfig, null),
+      tiers: { groups: swirlsPlan.groups, images: {}, anchors: {} },
+    });
+    expect(swirlsDoc.getNumberOfPages()).toBeGreaterThan(3);
+
+    // 3. No piping (Plain / None): Fundamentals style
+    const plainConfig = structuredClone(DEFAULT_CONFIG);
+    plainConfig.filling = { enabled: true, layers: 1, flavor: 'vanilla', piping: null };
+    const plainPlan = buildBlueprintTierPlan(plainConfig);
+    const plainFillingPage = plainPlan.groups[0].pages.find((p) => p.kind === 'filling');
+    expect(plainFillingPage.pipingTip).toBeNull();
+
+    const plainDoc = buildBlueprintPdf({
+      details: buildBlueprintDetails(plainConfig, null),
+      tiers: { groups: plainPlan.groups, images: {}, anchors: {} },
+    });
+    expect(plainDoc.getNumberOfPages()).toBeGreaterThan(3);
+  });
+
+  it('applies 2D pattern schematic for side and edge borders', () => {
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.side = { mode: 'victorianLambeth', victorianLambeth: { setId: 'doubleBand', colorId: 'pink' } };
+    config.edge = {
+      mode: 'both',
+      top: { piping: { tip: 'shell', colorId: 'chocolate' } },
+      bottom: { piping: { tip: 'ropeTwist', colorId: 'vanilla', secondaryColorId: 'chocolate' } },
+      both: { piping: { tip: 'shell', colorId: 'chocolate' } },
+    };
+
+    const plan = buildBlueprintTierPlan(config);
+    const sidePage = plan.groups[0].pages.find((p) => p.kind === 'side');
+    expect(sidePage).toBeDefined();
+
+    const edgePages = plan.groups[plan.groups.length - 1].pages.filter((p) => p.kind === 'edge');
+    expect(edgePages.length).toBe(2);
+    expect(edgePages[0].slot).toBe('top');
+    expect(edgePages[0].designId).toBe('shell');
+    expect(edgePages[1].slot).toBe('bottom');
+    expect(edgePages[1].designId).toBe('shell');
+
+    const doc = buildBlueprintPdf({
+      details: buildBlueprintDetails(config, null),
+      tiers: { groups: plan.groups, images: {}, anchors: {} },
+    });
+    expect(doc.getNumberOfPages()).toBeGreaterThan(3);
+  });
+
+  it('correctly handles edge colors (only alternating variants have secondary color) and configures close-up zooms for finish and edges', () => {
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.exteriorFinish = { style: 'texturedButtercream', buttercreamTexture: 'ribbonWrap', flavor: 'mocha' };
+    config.edge = {
+      mode: 'individual',
+      top: { piping: { tip: 'ropeTwistClassic', colorId: 'vanilla', secondaryColorId: 'red' } },
+      bottom: { piping: { tip: 'ropeTwistAlt', colorId: 'vanilla', secondaryColorId: 'red' } },
+    };
+
+    const plan = buildBlueprintTierPlan(config);
+
+    // Textured finish stage has close-up zoom
+    const finishStage = plan.stages.find((s) => s.key === 'finish');
+    expect(finishStage?.zoom).toBeDefined();
+    expect(finishStage.zoom.mode).toBe('pattern');
+    expect(finishStage.zoom.fullHeight).toBe(true);
+
+    // Edge stages have close-up zoom
+    const topEdgeStage = plan.stages.find((s) => s.key === 'edge-top');
+    expect(topEdgeStage?.zoom).toBeDefined();
+    expect(topEdgeStage.zoom.mode).toBe('edge');
+    expect(topEdgeStage.zoom.position).toBe('top');
+
+    const botEdgeStage = plan.stages.find((s) => s.key === 'edge-bottom');
+    expect(botEdgeStage?.zoom).toBeDefined();
+    expect(botEdgeStage.zoom.position).toBe('bottom');
+
+    // Edge pages: ropeTwistClassic is not alternating, so secondary color is ignored
+    const edgePages = plan.groups[plan.groups.length - 1].pages.filter((p) => p.kind === 'edge');
+    const topPage = edgePages.find((p) => p.slot === 'top');
+    expect(topPage.colorName).toBe('Vanilla');
+    expect(topPage.secondaryColor).toBeNull();
+
+    // ropeTwistAlt is alternating, so secondary color is included
+    const botPage = edgePages.find((p) => p.slot === 'bottom');
+    expect(botPage.colorName).toBe('Vanilla / Red');
+    expect(botPage.secondaryColor).toBe('#D6293E');
+
+    const details = buildBlueprintDetails(config, null);
+    const topEdgeDetail = details.sections.find((s) => s.title === 'Edge').items.find((i) => i.label.includes('Top Border Piping'));
+    expect(topEdgeDetail.detail).toBe('Rope Twist Classic · Vanilla');
+  });
 });
+
 
