@@ -1906,12 +1906,26 @@ html {
   flex-direction: column;
 }
 
-.compliance-niri-img {
-  width: 100%;
-  max-height: 145px;
-  object-fit: cover;
-  border-radius: 9px;
+.compliance-image-link {
   display: block;
+  border-radius: 9px;
+  overflow: hidden;
+  cursor: zoom-in;
+  transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 160ms ease;
+}
+
+.compliance-image-link:hover {
+  transform: scale(1.01);
+  box-shadow: 0 6px 18px rgba(44, 23, 19, 0.12);
+}
+
+.compliance-niri-img {
+  width: 100% !important;
+  height: auto !important;
+  max-height: none !important;
+  object-fit: contain !important;
+  border-radius: 9px;
+  display: block !important;
   box-shadow: 0 4px 12px rgba(44, 23, 19, 0.08);
 }
 
@@ -1969,7 +1983,7 @@ html {
     gap: 16px;
   }
   .compliance-niri-img {
-    max-height: 240px;
+    max-height: none;
   }
 }
 

@@ -141,14 +141,30 @@ export default function BusinessComplianceModal({ isOpen, onClose }) {
               </div>
             </dl>
 
-            <figure className="compliance-image-frame">
-              <img
-                src={birNiriImg}
-                alt="Official BIR Notice to Issue Receipt/Invoice (NIRI) plate for AH TINAPS BAKESHOP"
-                className="compliance-niri-img"
-              />
+            <figure className="compliance-image-frame" style={{ margin: '12px 0 0', display: 'flex', flexDirection: 'column' }}>
+              <a
+                href={birNiriImg}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="compliance-image-link"
+                title="Click to view full image in a new tab"
+                style={{ display: 'block', width: '100%', overflow: 'hidden', borderRadius: '9px', cursor: 'zoom-in' }}
+              >
+                <img
+                  src={birNiriImg}
+                  alt="Official BIR Notice to Issue Receipt/Invoice (NIRI) plate for AH TINAPS BAKESHOP"
+                  className="compliance-niri-img"
+                  style={{
+                    width: '100%',
+                    height: 'auto',
+                    maxHeight: 'none',
+                    objectFit: 'contain',
+                    display: 'block'
+                  }}
+                />
+              </a>
               <figcaption>
-                Official BIR Notice to Issue Receipt / Invoice posted in compliance with Philippine Tax Regulations.
+                Official BIR Notice to Issue Receipt / Invoice posted in compliance with Philippine Tax Regulations (Click to view full image).
               </figcaption>
             </figure>
           </section>
