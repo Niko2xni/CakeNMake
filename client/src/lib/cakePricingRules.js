@@ -208,25 +208,91 @@ export const DRIP_SECTIONS = [
 ];
 
 export const DEFAULT_DRIP_RATES = Object.fromEntries(
-  DRIP_SECTIONS.flatMap((s) => s.items.map((it) => [it.id, it.defaultPrice]))
+  DRIP_SECTIONS.flatMap((s) => s.items.map((it) => [it.id, 0]))
 );
 
 export const DEFAULT_SIDE_RATES = Object.fromEntries(
-  SIDE_SECTIONS.flatMap((s) => s.items.map((it) => [it.key, it.defaultPrice]))
+  SIDE_SECTIONS.flatMap((s) => s.items.map((it) => [it.key, 0]))
 );
 
 export const DEFAULT_EDGE_RATES = Object.fromEntries(
-  EDGE_SECTIONS.flatMap((s) => s.items.map((it) => [it.id, it.defaultPrice]))
+  EDGE_SECTIONS.flatMap((s) => s.items.map((it) => [it.id, 0]))
 );
+
+export const FLAVOR_PRICES = {
+  plain: 300,
+  vanilla: 350,
+  chocolate: 500,
+  strawberry: 500,
+  cheese: 400,
+  ube: 500,
+  mocha: 500,
+  pickColor: 400,
+};
+
+export const SIZE_ADDONS = {
+  '6x4': 0,
+  '8x6': 200,
+  '10x8': 400,
+  '12x10': 600,
+  // legacy aliases
+  '6x6': 0,
+  '8x8': 200,
+  '10x10': 400,
+  '12x12': 600,
+  small: 0,
+  big: 200,
+  '4x3': 0,
+};
 
 export const DEFAULT_RATES = {
   sponge: {
-    naked: { '6x6': 700, '8x8': 1500, '10x10': 2200, '12x12': 3000, big: 1500, small: 700 }, // 6x6, 8x8, 10x10, 12x12
-    frosted: { '6x6': 1000, '8x8': 1700, '10x10': 2500, '12x12': 3400, big: 1700, small: 1000 }, // Frosted
-    textured: { '6x6': 1000, '8x8': 1700, '10x10': 2500, '12x12': 3400, big: 1700, small: 1000 }, // Textured
+    naked: {
+      '6x4': 350, '8x6': 550, '10x8': 750, '12x10': 950,
+      '6x6': 350, '8x8': 550, '10x10': 750, '12x12': 950,
+      big: 550, small: 350,
+      classicCube: 400, largeCube: 600, miniBento: 350, standardBento: 450, largeBento: 550, squareBento2x2: 400, squareBento3x3: 500
+    },
+    frosted: {
+      '6x4': 550, '8x6': 750, '10x8': 950, '12x10': 1150,
+      '6x6': 550, '8x8': 750, '10x10': 950, '12x10': 1150,
+      big: 750, small: 550,
+      classicCube: 500, largeCube: 800, miniBento: 500, standardBento: 600, largeBento: 750, squareBento2x2: 500, squareBento3x3: 650
+    },
+    textured: {
+      '6x4': 550, '8x6': 750, '10x8': 950, '12x10': 1150,
+      '6x6': 550, '8x8': 750, '10x10': 950, '12x10': 1150,
+      big: 750, small: 550,
+      classicCube: 500, largeCube: 800, miniBento: 500, standardBento: 600, largeBento: 750, squareBento2x2: 500, squareBento3x3: 650
+    },
   },
-  twoTier: { naked: 2200, frosted: 2700, textured: 2700 },
-  glazePerTier: 100,
+  flavors: {
+    plain: 300,
+    vanilla: 350,
+    chocolate: 500,
+    strawberry: 500,
+    cheese: 400,
+    ube: 500,
+    mocha: 500,
+    pickColor: 400,
+  },
+  sizes: {
+    '6x4': 0,
+    '8x6': 200,
+    '10x8': 400,
+    '12x10': 600,
+    '6x6': 0,
+    '8x8': 200,
+    '10x10': 400,
+    '12x12': 600,
+  },
+  finishAddon: {
+    naked: 0,
+    frosted: 200,
+    textured: 200,
+  },
+  twoTier: { naked: 900, frosted: 1300, textured: 1300 },
+  glazePerTier: 0,
 
   // Independent Drip Item Rates:
   drip: { ...DEFAULT_DRIP_RATES },
@@ -238,18 +304,19 @@ export const DEFAULT_RATES = {
   edge: { ...DEFAULT_EDGE_RATES },
 
   // Backwards compatibility tier fallbacks
-  sideEdge: { small: 100, big: 150 },
+  sideEdge: { small: 0, big: 0 },
 
   center: {
     brackets: {
-      strawberry: [{ maxQty: 4, price: 150 }, { maxQty: 10, price: 200 }],
-      cherry: [{ maxQty: 4, price: 175 }, { maxQty: 10, price: 250 }],
-      blueberry: [{ maxQty: 4, price: 150 }, { maxQty: 10, price: 200 }],
-      mangoCube: [{ maxQty: 4, price: 150 }, { maxQty: 12, price: 200 }],
-      ferreroRocher: [{ maxQty: 3, price: 60 }, { maxQty: 8, price: 120 }],
-      oreo: [{ maxQty: 4, price: 8 }, { maxQty: 8, price: 15 }],
-      hersheysKisses: [{ maxQty: 4, price: 37 }, { maxQty: 9, price: 74 }],
-      fondantBalls: [{ maxQty: 3, price: 50 }, { maxQty: 8, price: 100 }],
+      strawberry: [{ maxQty: 4, price: 200 }, { maxQty: 10, price: 300 }],
+      cherry: [{ maxQty: 4, price: 200 }, { maxQty: 10, price: 300 }],
+      blueberry: [{ maxQty: 4, price: 200 }, { maxQty: 10, price: 300 }],
+      mangoCube: [{ maxQty: 4, price: 200 }, { maxQty: 12, price: 300 }],
+      ferreroRocher: [{ maxQty: 4, price: 200 }, { maxQty: 8, price: 300 }],
+      oreo: [{ maxQty: 4, price: 200 }, { maxQty: 8, price: 300 }],
+      hersheysKisses: [{ maxQty: 4, price: 200 }, { maxQty: 9, price: 300 }],
+      fondantBalls: [{ maxQty: 4, price: 200 }, { maxQty: 8, price: 300 }],
+      chocolateBear: [{ maxQty: 4, price: 200 }, { maxQty: 8, price: 300 }],
       buttercreamText: [
         { maxQty: 10, price: 50 },
         { maxQty: 20, price: 100 },
@@ -258,9 +325,7 @@ export const DEFAULT_RATES = {
         { maxQty: 50, price: 250 },
       ],
     },
-    perPiece: {
-      chocolateBear: 200,
-    },
+    perPiece: {},
   },
 };
 

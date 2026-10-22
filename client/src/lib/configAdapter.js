@@ -84,7 +84,7 @@ export function adaptConfigToLegacy(newConfig) {
 
   // Map structure
   const layers = structure.layers || 1;
-  const cakeSize = structure.size || '8x8';
+  const cakeSize = structure.size || '8x6';
   const cakeFormat = getCakeFormat(structure);
   const shape = resolveStructureShape(structure);
   const realSize = newConfig.realSize || { diameter: 8, height: 6 };

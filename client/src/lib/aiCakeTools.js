@@ -189,7 +189,7 @@ export function applyCakeAiTool(name, input, ctx) {
       const format = requestedFormat || formatForSize(nextStructure.size);
       if (format === 'petitsFour' && !petitsFourSizeIds.includes(nextStructure.size)) nextStructure.size = 'classicCube';
       if (format === 'bento' && !bentoSizeIds.includes(nextStructure.size)) nextStructure.size = 'standardBento';
-      if (format === 'standard' && !standardSizeIds.includes(nextStructure.size)) nextStructure.size = '8x8';
+      if (format === 'standard' && !standardSizeIds.includes(nextStructure.size)) nextStructure.size = '8x6';
       nextStructure.cakeFormat = format;
       nextStructure.format = format;
       nextStructure.shape = input.shape === 'round' || input.shape === 'rectangle' || input.shape === 'square'
@@ -205,8 +205,8 @@ export function applyCakeAiTool(name, input, ctx) {
       } else if (format === 'bento' && isSquareBentoSize && (input.shape === 'round' || input.shape === 'rectangle')) {
         nextStructure.size = 'standardBento';
       } else if (nextStructure.shape === 'square' && format === 'standard'
-        && nextStructure.size !== '6x6' && nextStructure.size !== '8x8') {
-        nextStructure.size = '8x8';
+        && nextStructure.size !== '6x4' && nextStructure.size !== '8x6' && nextStructure.size !== '6x6' && nextStructure.size !== '8x8') {
+        nextStructure.size = '8x6';
       }
       const isPetitsFour = format === 'petitsFour';
       const isBento = format === 'bento';

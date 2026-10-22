@@ -5,8 +5,12 @@ import {
   drawSidePatternSchematic,
   drawSurfaceTreatmentSchematic,
   drawTexturedFinishSchematic,
+  drawTexturedFinishSideSchematic,
   drawFillingPipingSchematic,
   drawEdgePatternSchematic,
+  drawAssemblyExplodedSchematic,
+  drawAssemblyCompleteSchematic,
+  hexToRgb,
 } from './blueprintSchematics';
 import { name } from './blueprintDetails';
 
@@ -251,31 +255,24 @@ function pill(doc, text, x, y, { w, fontSize = 8 } = {}) {
 function tierHeader(doc, designName, tierLabel, section) {
   doc.addPage();
   const secTitle = String(section || 'DETAILS').toUpperCase();
+
+  // Primary Section Title (Always Big, Bold H1: Font Size 20)
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(20);
   doc.setTextColor(...INK);
-  const secW = doc.getTextWidth(secTitle);
+  doc.text(secTitle, MARGIN, 24);
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  const nameW = designName ? doc.getTextWidth(designName) : 0;
-  const availOnRight = PAGE_W - MARGIN - (MARGIN + secW + 10);
-
-  if (designName && nameW > availOnRight) {
-    // When design name is too long to share the top row without overlapping the section title,
-    // place section title and tierLabel on top, and render designName below with ample room
+  // Optional Tier Label on the top right
+  if (tierLabel) {
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(20);
-    doc.setTextColor(...INK);
-    doc.text(secTitle, MARGIN, 24);
+    doc.setFontSize(9);
+    doc.setTextColor(...ACCENT);
+    doc.text(String(tierLabel).toUpperCase(), PAGE_W - MARGIN, 24, { align: 'right' });
+  }
 
-    if (tierLabel) {
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.setTextColor(...ACCENT);
-      doc.text(String(tierLabel).toUpperCase(), PAGE_W - MARGIN, 24, { align: 'right' });
-    }
-
+  // Design name subtitle underneath the section title
+  let lineY = 33;
+  if (designName) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
     doc.setTextColor(140, 120, 120);
@@ -283,29 +280,13 @@ function tierHeader(doc, designName, tierLabel, section) {
     const textStartY = 29.5;
     doc.text(lines, MARGIN, textStartY);
     const endY = textStartY + (lines.length - 1) * 4.2;
-
-    const lineY = Math.max(34, endY + 3.5);
-    doc.setDrawColor(230, 215, 210);
-    doc.setLineWidth(0.3);
-    doc.line(MARGIN, lineY, PAGE_W - MARGIN, lineY);
-    return lineY + 7;
+    lineY = Math.max(34, endY + 3.5);
   }
 
-  // Normal compact single-line layout
-  doc.text(secTitle, MARGIN, 26);
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(140, 120, 120);
-  if (designName) doc.text(designName, PAGE_W - MARGIN, 24, { align: 'right' });
-  if (tierLabel) {
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...ACCENT);
-    doc.text(String(tierLabel).toUpperCase(), PAGE_W - MARGIN, 30, { align: 'right' });
-  }
   doc.setDrawColor(230, 215, 210);
   doc.setLineWidth(0.3);
-  doc.line(MARGIN, 33, PAGE_W - MARGIN, 33);
-  return 40;
+  doc.line(MARGIN, lineY, PAGE_W - MARGIN, lineY);
+  return lineY + 7;
 }
 
 function placeImage(doc, src, x, y, w, h) {
@@ -530,11 +511,6 @@ function addExteriorFinishPage(doc, page, images, anchors, fillColors, designNam
   const isTextured = Boolean(page.isTextured) || page.style === 'texturedButtercream' || (Boolean(page.texture) && page.style !== 'naked' && page.style !== 'fullyFrosted' && !String(page.style || '').toLowerCase().includes('frosted'));
 
   if (isTextured) {
-    const boxW = 88;
-    const boxH = 74;
-    const gap = 6;
-    const leftX = MARGIN;
-    const rightX = MARGIN + boxW + gap;
     const boxY = top + 2;
 
     const flavor = (page.crops || [])[0] || {};
@@ -543,35 +519,59 @@ function addExteriorFinishPage(doc, page, images, anchors, fillColors, designNam
     const texture = page.texture || 'ridged';
     const textureName = page.textureName || name(texture);
 
-    // 1. LEFT SIDE: 2D Pattern Drawing
+    // 1. TOP: 3D Render (Prominent showcase view at the top)
+    const renderW = 100;
+    const renderH = 65;
+    const renderX = (PAGE_W - renderW) / 2;
+    placeImage(doc, images?.[page.image], renderX, boxY, renderW, renderH);
+    doc.setDrawColor(...INK);
+    doc.setLineWidth(0.6);
+    doc.roundedRect(renderX, boxY, renderW, renderH, 2, 2, 'S');
+    drawViewBadge(doc, '3D RENDER', renderX + 3, boxY + 3);
+
+    // 2. BELOW: 2D Schematics (Front View on the left, Side View on the right)
+    const schemY = boxY + renderH + 6;
+    const schemW = 84;
+    const schemH = 58;
+    const gap = 6;
+    const card1X = MARGIN;
+    const card2X = MARGIN + schemW + gap;
+
+    // 2A. LEFT: 2D Front View Schematic
     drawTexturedFinishSchematic(doc, {
-      x: leftX,
-      y: boxY,
-      w: boxW,
-      h: boxH,
+      x: card1X,
+      y: schemY,
+      w: schemW,
+      h: schemH,
+      texture,
+      textureName,
+      color: finishColor,
+      colorName: finishFlavorSub,
+      badge: '2D FRONT VIEW',
+    });
+
+    // 2B. RIGHT: 2D Side View Schematic (Showing bump profiles: Ridge Comb wide short hills vs Ribbon Wrap striking hills)
+    drawTexturedFinishSideSchematic(doc, {
+      x: card2X,
+      y: schemY,
+      w: schemW,
+      h: schemH,
       texture,
       textureName,
       color: finishColor,
       colorName: finishFlavorSub,
     });
 
-    // 2. RIGHT SIDE: 3D Render
-    placeImage(doc, images?.[page.image], rightX, boxY, boxW, boxH);
-    doc.setDrawColor(...INK);
-    doc.setLineWidth(0.6);
-    doc.roundedRect(rightX, boxY, boxW, boxH, 2, 2, 'S');
-    drawViewBadge(doc, '3D RENDER', rightX + 3, boxY + 3);
-
-    // 3. Details table & Highlights below
+    // 3. BELOW: Details table & Highlights below the schematics
     const rows = [
       ['Finish', name(page.style || 'texturedButtercream')],
       ['Texture', textureName],
     ];
     if (finishFlavorSub) rows.push(['Flavor', finishFlavorSub]);
 
-    detailBlock(doc, MARGIN, boxY + boxH + 8, PAGE_W - 2 * MARGIN, {
+    detailBlock(doc, MARGIN, schemY + schemH + 8, PAGE_W - 2 * MARGIN, {
       details: rows,
-      highlights: [`Textured finish (${textureName}) applied across the cake (2D pattern schematic vs. 3D render)`],
+      highlights: [`Textured finish (${textureName}) applied across the cake (3D render top, 2D front pattern & side bump profile below)`],
     });
     return;
   }
@@ -758,45 +758,107 @@ function addSidePages(doc, page, images, anchors, swatches, fillColors, designNa
   });
 }
 
-// Edge Border: Side-by-side layout!
-// Left-side: 2D Pattern Schematic (dumbed down mock copy of border along cake rim)
-// Right-side: 3D Render Screenshot (actual 3D cake render)
+// Edge Border: Side-by-side layout with dual-angle views (Front & Top)
+// Left-side: 2D Line Drawing Schematic showing FRONT and TOP angles (matching sketch 2)
+// Right-side: 3D Render Screenshot showing FRONT and TOP angles
 function addEdgePages(doc, page, images, anchors, fillColors, designName, tierLabel) {
   const top = tierHeader(doc, designName, tierLabel, 'EDGE');
 
-  const boxW = 88;
-  const boxH = 74;
+  const cardW = 84;
+  const cardH = 86;
   const gap = 6;
   const leftX = MARGIN;
-  const rightX = MARGIN + boxW + gap;
+  const rightX = MARGIN + cardW + gap;
   const boxY = top + 2;
+  const subH = 34.5;
 
-  // 1. LEFT SIDE: 2D Pattern Drawing
-  drawEdgePatternSchematic(doc, {
-    x: leftX,
-    y: boxY,
-    w: boxW,
-    h: boxH,
-    slot: page.slot || 'top',
-    designId: page.designId || 'shell',
-    designName: page.designName || 'Shell Border',
-    color: page.color || '#F6DEAB',
-    colorName: page.colorName || 'Vanilla',
-    secondaryColor: page.secondaryColor || null,
-  });
+  const frontSchematic = images?.[`${page.frontImage || page.image}-schematic`] || images?.[`edge-${page.slot || 'top'}-schematic`];
+  const topSchematic = images?.[`${page.topImage || page.image + '-top'}-schematic`] || images?.[`edge-${page.slot || 'top'}-top-schematic`] || frontSchematic;
 
-  // 2. RIGHT SIDE: Actual 3D Render Screenshot
-  placeImage(doc, images?.[page.image], rightX, boxY, boxW, boxH);
+  const front3D = images?.[page.frontImage] || images?.[page.image] || images?.[`edge-${page.slot || 'top'}`];
+  const top3D = images?.[page.topImage] || images?.[`${page.image}-top`] || images?.[`edge-${page.slot || 'top'}-top`] || front3D;
+
+  // 1. LEFT CARD: 2D Line Drawing Schematic (Front View & Top View)
+  doc.setFillColor(252, 250, 248);
+  doc.roundedRect(leftX, boxY, cardW, cardH, 2, 2, 'F');
+
+  // Upper Sub-panel: FRONT View
+  if (frontSchematic) {
+    placeImage(doc, frontSchematic, leftX + 1.5, boxY + 7, cardW - 3, subH);
+  }
+  drawViewBadge(doc, 'FRONT', leftX + 3, boxY + 8);
+
+  // Separator divider line
+  doc.setDrawColor(220, 215, 210);
+  doc.setLineWidth(0.4);
+  doc.line(leftX + 2, boxY + 43, leftX + cardW - 2, boxY + 43);
+
+  // Lower Sub-panel: TOP View
+  if (topSchematic) {
+    placeImage(doc, topSchematic, leftX + 1.5, boxY + 44, cardW - 3, subH);
+  }
+  drawViewBadge(doc, 'TOP', leftX + 3, boxY + 45);
+
+  // Left card outer frame & main badge
   doc.setDrawColor(...INK);
   doc.setLineWidth(0.6);
-  doc.roundedRect(rightX, boxY, boxW, boxH, 2, 2, 'S');
-  drawViewBadge(doc, '3D RENDER', rightX + 3, boxY + 3);
+  doc.roundedRect(leftX, boxY, cardW, cardH, 2, 2, 'S');
+  drawViewBadge(doc, '2D LINE SCHEMATIC', leftX + 3, boxY + 2.5);
 
-  // 3. Details table & Highlights below the side-by-side boxes
+  // Footer on Left Card with color chip
+  const footerY = boxY + cardH - 4;
+  const rgb = hexToRgb(page.color || '#F6DEAB');
+  doc.setFillColor(...rgb);
+  doc.circle(leftX + 4.5, footerY, 2.0, 'F');
+  doc.setDrawColor(...INK);
+  doc.setLineWidth(0.3);
+  doc.circle(leftX + 4.5, footerY, 2.0, 'S');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(...INK);
+  const borderLabel = `${String(page.slot || 'top').toUpperCase()} BORDER · ${String(page.designName || 'Shell Border').toUpperCase()} · ${String(page.colorName || 'Vanilla').toUpperCase()}`;
+  doc.text(borderLabel, leftX + 8.5, footerY + 1.0);
+
+  // 2. RIGHT CARD: 3D Render (Front View & Top View)
+  doc.setFillColor(252, 250, 248);
+  doc.roundedRect(rightX, boxY, cardW, cardH, 2, 2, 'F');
+
+  // Upper Sub-panel: FRONT 3D Render
+  if (front3D) {
+    placeImage(doc, front3D, rightX + 1.5, boxY + 7, cardW - 3, subH);
+  }
+  drawViewBadge(doc, 'FRONT (3D)', rightX + 3, boxY + 8);
+
+  // Separator divider line
+  doc.setDrawColor(220, 215, 210);
+  doc.setLineWidth(0.4);
+  doc.line(rightX + 2, boxY + 43, rightX + cardW - 2, boxY + 43);
+
+  // Lower Sub-panel: TOP 3D Render
+  if (top3D) {
+    placeImage(doc, top3D, rightX + 1.5, boxY + 44, cardW - 3, subH);
+  }
+  drawViewBadge(doc, 'TOP (3D)', rightX + 3, boxY + 45);
+
+  // Right card outer frame & main badge
+  doc.setDrawColor(...INK);
+  doc.setLineWidth(0.6);
+  doc.roundedRect(rightX, boxY, cardW, cardH, 2, 2, 'S');
+  drawViewBadge(doc, '3D RENDER', rightX + 3, boxY + 2.5);
+
+  // Footer on Right Card
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.4);
+  doc.setTextColor(...INK);
+  doc.text('FRONT & TOP MULTI-ANGLE 3D RENDER', rightX + 4, footerY + 1.0);
+
+  // 3. Details table & Highlights below the dual-angle cards
   const rows = [
     ['Edge Position', `${name(page.slot || 'top')} Rim`],
     ['Border Design', page.designName || 'Shell Border'],
     ['Color', page.colorName || 'Vanilla'],
+    ['Front Profile', 'Overlapping fluting ridges and forward diagonal twist contour along rim'],
+    ['Top Profile', 'Perimeter curvature, radial seating band, and top crest surface coverage'],
   ];
   if (page.details && Array.isArray(page.details)) {
     for (const [k, v] of page.details) {
@@ -806,32 +868,133 @@ function addEdgePages(doc, page, images, anchors, fillColors, designName, tierLa
     }
   }
 
-  detailBlock(doc, MARGIN, boxY + boxH + 8, PAGE_W - 2 * MARGIN, {
+  detailBlock(doc, MARGIN, boxY + cardH + 7, PAGE_W - 2 * MARGIN, {
     details: rows,
-    highlights: page.highlights || [`${name(page.slot || 'top')} border (${page.designName || 'Shell Border'}) - 2D pattern schematic vs. 3D render`],
+    highlights: page.highlights || [
+      'Dual-angle technical schematic: Front view highlights fluting & wave relief; Top view highlights rim coverage & placement curve',
+      'The 2D line schematic replicates the exact geometry of the 3D render to guide piping technique and spacing',
+    ],
   });
 }
 
-// Center Decorations: Top-view diagram showing where designs are placed.
-// Top view is framed and centered horizontally on the page with a "TOP VIEW" badge,
-// with no pointing arrows or bubbles, and concise, detailed placement details below.
+// Center Decorations: Layout matching user sketch 3:
+// Top (centered): Eagle-eye top view
+// Bottom: Left side view on left, Right side view on right
 function addCenterPage(doc, page, images, anchors, designName, tierLabel) {
   const top = tierHeader(doc, designName, tierLabel, 'CENTER');
 
-  // Centered framed box for the top view diagram
-  const imgW = 126;
-  const imgH = 94;
-  const imgX = (PAGE_W - imgW) / 2;
-  const imgY = top + 2;
+  // Top Card (Centered Eagle-Eye View)
+  const topW = 104;
+  const topH = 46;
+  const topX = MARGIN + (PAGE_W - 2 * MARGIN - topW) / 2;
+  const topY = top + 2;
 
-  placeImage(doc, images?.[page.image], imgX, imgY, imgW, imgH);
+  const topImg = images?.['center-top'] || images?.['center'];
+  placeImage(doc, topImg, topX, topY, topW, topH);
   doc.setDrawColor(...INK);
   doc.setLineWidth(0.6);
-  doc.roundedRect(imgX, imgY, imgW, imgH, 2, 2, 'S');
-  drawViewBadge(doc, 'TOP VIEW', imgX + 3, imgY + 3);
+  doc.roundedRect(topX, topY, topW, topH, 2, 2, 'S');
+  drawViewBadge(doc, 'TOP VIEW (EAGLE EYE)', topX + 3, topY + 3);
 
-  // Details and highlights below the framed top view
-  detailBlock(doc, MARGIN, imgY + imgH + 12, PAGE_W - 2 * MARGIN, page);
+  // Bottom Two Cards (Side-by-side literal side views matching user sketch 3)
+  const sideW = 84;
+  const sideH = 46;
+  const gap = 6;
+  const leftX = MARGIN;
+  const rightX = MARGIN + sideW + gap;
+  const sideY = topY + topH + 5;
+
+  // 1. Bottom Left: Left Side View (Literal side capture like EDGE)
+  const angle1Img = images?.['center-side1'] || images?.['center'];
+  placeImage(doc, angle1Img, leftX, sideY, sideW, sideH);
+  doc.setDrawColor(...INK);
+  doc.setLineWidth(0.6);
+  doc.roundedRect(leftX, sideY, sideW, sideH, 2, 2, 'S');
+  drawViewBadge(doc, 'LEFT SIDE VIEW', leftX + 3, sideY + 3);
+
+  // 2. Bottom Right: Right Side View (Literal side capture like EDGE)
+  const angle2Img = images?.['center-side2'] || images?.['center'];
+  placeImage(doc, angle2Img, rightX, sideY, sideW, sideH);
+  doc.setDrawColor(...INK);
+  doc.setLineWidth(0.6);
+  doc.roundedRect(rightX, sideY, sideW, sideH, 2, 2, 'S');
+  drawViewBadge(doc, 'RIGHT SIDE VIEW', rightX + 3, sideY + 3);
+
+  // 3. Details table & Highlights below the side cards
+  const angleRows = [
+    ['Top View (Eagle Eye)', 'Direct overhead alignment: Shows exact placement coordinates, spacing between pieces, and centering on top tier'],
+    ['Left Side View', 'Literal side profile (left): Captures standing 3D piece height, vertical clearance, and seating on frosting'],
+    ['Right Side View', 'Literal side profile (right): Captures opposite side elevation, standing profile, and outer rim border distance'],
+  ];
+
+  const combinedDetails = [
+    ...(page.details || []),
+    ...angleRows,
+  ];
+
+  detailBlock(doc, MARGIN, sideY + sideH + 7, PAGE_W - 2 * MARGIN, {
+    details: combinedDetails,
+    highlights: page.highlights || [
+      'Eagle-eye top view provides exact placement layout; literal side profile captures reveal vertical clearance and 3D piece height',
+      'Bakery placement: Ensure decorations are set firmly into frosting with equal spacing and vertical alignment',
+    ],
+  });
+}
+
+// Dedicated Assembling Page for Filling:
+// Left-side: 2D Layer-by-Layer Assembly (exploded stack with arrows and enclosing callout)
+// Right-side: Complete Look After Assembling (assembled core cylinder stack with alternating sponge/filling seams)
+function addAssemblyPage(doc, page, images, anchors, fillColors, designName, tierLabel) {
+  const top = tierHeader(doc, designName, tierLabel, 'ASSEMBLING');
+
+  const boxW = 84;
+  const boxH = 88;
+  const gap = 6;
+  const leftX = MARGIN;
+  const rightX = MARGIN + boxW + gap;
+  const boxY = top + 2;
+
+  // 1. LEFT SIDE: 2D Layer-by-Layer Assembly (matching 3rd sketch)
+  drawAssemblyExplodedSchematic(doc, {
+    x: leftX,
+    y: boxY,
+    w: boxW,
+    h: boxH,
+    layers: page.layers || 1,
+    spongeFlavor: page.spongeFlavor || 'Vanilla',
+    spongeColor: page.spongeColor || '#F5E6CA',
+    fillingFlavor: page.fillingFlavor || 'Chocolate',
+    fillingColor: page.fillingColor || '#7A4B2A',
+  });
+
+  // 2. RIGHT SIDE: Complete Look After Assembling (matching 4th sketch)
+  drawAssemblyCompleteSchematic(doc, {
+    x: rightX,
+    y: boxY,
+    w: boxW,
+    h: boxH,
+    layers: page.layers || 1,
+    spongeFlavor: page.spongeFlavor || 'Vanilla',
+    spongeColor: page.spongeColor || '#F5E6CA',
+    fillingFlavor: page.fillingFlavor || 'Chocolate',
+    fillingColor: page.fillingColor || '#7A4B2A',
+  });
+
+  // 3. Stacking instructions & Details below
+  const stackingSteps = [
+    ['Step 1 · Base Foundation', `Place initial ${page.spongeFlavor} sponge disc centered securely on cake board`],
+    ['Step 2 · Layer Stacking', `Spread ${page.fillingFlavor} filling evenly across each sponge tier layer (${page.layers} layer${page.layers > 1 ? 's' : ''})`],
+    ['Step 3 · Enclosing Crown', 'Place final enclosing sponge slice flat and level on top to seal cake core'],
+    ['Step 4 · Chill & Set', 'Refrigerate assembled core 20–30 mins to stabilize before applying exterior finish'],
+  ];
+
+  detailBlock(doc, MARGIN, boxY + boxH + 8, PAGE_W - 2 * MARGIN, {
+    details: [...(page.details || []), ...stackingSteps],
+    highlights: page.highlights || [
+      'Layer-by-layer internal assembly breakdown: stack strictly in order from bottom base to top enclosing crown',
+      'Ensure each filling layer is level and chilled before crumb-coating exterior',
+    ],
+  });
 }
 
 export function addTierPages(doc, { groups = [], images = {}, anchors = {}, swatches = {}, fillColors = {}, contours = {}, designName = '' } = {}) {
@@ -840,6 +1003,7 @@ export function addTierPages(doc, { groups = [], images = {}, anchors = {}, swat
       if (page.kind === 'fundamentals') addFundamentalsPage(doc, page, images, anchors, fillColors, designName, group.tierLabel);
       else if (page.kind === 'finish') addExteriorFinishPage(doc, page, images, anchors, fillColors, designName, group.tierLabel);
       else if (page.kind === 'filling') addFillingPages(doc, page, images, anchors, swatches, fillColors, designName, group.tierLabel);
+      else if (page.kind === 'assembling') addAssemblyPage(doc, page, images, anchors, fillColors, designName, group.tierLabel);
       else if (page.kind === 'surface') addSurfaceTreatmentPages(doc, page, images, anchors, swatches, fillColors, contours, designName, group.tierLabel);
       else if (page.kind === 'side') addSidePages(doc, page, images, anchors, swatches, fillColors, designName, group.tierLabel);
       else if (page.kind === 'edge') addEdgePages(doc, page, images, anchors, fillColors, designName, group.tierLabel);

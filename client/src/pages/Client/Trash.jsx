@@ -16,6 +16,7 @@ export default function Trash() {
   const [activeMenu, setActiveMenu] = useState(null);
   const [detailsModal, setDetailsModal] = useState({ open: false, design: null });
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
 
   useDragToScroll();
 
@@ -42,15 +43,16 @@ export default function Trash() {
   }, [activeMenu]);
 
   useEffect(() => {
-    if (!detailsModal.open && !deleteTarget) return undefined;
+    if (!detailsModal.open && !deleteTarget && !showDeleteAllConfirm) return undefined;
     const handleEscape = (event) => {
       if (event.key !== 'Escape') return;
       setDetailsModal({ open: false, design: null });
       setDeleteTarget(null);
+      setShowDeleteAllConfirm(false);
     };
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [detailsModal.open, deleteTarget]);
+  }, [detailsModal.open, deleteTarget, showDeleteAllConfirm]);
 
   const fetchTrashedDesigns = async () => {
     setLoading(true);
@@ -133,6 +135,25 @@ export default function Trash() {
     }
   };
 
+  const handleDeleteAll = async () => {
+    setPendingAction('delete-all');
+    setOperationError('');
+    setOperationFeedback('');
+    try {
+      const count = trashedDesigns.length;
+      await designApi.deleteAllTrash();
+      setTrashedDesigns([]);
+      setShowDeleteAllConfirm(false);
+      setActiveMenu(null);
+      setOperationFeedback(`All ${count} designs were permanently deleted.`);
+    } catch (error) {
+      console.error('Failed to delete all trashed designs:', error);
+      setOperationError('Could not permanently delete all designs. Please try again.');
+    } finally {
+      setPendingAction('');
+    }
+  };
+
   const handleShowDetails = (design) => {
     setDetailsModal({ open: true, design });
     setActiveMenu(null);
@@ -185,16 +206,30 @@ export default function Trash() {
             <span>Kept for 30 days</span>
             {!loading && trashedDesigns.length >= 19 && <em>Almost full</em>}
           </div>
-          <button
-            type="button"
-            aria-expanded={infoOpen}
-            aria-controls="trash-information"
-            onClick={() => setInfoOpen((open) => !open)}
-          >
-            <Info aria-hidden="true" />
-            How Trash works
-            <ChevronDown className={infoOpen ? 'is-open' : ''} aria-hidden="true" />
-          </button>
+          <div className="flex items-center gap-3">
+            {!loading && trashedDesigns.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowDeleteAllConfirm(true)}
+                disabled={Boolean(pendingAction)}
+                className="cn-trash-delete-all-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 text-[var(--cn-cherry)] text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                aria-label="Delete all designs in trash permanently"
+              >
+                <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                Delete all
+              </button>
+            )}
+            <button
+              type="button"
+              aria-expanded={infoOpen}
+              aria-controls="trash-information"
+              onClick={() => setInfoOpen((open) => !open)}
+            >
+              <Info aria-hidden="true" />
+              How Trash works
+              <ChevronDown className={infoOpen ? 'is-open' : ''} aria-hidden="true" />
+            </button>
+          </div>
         </div>
 
         {infoOpen && (
@@ -354,8 +389,33 @@ export default function Trash() {
             </div>
           )}
         </div>
-
       </div>
+
+      {showDeleteAllConfirm && (
+        <div
+          className="cn-trash-dialog-backdrop fixed inset-0 flex items-center justify-center z-[120]"
+          onMouseDown={(event) => event.target === event.currentTarget && setShowDeleteAllConfirm(false)}
+        >
+          <div role="dialog" aria-modal="true" aria-labelledby="delete-all-title" className="cn-trash-dialog w-full max-w-md mx-4">
+            <span className="cn-trash-dialog-icon"><Trash2 className="w-6 h-6" /></span>
+            <h2 id="delete-all-title">Delete all {trashedDesigns.length} designs permanently?</h2>
+            <p>This action cannot be undone. All deleted designs in your Trash will be permanently removed.</p>
+            {operationError && <p className="cn-trash-dialog-error" role="alert">{operationError}</p>}
+            <div className="cn-trash-dialog-actions">
+              <button type="button" onClick={() => setShowDeleteAllConfirm(false)} disabled={Boolean(pendingAction)}>Cancel</button>
+              <button
+                type="button"
+                onClick={handleDeleteAll}
+                disabled={Boolean(pendingAction)}
+                className="is-danger"
+              >
+                {pendingAction === 'delete-all' ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                Delete all permanently
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {deleteTarget && (
         <div

@@ -79,8 +79,30 @@ export default function ClientHome() {
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [trashNotification, setTrashNotification] = useState(null);
   const [trashConfirmTarget, setTrashConfirmTarget] = useState(null);
+  const [showMoveAllConfirm, setShowMoveAllConfirm] = useState(false);
+  const [showCapacityLimitModal, setShowCapacityLimitModal] = useState(false);
   const [showTrashFullWarning, setShowTrashFullWarning] = useState(false);
-  const [neverShowTrashWarning, setNeverShowTrashWarning] = useState(false);
+  const [neverShowTrashWarning, setNeverShowTrashWarning] = useState(() => {
+    try {
+      return localStorage.getItem('cakenmake_never_show_trash_warning') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleNeverShowTrashWarningChange = (checked) => {
+    setNeverShowTrashWarning(checked);
+    try {
+      if (checked) {
+        localStorage.setItem('cakenmake_never_show_trash_warning', 'true');
+      } else {
+        localStorage.removeItem('cakenmake_never_show_trash_warning');
+      }
+    } catch (e) {
+      console.warn('Could not persist trash warning preference:', e);
+    }
+  };
+
   const trashNotificationTimerRef = useRef(null);
   const detailsInputRef = useRef(null);
   const isSavingRenameRef = useRef(false);
@@ -114,6 +136,8 @@ export default function ClientHome() {
         setActiveMenu(null);
         if (renameModal.open) setRenameModal({ open: false, designId: null, currentName: '' });
         if (trashConfirmTarget) setTrashConfirmTarget(null);
+        if (showMoveAllConfirm) setShowMoveAllConfirm(false);
+        if (showCapacityLimitModal) setShowCapacityLimitModal(false);
         if (selectedDesign) setSelectedDesign(null);
       }
     };
@@ -124,7 +148,7 @@ export default function ClientHome() {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
     };
-  }, [activeMenu, renameModal.open, trashConfirmTarget, selectedDesign]);
+  }, [activeMenu, renameModal.open, trashConfirmTarget, showMoveAllConfirm, showCapacityLimitModal, selectedDesign]);
 
   // Fetch or resolve full pricing breakdown whenever selectedDesign changes
   useEffect(() => {
@@ -289,9 +313,13 @@ export default function ClientHome() {
       }, 5000);
 
       if (!neverShowTrashWarning) {
-        const trashedCount = recentDesigns.filter((d) => d.isTrashed).length;
-        if (trashedCount >= 19) {
-          setShowTrashFullWarning(true);
+        try {
+          const trashed = await designApi.getDesigns({ trashOnly: true });
+          if (Array.isArray(trashed) && trashed.length >= 19) {
+            setShowTrashFullWarning(true);
+          }
+        } catch {
+          // silently continue
         }
       }
     } catch (error) {
@@ -299,9 +327,43 @@ export default function ClientHome() {
     }
   };
 
+  const handleMoveAllToTrash = async () => {
+    setShowMoveAllConfirm(false);
+    try {
+      const count = recentDesigns.length;
+      await designApi.moveAllToTrash();
+      setRecentDesigns([]);
+      setSelectedDesign(null);
+      setActiveMenu(null);
+
+      if (trashNotificationTimerRef.current) {
+        clearTimeout(trashNotificationTimerRef.current);
+      }
+
+      setTrashNotification({
+        designName: `All ${count} designs`,
+        show: true,
+        isBulk: true,
+      });
+
+      trashNotificationTimerRef.current = setTimeout(() => {
+        setTrashNotification(null);
+      }, 5000);
+    } catch (error) {
+      console.error('Failed to move all designs to trash:', error);
+      setLoadError('Could not move all designs to trash. Please try again.');
+    }
+  };
+
   const handleDuplicate = async (design) => {
     setActiveMenu(null);
     setSelectedDesign(null);
+
+    if (recentDesigns.length >= 20) {
+      setShowCapacityLimitModal(true);
+      return;
+    }
+
     try {
       const copyableDesign = { ...design };
       ['_id', 'userId', 'createdAt', 'lastEdited', 'isTrashed', 'trashedAt', 'sentToBakery'].forEach((key) => delete copyableDesign[key]);
@@ -314,7 +376,11 @@ export default function ClientHome() {
       setRecentDesigns((designs) => [{ ...duplicate, isDuplicated: true }, ...designs.filter((d) => d._id !== duplicate._id)]);
     } catch (error) {
       console.error('Failed to duplicate design:', error);
-      setLoadError('The design could not be duplicated. Please try again.');
+      if (error?.message?.includes('capacity') || error?.message?.includes('maximum') || error?.status === 400) {
+        setShowCapacityLimitModal(true);
+      } else {
+        setLoadError('The design could not be duplicated. Please try again.');
+      }
     }
   };
 
@@ -418,10 +484,22 @@ export default function ClientHome() {
               <h2 id="your-designs-title">Your designs</h2>
             </div>
             {!loading && recentDesigns.length > 0 && (
-              <span>
-                {displayedDesigns.length} {displayedDesigns.length === 1 ? 'design' : 'designs'}
-                {searchQuery ? ' found' : ' (up to 20)'}
-              </span>
+              <div className="flex items-center gap-3">
+                <span className={recentDesigns.length >= 20 ? 'text-rose-600 font-semibold' : ''}>
+                  {displayedDesigns.length} {displayedDesigns.length === 1 ? 'design' : 'designs'}
+                  {searchQuery ? ' found' : ' (up to 20)'}
+                  {recentDesigns.length >= 20 && ' · Max limit reached'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowMoveAllConfirm(true)}
+                  className="cn-home-trash-all-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 text-[var(--cn-cherry)] text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                  aria-label="Move all designs to trash"
+                >
+                  <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                  Move to Trash all
+                </button>
+              </div>
             )}
           </div>
 
@@ -444,7 +522,17 @@ export default function ClientHome() {
                 <button type="button" onClick={fetchRecentDesigns}>
                   <RefreshCw aria-hidden="true" /> Retry
                 </button>
-                <Link to="/designer">Create a new cake</Link>
+                {recentDesigns.length >= 20 ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowCapacityLimitModal(true)}
+                    className="cn-capacity-limit-btn"
+                  >
+                    Create a new cake
+                  </button>
+                ) : (
+                  <Link to="/designer">Create a new cake</Link>
+                )}
               </div>
             </div>
           ) : recentDesigns.length === 0 ? (
@@ -468,7 +556,17 @@ export default function ClientHome() {
               </div>
               <div>
                 <button type="button" onClick={() => setSearchQuery('')}>Clear search</button>
-                <Link to="/designer">Create a new cake</Link>
+                {recentDesigns.length >= 20 ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowCapacityLimitModal(true)}
+                    className="cn-capacity-limit-btn"
+                  >
+                    Create a new cake
+                  </button>
+                ) : (
+                  <Link to="/designer">Create a new cake</Link>
+                )}
               </div>
             </div>
           ) : (
@@ -995,6 +1093,95 @@ export default function ClientHome() {
         </div>
       )}
 
+      {/* Move All to Trash Confirmation Dialog */}
+      {showMoveAllConfirm && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[120]"
+          role="presentation"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setShowMoveAllConfirm(false);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="move-all-confirm-title"
+            className="bg-white rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl border border-[var(--cn-line)] animate-in fade-in zoom-in-95 duration-150"
+          >
+            <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center text-[var(--cn-cherry)] mb-4">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <h3 id="move-all-confirm-title" className="font-heading text-lg font-bold text-[var(--cn-ink)] mb-2">
+              Move all {recentDesigns.length} designs to Trash?
+            </h3>
+            <p className="text-xs text-[var(--cn-muted)] leading-relaxed mb-6">
+              All designs on your cake table will be moved to your Trash folder. You can retrieve and restore them at any time within <strong>30 days</strong>.
+            </p>
+            <div className="flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowMoveAllConfirm(false)}
+                className="px-4 py-2 text-xs font-semibold text-[var(--cn-muted)] hover:bg-[var(--cn-paper)] rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleMoveAllToTrash}
+                className="px-4 py-2 bg-[var(--cn-cherry)] hover:bg-[var(--cn-cherry-dark)] text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer"
+              >
+                Move all to trash
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Maximum Capacity Reached Modal */}
+      {showCapacityLimitModal && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[120]"
+          role="presentation"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setShowCapacityLimitModal(false);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="capacity-limit-title"
+            className="bg-white rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl border border-[var(--cn-line)] animate-in fade-in zoom-in-95 duration-150"
+          >
+            <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 mb-4">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <h3 id="capacity-limit-title" className="font-heading text-lg font-bold text-[var(--cn-ink)] mb-2">
+              Maximum Design Capacity Reached (20/20)
+            </h3>
+            <p className="text-xs text-[var(--cn-muted)] leading-relaxed mb-6">
+              You have reached the maximum limit of 20 active designs. To create, customize, or duplicate a new design, please move unneeded designs to the Trash first.
+            </p>
+            <div className="flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowCapacityLimitModal(false)}
+                className="px-4 py-2 text-xs font-semibold text-[var(--cn-muted)] hover:bg-[var(--cn-paper)] rounded-xl transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+              <Link
+                to="/trash"
+                onClick={() => setShowCapacityLimitModal(false)}
+                className="px-4 py-2 bg-[var(--cn-cherry)] hover:bg-[var(--cn-cherry-dark)] text-white text-xs font-bold rounded-xl shadow-sm transition-colors inline-flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Go to Trash
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Trash Full Warning */}
       {showTrashFullWarning && (
         <div className="fixed top-4 left-4 right-4 md:left-auto md:right-4 md:w-96 bg-yellow-100 border border-yellow-400 rounded-xl p-4 shadow-xl z-50">
@@ -1015,7 +1202,7 @@ export default function ClientHome() {
               type="checkbox"
               id="neverShow"
               checked={neverShowTrashWarning}
-              onChange={(e) => setNeverShowTrashWarning(e.target.checked)}
+              onChange={(e) => handleNeverShowTrashWarningChange(e.target.checked)}
               className="rounded"
             />
             <label htmlFor="neverShow" className="text-sm text-yellow-700">Never show again</label>

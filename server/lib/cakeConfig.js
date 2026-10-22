@@ -44,7 +44,7 @@ const DEFAULT_CONFIG = {
   structure: {
     cakeFormat: 'standard', // 'standard' | 'bento' | 'petitsFour'
     format: 'standard',
-    size: '8x8', // Includes Standard, Bento, square Bento, and Petit Four size ids.
+    size: '8x6', // Includes Standard, Bento, square Bento, and Petit Four size ids.
     layers: 1, // 1 or 2
     shape: 'round', // 'round' | 'rectangle' | 'square'
     layerDesign: 'uniform', // 'uniform' | 'individual'
@@ -251,10 +251,10 @@ const BUTTERCREAM_TEXTURES = [
 
 // Size options
 const STANDARD_SIZE_OPTIONS = [
-  { id: '6x6', label: '6×6', dimensions: { diameter: 6, height: 6 } },
-  { id: '8x8', label: '8×8', dimensions: { diameter: 8, height: 8 } },
-  { id: '10x10', label: '10×10', dimensions: { diameter: 10, height: 10 } },
-  { id: '12x12', label: '12×12', dimensions: { diameter: 12, height: 12 } },
+  { id: '6x4', label: '6×4', dimensions: { diameter: 6, height: 4 } },
+  { id: '8x6', label: '8×6', dimensions: { diameter: 8, height: 6 } },
+  { id: '10x8', label: '10×8', dimensions: { diameter: 10, height: 8 } },
+  { id: '12x10', label: '12×10', dimensions: { diameter: 12, height: 10 } },
 ];
 
 // Bento size options (single tier only)
@@ -1129,7 +1129,7 @@ function getFerreroAwareBoundaryRadius(topRadius = 4, edgeConfig = null, exterio
  * Derives the topmost tier's radius directly from cake configuration.
  */
 function getTopTierRadiusFromConfig(config) {
-  const size = config?.structure?.size || '8x8';
+  const size = config?.structure?.size || '8x6';
   const layers = config?.structure?.layers || 1;
   if (size === 'classicCube') return 0.5;
   if (size === 'largeCube') return 1.0;
@@ -1138,16 +1138,16 @@ function getTopTierRadiusFromConfig(config) {
   if (size === 'largeBento') return 2.5;
   if (size === 'squareBento2x2') return 1.0;
   if (size === 'squareBento3x3') return 1.5;
-  if (size === '12x12') {
+  if (size === '12x10' || size === '12x12') {
     return layers >= 2 ? 5.0 : 6.0;
   }
-  if (size === '10x10') {
+  if (size === '10x8' || size === '10x10') {
     return layers >= 2 ? 4.0 : 5.0;
   }
-  if (size === '6x6' || size === 'small') {
+  if (size === '6x4' || size === '6x6' || size === 'small') {
     return layers >= 2 ? 2.0 : 3.0;
   }
-  // '8x8' or 'big' or default
+  // '8x6' or '8x8' or 'big' or default
   return layers >= 2 ? 3.0 : 4.0;
 }
 

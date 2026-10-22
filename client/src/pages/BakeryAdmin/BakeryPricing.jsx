@@ -303,64 +303,52 @@ export function computePricingChanges(rates = {}, activeRates = {}) {
     }
   }
 
-  const finishLabels = {
-    naked: 'Naked Finish',
-    frosted: 'Frosted Finish',
-    textured: 'Textured Buttercream',
+  const flavorLabels = {
+    plain: 'Plain Sponge (6×4 Base)',
+    vanilla: 'Vanilla Sponge (6×4 Base)',
+    cheese: 'Cheese Sponge (6×4 Base)',
+    chocolate: 'Chocolate Sponge (6×4 Base)',
+    strawberry: 'Strawberry Sponge (6×4 Base)',
+    ube: 'Ube Sponge (6×4 Base)',
+    mocha: 'Mocha Sponge (6×4 Base)',
+    pickColor: 'All Pick Colors (6×4 Base)',
   };
+
   const sizeLabels = {
-    '6x6': '6×6',
-    '8x8': '8×8',
-    '10x10': '10×10',
-    '12x12': '12×12',
-    small: '6×6',
-    big: '8×8',
+    '6x4': '6×4 Size Factor',
+    '8x6': '8×6 Size Factor',
+    '10x8': '10×8 Size Factor',
+    '12x10': '12×10 Size Factor',
   };
 
-  // 1. Fundamentals 1-Tier
-  ['naked', 'frosted', 'textured'].forEach((finish) => {
-    ['6x6', '8x8', '10x10', '12x12'].forEach((size) => {
-      const curr = rates?.sponge?.[finish]?.[size] ?? DEFAULT_RATES.sponge?.[finish]?.[size];
-      const old = activeRates?.sponge?.[finish]?.[size] ?? DEFAULT_RATES.sponge?.[finish]?.[size];
-      checkDiff('Fundamentals (1-Tier)', `${finishLabels[finish] || finish} · ${sizeLabels[size] || size}`, curr, old);
-    });
+  const finishLabels = {
+    naked: 'Naked Finish Add-on',
+    frosted: 'Frosted Finish Add-on',
+    textured: 'Textured Buttercream Add-on',
+  };
+
+  // 1. Fundamentals: Sponge Flavors & Custom Pick Color Base Rates
+  Object.keys(flavorLabels).forEach((key) => {
+    const curr = rates?.flavors?.[key] ?? DEFAULT_RATES.flavors?.[key];
+    const old = activeRates?.flavors?.[key] ?? DEFAULT_RATES.flavors?.[key];
+    checkDiff('Fundamentals · Sponge Flavors', flavorLabels[key], curr, old);
   });
 
-  // 2. Fundamentals 2-Tier
-  ['naked', 'frosted', 'textured'].forEach((finish) => {
-    const curr = rates?.twoTier?.[finish] ?? DEFAULT_RATES.twoTier?.[finish];
-    const old = activeRates?.twoTier?.[finish] ?? DEFAULT_RATES.twoTier?.[finish];
-    checkDiff('Fundamentals (2-Tier)', `${finishLabels[finish] || finish} Set (2-Tier)`, curr, old);
+  // 2. Fundamentals: Size Factor Add-ons
+  Object.keys(sizeLabels).forEach((key) => {
+    const curr = rates?.sizes?.[key] ?? DEFAULT_RATES.sizes?.[key];
+    const old = activeRates?.sizes?.[key] ?? DEFAULT_RATES.sizes?.[key];
+    checkDiff('Fundamentals · Size Factors', sizeLabels[key], curr, old);
   });
 
-  // 3. Drip
-  DRIP_SECTIONS.forEach((section) => {
-    section.items.forEach((item) => {
-      const curr = rates?.drip?.[item.id] ?? DEFAULT_RATES.drip?.[item.id] ?? item.defaultPrice;
-      const old = activeRates?.drip?.[item.id] ?? DEFAULT_RATES.drip?.[item.id] ?? item.defaultPrice;
-      checkDiff('Drip Rates', `${section.title} · ${item.label}`, curr, old);
-    });
+  // 3. Fundamentals: Finish Style Add-ons
+  Object.keys(finishLabels).forEach((key) => {
+    const curr = rates?.finishAddon?.[key] ?? DEFAULT_RATES.finishAddon?.[key];
+    const old = activeRates?.finishAddon?.[key] ?? DEFAULT_RATES.finishAddon?.[key];
+    checkDiff('Fundamentals · Finish Styles', finishLabels[key], curr, old);
   });
 
-  // 4. Side
-  SIDE_SECTIONS.forEach((section) => {
-    section.items.forEach((item) => {
-      const curr = rates?.side?.[item.key] ?? DEFAULT_RATES.side?.[item.key] ?? item.defaultPrice;
-      const old = activeRates?.side?.[item.key] ?? DEFAULT_RATES.side?.[item.key] ?? item.defaultPrice;
-      checkDiff(`Side · ${section.title}`, item.label, curr, old);
-    });
-  });
-
-  // 5. Edge
-  EDGE_SECTIONS.forEach((section) => {
-    section.items.forEach((item) => {
-      const curr = rates?.edge?.[item.id] ?? DEFAULT_RATES.edge?.[item.id] ?? item.defaultPrice;
-      const old = activeRates?.edge?.[item.id] ?? DEFAULT_RATES.edge?.[item.id] ?? item.defaultPrice;
-      checkDiff(`Edge · ${section.title}`, item.label, curr, old);
-    });
-  });
-
-  // 6. Center Decorations Brackets
+  // 4. Center Decorations Brackets
   const decBracketKeys = Object.keys(CENTER_DECORATION_META);
   decBracketKeys.forEach((designId) => {
     const currList = rates?.center?.brackets?.[designId] || DEFAULT_RATES.center?.brackets?.[designId] || [];
@@ -378,7 +366,7 @@ export function computePricingChanges(rates = {}, activeRates = {}) {
     });
   });
 
-  // 7. Center 3D Fondant Text
+  // 5. Center 3D Fondant Text
   const textBracketKeys = Object.keys(TEXT_PRICING_META);
   textBracketKeys.forEach((designId) => {
     const currList = rates?.center?.brackets?.[designId] || DEFAULT_RATES.center?.brackets?.[designId] || [];
@@ -396,7 +384,7 @@ export function computePricingChanges(rates = {}, activeRates = {}) {
     });
   });
 
-  // 8. Center Per Piece
+  // 6. Center Per Piece
   const perPieceKeys = Object.keys(DEFAULT_RATES.center?.perPiece || {});
   perPieceKeys.forEach((designId) => {
     const curr = rates?.center?.perPiece?.[designId] ?? DEFAULT_RATES.center?.perPiece?.[designId];
@@ -421,15 +409,10 @@ export default function BakeryPricing() {
   const [publishModal, setPublishModal] = useState(false);
   const [scheduleModal, setScheduleModal] = useState(false);
 
-  // Search & Filter state for Side and Edge lists
-  const [sideSearch, setSideSearch] = useState('');
-  const [activeSideSection, setActiveSideSection] = useState('all');
-  const [edgeSearch, setEdgeSearch] = useState('');
-  const [activeEdgeSection, setActiveEdgeSection] = useState('all');
-
   // Live Simulator state
   const [simLayers, setSimLayers] = useState(1);
-  const [simSize, setSimSize] = useState('8x8');
+  const [simSize, setSimSize] = useState('8x6');
+  const [simTier2Size, setSimTier2Size] = useState('6x4');
   const [simFinish, setSimFinish] = useState('frosted');
   const [simSpongeFlavor, setSimSpongeFlavor] = useState('Vanilla');
   const [simFilling, setSimFilling] = useState('Chocolate');
@@ -497,46 +480,54 @@ export default function BakeryPricing() {
     }
   }
 
-  // Nested rate update helpers
-  const setSpongePrice = (finish, size, price) => {
+  // Synchronize sponge table and two-tier rates for backward compatibility
+  const syncSpongeRates = (nextRates) => {
+    if (!nextRates.sponge) nextRates.sponge = { naked: {}, frosted: {}, textured: {} };
+    const baseVanilla = nextRates.flavors?.vanilla ?? 350;
+    ['naked', 'frosted', 'textured'].forEach((finish) => {
+      if (!nextRates.sponge[finish]) nextRates.sponge[finish] = {};
+      const fAddon = nextRates.finishAddon?.[finish] ?? (finish === 'naked' ? 0 : 200);
+      ['6x4', '8x6', '10x8', '12x10'].forEach((sz) => {
+        const szAddon = nextRates.sizes?.[sz] ?? 0;
+        nextRates.sponge[finish][sz] = baseVanilla + szAddon + fAddon;
+      });
+      nextRates.sponge[finish]['6x6'] = nextRates.sponge[finish]['6x4'];
+      nextRates.sponge[finish]['8x8'] = nextRates.sponge[finish]['8x6'];
+      nextRates.sponge[finish]['10x10'] = nextRates.sponge[finish]['10x8'];
+      nextRates.sponge[finish]['12x12'] = nextRates.sponge[finish]['12x10'];
+      nextRates.sponge[finish]['small'] = nextRates.sponge[finish]['6x4'];
+      nextRates.sponge[finish]['big'] = nextRates.sponge[finish]['8x6'];
+    });
+
+    if (!nextRates.twoTier) nextRates.twoTier = {};
+    const t1Base = (nextRates.flavors?.vanilla ?? 350) + (nextRates.sizes?.['8x6'] ?? 200);
+    const t2Base = (nextRates.flavors?.vanilla ?? 350) + (nextRates.sizes?.['6x4'] ?? 0);
+    nextRates.twoTier.naked = t1Base + t2Base;
+    nextRates.twoTier.frosted = t1Base + (nextRates.finishAddon?.frosted ?? 200) + t2Base + (nextRates.finishAddon?.frosted ?? 200);
+    nextRates.twoTier.textured = t1Base + (nextRates.finishAddon?.textured ?? 200) + t2Base + (nextRates.finishAddon?.textured ?? 200);
+  };
+
+  const setFlavorPrice = (flavorKey, price) => {
     const next = JSON.parse(JSON.stringify(rates));
-    if (!next.sponge) next.sponge = { naked: {}, frosted: {}, textured: {} };
-    if (!next.sponge[finish]) next.sponge[finish] = {};
-    next.sponge[finish][size] = price;
+    if (!next.flavors) next.flavors = { ...DEFAULT_RATES.flavors };
+    next.flavors[flavorKey] = price;
+    syncSpongeRates(next);
     updateRates(next);
   };
 
-  const setTwoTierPrice = (finish, price) => {
+  const setSizeAddon = (sizeKey, price) => {
     const next = JSON.parse(JSON.stringify(rates));
-    if (!next.twoTier) next.twoTier = {};
-    next.twoTier[finish] = price;
+    if (!next.sizes) next.sizes = { ...DEFAULT_RATES.sizes };
+    next.sizes[sizeKey] = price;
+    syncSpongeRates(next);
     updateRates(next);
   };
 
-  const setDripItemPrice = (dripId, price) => {
+  const setFinishAddon = (finishKey, price) => {
     const next = JSON.parse(JSON.stringify(rates));
-    if (!next.drip) next.drip = {};
-    next.drip[dripId] = price;
-    updateRates(next);
-  };
-
-  const setGlazeRate = (price) => {
-    const next = JSON.parse(JSON.stringify(rates));
-    next.glazePerTier = price;
-    updateRates(next);
-  };
-
-  const setSideItemPrice = (sideKey, price) => {
-    const next = JSON.parse(JSON.stringify(rates));
-    if (!next.side) next.side = {};
-    next.side[sideKey] = price;
-    updateRates(next);
-  };
-
-  const setEdgeItemPrice = (edgeId, price) => {
-    const next = JSON.parse(JSON.stringify(rates));
-    if (!next.edge) next.edge = {};
-    next.edge[edgeId] = price;
+    if (!next.finishAddon) next.finishAddon = { ...DEFAULT_RATES.finishAddon };
+    next.finishAddon[finishKey] = price;
+    syncSpongeRates(next);
     updateRates(next);
   };
 
@@ -615,86 +606,62 @@ export default function BakeryPricing() {
     }
   }
 
-  // Filtered Side sections & items
-  const filteredSideSections = useMemo(() => {
-    const q = sideSearch.trim().toLowerCase();
-    return SIDE_SECTIONS.filter((section) => {
-      if (activeSideSection !== 'all' && section.id !== activeSideSection) return false;
-      if (!q) return true;
-      const matchSection = section.title.toLowerCase().includes(q) || section.description.toLowerCase().includes(q);
-      const matchItems = section.items.some((it) => it.label.toLowerCase().includes(q));
-      return matchSection || matchItems;
-    }).map((section) => ({
-      ...section,
-      items: q
-        ? section.items.filter((it) => it.label.toLowerCase().includes(q) || section.title.toLowerCase().includes(q))
-        : section.items,
-    }));
-  }, [sideSearch, activeSideSection]);
-
-  // Filtered Edge sections & items
-  const filteredEdgeSections = useMemo(() => {
-    const q = edgeSearch.trim().toLowerCase();
-    return EDGE_SECTIONS.filter((section) => {
-      if (activeEdgeSection !== 'all' && section.id !== activeEdgeSection) return false;
-      if (!q) return true;
-      const matchSection = section.title.toLowerCase().includes(q) || section.description.toLowerCase().includes(q);
-      const matchItems = section.items.some((it) => it.label.toLowerCase().includes(q));
-      return matchSection || matchItems;
-    }).map((section) => ({
-      ...section,
-      items: q
-        ? section.items.filter((it) => it.label.toLowerCase().includes(q) || section.title.toLowerCase().includes(q))
-        : section.items,
-    }));
-  }, [edgeSearch, activeEdgeSection]);
-
-  // Legacy rate tables keyed 1-tier sponge prices as small/big; mirror the
-  // server calculator's fallback so old drafts still resolve a price.
-  const spongeRateForSize = (table, size) => table?.[size] ?? table?.[size === '6x6' ? 'small' : 'big'];
 
   // Simulation calculator
   const simTotal = useMemo(() => {
     let total = 0;
     const currentRates = rates || DEFAULT_RATES;
-    // Sponge
-    if (simLayers === 1) {
-      total += spongeRateForSize(currentRates.sponge?.[simFinish], simSize) ?? (simFinish === 'textured' ? spongeRateForSize(currentRates.sponge?.frosted, simSize) : 0) ?? 0;
-    } else {
-      total += currentRates.twoTier?.[simFinish] ?? (simFinish === 'textured' ? currentRates.twoTier?.frosted : 0) ?? 0;
+    const flvKey = (simSpongeFlavor || 'vanilla').toLowerCase().replace(/\s+/g, '');
+    const flavorBase =
+      flvKey === 'pickcolor'
+        ? (currentRates.flavors?.pickColor ?? 400)
+        : (currentRates.flavors?.[flvKey] ?? 350);
+
+    const finishAdd = currentRates.finishAddon?.[simFinish] ?? (simFinish === 'naked' ? 0 : 200);
+    const sizeAddTier1 = currentRates.sizes?.[simSize] ?? (simSize === '8x6' ? 200 : simSize === '10x8' ? 400 : simSize === '12x10' ? 600 : 0);
+
+    // Tier 1
+    total += flavorBase + sizeAddTier1 + finishAdd;
+
+    // Tier 2 (if 2 tiers)
+    if (simLayers === 2) {
+      const sizeAddTier2 = currentRates.sizes?.[simTier2Size] ?? (simTier2Size === '8x6' ? 200 : 0);
+      total += flavorBase + sizeAddTier2 + finishAdd;
     }
-    // Glaze
-    if (simGlaze) {
-      total += (currentRates.glazePerTier || 0) * simLayers;
-    }
-    // Side
-    if (simSideKey !== 'none') {
-      const sidePrice = currentRates.side?.[simSideKey] ?? DEFAULT_RATES.side?.[simSideKey] ?? 100;
-      total += sidePrice * simLayers;
-    }
-    // Edge
-    if (simEdgeId !== 'none') {
-      const edgePrice = currentRates.edge?.[simEdgeId] ?? DEFAULT_RATES.edge?.[simEdgeId] ?? 150;
-      total += edgePrice * simLayers;
-    }
-    // Strawberries bracket (Center Decoration)
+
+    // Filling, Drip, Side piping, and Edge borders are Included (₱0)
+
+    // Strawberries bracket (Center Decoration: 1-4 = 200, 5+ = 300)
     if (simStrawberries > 0) {
-      const brackets = currentRates.center?.brackets?.strawberry || [];
+      const brackets = currentRates.center?.brackets?.strawberry || [
+        { maxQty: 4, price: 200 },
+        { maxQty: 10, price: 300 },
+      ];
       const hit = brackets.find((b) => simStrawberries <= b.maxQty);
       if (hit) total += hit.price;
+      else total += 300;
     }
-    // Bear per piece (Center Decoration)
+
+    // Bear figure (Center Decoration)
     if (simBear > 0) {
-      total += (currentRates.center?.perPiece?.chocolateBear || 0) * simBear;
+      const brackets = currentRates.center?.brackets?.chocolateBear;
+      if (brackets && brackets.length > 0) {
+        const hit = brackets.find((b) => simBear <= b.maxQty);
+        if (hit) total += hit.price;
+        else total += (brackets[brackets.length - 1]?.price || 300);
+      } else {
+        total += (currentRates.center?.perPiece?.chocolateBear || 200) * simBear;
+      }
     }
-    // 3D Buttercream Letters (Text Pricing)
+
+    // 3D Buttercream / Fondant Letters (Text Pricing)
     if (simButtercreamLetters > 0) {
       const brackets = currentRates.center?.brackets?.buttercreamText || [];
       const hit = brackets.find((b) => simButtercreamLetters <= b.maxQty);
       if (hit) total += hit.price;
     }
     return total;
-  }, [rates, simLayers, simSize, simFinish, simGlaze, simSideKey, simEdgeId, simStrawberries, simBear, simButtercreamLetters]);
+  }, [rates, simLayers, simSize, simTier2Size, simFinish, simSpongeFlavor, simStrawberries, simBear, simButtercreamLetters]);
 
   const selectedSideLabel = useMemo(() => {
     if (simSideKey === 'none') return 'None';
@@ -834,9 +801,7 @@ export default function BakeryPricing() {
         <div className="flex w-full flex-col gap-4 lg:w-80 shrink-0">
           <div className="rounded-2xl border border-pink-100 bg-white p-3 shadow-sm space-y-1">
             {[
-              { id: 'fundamentals', label: 'Fundamentals', icon: Cake, desc: 'Base sponge, 1 & 2 tier pricing' },
-              { id: 'side', label: 'Side', icon: Layers, desc: '42 independent item rates' },
-              { id: 'edge', label: 'Edge', icon: Layers2, desc: '54 independent item rates' },
+              { id: 'fundamentals', label: 'Fundamentals', icon: Cake, desc: 'Flavors, sizes & finish add-ons' },
               { id: 'center', label: 'Center', icon: Tag, desc: 'Decorations & 3D text rates' },
               { id: 'simulator', label: 'Live Quote Tester', icon: SlidersHorizontal, desc: 'Simulate custom cake estimates' },
             ].map((tab) => {
@@ -869,20 +834,20 @@ export default function BakeryPricing() {
           <div className="rounded-2xl border border-pink-100 bg-gradient-to-br from-pink-50/50 to-white p-4 shadow-sm space-y-3">
             <div className="flex items-center gap-2">
               <Info className="h-4 w-4 text-primary shrink-0" />
-              <h3 className="text-xs font-bold text-gray-800">Pricing Logic Rules</h3>
+              <h3 className="text-xs font-bold text-gray-800">Pricing Architecture</h3>
             </div>
             <ul className="text-[11px] text-gray-600 space-y-2 leading-relaxed">
               <li className="flex items-start gap-1.5">
                 <span className="text-primary font-bold">•</span>
-                <span><strong>Filling & Flavors:</strong> Part of sponge price (₱0 extra charge).</span>
+                <span><strong>Fundamentals:</strong> Cake price starts from Sponge Flavor (6×4 base) + Size factor (+₱200/step) + Finish style (+₱200).</span>
               </li>
               <li className="flex items-start gap-1.5">
                 <span className="text-primary font-bold">•</span>
-                <span><strong>Side & Edge:</strong> Each item has its own independent price, applied per tier.</span>
+                <span><strong>All-Inclusive Items:</strong> Filling, Drip, Side piping, and Edge borders have no separate setup — they are included at ₱0 extra charge.</span>
               </li>
               <li className="flex items-start gap-1.5">
                 <span className="text-primary font-bold">•</span>
-                <span><strong>Center:</strong> Split into Decorations Rates and 3D Fondant Text Rates.</span>
+                <span><strong>Center Toppings:</strong> 1–4 pcs = +₱200 flat; 5+ pcs = +₱300; 3D letters and large chocolate figures priced by bracket/piece.</span>
               </li>
             </ul>
           </div>
@@ -892,129 +857,188 @@ export default function BakeryPricing() {
         <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-sm">
           <CustomScrollbar className="flex-1" contentClassName="p-6 space-y-6">
             {/* 1. Fundamentals Tab */}
+            {/* 1. Fundamentals Tab */}
             {activeTab === 'fundamentals' && (
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-base font-bold text-gray-900">1-Tier Cake Pricing</h2>
+                  <h2 className="text-base font-bold text-gray-900">Fundamentals Cake Pricing</h2>
                   <p className="text-xs text-gray-500">
-                    Sponge base cake pricing by size (6×6, 8×8, 10×10, 12×12) and finish style.
+                    Pricing is calculated from the Sponge Flavor or Custom Pick Color (6×4 base price), plus Size Factor and Finish Style add-ons.
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  {/* Naked 1-Tier */}
-                  <div className="rounded-2xl border border-pink-100 bg-white p-4 space-y-3.5 shadow-xs">
-                    <div>
-                      <h3 className="text-sm font-bold text-black">Naked Finish | 1-Tier</h3>
-                      <p className="text-[11.5px] text-gray-500 mt-0.5">Exposed sponge layers · Sponge flavor & filling included (₱0)</p>
+                {/* All-Inclusive Features Notice Banner */}
+                <div className="rounded-2xl border border-emerald-200/70 bg-gradient-to-r from-emerald-50/50 via-teal-50/30 to-pink-50/20 p-4 shadow-2xs">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                      <Sparkles className="h-5 w-5" />
                     </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <PriceStepper
-                        label="6×6"
-                        value={rates.sponge?.naked?.['6x6'] ?? rates.sponge?.naked?.small ?? 700}
-                        activeValue={activeRates.sponge?.naked?.['6x6'] ?? activeRates.sponge?.naked?.small}
-                        disabled={!isDraftActive}
-                        onChange={(val) => setSpongePrice('naked', '6x6', val)}
-                      />
-                      <PriceStepper
-                        label="8×8"
-                        value={rates.sponge?.naked?.['8x8'] ?? rates.sponge?.naked?.big ?? 1500}
-                        activeValue={activeRates.sponge?.naked?.['8x8'] ?? activeRates.sponge?.naked?.big}
-                        disabled={!isDraftActive}
-                        onChange={(val) => setSpongePrice('naked', '8x8', val)}
-                      />
-                      <PriceStepper
-                        label="10×10"
-                        value={rates.sponge?.naked?.['10x10'] ?? 2200}
-                        activeValue={activeRates.sponge?.naked?.['10x10']}
-                        disabled={!isDraftActive}
-                        onChange={(val) => setSpongePrice('naked', '10x10', val)}
-                      />
-                      <PriceStepper
-                        label="12×12"
-                        value={rates.sponge?.naked?.['12x12'] ?? 3000}
-                        activeValue={activeRates.sponge?.naked?.['12x12']}
-                        disabled={!isDraftActive}
-                        onChange={(val) => setSpongePrice('naked', '12x12', val)}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Frosted 1-Tier */}
-                  <div className="rounded-2xl border border-pink-100 bg-white p-4 space-y-3.5 shadow-xs">
-                    <div>
-                      <h3 className="text-sm font-bold text-black">Frosted Finish | 1-Tier</h3>
-                      <p className="text-[11.5px] text-gray-500 mt-0.5">Smooth frosted exterior · Sponge flavor & filling included (₱0)</p>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <PriceStepper
-                        label="6×6"
-                        value={rates.sponge?.frosted?.['6x6'] ?? rates.sponge?.frosted?.small ?? 1000}
-                        activeValue={activeRates.sponge?.frosted?.['6x6'] ?? activeRates.sponge?.frosted?.small}
-                        disabled={!isDraftActive}
-                        onChange={(val) => setSpongePrice('frosted', '6x6', val)}
-                      />
-                      <PriceStepper
-                        label="8×8"
-                        value={rates.sponge?.frosted?.['8x8'] ?? rates.sponge?.frosted?.big ?? 1700}
-                        activeValue={activeRates.sponge?.frosted?.['8x8'] ?? activeRates.sponge?.frosted?.big}
-                        disabled={!isDraftActive}
-                        onChange={(val) => setSpongePrice('frosted', '8x8', val)}
-                      />
-                      <PriceStepper
-                        label="10×10"
-                        value={rates.sponge?.frosted?.['10x10'] ?? 2500}
-                        activeValue={activeRates.sponge?.frosted?.['10x10']}
-                        disabled={!isDraftActive}
-                        onChange={(val) => setSpongePrice('frosted', '10x10', val)}
-                      />
-                      <PriceStepper
-                        label="12×12"
-                        value={rates.sponge?.frosted?.['12x12'] ?? 3400}
-                        activeValue={activeRates.sponge?.frosted?.['12x12']}
-                        disabled={!isDraftActive}
-                        onChange={(val) => setSpongePrice('frosted', '12x12', val)}
-                      />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-bold text-emerald-950">Included Features (₱0 Standalone Setup)</h3>
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">All-Inclusive</span>
+                      </div>
+                      <p className="text-xs text-emerald-800/80 mt-0.5">
+                        The following components do not have separate price setups. They are included at no extra charge (₱0) in customer quotes and factored directly into the cake pricing:
+                      </p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
+                        <div className="rounded-xl border border-emerald-200/50 bg-white/80 p-2.5">
+                          <span className="block text-[10px] font-bold uppercase tracking-wider text-emerald-700">Filling</span>
+                          <span className="block text-xs font-bold text-gray-800">Included (₱0)</span>
+                          <span className="block text-[10.5px] text-gray-500 mt-0.5">All 6 core fillings</span>
+                        </div>
+                        <div className="rounded-xl border border-emerald-200/50 bg-white/80 p-2.5">
+                          <span className="block text-[10px] font-bold uppercase tracking-wider text-emerald-700">Drip</span>
+                          <span className="block text-xs font-bold text-gray-800">Included (₱0)</span>
+                          <span className="block text-[10.5px] text-gray-500 mt-0.5">All 18 drip variations</span>
+                        </div>
+                        <div className="rounded-xl border border-emerald-200/50 bg-white/80 p-2.5">
+                          <span className="block text-[10px] font-bold uppercase tracking-wider text-emerald-700">Side Piping</span>
+                          <span className="block text-xs font-bold text-gray-800">Included (₱0)</span>
+                          <span className="block text-[10.5px] text-gray-500 mt-0.5">All 42 side wraps & patterns</span>
+                        </div>
+                        <div className="rounded-xl border border-emerald-200/50 bg-white/80 p-2.5">
+                          <span className="block text-[10px] font-bold uppercase tracking-wider text-emerald-700">Edge Borders</span>
+                          <span className="block text-xs font-bold text-gray-800">Included (₱0)</span>
+                          <span className="block text-[10.5px] text-gray-500 mt-0.5">All 54 border trims & ruffles</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
+                </div>
 
-                  {/* Textured 1-Tier */}
-                  <div className="rounded-2xl border border-pink-100 bg-white p-4 space-y-3.5 shadow-xs">
+                {/* Sponge Flavor & Pick Color Base Rates (6×4 Base) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
                     <div>
-                      <h3 className="text-sm font-bold text-black">Textured Buttercream | 1-Tier</h3>
-                      <p className="text-[11.5px] text-gray-500 mt-0.5">Artisanal textured ridges · Sponge flavor & filling included (₱0)</p>
+                      <h2 className="text-base font-bold text-gray-900">Sponge Flavor Base Rates (6×4 Default)</h2>
+                      <p className="text-xs text-gray-500">
+                        Default starting base price for 6×4 size naked sponge. Larger sizes add a size factor.
+                      </p>
+                    </div>
+                    <span className="text-[11px] font-semibold text-primary bg-pink-50 px-2.5 py-1 rounded-full border border-pink-100">
+                      6×4 Base
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 mt-3">
+                    <div className="rounded-2xl border border-pink-100 bg-white p-3.5 space-y-2 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-800">Plain</span>
+                        <span className="text-[10px] text-gray-400">Classic</span>
+                      </div>
+                      <PriceStepper
+                        label="6×4 Base"
+                        value={rates.flavors?.plain ?? 300}
+                        activeValue={activeRates.flavors?.plain ?? 300}
+                        disabled={!isDraftActive}
+                        step={25}
+                        onChange={(val) => setFlavorPrice('plain', val)}
+                      />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl border border-pink-100 bg-white p-3.5 space-y-2 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-800">Vanilla</span>
+                        <span className="text-[10px] text-gray-400">Standard</span>
+                      </div>
                       <PriceStepper
-                        label="6×6"
-                        value={rates.sponge?.textured?.['6x6'] ?? rates.sponge?.textured?.small ?? 1000}
-                        activeValue={activeRates.sponge?.textured?.['6x6'] ?? activeRates.sponge?.textured?.small}
+                        label="6×4 Base"
+                        value={rates.flavors?.vanilla ?? 350}
+                        activeValue={activeRates.flavors?.vanilla ?? 350}
                         disabled={!isDraftActive}
-                        onChange={(val) => setSpongePrice('textured', '6x6', val)}
+                        step={25}
+                        onChange={(val) => setFlavorPrice('vanilla', val)}
                       />
+                    </div>
+
+                    <div className="rounded-2xl border border-pink-100 bg-white p-3.5 space-y-2 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-800">Cheese</span>
+                        <span className="text-[10px] text-gray-400">Savory Sweet</span>
+                      </div>
                       <PriceStepper
-                        label="8×8"
-                        value={rates.sponge?.textured?.['8x8'] ?? rates.sponge?.textured?.big ?? 1700}
-                        activeValue={activeRates.sponge?.textured?.['8x8'] ?? activeRates.sponge?.textured?.big}
+                        label="6×4 Base"
+                        value={rates.flavors?.cheese ?? 400}
+                        activeValue={activeRates.flavors?.cheese ?? 400}
                         disabled={!isDraftActive}
-                        onChange={(val) => setSpongePrice('textured', '8x8', val)}
+                        step={25}
+                        onChange={(val) => setFlavorPrice('cheese', val)}
                       />
+                    </div>
+
+                    <div className="rounded-2xl border border-pink-100 bg-white p-3.5 space-y-2 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-800">Chocolate</span>
+                        <span className="text-[10px] text-gray-400">Rich Cocoa</span>
+                      </div>
                       <PriceStepper
-                        label="10×10"
-                        value={rates.sponge?.textured?.['10x10'] ?? 2500}
-                        activeValue={activeRates.sponge?.textured?.['10x10']}
+                        label="6×4 Base"
+                        value={rates.flavors?.chocolate ?? 500}
+                        activeValue={activeRates.flavors?.chocolate ?? 500}
                         disabled={!isDraftActive}
-                        onChange={(val) => setSpongePrice('textured', '10x10', val)}
+                        step={25}
+                        onChange={(val) => setFlavorPrice('chocolate', val)}
                       />
+                    </div>
+
+                    <div className="rounded-2xl border border-pink-100 bg-white p-3.5 space-y-2 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-800">Strawberry</span>
+                        <span className="text-[10px] text-gray-400">Berry Fruit</span>
+                      </div>
                       <PriceStepper
-                        label="12×12"
-                        value={rates.sponge?.textured?.['12x12'] ?? 3400}
-                        activeValue={activeRates.sponge?.textured?.['12x12']}
+                        label="6×4 Base"
+                        value={rates.flavors?.strawberry ?? 500}
+                        activeValue={activeRates.flavors?.strawberry ?? 500}
                         disabled={!isDraftActive}
-                        onChange={(val) => setSpongePrice('textured', '12x12', val)}
+                        step={25}
+                        onChange={(val) => setFlavorPrice('strawberry', val)}
+                      />
+                    </div>
+
+                    <div className="rounded-2xl border border-pink-100 bg-white p-3.5 space-y-2 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-800">Ube</span>
+                        <span className="text-[10px] text-gray-400">Purple Yam</span>
+                      </div>
+                      <PriceStepper
+                        label="6×4 Base"
+                        value={rates.flavors?.ube ?? 500}
+                        activeValue={activeRates.flavors?.ube ?? 500}
+                        disabled={!isDraftActive}
+                        step={25}
+                        onChange={(val) => setFlavorPrice('ube', val)}
+                      />
+                    </div>
+
+                    <div className="rounded-2xl border border-pink-100 bg-white p-3.5 space-y-2 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-800">Mocha</span>
+                        <span className="text-[10px] text-gray-400">Coffee Cocoa</span>
+                      </div>
+                      <PriceStepper
+                        label="6×4 Base"
+                        value={rates.flavors?.mocha ?? 500}
+                        activeValue={activeRates.flavors?.mocha ?? 500}
+                        disabled={!isDraftActive}
+                        step={25}
+                        onChange={(val) => setFlavorPrice('mocha', val)}
+                      />
+                    </div>
+
+                    <div className="rounded-2xl border border-pink-200 bg-pink-50/30 p-3.5 space-y-2 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-primary">All Pick Colors</span>
+                        <span className="text-[9.5px] font-bold text-pink-700 bg-pink-100 px-1.5 py-0.5 rounded">Custom Palette</span>
+                      </div>
+                      <PriceStepper
+                        label="6×4 Base"
+                        value={rates.flavors?.pickColor ?? 400}
+                        activeValue={activeRates.flavors?.pickColor ?? 400}
+                        disabled={!isDraftActive}
+                        step={25}
+                        onChange={(val) => setFlavorPrice('pickColor', val)}
                       />
                     </div>
                   </div>
@@ -1022,331 +1046,161 @@ export default function BakeryPricing() {
 
                 <hr className="border-pink-100" />
 
+                {/* Size Factor Add-ons */}
                 <div>
-                  <h2 className="text-base font-bold text-gray-900">2-Tier Cake Pricing</h2>
+                  <h2 className="text-base font-bold text-gray-900">Size Factor Add-ons</h2>
                   <p className="text-xs text-gray-500">
-                    Priced as a combined tiered set. Sponge flavors and fillings across both tiers are included at no extra charge.
+                    Additional cost added per tier based on diameter/height. 6×4 is the default base (+₱0).
                   </p>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="rounded-2xl border border-pink-100 bg-white p-4 space-y-3 shadow-xs">
-                    <div>
-                      <h3 className="text-sm font-bold text-black">Naked Set | 2-Tier</h3>
-                      <p className="text-[11.5px] text-gray-500 mt-0.5">Sponge flavor & filling included (₱0)</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 mt-3">
+                    <div className="rounded-2xl border border-pink-100 bg-white p-3.5 space-y-2 shadow-xs">
+                      <div>
+                        <span className="text-xs font-bold text-gray-800">6×4</span>
+                        <span className="block text-[10px] text-gray-400 mt-0.5">Base default size</span>
+                      </div>
+                      <PriceStepper
+                        label="Add-on"
+                        value={rates.sizes?.['6x4'] ?? 0}
+                        activeValue={activeRates.sizes?.['6x4'] ?? 0}
+                        disabled={!isDraftActive}
+                        step={25}
+                        onChange={(val) => setSizeAddon('6x4', val)}
+                      />
                     </div>
-                    <PriceStepper
-                      label="Big (8×5)"
-                      value={rates.twoTier?.naked ?? 2200}
-                      activeValue={activeRates.twoTier?.naked}
-                      disabled={!isDraftActive}
-                      step={50}
-                      onChange={(val) => setTwoTierPrice('naked', val)}
-                    />
-                  </div>
 
-                  <div className="rounded-2xl border border-pink-100 bg-white p-4 space-y-3 shadow-xs">
-                    <div>
-                      <h3 className="text-sm font-bold text-black">Frosted Set | 2-Tier</h3>
-                      <p className="text-[11.5px] text-gray-500 mt-0.5">Sponge flavor & filling included (₱0)</p>
+                    <div className="rounded-2xl border border-pink-100 bg-white p-3.5 space-y-2 shadow-xs">
+                      <div>
+                        <span className="text-xs font-bold text-gray-800">8×6</span>
+                        <span className="block text-[10px] text-gray-400 mt-0.5">+₱200 standard</span>
+                      </div>
+                      <PriceStepper
+                        label="Add-on"
+                        value={rates.sizes?.['8x6'] ?? 200}
+                        activeValue={activeRates.sizes?.['8x6'] ?? 200}
+                        disabled={!isDraftActive}
+                        step={25}
+                        onChange={(val) => setSizeAddon('8x6', val)}
+                      />
                     </div>
-                    <PriceStepper
-                      label="Big (8×5)"
-                      value={rates.twoTier?.frosted ?? 2700}
-                      activeValue={activeRates.twoTier?.frosted}
-                      disabled={!isDraftActive}
-                      step={50}
-                      onChange={(val) => setTwoTierPrice('frosted', val)}
-                    />
-                  </div>
 
-                  <div className="rounded-2xl border border-pink-100 bg-white p-4 space-y-3 shadow-xs">
-                    <div>
-                      <h3 className="text-sm font-bold text-black">Textured Set | 2-Tier</h3>
-                      <p className="text-[11.5px] text-gray-500 mt-0.5">Sponge flavor & filling included (₱0)</p>
+                    <div className="rounded-2xl border border-pink-100 bg-white p-3.5 space-y-2 shadow-xs">
+                      <div>
+                        <span className="text-xs font-bold text-gray-800">10×8</span>
+                        <span className="block text-[10px] text-gray-400 mt-0.5">+₱400 standard</span>
+                      </div>
+                      <PriceStepper
+                        label="Add-on"
+                        value={rates.sizes?.['10x8'] ?? 400}
+                        activeValue={activeRates.sizes?.['10x8'] ?? 400}
+                        disabled={!isDraftActive}
+                        step={25}
+                        onChange={(val) => setSizeAddon('10x8', val)}
+                      />
                     </div>
-                    <PriceStepper
-                      label="Big (8×5)"
-                      value={rates.twoTier?.textured ?? 2700}
-                      activeValue={activeRates.twoTier?.textured}
-                      disabled={!isDraftActive}
-                      step={50}
-                      onChange={(val) => setTwoTierPrice('textured', val)}
-                    />
+
+                    <div className="rounded-2xl border border-pink-100 bg-white p-3.5 space-y-2 shadow-xs">
+                      <div>
+                        <span className="text-xs font-bold text-gray-800">12×10</span>
+                        <span className="block text-[10px] text-gray-400 mt-0.5">+₱600 standard</span>
+                      </div>
+                      <PriceStepper
+                        label="Add-on"
+                        value={rates.sizes?.['12x10'] ?? 600}
+                        activeValue={activeRates.sizes?.['12x10'] ?? 600}
+                        disabled={!isDraftActive}
+                        step={25}
+                        onChange={(val) => setSizeAddon('12x10', val)}
+                      />
+                    </div>
                   </div>
                 </div>
 
                 <hr className="border-pink-100" />
 
-                {/* Drip Section inside Fundamentals */}
+                {/* Finish Style Factor Add-ons */}
                 <div>
-                  <h2 className="text-base font-bold text-gray-900">Drip Rates</h2>
-                </div>
+                  <h2 className="text-base font-bold text-gray-900">Finish Style Factor Add-ons</h2>
+                  <p className="text-xs text-gray-500">
+                    Exterior frosting finish style add-on per tier. Naked is base (+₱0); Frosted & Textured are +₱200.
+                  </p>
 
-                <div className="space-y-8 divide-y divide-pink-100">
-                  {DRIP_SECTIONS.map((section, sIdx) => (
-                    <div key={section.id} className={sIdx > 0 ? 'pt-6' : ''}>
-                      <div className="mb-3">
-                        <h3 className="text-sm font-bold text-black">
-                          {section.title} | {section.items.length} items
-                        </h3>
-                        <p className="text-[11.5px] text-gray-500 mt-0.5">{section.description}</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mt-3">
+                    <div className="rounded-2xl border border-pink-100 bg-white p-3.5 space-y-2 shadow-xs">
+                      <div>
+                        <span className="text-xs font-bold text-gray-800">Naked Finish</span>
+                        <span className="block text-[10px] text-gray-400 mt-0.5">Exposed sponge layers</span>
                       </div>
-
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
-                        {section.items.map((item, index) => {
-                          const val = rates.drip?.[item.id] ?? DEFAULT_RATES.drip?.[item.id] ?? item.defaultPrice;
-                          const activeVal = activeRates.drip?.[item.id] ?? DEFAULT_RATES.drip?.[item.id] ?? item.defaultPrice;
-                          return (
-                            <div
-                              key={item.id}
-                              className={`flex flex-col justify-between rounded-xl border border-pink-100 bg-white p-2.5 shadow-xs transition-all ${
-                                isDraftActive ? 'hover:border-pink-300 hover:shadow-sm' : ''
-                              }`}
-                            >
-                              <div className="flex items-center gap-2 mb-2 min-h-[34px]">
-                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-white text-xs font-bold shadow-xs">
-                                  {index + 1}
-                                </span>
-                                <p className="text-xs font-medium text-black line-clamp-2 leading-tight" title={item.label}>
-                                  {item.label}
-                                </p>
-                              </div>
-                              <PriceStepperCompact
-                                value={val}
-                                activeValue={activeVal}
-                                disabled={!isDraftActive}
-                                step={25}
-                                onChange={(newPrice) => setDripItemPrice(item.id, newPrice)}
-                              />
-                            </div>
-                          );
-                        })}
-                      </div>
+                      <PriceStepper
+                        label="Add-on"
+                        value={rates.finishAddon?.naked ?? 0}
+                        activeValue={activeRates.finishAddon?.naked ?? 0}
+                        disabled={!isDraftActive}
+                        step={25}
+                        onChange={(val) => setFinishAddon('naked', val)}
+                      />
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
-            {/* 3. Side Tab */}
-            {activeTab === 'side' && (
-              <div className="space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-base font-bold text-gray-900">Side Design Rates (By Section)</h2>
-                  </div>
-
-                  {/* Search Bar */}
-                  <div className="relative w-full sm:w-64">
-                    <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="Search side designs..."
-                      value={sideSearch}
-                      onChange={(e) => setSideSearch(e.target.value)}
-                      className="h-9 w-full rounded-xl border border-pink-100 bg-white pl-8 pr-8 text-xs font-medium text-black placeholder-gray-400 outline-none focus:border-pink-300 focus:ring-2 focus:ring-pink-100"
-                    />
-                    {sideSearch && (
-                      <button
-                        onClick={() => setSideSearch('')}
-                        className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Section Quick Jump Filter Pills */}
-                <div className="flex flex-wrap gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setActiveSideSection('all')}
-                    className={`rounded-xl px-3 py-1.5 text-xs font-medium transition-all ${
-                      activeSideSection === 'all'
-                        ? 'bg-primary text-white shadow-sm font-semibold'
-                        : 'bg-pink-50/50 text-black hover:bg-pink-100/60 border border-pink-100'
-                    }`}
-                  >
-                    All Sections (42)
-                  </button>
-                  {SIDE_SECTIONS.map((s) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => setActiveSideSection(s.id)}
-                      className={`rounded-xl px-3 py-1.5 text-xs font-medium transition-all ${
-                        activeSideSection === s.id
-                          ? 'bg-primary text-white shadow-sm font-semibold'
-                          : 'bg-pink-50/50 text-black hover:bg-pink-100/60 border border-pink-100'
-                      }`}
-                    >
-                      {s.title} ({s.items.length})
-                    </button>
-                  ))}
-                </div>
-
-                {/* Sections List */}
-                <div className="space-y-8 divide-y divide-pink-100">
-                  {filteredSideSections.length === 0 ? (
-                    <div className="p-8 text-center rounded-2xl border border-pink-100 bg-pink-50/20 text-xs text-gray-500">
-                      No side designs matched &ldquo;{sideSearch}&rdquo;.
-                    </div>
-                  ) : (
-                    filteredSideSections.map((section, sIdx) => (
-                      <div key={section.id} className={sIdx > 0 ? 'pt-6' : ''}>
-                        <div className="mb-3">
-                          <h3 className="text-sm font-bold text-black">
-                            {section.title} | {section.items.length} items
-                          </h3>
-                          <p className="text-[11.5px] text-gray-500 mt-0.5">{section.description}</p>
-                        </div>
-
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
-                          {section.items.map((item, index) => {
-                            const val = rates.side?.[item.key] ?? DEFAULT_RATES.side?.[item.key] ?? item.defaultPrice;
-                            const activeVal = activeRates.side?.[item.key] ?? DEFAULT_RATES.side?.[item.key] ?? item.defaultPrice;
-                            return (
-                              <div
-                                key={item.key}
-                                className={`flex flex-col justify-between rounded-xl border border-pink-100 bg-white p-2.5 shadow-xs transition-all ${
-                                  isDraftActive ? 'hover:border-pink-300 hover:shadow-sm' : ''
-                                }`}
-                              >
-                                <div className="flex items-center gap-2 mb-2 min-h-[34px]">
-                                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-white text-xs font-bold shadow-xs">
-                                    {index + 1}
-                                  </span>
-                                  <p className="text-xs font-medium text-black line-clamp-2 leading-tight" title={item.label}>
-                                    {item.label}
-                                  </p>
-                                </div>
-                                <PriceStepperCompact
-                                  value={val}
-                                  activeValue={activeVal}
-                                  disabled={!isDraftActive}
-                                  step={25}
-                                  onChange={(newPrice) => setSideItemPrice(item.key, newPrice)}
-                                />
-                              </div>
-                            );
-                          })}
-                        </div>
+                    <div className="rounded-2xl border border-pink-100 bg-white p-3.5 space-y-2 shadow-xs">
+                      <div>
+                        <span className="text-xs font-bold text-gray-800">Frosted Finish</span>
+                        <span className="block text-[10px] text-gray-400 mt-0.5">Smooth buttercream coat (+₱200)</span>
                       </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* 4. Edge Trims Tab */}
-            {activeTab === 'edge' && (
-              <div className="space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-base font-bold text-gray-900">Edge Trim Rates (By Section)</h2>
-                  </div>
-
-                  {/* Search Bar */}
-                  <div className="relative w-full sm:w-64">
-                    <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="Search edge trims..."
-                      value={edgeSearch}
-                      onChange={(e) => setEdgeSearch(e.target.value)}
-                      className="h-9 w-full rounded-xl border border-pink-100 bg-white pl-8 pr-8 text-xs font-medium text-black placeholder-gray-400 outline-none focus:border-pink-300 focus:ring-2 focus:ring-pink-100"
-                    />
-                    {edgeSearch && (
-                      <button
-                        onClick={() => setEdgeSearch('')}
-                        className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Section Quick Jump Filter Pills */}
-                <div className="flex flex-wrap gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setActiveEdgeSection('all')}
-                    className={`rounded-xl px-3 py-1.5 text-xs font-medium transition-all ${
-                      activeEdgeSection === 'all'
-                        ? 'bg-primary text-white shadow-sm font-semibold'
-                        : 'bg-pink-50/50 text-black hover:bg-pink-100/60 border border-pink-100'
-                    }`}
-                  >
-                    All Sections (54)
-                  </button>
-                  {EDGE_SECTIONS.map((s) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => setActiveEdgeSection(s.id)}
-                      className={`rounded-xl px-3 py-1.5 text-xs font-medium transition-all ${
-                        activeEdgeSection === s.id
-                          ? 'bg-primary text-white shadow-sm font-semibold'
-                          : 'bg-pink-50/50 text-black hover:bg-pink-100/60 border border-pink-100'
-                      }`}
-                    >
-                      {s.title} ({s.items.length})
-                    </button>
-                  ))}
-                </div>
-
-                {/* Sections List */}
-                <div className="space-y-8 divide-y divide-pink-100">
-                  {filteredEdgeSections.length === 0 ? (
-                    <div className="p-8 text-center rounded-2xl border border-pink-100 bg-pink-50/20 text-xs text-gray-500">
-                      No edge trims matched &ldquo;{edgeSearch}&rdquo;.
+                      <PriceStepper
+                        label="Add-on"
+                        value={rates.finishAddon?.frosted ?? 200}
+                        activeValue={activeRates.finishAddon?.frosted ?? 200}
+                        disabled={!isDraftActive}
+                        step={25}
+                        onChange={(val) => setFinishAddon('frosted', val)}
+                      />
                     </div>
-                  ) : (
-                    filteredEdgeSections.map((section, sIdx) => (
-                      <div key={section.id} className={sIdx > 0 ? 'pt-6' : ''}>
-                        <div className="mb-3">
-                          <h3 className="text-sm font-bold text-black">
-                            {section.title} | {section.items.length} items
-                          </h3>
-                          <p className="text-[11.5px] text-gray-500 mt-0.5">{section.description}</p>
-                        </div>
 
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
-                          {section.items.map((item, index) => {
-                            const val = rates.edge?.[item.id] ?? DEFAULT_RATES.edge?.[item.id] ?? item.defaultPrice;
-                            const activeVal = activeRates.edge?.[item.id] ?? DEFAULT_RATES.edge?.[item.id] ?? item.defaultPrice;
-                            return (
-                              <div
-                                key={item.id}
-                                className={`flex flex-col justify-between rounded-xl border border-pink-100 bg-white p-2.5 shadow-xs transition-all ${
-                                  isDraftActive ? 'hover:border-pink-300 hover:shadow-sm' : ''
-                                }`}
-                              >
-                                <div className="flex items-center gap-2 mb-2 min-h-[34px]">
-                                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-white text-xs font-bold shadow-xs">
-                                    {index + 1}
-                                  </span>
-                                  <p className="text-xs font-medium text-black line-clamp-2 leading-tight" title={item.label}>
-                                    {item.label}
-                                  </p>
-                                </div>
-                                <PriceStepperCompact
-                                  value={val}
-                                  activeValue={activeVal}
-                                  disabled={!isDraftActive}
-                                  step={25}
-                                  onChange={(newPrice) => setEdgeItemPrice(item.id, newPrice)}
-                                />
-                              </div>
-                            );
-                          })}
-                        </div>
+                    <div className="rounded-2xl border border-pink-100 bg-white p-3.5 space-y-2 shadow-xs">
+                      <div>
+                        <span className="text-xs font-bold text-gray-800">Textured Buttercream</span>
+                        <span className="block text-[10px] text-gray-400 mt-0.5">Artisanal textured ridges (+₱200)</span>
                       </div>
-                    ))
-                  )}
+                      <PriceStepper
+                        label="Add-on"
+                        value={rates.finishAddon?.textured ?? 200}
+                        activeValue={activeRates.finishAddon?.textured ?? 200}
+                        disabled={!isDraftActive}
+                        step={25}
+                        onChange={(val) => setFinishAddon('textured', val)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <hr className="border-pink-100" />
+
+                {/* 2-Tier Dynamic Formula Card */}
+                <div className="rounded-2xl border border-pink-200/80 bg-gradient-to-br from-pink-50/40 via-white to-pink-50/20 p-5 space-y-3 shadow-xs">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-pink-100 text-primary">
+                      <Layers2 className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-gray-900">2-Tier Dynamic Calculation Formula</h3>
+                      <p className="text-xs text-gray-500">How tiered custom cakes are priced automatically</p>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-gray-600 leading-relaxed">
+                    2-Tier cakes calculate both tiers dynamically using the exact rates above:
+                    <strong className="text-gray-900 block mt-1">
+                      Total = [Tier 1: Flavor Base + Size Add-on + Finish Add-on] + [Tier 2: Flavor Base + Size Add-on + Finish Add-on]
+                    </strong>
+                    All fillings, drips, side wraps, and edge piping for both tiers are completely included at ₱0.
+                  </p>
+
+                  <div className="rounded-xl border border-pink-100 bg-white p-3 text-xs text-gray-700 flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-semibold">Example: 8×6 + 6×4 Frosted Vanilla Cake</span>
+                    <span className="font-bold text-primary text-sm">
+                      ₱750 (Tier 1) + ₱550 (Tier 2) = ₱1,300 Total Base
+                    </span>
+                  </div>
                 </div>
               </div>
             )}
@@ -1536,15 +1390,15 @@ export default function BakeryPricing() {
                         </div>
                       </div>
 
-                      {simLayers === 1 && (
+                      {simLayers === 1 ? (
                         <div>
-                          <label className="text-xs font-semibold text-gray-600 block mb-1">1-Tier Size</label>
+                          <label className="text-xs font-semibold text-gray-600 block mb-1">1-Tier Cake Size</label>
                           <div className="flex gap-2">
                             {[
-                              { key: '6x6', label: '6×6' },
-                              { key: '8x8', label: '8×8' },
-                              { key: '10x10', label: '10×10' },
-                              { key: '12x12', label: '12×12' },
+                              { key: '6x4', label: '6×4' },
+                              { key: '8x6', label: '8×6' },
+                              { key: '10x8', label: '10×8' },
+                              { key: '12x10', label: '12×10' },
                             ].map(({ key, label }) => (
                               <button
                                 key={key}
@@ -1559,6 +1413,50 @@ export default function BakeryPricing() {
                             ))}
                           </div>
                         </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <div>
+                            <label className="text-xs font-semibold text-gray-600 block mb-1">Bottom Tier 1 Size</label>
+                            <div className="flex gap-2">
+                              {[
+                                { key: '8x6', label: '8×6' },
+                                { key: '10x8', label: '10×8' },
+                                { key: '12x10', label: '12×10' },
+                              ].map(({ key, label }) => (
+                                <button
+                                  key={key}
+                                  type="button"
+                                  onClick={() => setSimSize(key)}
+                                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                                    simSize === key ? 'bg-primary text-white' : 'bg-white border border-pink-100 text-gray-700'
+                                  }`}
+                                >
+                                  {label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-xs font-semibold text-gray-600 block mb-1">Top Tier 2 Size</label>
+                            <div className="flex gap-2">
+                              {[
+                                { key: '6x4', label: '6×4' },
+                                { key: '8x6', label: '8×6' },
+                              ].map(({ key, label }) => (
+                                <button
+                                  key={key}
+                                  type="button"
+                                  onClick={() => setSimTier2Size(key)}
+                                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                                    simTier2Size === key ? 'bg-primary text-white' : 'bg-white border border-pink-100 text-gray-700'
+                                  }`}
+                                >
+                                  {label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
                       )}
 
                       {/* Sponge Flavor & Filling Selectors */}
@@ -1566,16 +1464,21 @@ export default function BakeryPricing() {
                         <div>
                           <div className="flex items-center justify-between mb-1">
                             <label className="text-xs font-semibold text-gray-600">Sponge Flavor</label>
-                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">Incl. (₱0)</span>
+                            <span className="text-[10px] font-bold text-pink-700 bg-pink-50 px-1.5 py-0.5 rounded border border-pink-100">Base</span>
                           </div>
                           <select
                             value={simSpongeFlavor}
                             onChange={(e) => setSimSpongeFlavor(e.target.value)}
                             className="w-full rounded-xl border border-pink-100 bg-white p-2 text-xs font-semibold text-gray-800 outline-none"
                           >
-                            {['Vanilla', 'Chocolate', 'Strawberry', 'Cheese', 'Ube', 'Mocha', 'Plain'].map((flv) => (
-                              <option key={flv} value={flv}>{flv} Sponge</option>
-                            ))}
+                            <option value="Vanilla">Vanilla (₱{rates.flavors?.vanilla ?? 350})</option>
+                            <option value="Plain">Plain (₱{rates.flavors?.plain ?? 300})</option>
+                            <option value="Cheese">Cheese (₱{rates.flavors?.cheese ?? 400})</option>
+                            <option value="Chocolate">Chocolate (₱{rates.flavors?.chocolate ?? 500})</option>
+                            <option value="Strawberry">Strawberry (₱{rates.flavors?.strawberry ?? 500})</option>
+                            <option value="Ube">Ube (₱{rates.flavors?.ube ?? 500})</option>
+                            <option value="Mocha">Mocha (₱{rates.flavors?.mocha ?? 500})</option>
+                            <option value="Pick Color">All Pick Colors (₱{rates.flavors?.pickColor ?? 400})</option>
                           </select>
                         </div>
 
@@ -1597,12 +1500,12 @@ export default function BakeryPricing() {
                       </div>
 
                       <div>
-                        <label className="text-xs font-semibold text-gray-600 block mb-1">Finish</label>
+                        <label className="text-xs font-semibold text-gray-600 block mb-1">Finish Style</label>
                         <div className="flex gap-2">
                           {[
-                            { id: 'naked', label: 'Naked' },
-                            { id: 'frosted', label: 'Frosted' },
-                            { id: 'textured', label: 'Textured' },
+                            { id: 'naked', label: 'Naked (+₱0)' },
+                            { id: 'frosted', label: 'Frosted (+₱200)' },
+                            { id: 'textured', label: 'Textured (+₱200)' },
                           ].map((f) => (
                             <button
                               key={f.id}
@@ -1619,7 +1522,10 @@ export default function BakeryPricing() {
                       </div>
 
                       <div>
-                        <label className="text-xs font-semibold text-gray-600 block mb-1">Surface Drip</label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs font-semibold text-gray-600">Surface Drip</label>
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">Incl. (₱0)</span>
+                        </div>
                         <button
                           type="button"
                           onClick={() => setSimGlaze(!simGlaze)}
@@ -1627,12 +1533,15 @@ export default function BakeryPricing() {
                             simGlaze ? 'bg-primary text-white' : 'bg-white border border-pink-100 text-gray-700'
                           }`}
                         >
-                          {simGlaze ? 'Drip Applied' : 'No Drip'}
+                          {simGlaze ? 'Drip Applied (Included)' : 'No Drip'}
                         </button>
                       </div>
 
                       <div>
-                        <label className="text-xs font-semibold text-gray-600 block mb-1">Side Treatment</label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs font-semibold text-gray-600">Side Piping Wrap</label>
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">Incl. (₱0)</span>
+                        </div>
                         <select
                           value={simSideKey}
                           onChange={(e) => setSimSideKey(e.target.value)}
@@ -1643,7 +1552,7 @@ export default function BakeryPricing() {
                             <optgroup key={section.id} label={section.title}>
                               {section.items.map((it) => (
                                 <option key={it.key} value={it.key}>
-                                  {it.label} ({money(rates.side?.[it.key] ?? DEFAULT_RATES.side?.[it.key] ?? it.defaultPrice)})
+                                  {it.label} (Included)
                                 </option>
                               ))}
                             </optgroup>
@@ -1652,7 +1561,10 @@ export default function BakeryPricing() {
                       </div>
 
                       <div>
-                        <label className="text-xs font-semibold text-gray-600 block mb-1">Edge Trim</label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs font-semibold text-gray-600">Edge Border Trim</label>
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">Incl. (₱0)</span>
+                        </div>
                         <select
                           value={simEdgeId}
                           onChange={(e) => setSimEdgeId(e.target.value)}
@@ -1663,7 +1575,7 @@ export default function BakeryPricing() {
                             <optgroup key={section.id} label={section.title}>
                               {section.items.map((it) => (
                                 <option key={it.id} value={it.id}>
-                                  {it.label} ({money(rates.edge?.[it.id] ?? DEFAULT_RATES.edge?.[it.id] ?? it.defaultPrice)})
+                                  {it.label} (Included)
                                 </option>
                               ))}
                             </optgroup>
@@ -1675,7 +1587,9 @@ export default function BakeryPricing() {
                       <div className="pt-2 border-t border-pink-100/60 space-y-3">
                         <span className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">Center Decorations</span>
                         <div>
-                          <label className="text-xs font-semibold text-gray-600 block mb-1">Strawberries ({simStrawberries} pcs)</label>
+                          <label className="text-xs font-semibold text-gray-600 block mb-1">
+                            Strawberries ({simStrawberries} pcs) · {simStrawberries === 0 ? 'None' : simStrawberries <= 4 ? '+₱200 (1–4)' : '+₱300 (5+)'}
+                          </label>
                           <input
                             type="range"
                             min={0}
@@ -1687,11 +1601,13 @@ export default function BakeryPricing() {
                         </div>
 
                         <div>
-                          <label className="text-xs font-semibold text-gray-600 block mb-1">Chocolate Bears ({simBear} pcs)</label>
+                          <label className="text-xs font-semibold text-gray-600 block mb-1">
+                            Chocolate Bears ({simBear} pcs) · {simBear === 0 ? 'None' : simBear <= 4 ? '+₱200 (1–4)' : '+₱300 (5+)'}
+                          </label>
                           <input
                             type="range"
                             min={0}
-                            max={3}
+                            max={8}
                             value={simBear}
                             onChange={(e) => setSimBear(Number(e.target.value))}
                             className="w-full accent-primary"
@@ -1726,57 +1642,92 @@ export default function BakeryPricing() {
                       <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700">Estimated Breakdown</h3>
 
                       <div className="space-y-2 text-xs divide-y divide-pink-50">
+                        {/* Tier 1 */}
                         <div className="flex justify-between py-1 text-gray-700">
                           <div className="flex flex-col">
-                            <span>
-                              {simLayers === 1
-                                ? `1-Tier ${simFinish === 'naked' ? 'Naked' : simFinish === 'textured' ? 'Textured' : 'Frosted'} (${simSize.replace('x', '×')})`
-                                : `2-Tier ${simFinish === 'naked' ? 'Naked' : simFinish === 'textured' ? 'Textured' : 'Frosted'} Set`}
+                            <span className="font-semibold">
+                              Tier 1: {simSize.replace('x', '×')} {simFinish === 'naked' ? 'Naked' : simFinish === 'textured' ? 'Textured' : 'Frosted'}
                             </span>
                             <span className="text-[10px] text-gray-500 font-medium">
-                              {simSpongeFlavor} Sponge {simFilling !== 'None' ? `· ${simFilling} Filling` : '· No Filling'} (Included in base)
+                              {simSpongeFlavor} Sponge Base (₱{
+                                (simSpongeFlavor === 'Pick Color'
+                                  ? (rates.flavors?.pickColor ?? 400)
+                                  : (rates.flavors?.[simSpongeFlavor.toLowerCase()] ?? 350))
+                              }) + Size Factor (+₱{rates.sizes?.[simSize] ?? 0}) + Finish (+₱{rates.finishAddon?.[simFinish] ?? (simFinish === 'naked' ? 0 : 200)})
                             </span>
                           </div>
                           <span className="font-bold">
                             {money(
-                              simLayers === 1
-                                ? (spongeRateForSize(rates.sponge?.[simFinish], simSize) ?? (simFinish === 'textured' ? spongeRateForSize(rates.sponge?.frosted, simSize) : 0))
-                                : (rates.twoTier?.[simFinish] ?? (simFinish === 'textured' ? rates.twoTier?.frosted : 0))
+                              (simSpongeFlavor === 'Pick Color'
+                                ? (rates.flavors?.pickColor ?? 400)
+                                : (rates.flavors?.[simSpongeFlavor.toLowerCase()] ?? 350)) +
+                              (rates.sizes?.[simSize] ?? 0) +
+                              (rates.finishAddon?.[simFinish] ?? (simFinish === 'naked' ? 0 : 200))
                             )}
                           </span>
                         </div>
 
-                        {simGlaze && (
+                        {/* Tier 2 (if 2 tiers) */}
+                        {simLayers === 2 && (
                           <div className="flex justify-between py-1 text-gray-700">
-                            <span>Drip ({simLayers} tier{simLayers > 1 ? 's' : ''})</span>
-                            <span className="font-bold">{money((rates.glazePerTier || 0) * simLayers)}</span>
+                            <div className="flex flex-col">
+                              <span className="font-semibold">
+                                Tier 2: {simTier2Size.replace('x', '×')} {simFinish === 'naked' ? 'Naked' : simFinish === 'textured' ? 'Textured' : 'Frosted'}
+                              </span>
+                              <span className="text-[10px] text-gray-500 font-medium">
+                                {simSpongeFlavor} Sponge Base (₱{
+                                  (simSpongeFlavor === 'Pick Color'
+                                    ? (rates.flavors?.pickColor ?? 400)
+                                    : (rates.flavors?.[simSpongeFlavor.toLowerCase()] ?? 350))
+                                }) + Size Factor (+₱{rates.sizes?.[simTier2Size] ?? 0}) + Finish (+₱{rates.finishAddon?.[simFinish] ?? (simFinish === 'naked' ? 0 : 200)})
+                              </span>
+                            </div>
+                            <span className="font-bold">
+                              {money(
+                                (simSpongeFlavor === 'Pick Color'
+                                  ? (rates.flavors?.pickColor ?? 400)
+                                  : (rates.flavors?.[simSpongeFlavor.toLowerCase()] ?? 350)) +
+                                (rates.sizes?.[simTier2Size] ?? 0) +
+                                (rates.finishAddon?.[simFinish] ?? (simFinish === 'naked' ? 0 : 200))
+                              )}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Included items */}
+                        <div className="flex justify-between py-1 text-gray-600">
+                          <span>Filling ({simFilling})</span>
+                          <span className="text-emerald-700 font-bold">Included (₱0)</span>
+                        </div>
+
+                        {simGlaze && (
+                          <div className="flex justify-between py-1 text-gray-600">
+                            <span>Surface Drip ({simLayers} tier{simLayers > 1 ? 's' : ''})</span>
+                            <span className="text-emerald-700 font-bold">Included (₱0)</span>
                           </div>
                         )}
 
                         {simSideKey !== 'none' && (
-                          <div className="flex justify-between py-1 text-gray-700">
-                            <span>Side ({selectedSideLabel} × {simLayers})</span>
-                            <span className="font-bold">
-                              {money((rates.side?.[simSideKey] ?? DEFAULT_RATES.side?.[simSideKey] ?? 100) * simLayers)}
-                            </span>
+                          <div className="flex justify-between py-1 text-gray-600">
+                            <span>Side Piping ({selectedSideLabel})</span>
+                            <span className="text-emerald-700 font-bold">Included (₱0)</span>
                           </div>
                         )}
 
                         {simEdgeId !== 'none' && (
-                          <div className="flex justify-between py-1 text-gray-700">
-                            <span>Edge ({selectedEdgeLabel} × {simLayers})</span>
-                            <span className="font-bold">
-                              {money((rates.edge?.[simEdgeId] ?? DEFAULT_RATES.edge?.[simEdgeId] ?? 150) * simLayers)}
-                            </span>
+                          <div className="flex justify-between py-1 text-gray-600">
+                            <span>Edge Border ({selectedEdgeLabel})</span>
+                            <span className="text-emerald-700 font-bold">Included (₱0)</span>
                           </div>
                         )}
 
+                        {/* Center Decorations & Text */}
                         {simStrawberries > 0 && (
                           <div className="flex justify-between py-1 text-gray-700">
-                            <span>Strawberries ({simStrawberries} pcs bracket)</span>
+                            <span>Strawberries ({simStrawberries} pcs {simStrawberries <= 4 ? '1–4 bracket' : '5+ bracket'})</span>
                             <span className="font-bold">
                               {money(
-                                (rates.center?.brackets?.strawberry || []).find((b) => simStrawberries <= b.maxQty)?.price || 0
+                                (rates.center?.brackets?.strawberry || []).find((b) => simStrawberries <= b.maxQty)?.price || 300
                               )}
                             </span>
                           </div>
@@ -1784,8 +1735,12 @@ export default function BakeryPricing() {
 
                         {simBear > 0 && (
                           <div className="flex justify-between py-1 text-gray-700">
-                            <span>Chocolate Bear ({simBear} pcs @ {money(rates.center?.perPiece?.chocolateBear || 0)})</span>
-                            <span className="font-bold">{money((rates.center?.perPiece?.chocolateBear || 0) * simBear)}</span>
+                            <span>Chocolate Bear ({simBear} pcs {simBear <= 4 ? '1–4 bracket' : '5+ bracket'})</span>
+                            <span className="font-bold">
+                              {money(
+                                (rates.center?.brackets?.chocolateBear || []).find((b) => simBear <= b.maxQty)?.price || 300
+                              )}
+                            </span>
                           </div>
                         )}
 

@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { Palette } from 'lucide-react';
 import { bakeryApi } from '@/services/api';
 import { getChatSocket } from '@/lib/chat-socket';
 import { safeExternalUrl } from '@/lib/safe-url';
 import CustomScrollbar from '@/components/shared/CustomScrollbar';
 import { AdminRowsSkeleton } from '@/components/shared/PageLoadingSkeleton';
+import SidePatternsGalleryModal from '@/components/bakery/SidePatternsGalleryModal';
 
 export default function BakeryBlueprints() {
   const [records, setRecords] = useState([]);
@@ -12,6 +14,7 @@ export default function BakeryBlueprints() {
   const [refresh, setRefresh] = useState(0);
   const [busy, setBusy] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [sideGalleryOpen, setSideGalleryOpen] = useState(false);
   useEffect(() => {
     let active = true;
     let socket;
@@ -64,7 +67,17 @@ export default function BakeryBlueprints() {
     <div className="h-full rounded-2xl border border-pink-100 shadow-xl bg-white flex flex-col overflow-hidden">
       <header className="shrink-0 border-b border-pink-100 px-6 py-4 flex justify-between items-center">
         <div><h1 className="text-lg font-bold">Blueprints</h1><p className="text-sm text-gray-500">Production PDFs submitted after simulated payment confirmation</p></div>
-        <button onClick={() => setRefresh((n) => n + 1)} className="text-sm text-pink-600">Refresh</button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setSideGalleryOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pink-500 hover:bg-pink-600 text-white text-xs font-semibold shadow-sm transition-colors"
+          >
+            <Palette className="w-4 h-4" />
+            Preview 2D Patterns
+          </button>
+          <button onClick={() => setRefresh((n) => n + 1)} className="text-sm text-pink-600">Refresh</button>
+        </div>
       </header>
       <CustomScrollbar className="flex-1" contentClassName="p-4 space-y-2">
         {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
@@ -89,6 +102,7 @@ export default function BakeryBlueprints() {
         <div className="bg-white px-4 py-3 flex justify-between rounded-t-xl"><p>{preview.title}</p><button onClick={() => setPreview(null)}>Close preview</button></div>
         <iframe title="Blueprint PDF" src={preview.url} className="flex-1 w-full bg-white rounded-b-xl" />
       </div>}
+      <SidePatternsGalleryModal isOpen={sideGalleryOpen} onClose={() => setSideGalleryOpen(false)} />
     </div>
   );
 }

@@ -8,6 +8,7 @@ const apiMocks = vi.hoisted(() => ({
   getDesigns: vi.fn(),
   restoreFromTrash: vi.fn(),
   permanentlyDelete: vi.fn(),
+  deleteAllTrash: vi.fn(),
 }));
 
 vi.mock('@/services/api', () => ({ designApi: apiMocks }));
@@ -114,5 +115,22 @@ describe('Trash page states and actions', () => {
 
     expect(await screen.findByLabelText(/4 of 20 designs/i)).toBeInTheDocument();
     expect(screen.getAllByText(/days left to restore/i)).toHaveLength(4);
+  });
+
+  it('permanently deletes all trashed designs when confirmed', async () => {
+    apiMocks.getDesigns.mockResolvedValue([trashedDesign, { ...trashedDesign, _id: 'design-2' }]);
+    apiMocks.deleteAllTrash.mockResolvedValue({ message: 'Deleted', count: 2 });
+    renderPage();
+
+    const deleteAllBtn = await screen.findByRole('button', { name: /delete all designs in trash permanently/i });
+    fireEvent.click(deleteAllBtn);
+
+    expect(await screen.findByRole('heading', { name: /delete all 2 designs permanently/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete all permanently' }));
+
+    await waitFor(() => expect(apiMocks.deleteAllTrash).toHaveBeenCalled());
+    expect(await screen.findByRole('heading', { name: 'Trash is empty' })).toBeVisible();
+    expect(screen.getByRole('status')).toHaveTextContent(/all 2 designs were permanently deleted/i);
   });
 });

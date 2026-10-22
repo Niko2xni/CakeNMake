@@ -12,6 +12,30 @@ export const CAKE_SCALE = 2;
 // in CakeScene.jsx, which is tuned against tier 0 of 'big' (8x5)
 // specifically: BASE_RADIUS = diameter/2 = 4 units for an 8in cake.
 export const REAL_DIMENSIONS = {
+  '6x4': {
+    tiers: [
+      { diameter: 6, height: 4 },
+      { diameter: 4, height: 3 },
+    ],
+  },
+  '8x6': {
+    tiers: [
+      { diameter: 8, height: 6 },
+      { diameter: 6, height: 4 },
+    ],
+  },
+  '10x8': {
+    tiers: [
+      { diameter: 10, height: 8 },
+      { diameter: 8, height: 6 },
+    ],
+  },
+  '12x10': {
+    tiers: [
+      { diameter: 12, height: 10 },
+      { diameter: 10, height: 8 },
+    ],
+  },
   '6x6': {
     tiers: [
       { diameter: 6, height: 4 },
@@ -92,7 +116,7 @@ export const REAL_DIMENSIONS = {
 // pattern (getRenderDimensions(cakeSize)) is unchanged. Out-of-range
 // tierIndex clamps to the last defined tier rather than throwing.
 export const getRenderDimensions = (cakeSize, tierIndex = 0) => {
-  const sizeEntry = REAL_DIMENSIONS[cakeSize] || REAL_DIMENSIONS['8x8'] || REAL_DIMENSIONS.big;
+  const sizeEntry = REAL_DIMENSIONS[cakeSize] || REAL_DIMENSIONS['8x6'] || REAL_DIMENSIONS['8x8'] || REAL_DIMENSIONS.big;
   const tiers = sizeEntry.tiers;
   const clampedIndex = Math.max(0, Math.min(tierIndex, tiers.length - 1));
   const tier = tiers[clampedIndex];

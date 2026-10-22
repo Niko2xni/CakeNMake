@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { afterEach, mock, test } = require('node:test');
+const { afterEach, beforeEach, mock, test } = require('node:test');
 const mongoose = require('mongoose');
 
 const Design = require('../src/models/Design');
@@ -10,7 +10,11 @@ const {
   ownerFilter,
   updateDesign,
   moveToTrash,
+  moveAllToTrash,
+  restoreFromTrash,
+  deleteAllTrash,
   MAX_TRASH_CAPACITY,
+  MAX_ACTIVE_DESIGNS,
 } = require('../src/controllers/designController');
 
 const ownerId = new mongoose.Types.ObjectId();
@@ -35,6 +39,10 @@ function response() {
     json(body) { this.body = body; return this; },
   };
 }
+
+beforeEach(() => {
+  mock.method(Design, 'countDocuments', async () => 0);
+});
 
 afterEach(() => mock.restoreAll());
 
@@ -210,5 +218,71 @@ test('getDesigns allows fetching up to 20 trashed designs', async () => {
   assert.equal(capturedLimit, 20);
   assert.deepEqual(capturedSort, { trashedAt: -1, lastEdited: -1 });
   assert.equal(res.body.length, 15);
+});
+
+test('createDesign rejects when active designs reach capacity of 20', async () => {
+  assert.equal(MAX_ACTIVE_DESIGNS, 20);
+  mock.method(Design, 'countDocuments', async () => 20);
+
+  const res = response();
+  await createDesign(request({ body: { config: { layers: 1 }, name: 'Over limit cake' } }), res);
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.message, /maximum.*20/i);
+});
+
+test('restoreFromTrash rejects when active designs reach capacity of 20', async () => {
+  mock.method(Design, 'findOne', async () => ({
+    _id: designId,
+    isTrashed: true,
+    save: async function () { return this; },
+  }));
+  mock.method(Design, 'countDocuments', async () => 20);
+
+  const res = response();
+  await restoreFromTrash(request(), res);
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.message, /maximum.*20/i);
+});
+
+test('moveAllToTrash moves all active designs to trash', async () => {
+  let updatedFilter = null;
+  let updateSet = null;
+
+  mock.method(Design, 'find', (filter) => {
+    if (filter?.isTrashed === false) {
+      return Promise.resolve([{ _id: 'd1', name: 'Cake 1' }, { _id: 'd2', name: 'Cake 2' }]);
+    }
+    return {
+      sort: () => Promise.resolve([{ _id: 'd1' }, { _id: 'd2' }]),
+    };
+  });
+
+  mock.method(Design, 'updateMany', async (filter, update) => {
+    updatedFilter = filter;
+    updateSet = update;
+    return { modifiedCount: 2 };
+  });
+
+  const res = response();
+  await moveAllToTrash(request(), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.count, 2);
+  assert.equal(updatedFilter.isTrashed, false);
+  assert.equal(updateSet.$set.isTrashed, true);
+});
+
+test('deleteAllTrash permanently removes all trashed designs', async () => {
+  let deleteFilter = null;
+  mock.method(Design, 'find', async () => [{ _id: 'd1', thumbnailAsset: null }]);
+  mock.method(Design, 'deleteMany', async (filter) => {
+    deleteFilter = filter;
+    return { deletedCount: 1 };
+  });
+
+  const res = response();
+  await deleteAllTrash(request(), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.count, 1);
+  assert.equal(deleteFilter.isTrashed, true);
 });
 

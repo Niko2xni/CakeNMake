@@ -11,8 +11,10 @@ const {
   updateDesign,
   deleteDesign,
   moveToTrash,
+  moveAllToTrash,
   restoreFromTrash,
   permanentlyDelete,
+  deleteAllTrash,
   createThumbnailUploadSignature,
   attachThumbnail
 } = require('../controllers/designController');
@@ -22,6 +24,10 @@ router.use(loadAppUser);
 
 // GET /api/designs - Get all designs for a user
 router.get('/', getDesigns);
+
+// Bulk trash operations (must be before /:id routes)
+router.post('/trash/all', moveAllToTrash);
+router.delete('/trash/all', deleteAllTrash);
 
 // GET /api/designs/:id - Get a single design
 router.get('/:id', getDesignById);

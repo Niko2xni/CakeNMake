@@ -155,16 +155,17 @@ export function getCakeGlazeCarve(pattern) {
 
 export function getCakeGlazeCarveForShape(pattern, shape, size) {
   if (pattern === 'longGaps') {
-    // Square cakes (6x6, 8x8, and square Bentos) - 3 drips per face for standard, 2 for Bentos
+    // Square cakes (6x4, 8x6, 10x8, 12x10, and square Bentos) - 3 drips per face for standard, 2 for Bentos
     if (
       shape === 'square' &&
-      (size === '6x6' || size === '8x8' || size === '10x10' || size === '12x12' ||
+      (size === '6x4' || size === '8x6' || size === '10x8' || size === '12x10' ||
+        size === '6x6' || size === '8x8' || size === '10x10' || size === '12x12' ||
         size === 'squareBento2x2' || size === 'squareBento3x3')
     ) {
       return getSquareLongDripsCarve(size);
     }
     // Rectangle cakes - different drip pattern
-    if (shape === 'rectangle' && (size === '6x6' || size === '8x8' || size === '10x10' || size === '12x12')) {
+    if (shape === 'rectangle' && (size === '6x4' || size === '8x6' || size === '10x8' || size === '12x10' || size === '6x6' || size === '8x8' || size === '10x10' || size === '12x12')) {
       return getRectangleLongDripsCarve(size);
     }
     // Fallback for backwards compatibility with 'small' or other legacy sizes
@@ -1628,6 +1629,7 @@ const CakeScene = React.forwardRef(function CakeScene({
       const prevGhostVisible = ghostGroupRef.current ? ghostGroupRef.current.visible : true;
       const prevSize = renderer.getSize(new THREE.Vector2());
       const prevPixelRatio = renderer.getPixelRatio();
+      const prevFog = scene.fog;
       const images = {};
       const anchorsOut = {};
       const swatches = {};
@@ -1635,6 +1637,7 @@ const CakeScene = React.forwardRef(function CakeScene({
       const contoursOut = {};
 
       try {
+        scene.fog = null; // Prevent distance fog from washing out cake colors
         if (slotsGroupRef.current) slotsGroupRef.current.visible = false;
         if (ghostGroupRef.current) ghostGroupRef.current.visible = false;
         renderer.setPixelRatio(1);
@@ -1650,7 +1653,7 @@ const CakeScene = React.forwardRef(function CakeScene({
           const tiers = Math.max(1, Number(stage.config.layers) || 1);
           const tilt = deg(stage.tilt ?? (tiers <= 1 ? 24 : tiers === 2 ? 19 : 14));
           const azimuth = deg(stage.azimuth ?? 18);
-          const FIT = stage.zoom?.fit ?? stage.fit ?? (stage.zoom ? 0.8 : 0.58);
+          const FIT = stage.zoom?.fit ?? stage.fit ?? (stage.zoom ? 0.8 : 0.85);
 
           const box = new THREE.Box3().setFromObject(cakeGroup);
           if (box.isEmpty()) continue;
@@ -1724,17 +1727,18 @@ const CakeScene = React.forwardRef(function CakeScene({
 
                 const H = Math.max(0.05, yHi - yLo);
                 const yMid = (yLo + yHi) / 2;
-                // Frame inner 55% of the pattern height to guarantee neither top nor bottom rim or background is visible
-                const ySpan = H * 0.275;
-                const half = deg(12);
+                const isSurface = stage.key.startsWith('surface');
+                // For surface treatment (drip): frame 92% of tier height so the entire drip and end of cake are visible!
+                const ySpan = isSurface ? H * 0.46 : H * 0.275;
+                const half = deg(isSurface ? 18 : 12);
                 for (let k = 0; k <= 10; k++) {
                   const a = azimuth - half + (k / 10) * 2 * half;
                   for (const y of [yMid - ySpan, yMid + ySpan]) {
                     points.push(new THREE.Vector3(targetCenter.x + Math.sin(a) * zr, y, targetCenter.z + Math.cos(a) * zr));
                   }
                 }
-                lookAt = new THREE.Vector3(targetCenter.x + Math.sin(azimuth) * zr, yMid, targetCenter.z + Math.cos(azimuth) * zr);
-                zoomTilt = 0;
+                lookAt = new THREE.Vector3(targetCenter.x + Math.sin(azimuth) * zr, isSurface ? (yLo + yHi * 0.95) / 2 : yMid, targetCenter.z + Math.cos(azimuth) * zr);
+                zoomTilt = isSurface ? deg(6) : 0;
               }
             } else {
               // Standard filling zoom, edge piping zoom, or band zoom:
@@ -1752,11 +1756,14 @@ const CakeScene = React.forwardRef(function CakeScene({
                 zr = Math.max(eb.max.x - eb.min.x, eb.max.z - eb.min.z) / 2;
                 const yMid = (eb.min.y + eb.max.y) / 2;
                 const ySpan = Math.max(eh * 0.9, 0.35);
+                const radSpan = Math.max(eh * 1.5, 0.35);
                 const half = deg(stage.zoom.arc ?? 20);
                 for (let k = 0; k <= 10; k++) {
                   const a = azimuth - half + (k / 10) * 2 * half;
-                  for (const y of [yMid - ySpan, yMid + ySpan]) {
-                    points.push(new THREE.Vector3(targetCenter.x + Math.sin(a) * zr, y, targetCenter.z + Math.cos(a) * zr));
+                  for (const r of [zr - radSpan, zr, zr + radSpan]) {
+                    for (const y of [yMid - ySpan, yMid + ySpan]) {
+                      points.push(new THREE.Vector3(targetCenter.x + Math.sin(a) * r, y, targetCenter.z + Math.cos(a) * r));
+                    }
                   }
                 }
                 lookAt = new THREE.Vector3(targetCenter.x + Math.sin(azimuth) * zr, yMid, targetCenter.z + Math.cos(azimuth) * zr);
@@ -1810,7 +1817,31 @@ const CakeScene = React.forwardRef(function CakeScene({
           const camera = new THREE.PerspectiveCamera(30, width / height, 0.1, 300);
           const projected = new THREE.Vector3();
           const useTilt = zoomTilt ?? tilt;
-          if (useTilt >= Math.PI / 2 - 0.01) {
+          if (stage.key.startsWith('edge') && useTilt >= deg(50)) {
+            // Top view of rim piping: oriented with cake center upwards
+            camera.up.set(-Math.sin(azimuth), 0, -Math.cos(azimuth));
+          } else if (stage.key === 'center' || stage.key === 'center-top') {
+            // Eagle eye top view: focus directly on the top surface where decorations are placed
+            points.length = 0;
+            for (let i = 0; i < 32; i++) {
+              const a = (i / 32) * Math.PI * 2;
+              points.push(new THREE.Vector3(center.x + Math.cos(a) * ringRadius, box.max.y, center.z + Math.sin(a) * ringRadius));
+            }
+            lookAt = new THREE.Vector3(center.x, box.max.y, center.z);
+            camera.up.set(0, 0, -1);
+          } else if (stage.key === 'center-side1' || stage.key === 'center-side2') {
+            // Literal side view of the center decorations sitting on the top surface (matching EDGE side-front capture)
+            points.length = 0;
+            const topBandH = Math.max(0.6, dims.y * 0.35);
+            const decorRadius = ringRadius * 0.75;
+            for (let i = 0; i < 32; i++) {
+              const a = (i / 32) * Math.PI * 2;
+              points.push(new THREE.Vector3(center.x + Math.cos(a) * decorRadius, box.max.y - topBandH * 0.25, center.z + Math.cos(a) * decorRadius));
+              points.push(new THREE.Vector3(center.x + Math.cos(a) * decorRadius, box.max.y + topBandH * 0.75, center.z + Math.sin(a) * decorRadius));
+            }
+            lookAt = new THREE.Vector3(center.x, box.max.y + topBandH * 0.2, center.z);
+            camera.up.set(0, 1, 0);
+          } else if (useTilt >= Math.PI / 2 - 0.01) {
             camera.up.set(0, 0, -1);
             lookAt = new THREE.Vector3(center.x, box.max.y, center.z);
           }
@@ -1839,6 +1870,73 @@ const CakeScene = React.forwardRef(function CakeScene({
 
           renderer.render(scene, camera);
           images[stage.key] = renderer.domElement.toDataURL('image/jpeg', quality);
+
+          // Extract raw technical line drawing schematic for edge piping directly from 3D render
+          if (stage.key.startsWith('edge')) {
+            try {
+              const rawCanvas = document.createElement('canvas');
+              rawCanvas.width = width;
+              rawCanvas.height = height;
+              const rCtx = rawCanvas.getContext('2d');
+              rCtx.drawImage(renderer.domElement, 0, 0, width, height);
+              const imgData = rCtx.getImageData(0, 0, width, height);
+              const d = imgData.data;
+
+              const lineCanvas = document.createElement('canvas');
+              lineCanvas.width = width;
+              lineCanvas.height = height;
+              const lCtx = lineCanvas.getContext('2d');
+              lCtx.fillStyle = '#ffffff';
+              lCtx.fillRect(0, 0, width, height);
+              const outData = lCtx.createImageData(width, height);
+              const od = outData.data;
+
+              const gray = new Float32Array(width * height);
+              for (let i = 0, j = 0; i < d.length; i += 4, j++) {
+                const alpha = d[i + 3] / 255;
+                if (alpha < 0.05) {
+                  gray[j] = 255;
+                } else {
+                  const r = d[i] * alpha + 255 * (1 - alpha);
+                  const g = d[i + 1] * alpha + 255 * (1 - alpha);
+                  const b = d[i + 2] * alpha + 255 * (1 - alpha);
+                  gray[j] = 0.299 * r + 0.587 * g + 0.114 * b;
+                }
+              }
+
+              for (let y = 1; y < height - 1; y++) {
+                for (let x = 1; x < width - 1; x++) {
+                  const idx = y * width + x;
+                  const gx =
+                    -gray[idx - width - 1] + gray[idx - width + 1] +
+                    -2 * gray[idx - 1] + 2 * gray[idx + 1] +
+                    -gray[idx + width - 1] + gray[idx + width + 1];
+                  const gy =
+                    -gray[idx - width - 1] - 2 * gray[idx - width] - gray[idx - width + 1] +
+                    gray[idx + width - 1] + 2 * gray[idx + width] + gray[idx + width + 1];
+                  const mag = Math.sqrt(gx * gx + gy * gy);
+                  const outIdx = idx * 4;
+                  if (mag > 28) {
+                    const intensity = Math.min(1, (mag - 28) / 36);
+                    const penColor = Math.round(255 - intensity * 235);
+                    od[outIdx] = penColor;
+                    od[outIdx + 1] = Math.round(penColor * 0.92);
+                    od[outIdx + 2] = Math.round(penColor * 0.92);
+                    od[outIdx + 3] = 255;
+                  } else {
+                    od[outIdx] = 255;
+                    od[outIdx + 1] = 255;
+                    od[outIdx + 2] = 255;
+                    od[outIdx + 3] = 255;
+                  }
+                }
+              }
+              lCtx.putImageData(outData, 0, 0);
+              images[stage.key + '-schematic'] = lineCanvas.toDataURL('image/jpeg', 0.94);
+            } catch (err) {
+              console.warn('Line drawing schematic generation failed:', err);
+            }
+          }
           // The filling flavor's own color (what the designer's flavor chip shows).
           try {
             const fillingKey = stage.config.fillingColor;
@@ -2127,6 +2225,7 @@ const CakeScene = React.forwardRef(function CakeScene({
         renderer.setSize(prevSize.x, prevSize.y, false);
         if (slotsGroupRef.current) slotsGroupRef.current.visible = prevSlotsVisible;
         if (ghostGroupRef.current) ghostGroupRef.current.visible = prevGhostVisible;
+        scene.fog = prevFog;
       }
       return { images, anchors: anchorsOut, swatches, fillColors, contours: contoursOut };
     },

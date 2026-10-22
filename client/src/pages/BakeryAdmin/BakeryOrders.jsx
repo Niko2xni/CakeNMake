@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Banknote, TrendingUp, Clock } from 'lucide-react';
+import { Banknote, TrendingUp, Clock, Palette } from 'lucide-react';
 import { bakeryApi, transactionApi } from '@/services/api';
 import { getChatSocket } from '@/lib/chat-socket';
 import { Skeleton } from '@/components/ui/skeleton';
 import BakeryReservations from './BakeryReservations';
 import BakeryPaymentHistory from './BakeryPaymentHistory';
+import SidePatternsGalleryModal from '@/components/bakery/SidePatternsGalleryModal';
 
 function LoadError({ message, onRetry }) {
   return <div role="alert" className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm text-red-700">
@@ -27,6 +28,7 @@ export default function BakeryOrders() {
   const [selected, setSelected] = useState(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [statusError, setStatusError] = useState('');
+  const [sideGalleryOpen, setSideGalleryOpen] = useState(false);
 
   async function loadReservations({ silent = false } = {}) {
     if (!silent) setReservationsLoading(true);
@@ -147,9 +149,19 @@ export default function BakeryOrders() {
   ] : [];
 
   return <div className="cn-bakery-orders h-full min-h-0 rounded-2xl border border-pink-100 bg-white shadow-sm flex flex-col overflow-hidden">
-    <header className="shrink-0 border-b border-pink-100 px-4 py-4 sm:px-6">
-      <h1 className="text-xl font-bold tracking-tight text-gray-900">Orders</h1>
-      <p className="text-sm text-gray-500">Manage cake reservations and payments</p>
+    <header className="shrink-0 border-b border-pink-100 px-4 py-4 sm:px-6 flex justify-between items-center">
+      <div>
+        <h1 className="text-xl font-bold tracking-tight text-gray-900">Orders</h1>
+        <p className="text-sm text-gray-500">Manage cake reservations and payments</p>
+      </div>
+      <button
+        type="button"
+        onClick={() => setSideGalleryOpen(true)}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pink-500 hover:bg-pink-600 text-white text-xs font-semibold shadow-sm transition-colors"
+      >
+        <Palette className="w-4 h-4" />
+        Preview 2D Patterns
+      </button>
     </header>
     <div className="cn-order-summary shrink-0 grid grid-cols-1 sm:grid-cols-3 gap-2 px-4 py-3 sm:px-6 border-b border-pink-100">
       {paymentsLoading ? [0, 1, 2].map((key) => <div key={key} className="space-y-2 rounded-xl border border-pink-100 p-3" aria-label="Loading order summary"><Skeleton className="h-3 w-2/3" /><Skeleton className="h-6 w-1/2" /></div>) : paymentsError ? <div className="sm:col-span-3"><LoadError message={paymentsError} onRetry={loadPayments} /></div> : cards.map(({ label, value, icon: Icon }) =>
@@ -187,5 +199,6 @@ export default function BakeryOrders() {
         changeTab('reservations');
       }} />}
     </section>
+    <SidePatternsGalleryModal isOpen={sideGalleryOpen} onClose={() => setSideGalleryOpen(false)} />
   </div>;
 }

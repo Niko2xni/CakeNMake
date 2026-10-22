@@ -69,8 +69,8 @@ export function buildBlueprintDetails(config, quote, designName = '') {
   const variationCount = isPetitsFour ? 4 : layers;
   const individual = (layers > 1 || isPetitsFour) && config.structure?.layerDesign === 'individual';
   const pieceName = isPetitsFour ? 'Variant' : 'Tier';
-  const sizeKey = config.structure?.size || '8x8';
-  const sizeAliases = sizeKey === '8x8' || sizeKey === 'big' ? ['size.8x8', 'size.big'] : sizeKey === '6x6' || sizeKey === 'small' ? ['size.6x6', 'size.small'] : [`size.${sizeKey}`];
+  const sizeKey = config.structure?.size || '8x6';
+  const sizeAliases = sizeKey === '8x6' || sizeKey === '8x8' || sizeKey === 'big' ? ['size.8x6', 'size.8x8', 'size.big'] : sizeKey === '6x4' || sizeKey === '6x6' || sizeKey === 'small' ? ['size.6x4', 'size.6x6', 'size.small'] : [`size.${sizeKey}`];
   const fundamentals = [[isPetitsFour ? 'Format' : 'Tiers', isPetitsFour ? `Petit Fours · 4 pieces · ${name(sizeKey)}` : `${layers} tier(s) · ${config.realSize?.diameter || ''} in diameter · ${config.realSize?.height || ''} in height`, ['base.standard', ...sizeAliases, 'tier.additional']]];
   for (let i = 0; i < (individual ? variationCount : 1); i++) {
     const prefix = individual ? `${pieceName} ${i + 1} ` : '';

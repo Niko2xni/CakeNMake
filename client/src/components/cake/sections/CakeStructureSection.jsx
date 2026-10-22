@@ -39,7 +39,7 @@ export default function CakeStructureSection({ structure, realSize, onChange }) 
     : activeSizeOptions[0]?.id;
 
   const filteredSizeOptions = visualShape === 'square' && !isPetitsFour && !isBento
-    ? activeSizeOptions.filter(opt => opt.id === '6x6' || opt.id === '8x8')
+    ? activeSizeOptions.filter(opt => opt.id === '6x4' || opt.id === '8x6' || opt.id === '6x6' || opt.id === '8x8')
     : activeSizeOptions;
 
   // Always force single tier only for all cake types
@@ -86,12 +86,13 @@ export default function CakeStructureSection({ structure, realSize, onChange }) 
       const isSpecialSize = BENTO_SIZE_OPTIONS.some((o) => o.id === structure.size)
         || BENTO_SQUARE_SIZE_OPTIONS.some((o) => o.id === structure.size)
         || PETITS_FOUR_SIZE_OPTIONS.some((o) => o.id === structure.size);
-      const nextSize = isSpecialSize ? '8x8' : structure.size;
+      const nextSize = isSpecialSize ? '8x6' : structure.size;
       const selectedOption = STANDARD_SIZE_OPTIONS.find((o) => o.id === nextSize);
       // Always force 1 tier
       const nextLayers = 1;
-      // If current shape is square but size isn't 6x6 or 8x8, reset to round
-      const nextShape = structure.shape === 'square' && nextSize !== '6x6' && nextSize !== '8x8' 
+      // If current shape is square but size isn't 6x4 or 8x6, reset to round
+      const isAllowedSquare = nextSize === '6x4' || nextSize === '8x6' || nextSize === '6x6' || nextSize === '8x8';
+      const nextShape = structure.shape === 'square' && !isAllowedSquare 
         ? 'round' 
         : nextVisualShape(structure);
       onChange(
@@ -116,7 +117,7 @@ export default function CakeStructureSection({ structure, realSize, onChange }) 
     const nextLayerDesign = 'uniform';
     const isSquareSize = cakeFormat === 'bento'
       ? BENTO_SQUARE_SIZE_OPTIONS.some((option) => option.id === size)
-      : size === '6x6' || size === '8x8';
+      : size === '6x4' || size === '8x6' || size === '6x6' || size === '8x8';
     const nextShape = structure.shape === 'square' && !isSquareSize
       ? 'round'
       : structure.shape;
@@ -145,10 +146,10 @@ export default function CakeStructureSection({ structure, realSize, onChange }) 
   };
 
   const updateShape = (shape) => {
-    const validSquareSizes = isBento ? BENTO_SQUARE_SIZE_OPTIONS : STANDARD_SIZE_OPTIONS.filter((option) => option.id === '6x6' || option.id === '8x8');
+    const validSquareSizes = isBento ? BENTO_SQUARE_SIZE_OPTIONS : STANDARD_SIZE_OPTIONS.filter((option) => option.id === '6x4' || option.id === '8x6' || option.id === '6x6' || option.id === '8x8');
     const isAllowedSquareSize = validSquareSizes.some((option) => option.id === structure.size);
     const nextSize = shape === 'square' && !isAllowedSquareSize
-      ? (isBento ? 'squareBento3x3' : '8x8')
+      ? (isBento ? 'squareBento3x3' : '8x6')
       : shape !== 'square' && isBento && BENTO_SQUARE_SIZE_OPTIONS.some((option) => option.id === structure.size)
       ? 'standardBento'
       : structure.size;
@@ -234,7 +235,7 @@ export default function CakeStructureSection({ structure, realSize, onChange }) 
             // Square Bentos have dedicated 2x2 and 3x3 size options.
             const isSquareRestricted = option.id === 'square' && (
               isPetitsFour
-              || (!isBento && structure.size !== '6x6' && structure.size !== '8x8')
+              || (!isBento && structure.size !== '6x4' && structure.size !== '8x6' && structure.size !== '6x6' && structure.size !== '8x8')
             );
             
             return (

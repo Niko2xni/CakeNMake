@@ -235,31 +235,94 @@ const DRIP_SECTIONS = [
 ];
 
 const DEFAULT_DRIP_RATES = Object.fromEntries(
-  DRIP_SECTIONS.flatMap((s) => s.items.map((it) => [it.id, it.defaultPrice]))
+  DRIP_SECTIONS.flatMap((s) => s.items.map((it) => [it.id, 0]))
 );
 
 const DEFAULT_SIDE_RATES = Object.fromEntries(
-  SIDE_SECTIONS.flatMap((s) => s.items.map((it) => [it.key, it.defaultPrice]))
+  SIDE_SECTIONS.flatMap((s) => s.items.map((it) => [it.key, 0]))
 );
 
 const DEFAULT_EDGE_RATES = Object.fromEntries(
-  EDGE_SECTIONS.flatMap((s) => s.items.map((it) => [it.id, it.defaultPrice]))
+  EDGE_SECTIONS.flatMap((s) => s.items.map((it) => [it.id, 0]))
 );
 
-const DEFAULT_RATES = {
-  // One tier on its own. Filling is part of the sponge price (no charge).
-  // Any flavor costs the same.
-  sponge: {
-    naked: { classicCube: 400, largeCube: 600, miniBento: 350, standardBento: 450, largeBento: 550, squareBento2x2: 400, squareBento3x3: 500, '6x6': 700, '8x8': 1500, '10x10': 2200, '12x12': 3000, big: 1500, small: 700 }, // Petits Four, Bento, Square Bento, 6x6, 8x8, 10x10, 12x12
-    frosted: { classicCube: 500, largeCube: 800, miniBento: 500, standardBento: 600, largeBento: 750, squareBento2x2: 500, squareBento3x3: 650, '6x6': 1000, '8x8': 1700, '10x10': 2500, '12x12': 3400, big: 1700, small: 1000 }, // Frosted
-    textured: { classicCube: 500, largeCube: 800, miniBento: 500, standardBento: 600, largeBento: 750, squareBento2x2: 500, squareBento3x3: 650, '6x6': 1000, '8x8': 1700, '10x10': 2500, '12x12': 3400, big: 1700, small: 1000 }, // Textured
-  },
-  // Two tiers: 8x5 bottom + 6x4 top, priced as a set.
-  // Naked: 1500 + 700 = 2200. Frosted / Textured: 1700 + 1000 = 2700.
-  twoTier: { naked: 2200, frosted: 2700, textured: 2700 },
+const FLAVOR_PRICES = {
+  plain: 300,
+  vanilla: 350,
+  chocolate: 500,
+  strawberry: 500,
+  cheese: 400,
+  ube: 500,
+  mocha: 500,
+  pickColor: 400,
+};
 
-  // Glaze / drip: any tier, any flavor, any design.
-  glazePerTier: 100,
+const SIZE_ADDONS = {
+  '6x4': 0,
+  '8x6': 200,
+  '10x8': 400,
+  '12x10': 600,
+  // legacy aliases
+  '6x6': 0,
+  '8x8': 200,
+  '10x10': 400,
+  '12x12': 600,
+  small: 0,
+  big: 200,
+  '4x3': 0,
+};
+
+const DEFAULT_RATES = {
+  sponge: {
+    naked: {
+      '6x4': 350, '8x6': 550, '10x8': 750, '12x10': 950,
+      '6x6': 350, '8x8': 550, '10x10': 750, '12x12': 950,
+      big: 550, small: 350,
+      classicCube: 400, largeCube: 600, miniBento: 350, standardBento: 450, largeBento: 550, squareBento2x2: 400, squareBento3x3: 500
+    },
+    frosted: {
+      '6x4': 550, '8x6': 750, '10x8': 950, '12x10': 1150,
+      '6x6': 550, '8x8': 750, '10x10': 950, '12x10': 1150,
+      big: 750, small: 550,
+      classicCube: 500, largeCube: 800, miniBento: 500, standardBento: 600, largeBento: 750, squareBento2x2: 500, squareBento3x3: 650
+    },
+    textured: {
+      '6x4': 550, '8x6': 750, '10x8': 950, '12x10': 1150,
+      '6x6': 550, '8x8': 750, '10x10': 950, '12x12': 1150,
+      big: 750, small: 550,
+      classicCube: 500, largeCube: 800, miniBento: 500, standardBento: 600, largeBento: 750, squareBento2x2: 500, squareBento3x3: 650
+    },
+  },
+  flavors: {
+    plain: 300,
+    vanilla: 350,
+    chocolate: 500,
+    strawberry: 500,
+    cheese: 400,
+    ube: 500,
+    mocha: 500,
+    pickColor: 400,
+  },
+  sizes: {
+    '6x4': 0,
+    '8x6': 200,
+    '10x8': 400,
+    '12x10': 600,
+    '6x6': 0,
+    '8x8': 200,
+    '10x10': 400,
+    '12x12': 600,
+  },
+  finishAddon: {
+    naked: 0,
+    frosted: 200,
+    textured: 200,
+  },
+  // Two tiers set default
+  twoTier: { naked: 900, frosted: 1300, textured: 1300 },
+
+  // Glaze / drip: included (₱0)
+  glazePerTier: 0,
 
   // Independent Drip Item Rates:
   drip: { ...DEFAULT_DRIP_RATES },
@@ -271,7 +334,7 @@ const DEFAULT_RATES = {
   edge: { ...DEFAULT_EDGE_RATES },
 
   // Legacy tier rates for backwards compatibility
-  sideEdge: { small: 100, big: 150 },
+  sideEdge: { small: 0, big: 0 },
   // Side keys are `${side.mode}.${setId}`.
   sideQuantity: {
     'checkeredPattern.wholeCake': 'big',
@@ -345,14 +408,15 @@ const DEFAULT_RATES = {
   //   buttercreamText (placed letters, counted in letters)
   center: {
     brackets: {
-      strawberry: [{ maxQty: 4, price: 150 }, { maxQty: 10, price: 200 }],
-      cherry: [{ maxQty: 4, price: 175 }, { maxQty: 10, price: 250 }],
-      blueberry: [{ maxQty: 4, price: 150 }, { maxQty: 10, price: 200 }],
-      mangoCube: [{ maxQty: 4, price: 150 }, { maxQty: 12, price: 200 }],
-      ferreroRocher: [{ maxQty: 3, price: 60 }, { maxQty: 8, price: 120 }],
-      oreo: [{ maxQty: 4, price: 8 }, { maxQty: 8, price: 15 }],
-      hersheysKisses: [{ maxQty: 4, price: 37 }, { maxQty: 9, price: 74 }],
-      fondantBalls: [{ maxQty: 3, price: 50 }, { maxQty: 8, price: 100 }],
+      strawberry: [{ maxQty: 4, price: 200 }, { maxQty: 10, price: 300 }],
+      cherry: [{ maxQty: 4, price: 200 }, { maxQty: 10, price: 300 }],
+      blueberry: [{ maxQty: 4, price: 200 }, { maxQty: 10, price: 300 }],
+      mangoCube: [{ maxQty: 4, price: 200 }, { maxQty: 12, price: 300 }],
+      ferreroRocher: [{ maxQty: 4, price: 200 }, { maxQty: 8, price: 300 }],
+      oreo: [{ maxQty: 4, price: 200 }, { maxQty: 8, price: 300 }],
+      hersheysKisses: [{ maxQty: 4, price: 200 }, { maxQty: 9, price: 300 }],
+      fondantBalls: [{ maxQty: 4, price: 200 }, { maxQty: 8, price: 300 }],
+      chocolateBear: [{ maxQty: 4, price: 200 }, { maxQty: 8, price: 300 }],
       buttercreamText: [
         { maxQty: 10, price: 50 },
         { maxQty: 20, price: 100 },
@@ -361,9 +425,7 @@ const DEFAULT_RATES = {
         { maxQty: 50, price: 250 },
       ],
     },
-    perPiece: {
-      chocolateBear: 200,
-    },
+    perPiece: {},
   },
 };
 
@@ -387,6 +449,45 @@ const frostClass = (style) => {
   if (style === 'texturedButtercream' || style === 'textured') return 'textured';
   return 'frosted';
 };
+
+function calculateTierPrice(sizeClass, spongeFlavor, finishCls, rates, colorOverride = null) {
+  const cls = finishCls || 'naked';
+
+  if (sizeClass === 'classicCube' || sizeClass === 'largeCube') {
+    const pfDefaults = {
+      naked: { classicCube: 400, largeCube: 600 },
+      frosted: { classicCube: 500, largeCube: 800 },
+      textured: { classicCube: 500, largeCube: 800 },
+    };
+    return rates?.sponge?.[cls]?.[sizeClass] ?? pfDefaults[cls]?.[sizeClass] ?? 500;
+  }
+
+  if (['miniBento', 'standardBento', 'largeBento', 'squareBento2x2', 'squareBento3x3'].includes(sizeClass)) {
+    const bentoDefaults = {
+      naked: { miniBento: 350, standardBento: 450, largeBento: 550, squareBento2x2: 400, squareBento3x3: 500 },
+      frosted: { miniBento: 500, standardBento: 600, largeBento: 750, squareBento2x2: 500, squareBento3x3: 650 },
+      textured: { miniBento: 500, standardBento: 600, largeBento: 750, squareBento2x2: 500, squareBento3x3: 650 },
+    };
+    return rates?.sponge?.[cls]?.[sizeClass] ?? bentoDefaults[cls]?.[sizeClass] ?? 500;
+  }
+
+  // If a custom price book explicitly set rates.sponge[cls] and did NOT set rates.flavors:
+  if (rates && rates !== DEFAULT_RATES && rates.sponge?.[cls] &&
+      (rates.sponge[cls][sizeClass] !== undefined || rates.sponge[cls][sizeClass === '6x4' || sizeClass === '6x6' || sizeClass === 'small' ? 'small' : 'big'] !== undefined) &&
+      !rates.flavors) {
+    return rates.sponge[cls][sizeClass] ?? rates.sponge[cls][sizeClass === '6x4' || sizeClass === '6x6' || sizeClass === 'small' ? 'small' : 'big'];
+  }
+
+  const flavorKey = String(spongeFlavor || 'vanilla').toLowerCase();
+  const isPickColor = (colorOverride && colorOverride.mode === 'colorOverride' && !['plain', 'vanilla', 'chocolate', 'strawberry', 'cheese', 'ube', 'mocha'].includes(colorOverride.colorId)) || flavorKey === 'pickcolor' || (!['plain', 'vanilla', 'chocolate', 'strawberry', 'cheese', 'ube', 'mocha'].includes(flavorKey) && flavorKey !== 'vanilla');
+  const flavorBase = isPickColor
+    ? (rates?.flavors?.pickColor ?? FLAVOR_PRICES.pickColor ?? 400)
+    : (rates?.flavors?.[flavorKey] ?? FLAVOR_PRICES[flavorKey] ?? 350);
+  const sizeAddon = rates?.sizes?.[sizeClass] ?? SIZE_ADDONS[sizeClass] ?? 0;
+  const finishAddon = (cls === 'frosted' || cls === 'textured') ? (rates?.finishAddon?.[cls] ?? 200) : 0;
+
+  return flavorBase + sizeAddon + finishAddon;
+}
 
 function bracketPrice(brackets, quantity) {
   if (!Array.isArray(brackets) || brackets.length === 0) return { price: null, reason: 'no price configured' };
@@ -429,8 +530,8 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
       .replace(/\b\w/g, (c) => c.toUpperCase());
   };
 
-  const getTierSpecs = (tierIndex = 0, sizeClass = '8x8', tierLabel = '1 Tier', finishCls = 'naked') => {
-    const dims = sizeClass === 'classicCube' ? '1x1' : sizeClass === 'largeCube' ? '2x2' : sizeClass === 'miniBento' ? '3.5x2' : sizeClass === 'standardBento' ? '4x2' : sizeClass === 'largeBento' ? '5x3' : sizeClass === 'squareBento2x2' ? '2x2' : sizeClass === 'squareBento3x3' ? '3x3' : sizeClass === '12x12' ? '12x10' : sizeClass === '10x10' ? '10x8' : sizeClass === '6x6' || sizeClass === 'small' ? '6x4' : sizeClass === '4x4' ? '4x3' : sizeClass === '4x3' ? '4x3' : sizeClass === '6x4' ? '6x4' : sizeClass === '8x6' ? '8x6' : sizeClass === '10x8' ? '10x8' : '8x6';
+  const getTierSpecs = (tierIndex = 0, sizeClass = '8x6', tierLabel = '1 Tier', finishCls = 'naked') => {
+    const dims = sizeClass === 'classicCube' ? '1x1' : sizeClass === 'largeCube' ? '2x2' : sizeClass === 'miniBento' ? '3.5x2' : sizeClass === 'standardBento' ? '4x2' : sizeClass === 'largeBento' ? '5x3' : sizeClass === 'squareBento2x2' ? '2x2' : sizeClass === 'squareBento3x3' ? '3x3' : sizeClass === '12x10' || sizeClass === '12x12' ? '12x10' : sizeClass === '10x8' || sizeClass === '10x10' ? '10x8' : sizeClass === '6x4' || sizeClass === '6x6' || sizeClass === 'small' ? '6x4' : sizeClass === '4x4' ? '4x3' : sizeClass === '4x3' ? '4x3' : '8x6';
     let finish = `${finishLabel(finishCls)} Finish`;
     if (finishCls === 'textured') {
       const textureId = isIndividual
@@ -515,9 +616,11 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
     }
   } else if (tiers === 1) {
     const cls = frostClass(styleOfTier(0));
-    const size = structure.size || '8x8';
-    const price = rates.sponge?.[cls]?.[size] ?? rates.sponge?.[cls]?.[size === '6x6' || size === 'small' ? 'small' : 'big'] ?? (cls === 'textured' ? (rates.sponge?.frosted?.[size] ?? rates.sponge?.frosted?.[size === '6x6' || size === 'small' ? 'small' : 'big']) : undefined);
-    const dims = size === 'miniBento' ? '3.5x2' : size === 'standardBento' ? '4x2' : size === 'largeBento' ? '5x3' : size === 'squareBento2x2' ? '2x2' : size === 'squareBento3x3' ? '3x3' : size === '12x12' ? '12x10' : size === '10x10' ? '10x8' : size === '6x6' || size === 'small' ? '6x4' : '8x6';
+    const size = structure.size || '8x6';
+    const flavor = (isIndividual ? config.sponge?.layerFlavors?.[0] : null) || config.sponge?.flavor || 'vanilla';
+    const exteriorColorOverride = config.sugarColorOverrides?.exterior || config.sugarColor;
+    const price = calculateTierPrice(size, flavor, cls, rates, exteriorColorOverride);
+    const dims = size === 'miniBento' ? '3.5x2' : size === 'standardBento' ? '4x2' : size === 'largeBento' ? '5x3' : size === 'squareBento2x2' ? '2x2' : size === 'squareBento3x3' ? '3x3' : size === '12x10' || size === '12x12' ? '12x10' : size === '10x8' || size === '10x10' ? '10x8' : size === '6x4' || size === '6x6' || size === 'small' ? '6x4' : '8x6';
     const specs = getTierSpecs(0, size, '1 Tier', cls);
     if (price == null) missing(`1 tier ${cls} sponge ${dims}`, 'no price configured');
     else add('sponge', `1 Tier ${finishLabel(cls)} Cake (${dims})`, price, 1, specs);
@@ -525,16 +628,25 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
     // 2 Tiers: Split into independent Bottom Tier and Top Tier line items
     const bottom = frostClass(styleOfTier(0));
     const top = frostClass(styleOfTier(1));
-    const baseSize = structure.size || '8x8';
-    const topSize = baseSize === '12x12' ? '10x8' : baseSize === '10x10' ? '8x6' : baseSize === '6x6' || baseSize === 'small' ? '4x3' : '6x4';
-    const b = rates.sponge?.[bottom]?.[baseSize] ?? rates.sponge?.[bottom]?.big ?? (bottom === 'textured' ? (rates.sponge?.frosted?.[baseSize] ?? rates.sponge?.frosted?.big) : undefined);
-    const t = rates.sponge?.[top]?.[topSize] ?? rates.sponge?.[top]?.small ?? (top === 'textured' ? (rates.sponge?.frosted?.[topSize] ?? rates.sponge?.frosted?.small) : undefined);
+    const baseSize = structure.size || '8x6';
+    const topSize = (baseSize === '12x10' || baseSize === '12x12') ? '10x8'
+      : (baseSize === '10x8' || baseSize === '10x10') ? '8x6'
+      : (baseSize === '6x4' || baseSize === '6x6' || baseSize === 'small') ? '4x3'
+      : '6x4';
+
+    const bottomFlavor = (isIndividual ? config.sponge?.layerFlavors?.[0] : null) || config.sponge?.flavor || 'vanilla';
+    const topFlavor = (isIndividual ? config.sponge?.layerFlavors?.[1] : null) || config.sponge?.flavor || 'vanilla';
+    const bottomExtColor = (isIndividual ? config.sugarColorOverrides?.['exterior-0'] : null) || config.sugarColorOverrides?.exterior || config.sugarColor;
+    const topExtColor = (isIndividual ? config.sugarColorOverrides?.['exterior-1'] : null) || config.sugarColorOverrides?.exterior || config.sugarColor;
+
+    const b = calculateTierPrice(baseSize, bottomFlavor, bottom, rates, bottomExtColor);
+    const t = calculateTierPrice(topSize, topFlavor, top, rates, topExtColor);
 
     if (b == null || t == null) {
       missing('2 tier sponge', 'no price configured');
     } else {
-      const baseDims = baseSize === '12x12' ? '12x10' : baseSize === '10x10' ? '10x8' : baseSize === '6x6' || baseSize === 'small' ? '6x4' : '8x6';
-      const topDims = baseSize === '12x12' ? '10x8' : baseSize === '10x10' ? '8x6' : baseSize === '6x6' || baseSize === 'small' ? '4x3' : '6x4';
+      const baseDims = baseSize === '12x10' || baseSize === '12x12' ? '12x10' : baseSize === '10x8' || baseSize === '10x10' ? '10x8' : baseSize === '6x4' || baseSize === '6x6' || baseSize === 'small' ? '6x4' : '8x6';
+      const topDims = topSize === '10x8' ? '10x8' : topSize === '8x6' ? '8x6' : topSize === '4x3' ? '4x3' : '6x4';
       const d0 = getTierSpecs(0, baseSize, 'Bottom Tier', bottom);
       const d1 = getTierSpecs(1, topSize, 'Top Tier', top);
       add('sponge', `Bottom Tier ${finishLabel(bottom)} Cake (${baseDims})`, b, 1, d0);
@@ -555,7 +667,7 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
         : (surface || {});
       if (tierSurface.mode === 'glaze') {
         const patternId = tierSurface.pattern || 'naturalTear2';
-        const specificDripPrice = rates.drip?.[patternId] ?? DEFAULT_DRIP_RATES[patternId] ?? rates.glazePerTier ?? 100;
+        const specificDripPrice = rates.drip?.[patternId] ?? DEFAULT_DRIP_RATES[patternId] ?? rates.glazePerTier ?? 0;
         const dripLabel = DRIP_SECTIONS[0]?.items?.find((it) => it.id === patternId)?.label || title(patternId);
         if (specificDripPrice == null) {
           missing(`${label} — ${dripLabel}`, 'no price configured');
@@ -581,7 +693,7 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
     // 1 Tier Drip
     if (surface.mode === 'glaze') {
       const patternId = surface.pattern || 'naturalTear2';
-      const specificDripPrice = rates.drip?.[patternId] ?? DEFAULT_DRIP_RATES[patternId] ?? rates.glazePerTier ?? 100;
+      const specificDripPrice = rates.drip?.[patternId] ?? DEFAULT_DRIP_RATES[patternId] ?? rates.glazePerTier ?? 0;
       const dripLabel = DRIP_SECTIONS[0]?.items?.find((it) => it.id === patternId)?.label || title(patternId);
       if (specificDripPrice == null) {
         missing('Drip', 'no price configured');
@@ -614,7 +726,7 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
         const specificPrice = rates.side?.[sideKey] ?? rates.side?.[sideTier.mode]?.[setId];
         const qty = rates.sideQuantity?.[sideKey];
         const legacyPrice = qty ? rates.sideEdge?.[qty] : null;
-        const price = specificPrice !== undefined ? specificPrice : (legacyPrice ?? DEFAULT_SIDE_RATES[sideKey] ?? 100);
+        const price = specificPrice !== undefined ? specificPrice : (legacyPrice ?? DEFAULT_SIDE_RATES[sideKey] ?? 0);
         if (price == null) {
           missing(`Side (${tierLabel}) — ${setId || sideTier.mode}`, 'no price configured for this design');
         } else {
@@ -648,7 +760,7 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
       const specificPrice = rates.side?.[sideKey] ?? rates.side?.[side.mode]?.[setId];
       const qty = rates.sideQuantity?.[sideKey];
       const legacyPrice = qty ? rates.sideEdge?.[qty] : null;
-      const price = specificPrice !== undefined ? specificPrice : (legacyPrice ?? DEFAULT_SIDE_RATES[sideKey] ?? 100);
+      const price = specificPrice !== undefined ? specificPrice : (legacyPrice ?? DEFAULT_SIDE_RATES[sideKey] ?? 0);
       if (price == null) {
         missing(`Side — ${setId || side.mode}`, 'no price configured for this design');
       } else {
@@ -703,7 +815,7 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
     const specificPrice = rates.edge?.[tip];
     const legacyQty = rates.edgeQuantity?.[tip];
     const legPrice = legacyQty ? rates.sideEdge?.[legacyQty] : null;
-    const price = specificPrice !== undefined ? specificPrice : (legPrice ?? DEFAULT_EDGE_RATES[tip] ?? 150);
+    const price = specificPrice !== undefined ? specificPrice : (legPrice ?? DEFAULT_EDGE_RATES[tip] ?? 0);
 
     if (price == null) {
       missing(`${slotLabel} — ${tip}`, 'no price configured for this design');
@@ -891,7 +1003,7 @@ function filterPrunedPlacedItems(config) {
   const spec = DELICATES_SPECS[tip];
   if (!spec) return items;
 
-  const size = config?.structure?.size || '8x8';
+  const size = config?.structure?.size || '8x6';
   const layers = config?.structure?.layers || 1;
   const topRadius = size === 'classicCube'
     ? 0.5
@@ -903,11 +1015,11 @@ function filterPrunedPlacedItems(config) {
     ? 2.0
     : size === 'largeBento'
     ? 2.5
-    : size === '12x12'
+    : size === '12x10' || size === '12x12'
     ? (layers >= 2 ? 5.0 : 6.0)
-    : size === '10x10'
+    : size === '10x8' || size === '10x10'
     ? (layers >= 2 ? 4.0 : 5.0)
-    : size === '6x6' || size === 'small'
+    : size === '6x4' || size === '6x6' || size === 'small'
     ? (layers >= 2 ? 2.0 : 3.0)
     : (layers >= 2 ? 3.0 : 4.0);
   const finish = config?.exteriorFinish?.style || 'fullyFrosted';
@@ -1050,6 +1162,9 @@ function centerMaxQuantity(designId, rates = DEFAULT_RATES) {
 module.exports = {
   DEFAULT_RATES,
   calculateCakePrice,
+  calculateTierPrice,
+  FLAVOR_PRICES,
+  SIZE_ADDONS,
   bracketPrice,
   centerMaxQuantity,
   DRIP_SECTIONS,

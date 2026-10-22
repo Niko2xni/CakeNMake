@@ -84,7 +84,7 @@ export function buildBlueprintTierPlan(config = {}) {
     const stages = [];
     const plain = stripTo(config);
 
-    stages.push({ key: 'base', config: plain });
+    stages.push({ key: 'base', config: plain, fit: 0.88 });
 
     // ── per-tier data ──
     const info = [];
@@ -130,7 +130,7 @@ export function buildBlueprintTierPlan(config = {}) {
                 },
             });
         } else {
-            stages.push({ key: 'finish', config: running });
+            stages.push({ key: 'finish', config: running, fit: 0.88 });
         }
         runningKey = 'finish';
     }
@@ -146,20 +146,20 @@ export function buildBlueprintTierPlan(config = {}) {
         }
 
         // Close front screenshot (tilted to highlight top surface treatment & drips)
-        // Close front screenshot (no background, only surface pattern)
+        // Zoomed out slightly (fit: 0.82) so the end/bottom rim of the cake is seen
         stages.push({
             key: 'surface-front',
             config: surfaceConfig,
             diffConfig: surfaceBase,
             azimuth: 18,
             tilt: 0,
-            fit: 0.86,
+            fit: 0.82,
             zoom: {
                 mode: 'pattern',
                 fullHeight: true,
                 tilt: 0,
                 arc: 28,
-                fit: 1.0,
+                fit: 0.82,
             },
         });
         // Close back screenshot (no background, only surface pattern)
@@ -167,13 +167,13 @@ export function buildBlueprintTierPlan(config = {}) {
             key: 'surface-back',
             config: surfaceConfig,
             azimuth: 198,
-            fit: 0.86,
+            fit: 0.82,
             zoom: {
                 mode: 'pattern',
                 fullHeight: true,
                 tilt: 0,
                 arc: 28,
-                fit: 1.0,
+                fit: 0.82,
             },
         });
 
@@ -262,17 +262,60 @@ export function buildBlueprintTierPlan(config = {}) {
                 fit: 0.98,
             },
         });
+        stages.push({
+            key: `edge-${slot}-top`,
+            config: only,
+            diffConfig: edgeBase,
+            azimuth: 18,
+            tilt: 72,
+            fit: 0.95,
+            zoom: {
+                mode: 'edge',
+                position: slot === 'top' ? 'top' : 'bottom',
+                tilt: 72,
+                arc: 24,
+                band: 0.22,
+                fit: 0.98,
+            },
+        });
     });
     if (placed.length) {
         const withoutCenter = clone(config);
         withoutCenter.place = { ...(withoutCenter.place || {}), items: [] };
+        // 1. Direct top-down angle (eagle eye of top view)
         stages.push({
             key: 'center',
             config: clone(config),
             diffConfig: withoutCenter,
             tilt: 90,
             azimuth: 0,
-            fit: 0.85,
+            fit: 0.98,
+        });
+        stages.push({
+            key: 'center-top',
+            config: clone(config),
+            diffConfig: withoutCenter,
+            tilt: 90,
+            azimuth: 0,
+            fit: 0.98,
+        });
+        // 2. Literal side view from the left (capturing literal side like EDGE)
+        stages.push({
+            key: 'center-side1',
+            config: clone(config),
+            diffConfig: withoutCenter,
+            tilt: 14,
+            azimuth: -70,
+            fit: 0.94,
+        });
+        // 3. Literal side view from the right (capturing literal side like EDGE)
+        stages.push({
+            key: 'center-side2',
+            config: clone(config),
+            diffConfig: withoutCenter,
+            tilt: 14,
+            azimuth: 70,
+            fit: 0.94,
         });
     }
 
@@ -376,6 +419,30 @@ export function buildBlueprintTierPlan(config = {}) {
                     ...callout(`filling-zoom-${t.i}`, `pattern-${t.i}`, 'PATTERN', 0.99, -0.3, 0.4, 0.3, { role: 'filling', edge: true }),
                     anchorId: `pattern-${t.i}`,
                 },
+            });
+
+            // Dedicated ASSEMBLING page: Layer-by-layer breakdown and complete assembled look
+            pages.push({
+                kind: 'assembling',
+                section: 'ASSEMBLING',
+                title: 'Cake Layer-by-Layer Assembly',
+                spongeFlavor: name(t.sponge),
+                spongeColor: flavorColorOf(t.sponge) || '#F5E6CA',
+                fillingFlavor: fillingSub,
+                fillingColor: fillingChipColor || '#7A4B2A',
+                layers: Number(t.fillingLayers) || 1,
+                pipingTip: t.piping?.tip ? name(t.piping.tip) : null,
+                details: [
+                    ['Sponge Base', name(t.sponge)],
+                    ['Filling Flavor', fillingSub],
+                    ['Filling Layers', `${t.fillingLayers} layer${t.fillingLayers > 1 ? 's' : ''}`],
+                    ['Total Sponge Slices', `${(Number(t.fillingLayers) || 1) + 1} slices (including enclosing crown)`],
+                    ...(t.piping?.tip ? [['Perimeter Dam / Piping', name(t.piping.tip)]] : []),
+                ],
+                highlights: [
+                    'Assemble cake tier from bottom up: base sponge, alternating filling layers, then crown with enclosing sponge',
+                    'Ensure filling is spread evenly to edges; chill stacked core before exterior crumb-coating',
+                ],
             });
         }
 
@@ -605,31 +672,49 @@ export function buildBlueprintTierPlan(config = {}) {
     }
 
     function describeGroupPlacement(items) {
-        if (!items || items.length === 0) return 'Top surface';
+        if (!items || items.length === 0) return 'Place flat on the top surface';
         if (items.length === 1) {
             const zone = getItemZone(items[0]);
-            return zone === 'Center' ? 'Center of cake' : `${zone} edge`;
+            return zone === 'Center'
+                ? 'Place firmly upright in the exact center of the top tier'
+                : `Place upright toward the ${zone.toLowerCase()} side of the top tier`;
         }
 
         const zones = items.map(getItemZone);
         const uniqueZones = [...new Set(zones)];
 
+        // Check for cross / cardinal arrangement (1 center piece + 4 surrounding pieces, e.g. 5 mango cubes)
+        const centerItems = items.filter((it) => Math.hypot(Number(it.x) || 0, Number(it.z) || 0) < 0.25);
+        const outerItems = items.filter((it) => Math.hypot(Number(it.x) || 0, Number(it.z) || 0) >= 0.25);
+        if (items.length === 5 && centerItems.length === 1 && outerItems.length === 4) {
+            return 'Arrange in a symmetrical cross (+) pattern at the center of the top tier: place 1 piece in the exact center, then place the remaining 4 pieces evenly around it facing front, back, left, and right (approx. 1 inch apart)';
+        }
+
+        if (items.length >= 3 && items.length <= 6 && centerItems.length >= 1) {
+            return `Cluster evenly around the center of the top tier: place 1 piece centered and surrounding pieces spaced 1 inch apart`;
+        }
+
         const allBack = items.every((it) => (Number(it.z) || 0) < -0.2);
         const allFront = items.every((it) => (Number(it.z) || 0) > 0.2);
+        const allLeft = items.every((it) => (Number(it.x) || 0) < -0.2);
+        const allRight = items.every((it) => (Number(it.x) || 0) > 0.2);
 
         if (items.length >= 6) {
-            if (allBack) return 'Circular arc along rear perimeter';
-            if (allFront) return 'Circular arc along front perimeter';
-            if (uniqueZones.length >= 5) return 'Full perimeter ring arrangement';
+            if (allBack) return 'Arrange in an arc along the rear half of the top tier, inset 1.5 inches from the edge';
+            if (allFront) return 'Arrange in an arc along the front half of the top tier, inset 1.5 inches from the edge';
+            if (uniqueZones.length >= 5) return 'Distribute in an even circular ring around the top surface, keeping a uniform 1.5-inch border from the rim';
         }
 
-        if (uniqueZones.length <= 3) {
-            return `Placed at ${uniqueZones.join(', ')}`;
+        if (allBack) return `Arrange across the rear top surface (${uniqueZones.join(', ')}) with even spacing`;
+        if (allFront) return `Arrange across the front top surface (${uniqueZones.join(', ')}) with even spacing`;
+        if (allLeft) return `Arrange along the left side of the top tier with balanced spacing`;
+        if (allRight) return `Arrange along the right side of the top tier with balanced spacing`;
+
+        if (uniqueZones.length === 1 && uniqueZones[0] === 'Center') {
+            return 'Group tightly together as a centerpiece in the exact center of the cake top';
         }
 
-        if (allBack) return `Rear arrangement across ${uniqueZones.slice(0, 3).join(', ')}`;
-        if (allFront) return `Front arrangement across ${uniqueZones.slice(0, 3).join(', ')}`;
-        return `Arranged across ${uniqueZones.slice(0, 4).join(', ')}`;
+        return `Distribute evenly across the top surface (${uniqueZones.join(', ')}), maintaining uniform spacing between pieces`;
     }
 
     if (placed.length) {
@@ -671,7 +756,9 @@ export function buildBlueprintTierPlan(config = {}) {
             callouts: [], // Remove CENTER pointing arrow & pill
             details: rows,
             highlights: [
-                `Top-view placement layout for ${placed.length} center decoration${placed.length > 1 ? 's' : ''}`,
+                `3 visual angles provided above: Top View (exact placement layout), Perspective (3D relief), and Side Profile (clearance & height)`,
+                `Bakery Placement Guide: Place center piece first, then align adjacent pieces symmetrically with equal spacing`,
+                `Ensure decorations are set firmly into the frosting and kept clear of the edge piping border`,
             ],
             flavor: null,
         });

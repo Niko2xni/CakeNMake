@@ -217,9 +217,23 @@ export const designApi = {
     });
   },
 
+  // Move all designs to trash
+  moveAllToTrash: async () => {
+    return requestAuthenticatedJson(`${API_BASE_URL}/designs/trash/all`, {
+      method: 'POST'
+    });
+  },
+
   // Permanently delete design
   permanentlyDelete: async (id) => {
     return requestAuthenticatedJson(`${API_BASE_URL}/designs/${id}/permanent`, {
+      method: 'DELETE'
+    });
+  },
+
+  // Permanently delete all trashed designs
+  deleteAllTrash: async () => {
+    return requestAuthenticatedJson(`${API_BASE_URL}/designs/trash/all`, {
       method: 'DELETE'
     });
   },

@@ -9,7 +9,7 @@ import SendBakeryModal from '@/components/bakery/SendBakeryModal';
 import useDesignAiChat from '@/hooks/useDesignAiChat';
 import GuestAuthModal from '@/components/auth/GuestAuthModal';
 import DesignerTutorial, { TUTORIAL_STEPS } from '@/components/tutorial/DesignerTutorial';
-import { Home, X, Send, Cloud, CloudOff, Loader2, RotateCcw, SlidersHorizontal, HelpCircle, LogIn } from 'lucide-react';
+import { Home, X, Send, Cloud, CloudOff, Loader2, RotateCcw, SlidersHorizontal, HelpCircle, LogIn, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { blueprintApi, designApi, pricingApi, templateApi } from '@/services/api';
@@ -108,6 +108,7 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
   const [guestAuthAction, setGuestAuthAction] = useState(() => location.state?.action || 'general');
   const [guestAuthInitialEmail, setGuestAuthInitialEmail] = useState(() => location.state?.email || '');
   const [guestAuthInitialExpiresAt, setGuestAuthInitialExpiresAt] = useState(() => location.state?.expiresAt || null);
+  const [capacityModalOpen, setCapacityModalOpen] = useState(false);
 
   useEffect(() => {
     if (location.state?.guestAuthOpen && location.state?.email) {
@@ -515,6 +516,12 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
 
           if (account) {
             try {
+              const userDesigns = await designApi.getDesigns();
+              const activeUserDesigns = (Array.isArray(userDesigns) ? userDesigns : []).filter((d) => !d?.isTrashed);
+              if (activeUserDesigns.length >= 20) {
+                setCapacityModalOpen(true);
+                return;
+              }
               const savedDesign = await designApi.createDesign({
                 name: tplTitle,
                 config: adapted,
@@ -527,7 +534,11 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
               navigate(`/designer?designId=${savedDesign._id}`, { replace: true });
               setTimeout(() => saveThumbnail(savedDesign._id), 600);
             } catch (e) {
-              console.warn('Could not auto-create template design:', e);
+              if (e?.message?.includes('capacity') || e?.message?.includes('maximum') || e?.status === 400) {
+                setCapacityModalOpen(true);
+              } else {
+                console.warn('Could not auto-create template design:', e);
+              }
             }
           }
         }
@@ -568,9 +579,14 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
         if (account) {
           try {
             const userDesigns = await designApi.getDesigns();
+            const activeUserDesigns = (Array.isArray(userDesigns) ? userDesigns : []).filter((d) => !d?.isTrashed);
+            if (activeUserDesigns.length >= 20) {
+              setCapacityModalOpen(true);
+              return;
+            }
+
             const existingNames = new Set(
-              (Array.isArray(userDesigns) ? userDesigns : [])
-                .filter((d) => !d?.isTrashed)
+              activeUserDesigns
                 .map((d) => (d?.name || '').trim().toLowerCase())
                 .filter(Boolean)
             );
@@ -609,7 +625,11 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
             }
             return;
           } catch (err) {
-            console.warn('Could not initialize new design in db:', err);
+            if (err?.message?.includes('capacity') || err?.message?.includes('maximum') || err?.status === 400) {
+              setCapacityModalOpen(true);
+            } else {
+              console.warn('Could not initialize new design in db:', err);
+            }
           }
         }
 
@@ -670,13 +690,22 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
         savedDesign = await designApi.updateDesign(designId, designData);
       } else {
         // Create new design
-        savedDesign = await designApi.createDesign(designData);
-        setDesignId(savedDesign._id);
-        if (savedDesign.name) {
-          setTitle(savedDesign.name);
+        try {
+          savedDesign = await designApi.createDesign(designData);
+          setDesignId(savedDesign._id);
+          if (savedDesign.name) {
+            setTitle(savedDesign.name);
+          }
+          // Update URL with new design ID without reloading
+          navigate(`/designer?designId=${savedDesign._id}`, { replace: true });
+        } catch (err) {
+          if (err?.message?.includes('capacity') || err?.message?.includes('maximum') || err?.status === 400) {
+            setCapacityModalOpen(true);
+            setSaveStatus('error');
+            return null;
+          }
+          throw err;
         }
-        // Update URL with new design ID without reloading
-        navigate(`/designer?designId=${savedDesign._id}`, { replace: true });
       }
 
       setSaveStatus('saved');
@@ -1550,6 +1579,47 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
         onComplete={finishTutorial}
         onSkip={finishTutorial}
       />
+
+      {/* 20 designs capacity limit modal */}
+      {capacityModalOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[150]"
+          role="presentation"
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="designer-capacity-title"
+            className="bg-white rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl border border-pink-100 animate-in fade-in zoom-in-95 duration-150"
+          >
+            <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 mb-4">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <h3 id="designer-capacity-title" className="font-heading text-lg font-bold text-gray-900 mb-2">
+              Maximum Design Limit Reached (20/20)
+            </h3>
+            <p className="text-xs text-gray-600 leading-relaxed mb-6">
+              You have reached the limit of 20 active cake designs. To create a new cake, please delete or move some designs to the Trash first.
+            </p>
+            <div className="flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => navigate('/client')}
+                className="px-4 py-2 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors cursor-pointer"
+              >
+                Back to My Designs
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/trash')}
+                className="px-4 py-2 bg-pink-500 hover:bg-pink-600 text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer"
+              >
+                Go to Trash
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

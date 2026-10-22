@@ -7,7 +7,9 @@ const {
 } = require('../config/cloudinary');
 
 const MAX_TRASH_CAPACITY = 20;
+const MAX_ACTIVE_DESIGNS = 20;
 exports.MAX_TRASH_CAPACITY = MAX_TRASH_CAPACITY;
+exports.MAX_ACTIVE_DESIGNS = MAX_ACTIVE_DESIGNS;
 
 function legacyEmail(req) {
   if (!req.auth?.emailVerified) return '';
@@ -97,6 +99,14 @@ exports.createDesign = async (req, res) => {
     const { config, lastEstimate, thumbnail, thumbnailFallback, thumbnailAsset } = req.body;
     if (!config || typeof config !== 'object' || Array.isArray(config)) {
       return res.status(400).json({ message: 'A valid design configuration is required' });
+    }
+
+    const activeCount = await Design.countDocuments({ ...ownerFilter(req), isTrashed: false });
+    if (activeCount >= MAX_ACTIVE_DESIGNS) {
+      return res.status(400).json({
+        message: 'Maximum design capacity reached (20). Please delete or move older designs to trash to create a new one.',
+        code: 'MAX_CAPACITY_REACHED'
+      });
     }
     let name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
     const isAutoName = !name || /^(?:Unnamed|Untitled)(?:\s+\d+)?$/i.test(name);
@@ -222,12 +232,79 @@ exports.restoreFromTrash = async (req, res) => {
   try {
     const design = await Design.findOne(ownedDesignFilter(req));
     if (!design) return notFound(res);
+    const activeCount = await Design.countDocuments({ ...ownerFilter(req), isTrashed: false });
+    if (activeCount >= MAX_ACTIVE_DESIGNS) {
+      return res.status(400).json({
+        message: 'Cannot restore design. Your cake table has reached the maximum capacity of 20 designs. Please move or delete designs before restoring.',
+        code: 'MAX_CAPACITY_REACHED'
+      });
+    }
     design.isTrashed = false;
     design.trashedAt = null;
     return res.json(await design.save());
   } catch (error) {
     console.error('Error restoring design:', error);
     return res.status(500).json({ message: 'Failed to restore design' });
+  }
+};
+
+exports.moveAllToTrash = async (req, res) => {
+  try {
+    const filter = ownerFilter(req);
+    const activeDesigns = await Design.find({ ...filter, isTrashed: false });
+    if (activeDesigns.length === 0) {
+      return res.json({ message: 'No designs to move to trash', count: 0 });
+    }
+
+    const now = new Date();
+    await Design.updateMany(
+      { ...filter, isTrashed: false },
+      { $set: { isTrashed: true, trashedAt: now } }
+    );
+
+    // Enforce trash capacity (up to 20 designs in trash). Trim oldest if needed.
+    const allTrashed = await Design.find({ ...filter, isTrashed: true })
+      .sort({ trashedAt: -1, lastEdited: -1 });
+
+    if (allTrashed.length > MAX_TRASH_CAPACITY) {
+      const excess = allTrashed.slice(MAX_TRASH_CAPACITY);
+      for (const oldDesign of excess) {
+        await Design.findByIdAndDelete(oldDesign._id);
+        if (oldDesign.thumbnailAsset) {
+          await deleteTrustedThumbnail({
+            asset: oldDesign.thumbnailAsset,
+            firebaseUid: req.auth.uid,
+            designId: oldDesign._id.toString(),
+          });
+        }
+      }
+    }
+
+    return res.json({ message: 'All designs moved to trash', count: activeDesigns.length });
+  } catch (error) {
+    console.error('Error moving all designs to trash:', error);
+    return res.status(500).json({ message: 'Failed to move all designs to trash' });
+  }
+};
+
+exports.deleteAllTrash = async (req, res) => {
+  try {
+    const filter = ownerFilter(req);
+    const trashedDesigns = await Design.find({ ...filter, isTrashed: true });
+    for (const d of trashedDesigns) {
+      if (d.thumbnailAsset) {
+        await deleteTrustedThumbnail({
+          asset: d.thumbnailAsset,
+          firebaseUid: req.auth.uid,
+          designId: d._id.toString(),
+        });
+      }
+    }
+    const result = await Design.deleteMany({ ...filter, isTrashed: true });
+    return res.json({ message: 'All trashed designs permanently deleted', count: result.deletedCount });
+  } catch (error) {
+    console.error('Error deleting all trashed designs:', error);
+    return res.status(500).json({ message: 'Failed to delete all trashed designs' });
   }
 };
 

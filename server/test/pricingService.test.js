@@ -175,7 +175,7 @@ test('drip breakdown displays Drip with design and sugar color for 1-tier, and s
   });
   const dripLine1 = quote1.lineItems.find((l) => l.componentKey === 'glaze');
   assert.equal(dripLine1.label, 'Drip — Long Drips');
-  assert.equal(dripLine1.lineTotalMinor, 10000); // ₱100
+  assert.equal(dripLine1.lineTotalMinor, 0); // ₱0 (included)
   assert.deepEqual(dripLine1.details, [
     'Drip:',
     'Design: Long Drips',
@@ -188,7 +188,7 @@ test('drip breakdown displays Drip with design and sugar color for 1-tier, and s
   });
   const naturalTear2Line = naturalTear2Quote.lineItems.find((line) => line.componentKey === 'glaze');
   assert.equal(naturalTear2Line.label, 'Drip — Natural Tear 2');
-  assert.equal(naturalTear2Line.lineTotalMinor, 10000);
+  assert.equal(naturalTear2Line.lineTotalMinor, 0);
 
   // 2-Tier Drip
   const quote2 = buildQuote({
@@ -203,7 +203,7 @@ test('drip breakdown displays Drip with design and sugar color for 1-tier, and s
   const dripBottom = quote2.lineItems.find((l) => l.componentKey === 'glaze-bottom');
 
   assert.equal(dripTop.label, 'Drip Top — Long Drips');
-  assert.equal(dripTop.lineTotalMinor, 10000); // ₱100
+  assert.equal(dripTop.lineTotalMinor, 0); // ₱0 (included)
   assert.deepEqual(dripTop.details, [
     'Drip Top:',
     'Design: Long Drips',
@@ -211,7 +211,7 @@ test('drip breakdown displays Drip with design and sugar color for 1-tier, and s
   ]);
 
   assert.equal(dripBottom.label, 'Drip Bottom — Long Drips');
-  assert.equal(dripBottom.lineTotalMinor, 10000); // ₱100
+  assert.equal(dripBottom.lineTotalMinor, 0); // ₱0 (included)
   assert.deepEqual(dripBottom.details, [
     'Drip Bottom:',
     'Design: Long Drips',
@@ -553,3 +553,165 @@ test('retired flat inscriptions are ignored while placed letters remain priced',
   const letters = buildQuote({ ...config, place: { items: [{ type: 'center-letterUpperA-default', x: 0, z: 0 }] } });
   assert.ok(letters.lineItems.some(line => line.componentKey === 'center-buttercreamText'));
 });
+
+test('new pricing formula: flavor base + size factor + finish factor for 1-tier cakes', () => {
+  // 6x4 Plain Naked = 300
+  const plain6x4 = buildQuote({
+    structure: { size: '6x4', layers: 1 },
+    sponge: { flavor: 'plain' },
+    exteriorFinish: { style: 'naked' },
+  });
+  assert.equal(plain6x4.totalMinor, 30000);
+
+  // 6x4 Vanilla Naked = 350
+  const vanilla6x4Naked = buildQuote({
+    structure: { size: '6x4', layers: 1 },
+    sponge: { flavor: 'vanilla' },
+    exteriorFinish: { style: 'naked' },
+  });
+  assert.equal(vanilla6x4Naked.totalMinor, 35000);
+
+  // 6x4 Vanilla Frosted = 350 + 200 = 550
+  const vanilla6x4Frosted = buildQuote({
+    structure: { size: '6x4', layers: 1 },
+    sponge: { flavor: 'vanilla' },
+    exteriorFinish: { style: 'fullyFrosted' },
+  });
+  assert.equal(vanilla6x4Frosted.totalMinor, 55000);
+
+  // 8x6 Chocolate Frosted = 500 (flavor) + 200 (8x6) + 200 (frosted) = 900
+  const choc8x6 = buildQuote({
+    structure: { size: '8x6', layers: 1 },
+    sponge: { flavor: 'chocolate' },
+    exteriorFinish: { style: 'fullyFrosted' },
+  });
+  assert.equal(choc8x6.totalMinor, 90000);
+
+  // 10x8 Plain Textured = 300 (flavor) + 400 (10x8) + 200 (textured) = 900
+  const plain10x8Textured = buildQuote({
+    structure: { size: '10x8', layers: 1 },
+    sponge: { flavor: 'plain' },
+    exteriorFinish: { style: 'texturedButtercream' },
+  });
+  assert.equal(plain10x8Textured.totalMinor, 90000);
+
+  // 12x10 Strawberry Frosted = 500 (flavor) + 600 (12x10) + 200 (frosted) = 1300
+  const straw12x10 = buildQuote({
+    structure: { size: '12x10', layers: 1 },
+    sponge: { flavor: 'strawberry' },
+    exteriorFinish: { style: 'fullyFrosted' },
+  });
+  assert.equal(straw12x10.totalMinor, 130000);
+
+  // Cheese 6x4 Naked = 400
+  const cheese6x4 = buildQuote({
+    structure: { size: '6x4', layers: 1 },
+    sponge: { flavor: 'cheese' },
+    exteriorFinish: { style: 'naked' },
+  });
+  assert.equal(cheese6x4.totalMinor, 40000);
+
+  // Ube 6x4 Naked = 500
+  const ube6x4 = buildQuote({
+    structure: { size: '6x4', layers: 1 },
+    sponge: { flavor: 'ube' },
+    exteriorFinish: { style: 'naked' },
+  });
+  assert.equal(ube6x4.totalMinor, 50000);
+
+  // Mocha 6x4 Naked = 500
+  const mocha6x4 = buildQuote({
+    structure: { size: '6x4', layers: 1 },
+    sponge: { flavor: 'mocha' },
+    exteriorFinish: { style: 'naked' },
+  });
+  assert.equal(mocha6x4.totalMinor, 50000);
+});
+
+test('2-tier cake prices each tier based on size + flavor + finish', () => {
+  // Uniform design 2-tier: Base 8x6 Vanilla Frosted (350+200+200 = 750) + Top 6x4 Vanilla Frosted (350+0+200 = 550) = 1300
+  const quoteUniform2Tier = buildQuote({
+    structure: { size: '8x6', layers: 2, layerDesign: 'uniform' },
+    sponge: { flavor: 'vanilla' },
+    exteriorFinish: { style: 'fullyFrosted' },
+  });
+  assert.equal(quoteUniform2Tier.totalMinor, 130000);
+
+  // Individual design 2-tier:
+  // Bottom: 8x6 Chocolate Frosted = 500 + 200 + 200 = 900
+  // Top: 6x4 Vanilla Naked = 350 + 0 + 0 = 350
+  // Total = 1250 (125000 minor)
+  const quoteIndividual2Tier = buildQuote({
+    structure: { size: '8x6', layers: 2, layerDesign: 'individual' },
+    sponge: { layerFlavors: ['chocolate', 'vanilla'] },
+    exteriorFinish: { layerStyles: ['fullyFrosted', 'naked'] },
+  });
+  assert.equal(quoteIndividual2Tier.totalMinor, 125000);
+});
+
+test('center toppings bracket pricing: 1-4 = +200, 5+ = +300', () => {
+  // 3 cherries: bracket 1-4 => 200 (20000 minor)
+  const quote3 = buildQuote({
+    structure: { size: '6x4', layers: 1 },
+    sponge: { flavor: 'plain' },
+    exteriorFinish: { style: 'naked' },
+    place: {
+      items: [
+        { type: 'center-cherry-default', x: 0, z: 0 },
+        { type: 'center-cherry-default', x: 1, z: 0 },
+        { type: 'center-cherry-default', x: 2, z: 0 },
+      ],
+    },
+  });
+  // 300 (sponge) + 200 (toppings) = 500
+  assert.equal(quote3.totalMinor, 50000);
+  const decoLine3 = quote3.lineItems.find((l) => l.componentKey === 'center-decorations');
+  assert.equal(decoLine3.lineTotalMinor, 20000);
+
+  // 6 cherries: bracket 5+ => 300 (30000 minor)
+  const quote6 = buildQuote({
+    structure: { size: '6x4', layers: 1 },
+    sponge: { flavor: 'plain' },
+    exteriorFinish: { style: 'naked' },
+    place: {
+      items: [
+        { type: 'center-cherry-default', x: 0, z: 0 },
+        { type: 'center-cherry-default', x: 1, z: 0 },
+        { type: 'center-cherry-default', x: 2, z: 0 },
+        { type: 'center-cherry-default', x: -1, z: 0 },
+        { type: 'center-cherry-default', x: -2, z: 0 },
+        { type: 'center-cherry-default', x: 0, z: 1 },
+      ],
+    },
+  });
+  // 300 (sponge) + 300 (toppings) = 600
+  assert.equal(quote6.totalMinor, 60000);
+  const decoLine6 = quote6.lineItems.find((l) => l.componentKey === 'center-decorations');
+  assert.equal(decoLine6.lineTotalMinor, 30000);
+});
+
+test('filling, drip, side, and edge are included (₱0)', () => {
+  const quoteWithAll = buildQuote({
+    structure: { size: '6x4', layers: 1 },
+    sponge: { flavor: 'plain' },
+    exteriorFinish: { style: 'naked' },
+    filling: { enabled: true, flavor: 'chocolate', layers: 1 },
+    surfaceTreatment: { mode: 'glaze', pattern: 'longGaps' },
+    sideTreatment: { mode: 'pipingScrolls', setId: 'scrolls1' },
+    edge: { mode: 'both', both: { piping: { tip: 'shell' } } },
+  });
+
+  const fillingLine = quoteWithAll.lineItems.find((l) => l.componentKey === 'filling');
+  const dripLine = quoteWithAll.lineItems.find((l) => l.componentKey === 'glaze');
+  const sideLine = quoteWithAll.lineItems.find((l) => l.componentKey === 'side');
+  const edgeLine = quoteWithAll.lineItems.find((l) => l.componentKey === 'edgeBoth');
+
+  if (fillingLine) assert.equal(fillingLine.lineTotalMinor, 0);
+  if (dripLine) assert.equal(dripLine.lineTotalMinor, 0);
+  if (sideLine) assert.equal(sideLine.lineTotalMinor, 0);
+  if (edgeLine) assert.equal(edgeLine.lineTotalMinor, 0);
+
+  // Total should still just be 300 (plain 6x4 naked)
+  assert.equal(quoteWithAll.totalMinor, 30000);
+});
+

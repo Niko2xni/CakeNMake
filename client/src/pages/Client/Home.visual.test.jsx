@@ -9,6 +9,7 @@ const apiMocks = vi.hoisted(() => ({
   createDesign: vi.fn(),
   updateDesign: vi.fn(),
   moveToTrash: vi.fn(),
+  moveAllToTrash: vi.fn(),
   restoreFromTrash: vi.fn(),
   getDesignById: vi.fn(),
 }));
@@ -114,5 +115,56 @@ describe('ClientHome presentation', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /move to trash/i }));
 
     expect(screen.getByRole('heading', { name: `Move “${longName}” to trash?` })).toHaveClass('break-words');
+  });
+
+  it('moves all designs to trash through the Move to Trash all button', async () => {
+    apiMocks.getDesigns.mockResolvedValue(designs);
+    apiMocks.moveAllToTrash.mockResolvedValue({ message: 'All designs moved to trash', count: 2 });
+    renderHome();
+
+    const moveAllBtn = await screen.findByRole('button', { name: /move all designs to trash/i });
+    fireEvent.click(moveAllBtn);
+
+    expect(await screen.findByRole('heading', { name: /move all 2 designs to trash\?/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Move all to trash' }));
+
+    await waitFor(() => expect(apiMocks.moveAllToTrash).toHaveBeenCalled());
+    expect(await screen.findByText(/your cake table is ready/i)).toBeInTheDocument();
+  });
+
+  it('prevents bypassing the 20 max limit and displays the capacity modal', async () => {
+    const twentyDesigns = Array.from({ length: 20 }, (_, i) => ({
+      _id: `design-${i}`,
+      name: `Cake ${i}`,
+      lastEdited: new Date().toISOString(),
+      thumbnail: 'cake.png',
+      config: {},
+      sentToBakery: false,
+    }));
+    apiMocks.getDesigns.mockResolvedValue(twentyDesigns);
+    renderHome();
+
+    expect(await screen.findByText(/max limit reached/i)).toBeInTheDocument();
+
+    // Try duplicating when at 20 limit
+    fireEvent.click(await screen.findByRole('button', { name: /actions for cake 0/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /duplicate/i }));
+
+    expect(await screen.findByRole('heading', { name: /maximum design capacity reached \(20\/20\)/i })).toBeInTheDocument();
+    expect(apiMocks.createDesign).not.toHaveBeenCalled();
+
+    // Close modal
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+    // Try searching for nonexistent cake to reveal empty search result
+    const searchInput = screen.getByPlaceholderText(/search your designs/i);
+    fireEvent.change(searchInput, { target: { value: 'Nonexistent Cake' } });
+
+    expect(await screen.findByText(/no designs found/i)).toBeInTheDocument();
+    const createBtn = screen.getByRole('button', { name: /create a new cake/i });
+    fireEvent.click(createBtn);
+
+    expect(await screen.findByRole('heading', { name: /maximum design capacity reached \(20\/20\)/i })).toBeInTheDocument();
   });
 });

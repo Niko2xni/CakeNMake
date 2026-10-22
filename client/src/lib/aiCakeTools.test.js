@@ -88,25 +88,25 @@ describe('Cake AI edits without a provider', () => {
     config.structure.layers = 2;
     config.structure.layerDesign = 'individual';
     config.place.items = [{ id: 'one', type: 'center-cherry-default' }, { id: 'other', type: 'candle' }];
-    const { next } = execute('set_structure', { size: '6x6', layers: 1 }, config);
-    expect(next.structure).toMatchObject({ size: '6x6', layers: 1, layerDesign: 'uniform' });
-    expect(next.realSize).toEqual(SIZE_OPTIONS.find(size => size.id === '6x6').dimensions);
+    const { next } = execute('set_structure', { size: '6x4', layers: 1 }, config);
+    expect(next.structure).toMatchObject({ size: '6x4', layers: 1, layerDesign: 'uniform' });
+    expect(next.realSize).toEqual(SIZE_OPTIONS.find(size => size.id === '6x4').dimensions);
     expect(next.place.items).toEqual([{ id: 'other', type: 'candle' }]);
     expect(config.structure.layers).toBe(2);
   });
 
-  it('updates cake size to 10x10 and 12x12 with correct real dimensions', () => {
-    const { next: next10 } = execute('set_structure', { size: '10x10' });
-    expect(next10.structure.size).toBe('10x10');
+  it('updates cake size to 10x8 and 12x10 with correct real dimensions', () => {
+    const { next: next10 } = execute('set_structure', { size: '10x8' });
+    expect(next10.structure.size).toBe('10x8');
     expect(next10.realSize).toEqual({ diameter: 10, height: 8 });
 
-    const { next: next12 } = execute('set_structure', { size: '12x12' });
-    expect(next12.structure.size).toBe('12x12');
+    const { next: next12 } = execute('set_structure', { size: '12x10' });
+    expect(next12.structure.size).toBe('12x10');
     expect(next12.realSize).toEqual({ diameter: 12, height: 10 });
   });
 
   it('rejects 2 tiers for all cake sizes', () => {
-    const { response } = execute('set_structure', { size: '6x6', layers: 2 });
+    const { response } = execute('set_structure', { size: '6x4', layers: 2 });
     expect(response.error).toBe('All cakes are limited to 1 tier only.');
   });
 
@@ -116,8 +116,8 @@ describe('Cake AI edits without a provider', () => {
 
     const { next: nextSquare } = execute('set_structure', { shape: 'square' });
     expect(nextSquare.structure.shape).toBe('square');
-    // Square shape should default to 8x8 if current size isn't 6x6 or 8x8
-    expect(['6x6', '8x8']).toContain(nextSquare.structure.size);
+    // Square shape should default to 8x6 if current size isn't 6x4 or 8x6
+    expect(['6x4', '8x6', '6x6', '8x8']).toContain(nextSquare.structure.size);
 
     const { next: nextRound } = execute('set_structure', { shape: 'round' });
     expect(nextRound.structure.shape).toBe('round');
@@ -138,32 +138,32 @@ describe('Cake AI edits without a provider', () => {
     expect(bento.structure).toMatchObject({ cakeFormat: 'bento', size: 'standardBento', layers: 1 });
 
     const standard = execute('set_structure', { cakeFormat: 'standard' }, bento).next;
-    expect(standard.structure).toMatchObject({ cakeFormat: 'standard', size: '8x8' });
+    expect(standard.structure).toMatchObject({ cakeFormat: 'standard', size: '8x6' });
   });
 
   it('rejects two tiers for all cake types', () => {
     expect(execute('set_structure', { layers: 2 }).response.error).toBe('All cakes are limited to 1 tier only.');
     expect(execute('set_structure', { size: 'miniBento', layers: 2 }).response.error).toBe('All cakes are limited to 1 tier only.');
     expect(execute('set_structure', { size: 'largeCube', layers: 2 }).response.error).toBe('All cakes are limited to 1 tier only.');
-    expect(execute('set_structure', { size: '8x8', layers: 2 }).response.error).toBe('All cakes are limited to 1 tier only.');
-    expect(execute('set_structure', { size: '10x10', layers: 2 }).response.error).toBe('All cakes are limited to 1 tier only.');
+    expect(execute('set_structure', { size: '8x6', layers: 2 }).response.error).toBe('All cakes are limited to 1 tier only.');
+    expect(execute('set_structure', { size: '10x8', layers: 2 }).response.error).toBe('All cakes are limited to 1 tier only.');
   });
 
   it('restricts square shape to supported Standard sizes and selects Bento square sizes', () => {
-    // Setting square shape with a non-allowed size should force size to 8x8
+    // Setting square shape with a non-allowed size should force size to 8x6
     const config = structuredClone(DEFAULT_CONFIG);
-    config.structure.size = '10x10';
+    config.structure.size = '10x8';
     const { next } = execute('set_structure', { shape: 'square' }, config);
     expect(next.structure.shape).toBe('square');
-    expect(next.structure.size).toBe('8x8');
+    expect(next.structure.size).toBe('8x6');
 
-    // Square shape with 6x6 should work fine
-    const { next: next6x6 } = execute('set_structure', { size: '6x6', shape: 'square' });
-    expect(next6x6.structure).toMatchObject({ size: '6x6', shape: 'square' });
+    // Square shape with 6x4 should work fine
+    const { next: next6x4 } = execute('set_structure', { size: '6x4', shape: 'square' });
+    expect(next6x4.structure).toMatchObject({ size: '6x4', shape: 'square' });
 
-    // Square shape with 8x8 should work fine
-    const { next: next8x8 } = execute('set_structure', { size: '8x8', shape: 'square' });
-    expect(next8x8.structure).toMatchObject({ size: '8x8', shape: 'square' });
+    // Square shape with 8x6 should work fine
+    const { next: next8x6 } = execute('set_structure', { size: '8x6', shape: 'square' });
+    expect(next8x6.structure).toMatchObject({ size: '8x6', shape: 'square' });
 
     const bentoSquare = execute('set_structure', { cakeFormat: 'bento', shape: 'square' }).next;
     expect(bentoSquare.structure).toMatchObject({ cakeFormat: 'bento', size: 'squareBento3x3', shape: 'square' });
