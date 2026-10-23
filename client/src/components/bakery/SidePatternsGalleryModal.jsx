@@ -84,7 +84,7 @@ export default function SidePatternsGalleryModal({ isOpen, onClose }) {
                 </span>
               </h2>
               <p className="text-xs text-gray-500">
-                Direct live preview of Side and Edge vector schematics in blueprintSchematics.js
+                Direct live preview of Side, Edge, Surface Treatment, and Textured Buttercream vector schematics in blueprintSchematics.js
               </p>
             </div>
           </div>
@@ -163,7 +163,9 @@ export default function SidePatternsGalleryModal({ isOpen, onClose }) {
                   : 'bg-white text-gray-600 hover:bg-pink-100/60 border border-gray-200'
               }`}
             >
-              <span className="text-[10px] text-pink-700/70 mr-1 font-semibold">[{cat.section || 'Side'}]</span>
+              <span className={`text-[10px] mr-1 font-semibold ${selectedCategory === cat.id ? 'text-pink-100' : 'text-pink-700/70'}`}>
+                [{cat.section || 'Side'}]
+              </span>
               {cat.label} ({cat.sets.length})
             </button>
           ))}

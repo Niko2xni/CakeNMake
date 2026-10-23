@@ -321,12 +321,6 @@ export function computePricingChanges(rates = {}, activeRates = {}) {
     '12x10': '12×10 Size Factor',
   };
 
-  const finishLabels = {
-    naked: 'Naked Finish Add-on',
-    frosted: 'Frosted Finish Add-on',
-    textured: 'Textured Buttercream Add-on',
-  };
-
   // 1. Fundamentals: Sponge Flavors & Custom Pick Color Base Rates
   Object.keys(flavorLabels).forEach((key) => {
     const curr = rates?.flavors?.[key] ?? DEFAULT_RATES.flavors?.[key];
@@ -339,13 +333,6 @@ export function computePricingChanges(rates = {}, activeRates = {}) {
     const curr = rates?.sizes?.[key] ?? DEFAULT_RATES.sizes?.[key];
     const old = activeRates?.sizes?.[key] ?? DEFAULT_RATES.sizes?.[key];
     checkDiff('Fundamentals · Size Factors', sizeLabels[key], curr, old);
-  });
-
-  // 3. Fundamentals: Finish Style Add-ons
-  Object.keys(finishLabels).forEach((key) => {
-    const curr = rates?.finishAddon?.[key] ?? DEFAULT_RATES.finishAddon?.[key];
-    const old = activeRates?.finishAddon?.[key] ?? DEFAULT_RATES.finishAddon?.[key];
-    checkDiff('Fundamentals · Finish Styles', finishLabels[key], curr, old);
   });
 
   // 4. Center Decorations Brackets
@@ -414,6 +401,7 @@ export default function BakeryPricing() {
   const [simSize, setSimSize] = useState('8x6');
   const [simTier2Size, setSimTier2Size] = useState('6x4');
   const [simFinish, setSimFinish] = useState('frosted');
+  const [simFrostingFlavor, setSimFrostingFlavor] = useState('Vanilla');
   const [simSpongeFlavor, setSimSpongeFlavor] = useState('Vanilla');
   const [simFilling, setSimFilling] = useState('Chocolate');
   const [simGlaze, setSimGlaze] = useState(true);
@@ -486,10 +474,9 @@ export default function BakeryPricing() {
     const baseVanilla = nextRates.flavors?.vanilla ?? 350;
     ['naked', 'frosted', 'textured'].forEach((finish) => {
       if (!nextRates.sponge[finish]) nextRates.sponge[finish] = {};
-      const fAddon = nextRates.finishAddon?.[finish] ?? (finish === 'naked' ? 0 : 200);
       ['6x4', '8x6', '10x8', '12x10'].forEach((sz) => {
         const szAddon = nextRates.sizes?.[sz] ?? 0;
-        nextRates.sponge[finish][sz] = baseVanilla + szAddon + fAddon;
+        nextRates.sponge[finish][sz] = baseVanilla + szAddon;
       });
       nextRates.sponge[finish]['6x6'] = nextRates.sponge[finish]['6x4'];
       nextRates.sponge[finish]['8x8'] = nextRates.sponge[finish]['8x6'];
@@ -500,11 +487,11 @@ export default function BakeryPricing() {
     });
 
     if (!nextRates.twoTier) nextRates.twoTier = {};
-    const t1Base = (nextRates.flavors?.vanilla ?? 350) + (nextRates.sizes?.['8x6'] ?? 200);
-    const t2Base = (nextRates.flavors?.vanilla ?? 350) + (nextRates.sizes?.['6x4'] ?? 0);
+    const t1Base = baseVanilla + (nextRates.sizes?.['8x6'] ?? 200);
+    const t2Base = baseVanilla + (nextRates.sizes?.['6x4'] ?? 0);
     nextRates.twoTier.naked = t1Base + t2Base;
-    nextRates.twoTier.frosted = t1Base + (nextRates.finishAddon?.frosted ?? 200) + t2Base + (nextRates.finishAddon?.frosted ?? 200);
-    nextRates.twoTier.textured = t1Base + (nextRates.finishAddon?.textured ?? 200) + t2Base + (nextRates.finishAddon?.textured ?? 200);
+    nextRates.twoTier.frosted = t1Base + t2Base;
+    nextRates.twoTier.textured = t1Base + t2Base;
   };
 
   const setFlavorPrice = (flavorKey, price) => {
@@ -617,19 +604,18 @@ export default function BakeryPricing() {
         ? (currentRates.flavors?.pickColor ?? 400)
         : (currentRates.flavors?.[flvKey] ?? 350);
 
-    const finishAdd = currentRates.finishAddon?.[simFinish] ?? (simFinish === 'naked' ? 0 : 200);
     const sizeAddTier1 = currentRates.sizes?.[simSize] ?? (simSize === '8x6' ? 200 : simSize === '10x8' ? 400 : simSize === '12x10' ? 600 : 0);
 
     // Tier 1
-    total += flavorBase + sizeAddTier1 + finishAdd;
+    total += flavorBase + sizeAddTier1;
 
     // Tier 2 (if 2 tiers)
     if (simLayers === 2) {
       const sizeAddTier2 = currentRates.sizes?.[simTier2Size] ?? (simTier2Size === '8x6' ? 200 : 0);
-      total += flavorBase + sizeAddTier2 + finishAdd;
+      total += flavorBase + sizeAddTier2;
     }
 
-    // Filling, Drip, Side piping, and Edge borders are Included (₱0)
+    // Finish styles, Filling, Drip, Side piping, and Edge borders are Included (₱0)
 
     // Strawberries bracket (Center Decoration: 1-4 = 200, 5+ = 300)
     if (simStrawberries > 0) {
@@ -661,7 +647,7 @@ export default function BakeryPricing() {
       if (hit) total += hit.price;
     }
     return total;
-  }, [rates, simLayers, simSize, simTier2Size, simFinish, simSpongeFlavor, simStrawberries, simBear, simButtercreamLetters]);
+  }, [rates, simLayers, simSize, simTier2Size, simFinish, simFrostingFlavor, simSpongeFlavor, simStrawberries, simBear, simButtercreamLetters]);
 
   const selectedSideLabel = useMemo(() => {
     if (simSideKey === 'none') return 'None';
@@ -839,11 +825,11 @@ export default function BakeryPricing() {
             <ul className="text-[11px] text-gray-600 space-y-2 leading-relaxed">
               <li className="flex items-start gap-1.5">
                 <span className="text-primary font-bold">•</span>
-                <span><strong>Fundamentals:</strong> Cake price starts from Sponge Flavor (6×4 base) + Size factor (+₱200/step) + Finish style (+₱200).</span>
+                <span><strong>Fundamentals:</strong> Cake price starts from Sponge Flavor (6×4 base) + Size factor (+₱200/step). All finishes, fillings, drips, side wraps, and edge piping are included at ₱0.</span>
               </li>
               <li className="flex items-start gap-1.5">
                 <span className="text-primary font-bold">•</span>
-                <span><strong>All-Inclusive Items:</strong> Filling, Drip, Side piping, and Edge borders have no separate setup — they are included at ₱0 extra charge.</span>
+                <span><strong>All-Inclusive Items:</strong> Finish styles (Naked, Frosted, Textured Buttercream), Filling, Drip, Side piping, and Edge borders have no separate setup — they are included at ₱0 extra charge.</span>
               </li>
               <li className="flex items-start gap-1.5">
                 <span className="text-primary font-bold">•</span>
@@ -857,13 +843,12 @@ export default function BakeryPricing() {
         <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-sm">
           <CustomScrollbar className="flex-1" contentClassName="p-6 space-y-6">
             {/* 1. Fundamentals Tab */}
-            {/* 1. Fundamentals Tab */}
             {activeTab === 'fundamentals' && (
               <div className="space-y-6">
                 <div>
                   <h2 className="text-base font-bold text-gray-900">Fundamentals Cake Pricing</h2>
                   <p className="text-xs text-gray-500">
-                    Pricing is calculated from the Sponge Flavor or Custom Pick Color (6×4 base price), plus Size Factor and Finish Style add-ons.
+                    Pricing is calculated from the Sponge Flavor or Custom Pick Color (6×4 base price) plus Size Factor add-ons. Finishes, fillings, drips, side wraps, and edge borders are included at ₱0.
                   </p>
                 </div>
 
@@ -881,7 +866,12 @@ export default function BakeryPricing() {
                       <p className="text-xs text-emerald-800/80 mt-0.5">
                         The following components do not have separate price setups. They are included at no extra charge (₱0) in customer quotes and factored directly into the cake pricing:
                       </p>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-3">
+                        <div className="rounded-xl border border-emerald-200/50 bg-white/80 p-2.5">
+                          <span className="block text-[10px] font-bold uppercase tracking-wider text-emerald-700">Finishes</span>
+                          <span className="block text-xs font-bold text-gray-800">Included (₱0)</span>
+                          <span className="block text-[10.5px] text-gray-500 mt-0.5">Naked, Frosted, Textured</span>
+                        </div>
                         <div className="rounded-xl border border-emerald-200/50 bg-white/80 p-2.5">
                           <span className="block text-[10px] font-bold uppercase tracking-wider text-emerald-700">Filling</span>
                           <span className="block text-xs font-bold text-gray-800">Included (₱0)</span>
@@ -1116,65 +1106,6 @@ export default function BakeryPricing() {
                   </div>
                 </div>
 
-                <hr className="border-pink-100" />
-
-                {/* Finish Style Factor Add-ons */}
-                <div>
-                  <h2 className="text-base font-bold text-gray-900">Finish Style Factor Add-ons</h2>
-                  <p className="text-xs text-gray-500">
-                    Exterior frosting finish style add-on per tier. Naked is base (+₱0); Frosted & Textured are +₱200.
-                  </p>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mt-3">
-                    <div className="rounded-2xl border border-pink-100 bg-white p-3.5 space-y-2 shadow-xs">
-                      <div>
-                        <span className="text-xs font-bold text-gray-800">Naked Finish</span>
-                        <span className="block text-[10px] text-gray-400 mt-0.5">Exposed sponge layers</span>
-                      </div>
-                      <PriceStepper
-                        label="Add-on"
-                        value={rates.finishAddon?.naked ?? 0}
-                        activeValue={activeRates.finishAddon?.naked ?? 0}
-                        disabled={!isDraftActive}
-                        step={25}
-                        onChange={(val) => setFinishAddon('naked', val)}
-                      />
-                    </div>
-
-                    <div className="rounded-2xl border border-pink-100 bg-white p-3.5 space-y-2 shadow-xs">
-                      <div>
-                        <span className="text-xs font-bold text-gray-800">Frosted Finish</span>
-                        <span className="block text-[10px] text-gray-400 mt-0.5">Smooth buttercream coat (+₱200)</span>
-                      </div>
-                      <PriceStepper
-                        label="Add-on"
-                        value={rates.finishAddon?.frosted ?? 200}
-                        activeValue={activeRates.finishAddon?.frosted ?? 200}
-                        disabled={!isDraftActive}
-                        step={25}
-                        onChange={(val) => setFinishAddon('frosted', val)}
-                      />
-                    </div>
-
-                    <div className="rounded-2xl border border-pink-100 bg-white p-3.5 space-y-2 shadow-xs">
-                      <div>
-                        <span className="text-xs font-bold text-gray-800">Textured Buttercream</span>
-                        <span className="block text-[10px] text-gray-400 mt-0.5">Artisanal textured ridges (+₱200)</span>
-                      </div>
-                      <PriceStepper
-                        label="Add-on"
-                        value={rates.finishAddon?.textured ?? 200}
-                        activeValue={activeRates.finishAddon?.textured ?? 200}
-                        disabled={!isDraftActive}
-                        step={25}
-                        onChange={(val) => setFinishAddon('textured', val)}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <hr className="border-pink-100" />
-
                 {/* 2-Tier Dynamic Formula Card */}
                 <div className="rounded-2xl border border-pink-200/80 bg-gradient-to-br from-pink-50/40 via-white to-pink-50/20 p-5 space-y-3 shadow-xs">
                   <div className="flex items-center gap-2.5">
@@ -1190,15 +1121,15 @@ export default function BakeryPricing() {
                   <p className="text-xs text-gray-600 leading-relaxed">
                     2-Tier cakes calculate both tiers dynamically using the exact rates above:
                     <strong className="text-gray-900 block mt-1">
-                      Total = [Tier 1: Flavor Base + Size Add-on + Finish Add-on] + [Tier 2: Flavor Base + Size Add-on + Finish Add-on]
+                      Total = [Tier 1: Flavor Base + Size Add-on] + [Tier 2: Flavor Base + Size Add-on]
                     </strong>
-                    All fillings, drips, side wraps, and edge piping for both tiers are completely included at ₱0.
+                    All finishes, fillings, drips, side wraps, and edge piping for both tiers are completely included at ₱0.
                   </p>
 
                   <div className="rounded-xl border border-pink-100 bg-white p-3 text-xs text-gray-700 flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-semibold">Example: 8×6 + 6×4 Frosted Vanilla Cake</span>
+                    <span className="font-semibold">Example: 8×6 + 6×4 Vanilla Cake</span>
                     <span className="font-bold text-primary text-sm">
-                      ₱750 (Tier 1) + ₱550 (Tier 2) = ₱1,300 Total Base
+                      ₱550 (Tier 1: 350 + 200) + ₱350 (Tier 2: 350 + 0) = ₱900 Total Base
                     </span>
                   </div>
                 </div>
@@ -1503,9 +1434,9 @@ export default function BakeryPricing() {
                         <label className="text-xs font-semibold text-gray-600 block mb-1">Finish Style</label>
                         <div className="flex gap-2">
                           {[
-                            { id: 'naked', label: 'Naked (+₱0)' },
-                            { id: 'frosted', label: 'Frosted (+₱200)' },
-                            { id: 'textured', label: 'Textured (+₱200)' },
+                            { id: 'naked', label: 'Naked (Included)' },
+                            { id: 'frosted', label: 'Frosted (Included)' },
+                            { id: 'textured', label: 'Textured (Included)' },
                           ].map((f) => (
                             <button
                               key={f.id}
@@ -1642,59 +1573,56 @@ export default function BakeryPricing() {
                       <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700">Estimated Breakdown</h3>
 
                       <div className="space-y-2 text-xs divide-y divide-pink-50">
-                        {/* Tier 1 */}
+                        {/* Tier 1: Size & Flavor */}
                         <div className="flex justify-between py-1 text-gray-700">
-                          <div className="flex flex-col">
-                            <span className="font-semibold">
-                              Tier 1: {simSize.replace('x', '×')} {simFinish === 'naked' ? 'Naked' : simFinish === 'textured' ? 'Textured' : 'Frosted'}
-                            </span>
-                            <span className="text-[10px] text-gray-500 font-medium">
-                              {simSpongeFlavor} Sponge Base (₱{
-                                (simSpongeFlavor === 'Pick Color'
-                                  ? (rates.flavors?.pickColor ?? 400)
-                                  : (rates.flavors?.[simSpongeFlavor.toLowerCase()] ?? 350))
-                              }) + Size Factor (+₱{rates.sizes?.[simSize] ?? 0}) + Finish (+₱{rates.finishAddon?.[simFinish] ?? (simFinish === 'naked' ? 0 : 200)})
-                            </span>
-                          </div>
+                          <span className="font-semibold">
+                            Size: {simSize.replace('x', '×')} (Tier 1)
+                          </span>
+                          <span className="font-bold">{money(rates.sizes?.[simSize] ?? 0)}</span>
+                        </div>
+                        <div className="flex justify-between py-1 text-gray-700">
+                          <span className="font-semibold">
+                            Flavor: {simSpongeFlavor} Sponge
+                          </span>
                           <span className="font-bold">
                             {money(
-                              (simSpongeFlavor === 'Pick Color'
+                              simSpongeFlavor === 'Pick Color'
                                 ? (rates.flavors?.pickColor ?? 400)
-                                : (rates.flavors?.[simSpongeFlavor.toLowerCase()] ?? 350)) +
-                              (rates.sizes?.[simSize] ?? 0) +
-                              (rates.finishAddon?.[simFinish] ?? (simFinish === 'naked' ? 0 : 200))
+                                : (rates.flavors?.[simSpongeFlavor.toLowerCase()] ?? 350)
                             )}
                           </span>
                         </div>
 
-                        {/* Tier 2 (if 2 tiers) */}
+                        {/* Tier 2: Size & Flavor (if 2 tiers) */}
                         {simLayers === 2 && (
-                          <div className="flex justify-between py-1 text-gray-700">
-                            <div className="flex flex-col">
+                          <>
+                            <div className="flex justify-between py-1 text-gray-700">
                               <span className="font-semibold">
-                                Tier 2: {simTier2Size.replace('x', '×')} {simFinish === 'naked' ? 'Naked' : simFinish === 'textured' ? 'Textured' : 'Frosted'}
+                                Size: {simTier2Size.replace('x', '×')} (Tier 2)
                               </span>
-                              <span className="text-[10px] text-gray-500 font-medium">
-                                {simSpongeFlavor} Sponge Base (₱{
-                                  (simSpongeFlavor === 'Pick Color'
+                              <span className="font-bold">{money(rates.sizes?.[simTier2Size] ?? 0)}</span>
+                            </div>
+                            <div className="flex justify-between py-1 text-gray-700">
+                              <span className="font-semibold">
+                                Flavor: {simSpongeFlavor} Sponge (Tier 2)
+                              </span>
+                              <span className="font-bold">
+                                {money(
+                                  simSpongeFlavor === 'Pick Color'
                                     ? (rates.flavors?.pickColor ?? 400)
-                                    : (rates.flavors?.[simSpongeFlavor.toLowerCase()] ?? 350))
-                                }) + Size Factor (+₱{rates.sizes?.[simTier2Size] ?? 0}) + Finish (+₱{rates.finishAddon?.[simFinish] ?? (simFinish === 'naked' ? 0 : 200)})
+                                    : (rates.flavors?.[simSpongeFlavor.toLowerCase()] ?? 350)
+                                )}
                               </span>
                             </div>
-                            <span className="font-bold">
-                              {money(
-                                (simSpongeFlavor === 'Pick Color'
-                                  ? (rates.flavors?.pickColor ?? 400)
-                                  : (rates.flavors?.[simSpongeFlavor.toLowerCase()] ?? 350)) +
-                                (rates.sizes?.[simTier2Size] ?? 0) +
-                                (rates.finishAddon?.[simFinish] ?? (simFinish === 'naked' ? 0 : 200))
-                              )}
-                            </span>
-                          </div>
+                          </>
                         )}
 
                         {/* Included items */}
+                        <div className="flex justify-between py-1 text-gray-600">
+                          <span>Finish Style ({simFinish === 'naked' ? 'Naked' : simFinish === 'textured' ? 'Textured' : 'Frosted'})</span>
+                          <span className="text-emerald-700 font-bold">Included (₱0)</span>
+                        </div>
+
                         <div className="flex justify-between py-1 text-gray-600">
                           <span>Filling ({simFilling})</span>
                           <span className="text-emerald-700 font-bold">Included (₱0)</span>

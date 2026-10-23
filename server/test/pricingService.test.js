@@ -166,7 +166,7 @@ test('piping sugar color registers dynamically when sugar color or filling flavo
   assert.ok(quoteWithFlavor.lineItems[0].details.includes('Piping Sugar Color: Strawberry'));
 });
 
-test('drip breakdown displays Drip with design and sugar color for 1-tier, and splits into Drip Top and Drip Bottom for 2-tier', () => {
+test('drip breakdown is included in Size details at ₱0 and does not emit separate line item', () => {
   // 1-Tier Drip
   const quote1 = buildQuote({
     structure: { size: 'big', layers: 1 },
@@ -174,49 +174,21 @@ test('drip breakdown displays Drip with design and sugar color for 1-tier, and s
     sugarColorOverrides: { surface: { colorId: 'vanilla' } },
   });
   const dripLine1 = quote1.lineItems.find((l) => l.componentKey === 'glaze');
-  assert.equal(dripLine1.label, 'Drip — Long Drips');
-  assert.equal(dripLine1.lineTotalMinor, 0); // ₱0 (included)
-  assert.deepEqual(dripLine1.details, [
-    'Drip:',
-    'Design: Long Drips',
-    'Sugar Color: Vanilla',
-  ]);
-
-  const naturalTear2Quote = buildQuote({
-    structure: { size: 'big', layers: 1 },
-    surfaceTreatment: { mode: 'glaze', pattern: 'naturalTear2' },
-  });
-  const naturalTear2Line = naturalTear2Quote.lineItems.find((line) => line.componentKey === 'glaze');
-  assert.equal(naturalTear2Line.label, 'Drip — Natural Tear 2');
-  assert.equal(naturalTear2Line.lineTotalMinor, 0);
+  assert.equal(dripLine1, undefined);
+  const sizeLine = quote1.lineItems.find((l) => l.componentKey === 'sponge-size');
+  assert.ok(sizeLine.details.includes('Drip: Long Drips (Included)'));
 
   // 2-Tier Drip
   const quote2 = buildQuote({
     structure: { size: 'big', layers: 2 },
     surfaceTreatment: { mode: 'glaze', pattern: 'longGaps' },
-    sugarColorOverrides: {
-      'surface-0': { colorId: 'vanilla' },
-      'surface-1': { colorId: 'chocolate' },
-    },
   });
   const dripTop = quote2.lineItems.find((l) => l.componentKey === 'glaze-top');
   const dripBottom = quote2.lineItems.find((l) => l.componentKey === 'glaze-bottom');
-
-  assert.equal(dripTop.label, 'Drip Top — Long Drips');
-  assert.equal(dripTop.lineTotalMinor, 0); // ₱0 (included)
-  assert.deepEqual(dripTop.details, [
-    'Drip Top:',
-    'Design: Long Drips',
-    'Sugar Color: Chocolate',
-  ]);
-
-  assert.equal(dripBottom.label, 'Drip Bottom — Long Drips');
-  assert.equal(dripBottom.lineTotalMinor, 0); // ₱0 (included)
-  assert.deepEqual(dripBottom.details, [
-    'Drip Bottom:',
-    'Design: Long Drips',
-    'Sugar Color: Vanilla',
-  ]);
+  assert.equal(dripTop, undefined);
+  assert.equal(dripBottom, undefined);
+  const bSize = quote2.lineItems.find((l) => l.componentKey === 'sponge-size-bottom');
+  assert.ok(bSize.details.includes('Drip: Long Drips (Included)'));
 });
 
 test('next publication time is the next 10 PM in Manila', () => {
@@ -363,7 +335,7 @@ test('cake quote prices buttercream text across 1-10, 11-20, 21-30, 31-40, and 4
   assert.equal(text45.lineTotalMinor, 25000); // ₱250
 });
 
-test('edge breakdown details omit Sugar Color for Edible Delicates designs', () => {
+test('edge borders are included in Size details at ₱0 and do not emit separate line item', () => {
   const config = {
     structure: { size: 'big', layers: 2 },
     sponge: { flavor: 'vanilla' },
@@ -377,12 +349,10 @@ test('edge breakdown details omit Sugar Color for Edible Delicates designs', () 
   };
   const quote = buildQuote(config);
   const edgeTop = quote.lineItems.find((l) => l.componentKey === 'edge-top');
-  const edgeMiddle = quote.lineItems.find((l) => l.componentKey === 'edge-middle');
-  const edgeBottom = quote.lineItems.find((l) => l.componentKey === 'edge-bottom');
-
-  assert.deepEqual(edgeTop.details, ['Edge Top:', 'Design: Shell Border', 'Sugar Color: Vanilla']);
-  assert.deepEqual(edgeMiddle.details, ['Edge Middle:', 'Design: Cherry and Hershey']);
-  assert.deepEqual(edgeBottom.details, ['Edge Bottom:', 'Design: Shell Border', 'Sugar Color: Vanilla']);
+  assert.equal(edgeTop, undefined);
+  const bSize = quote.lineItems.find((l) => l.componentKey === 'sponge-size-bottom');
+  assert.ok(bSize.details.includes('Edge Top: Shell Border (Included)'));
+  assert.ok(bSize.details.includes('Edge Bottom: Shell Border (Included)'));
 });
 
 test('two-tier quote prices and generates accurate specs for Uniform vs Individual configurations', () => {
@@ -397,24 +367,20 @@ test('two-tier quote prices and generates accurate specs for Uniform vs Individu
     },
   };
   const uniformQuote = buildQuote(uniformConfig);
-  const uniformBottom = uniformQuote.lineItems.find((l) => l.componentKey === 'sponge');
-  const uniformTop = uniformQuote.lineItems.find((l) => l.componentKey === 'sponge-top');
+  const uniformBottom = uniformQuote.lineItems.find((l) => l.componentKey === 'sponge-size-bottom');
+  const uniformTop = uniformQuote.lineItems.find((l) => l.componentKey === 'sponge-size-top');
 
   assert.deepEqual(uniformBottom.details, [
-    'Bottom Tier',
-    '8x6',
-    'Frosted Finish',
-    'Chocolate Sponge',
-    'Filling: Strawberry (2 Layers)',
+    'Size: 8x6 (Bottom Tier)',
+    'Frosted Finish (Included)',
+    'Filling: Strawberry (2 Layers) (Included)',
     'Piping Design: None',
     'Piping Sugar Color: Rose Pink',
   ]);
   assert.deepEqual(uniformTop.details, [
-    'Top Tier',
-    '6x4',
-    'Frosted Finish',
-    'Chocolate Sponge',
-    'Filling: Strawberry (2 Layers)',
+    'Size: 6x4 (Top Tier)',
+    'Frosted Finish (Included)',
+    'Filling: Strawberry (2 Layers) (Included)',
     'Piping Design: None',
     'Piping Sugar Color: Rose Pink',
   ]);
@@ -434,24 +400,20 @@ test('two-tier quote prices and generates accurate specs for Uniform vs Individu
     },
   };
   const indQuote = buildQuote(individualConfig);
-  const indBottom = indQuote.lineItems.find((l) => l.componentKey === 'sponge');
-  const indTop = indQuote.lineItems.find((l) => l.componentKey === 'sponge-top');
+  const indBottom = indQuote.lineItems.find((l) => l.componentKey === 'sponge-size-bottom');
+  const indTop = indQuote.lineItems.find((l) => l.componentKey === 'sponge-size-top');
 
   assert.deepEqual(indBottom.details, [
-    'Bottom Tier',
-    '8x6',
-    'Naked Finish',
-    'Chocolate Sponge',
-    'Filling: Vanilla (1 Layer)',
+    'Size: 8x6 (Bottom Tier)',
+    'Naked Finish (Included)',
+    'Filling: Vanilla (1 Layer) (Included)',
     'Piping Design: None',
     'Piping Sugar Color: Mocha',
   ]);
   assert.deepEqual(indTop.details, [
-    'Top Tier',
-    '6x4',
-    'Textured: Ribbon Wrap',
-    'Ube Sponge',
-    'Filling: Lemon (1 Layer)',
+    'Size: 6x4 (Top Tier)',
+    'Textured: Ribbon Wrap (Included)',
+    'Filling: Lemon (1 Layer) (Included)',
     'Piping Design: None',
     'Piping Sugar Color: Lemon',
   ]);
@@ -571,23 +533,23 @@ test('new pricing formula: flavor base + size factor + finish factor for 1-tier 
   });
   assert.equal(vanilla6x4Naked.totalMinor, 35000);
 
-  // 6x4 Vanilla Frosted = 350 + 200 = 550
+  // 6x4 Vanilla Frosted = 350 (sponge) + 0 (size) + 350 (vanilla frosting copied from sponge flavor) = 700
   const vanilla6x4Frosted = buildQuote({
     structure: { size: '6x4', layers: 1 },
     sponge: { flavor: 'vanilla' },
     exteriorFinish: { style: 'fullyFrosted' },
   });
-  assert.equal(vanilla6x4Frosted.totalMinor, 55000);
+  assert.equal(vanilla6x4Frosted.totalMinor, 70000);
 
-  // 8x6 Chocolate Frosted = 500 (flavor) + 200 (8x6) + 200 (frosted) = 900
+  // 8x6 Chocolate Frosted = 500 (sponge) + 200 (8x6) + 500 (chocolate frosting copied from sponge flavor) = 1200
   const choc8x6 = buildQuote({
     structure: { size: '8x6', layers: 1 },
     sponge: { flavor: 'chocolate' },
     exteriorFinish: { style: 'fullyFrosted' },
   });
-  assert.equal(choc8x6.totalMinor, 90000);
+  assert.equal(choc8x6.totalMinor, 120000);
 
-  // 10x8 Plain Textured = 300 (flavor) + 400 (10x8) + 200 (textured) = 900
+  // 10x8 Plain Textured = 300 (sponge) + 400 (10x8) + 200 (textured on plain is 200) = 900
   const plain10x8Textured = buildQuote({
     structure: { size: '10x8', layers: 1 },
     sponge: { flavor: 'plain' },
@@ -595,13 +557,22 @@ test('new pricing formula: flavor base + size factor + finish factor for 1-tier 
   });
   assert.equal(plain10x8Textured.totalMinor, 90000);
 
-  // 12x10 Strawberry Frosted = 500 (flavor) + 600 (12x10) + 200 (frosted) = 1300
+  // 12x10 Strawberry Frosted = 500 (sponge) + 600 (12x10) + 500 (strawberry frosting copied from sponge flavor) = 1600
   const straw12x10 = buildQuote({
     structure: { size: '12x10', layers: 1 },
     sponge: { flavor: 'strawberry' },
     exteriorFinish: { style: 'fullyFrosted' },
   });
-  assert.equal(straw12x10.totalMinor, 130000);
+  assert.equal(straw12x10.totalMinor, 160000);
+
+  // 6x4 Vanilla Frosted with Pick Color = 350 (sponge) + 0 (size) + 200 (pick color finish) = 550
+  const vanillaPickColor = buildQuote({
+    structure: { size: '6x4', layers: 1 },
+    sponge: { flavor: 'vanilla' },
+    exteriorFinish: { style: 'fullyFrosted' },
+    sugarColor: { mode: 'colorOverride', colorId: 'skyBlue' },
+  });
+  assert.equal(vanillaPickColor.totalMinor, 55000);
 
   // Cheese 6x4 Naked = 400
   const cheese6x4 = buildQuote({
@@ -629,24 +600,24 @@ test('new pricing formula: flavor base + size factor + finish factor for 1-tier 
 });
 
 test('2-tier cake prices each tier based on size + flavor + finish', () => {
-  // Uniform design 2-tier: Base 8x6 Vanilla Frosted (350+200+200 = 750) + Top 6x4 Vanilla Frosted (350+0+200 = 550) = 1300
+  // Uniform design 2-tier: Base 8x6 Vanilla Frosted (350+200+350 = 900) + Top 6x4 Vanilla Frosted (350+0+350 = 700) = 1600
   const quoteUniform2Tier = buildQuote({
     structure: { size: '8x6', layers: 2, layerDesign: 'uniform' },
     sponge: { flavor: 'vanilla' },
     exteriorFinish: { style: 'fullyFrosted' },
   });
-  assert.equal(quoteUniform2Tier.totalMinor, 130000);
+  assert.equal(quoteUniform2Tier.totalMinor, 160000);
 
   // Individual design 2-tier:
-  // Bottom: 8x6 Chocolate Frosted = 500 + 200 + 200 = 900
+  // Bottom: 8x6 Chocolate Frosted = 500 + 200 + 500 = 1200
   // Top: 6x4 Vanilla Naked = 350 + 0 + 0 = 350
-  // Total = 1250 (125000 minor)
+  // Total = 1550 (155000 minor)
   const quoteIndividual2Tier = buildQuote({
     structure: { size: '8x6', layers: 2, layerDesign: 'individual' },
     sponge: { layerFlavors: ['chocolate', 'vanilla'] },
-    exteriorFinish: { layerStyles: ['fullyFrosted', 'naked'] },
+    exteriorFinish: { layerStyles: ['fullyFrosted', 'naked'], layerFlavors: ['chocolate', 'vanilla'] },
   });
-  assert.equal(quoteIndividual2Tier.totalMinor, 125000);
+  assert.equal(quoteIndividual2Tier.totalMinor, 155000);
 });
 
 test('center toppings bracket pricing: 1-4 = +200, 5+ = +300', () => {

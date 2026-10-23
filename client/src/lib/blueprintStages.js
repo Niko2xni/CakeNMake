@@ -282,14 +282,13 @@ export function buildBlueprintTierPlan(config = {}) {
     if (placed.length) {
         const withoutCenter = clone(config);
         withoutCenter.place = { ...(withoutCenter.place || {}), items: [] };
-        // 1. Direct top-down angle (eagle eye of top view)
         stages.push({
             key: 'center',
             config: clone(config),
             diffConfig: withoutCenter,
             tilt: 90,
             azimuth: 0,
-            fit: 0.98,
+            fit: 0.85,
         });
         stages.push({
             key: 'center-top',
@@ -297,25 +296,7 @@ export function buildBlueprintTierPlan(config = {}) {
             diffConfig: withoutCenter,
             tilt: 90,
             azimuth: 0,
-            fit: 0.98,
-        });
-        // 2. Literal side view from the left (capturing literal side like EDGE)
-        stages.push({
-            key: 'center-side1',
-            config: clone(config),
-            diffConfig: withoutCenter,
-            tilt: 14,
-            azimuth: -70,
-            fit: 0.94,
-        });
-        // 3. Literal side view from the right (capturing literal side like EDGE)
-        stages.push({
-            key: 'center-side2',
-            config: clone(config),
-            diffConfig: withoutCenter,
-            tilt: 14,
-            azimuth: 70,
-            fit: 0.94,
+            fit: 0.85,
         });
     }
 
@@ -426,6 +407,7 @@ export function buildBlueprintTierPlan(config = {}) {
                 kind: 'assembling',
                 section: 'ASSEMBLING',
                 title: 'Cake Layer-by-Layer Assembly',
+                shape: shape || 'round',
                 spongeFlavor: name(t.sponge),
                 spongeColor: flavorColorOf(t.sponge) || '#F5E6CA',
                 fillingFlavor: fillingSub,
@@ -496,6 +478,48 @@ export function buildBlueprintTierPlan(config = {}) {
                         : `${name(t.style)} coating spread smoothly over the whole cake`,
                 ],
             });
+
+            // Dedicated ASSEMBLING page (Exterior Coating): in-between EXTERIOR FINISH and SURFACE TREATMENT
+            // Left: Assembled Fundamentals + Filling ("FILLING") -> Right: Covered with Frosting or Textured ("COATED")
+            const fillingSugarOverrideForCoating = config.sugarColorOverrides?.[`filling-${t.i}`] || config.sugarColorOverrides?.filling;
+            const hasSugarOverrideForCoating = fillingSugarOverrideForCoating?.mode === 'colorOverride' && fillingSugarOverrideForCoating.colorId;
+            const fillingColorIdForCoating = hasSugarOverrideForCoating ? fillingSugarOverrideForCoating.colorId : t.fillingFlavor;
+            const activeFillingChipColor = t.fillingOn ? (flavorColorOf(fillingColorIdForCoating) || flavorColorOf(t.fillingFlavor) || '#7A4B2A') : (flavorColorOf(t.sponge) || '#F5E6CA');
+            const activeFillingSub = t.fillingOn ? (hasSugarOverrideForCoating ? name(fillingColorIdForCoating) : name(t.fillingFlavor)) : 'None';
+
+            pages.push({
+                kind: 'coating-assembly',
+                section: 'ASSEMBLING',
+                title: 'Cake Exterior Coating Assembly',
+                shape: shape || 'round',
+                spongeFlavor: name(t.sponge),
+                spongeColor: flavorColorOf(t.sponge) || '#F5E6CA',
+                fillingFlavor: activeFillingSub,
+                fillingColor: activeFillingChipColor,
+                layers: t.fillingOn ? (Number(t.fillingLayers) || 1) : 1,
+                style: t.style,
+                styleName: name(t.style),
+                texture: t.texture,
+                textureName: t.texture ? name(t.texture) : '',
+                isTextured: t.style === 'texturedButtercream',
+                finishFlavor: finishFlavorSub,
+                finishColor: finishChipColor,
+                finishColorId: finishColorId,
+                details: [
+                    ['Assembled Core', `${name(t.sponge)} Sponge${t.fillingOn ? ` with ${activeFillingSub} Filling` : ''}`],
+                    ['Exterior Finish', name(t.style)],
+                    ...(t.style === 'texturedButtercream' && t.texture ? [['Texture Pattern', name(t.texture)]] : []),
+                    ['Frosting Flavor / Color', finishFlavorSub],
+                    ['Crumb Coat', 'Apply thin crumb coat layer to seal core; chill 15–20 minutes before exterior finish'],
+                    ['Finish Coat', t.style === 'texturedButtercream' && t.texture
+                        ? `Apply 4–6mm even buttercream coat, then carve ${name(t.texture).toLowerCase()} with decorating comb`
+                        : 'Apply 4–6mm even frosting layer, smoothed with bench scraper'],
+                ],
+                highlights: [
+                    'Step 1 (FILLING): Take assembled and chilled cake core (sponge slices and filling layers)',
+                    `Step 2 (COATED): Apply crumb coat, then cover completely with ${finishFlavorSub} ${name(t.style)}${t.style === 'texturedButtercream' && t.texture ? ` (${name(t.texture)} texture)` : ''}`,
+                ],
+            });
         }
 
         if (t.surface?.mode) {
@@ -506,12 +530,17 @@ export function buildBlueprintTierPlan(config = {}) {
               ? surfaceSugarOverride.colorId
               : (surfaceSugarOverride?.colorId
                  || t.surface?.colorId
+                 || t.surface?.[t.surface?.mode]?.colorId
+                 || t.surface?.[t.surface?.mode]?.flavor
                  || config.surfaceTreatment?.colorId
                  || (surfaceSugarOverride?.mode === 'default' ? (surfaceSugarOverride.colorId || t.frost || 'vanilla') : 'vanilla'));
             const isChoc = String(surfaceColorId || '').toLowerCase().includes('choc');
             const surfaceChipColor = isChoc ? '#301009' : (flavorColorOf(surfaceColorId) || '#F6DEAB');
             const surfaceFlavorName = name(surfaceColorId);
-            const patternId = getSurfaceTreatmentPattern(t.surface, config.structure);
+            const patternId = t.surface?.[t.surface?.mode]?.setId
+              || t.surface?.pattern
+              || config.surfaceTreatment?.[config.surfaceTreatment?.mode]?.setId
+              || getSurfaceTreatmentPattern(t.surface, config.structure);
             const patternName = name(patternId);
 
             pages.push({
@@ -550,6 +579,47 @@ export function buildBlueprintTierPlan(config = {}) {
                     ['Flavor', surfaceFlavorName],
                 ],
                 highlights: [`${name(t.surface.mode)} finish applied to the surface (Front and Back views)`],
+            });
+
+            // Dedicated ASSEMBLING page (Surface Treatment / Drip Application): in-between SURFACE TREATMENT and SIDE
+            // Left: Coated Cake ("COATED") -> Right: Cake with Surface Treatment / Drips ("DRIP")
+            const finishSugarOverrideForSurface = config.sugarColorOverrides?.[`exterior-${t.i}`] || config.sugarColorOverrides?.exterior || config.sugarColor;
+            const finishColorIdForSurface = finishSugarOverrideForSurface?.colorId || t.frost || 'vanilla';
+            const finishChipColorForSurface = flavorColorOf(finishColorIdForSurface) || flavorColorOf(t.frost) || '#F6DEAB';
+            const finishFlavorSubForSurface = name(finishColorIdForSurface);
+
+            pages.push({
+                kind: 'surface-assembly',
+                section: 'ASSEMBLING',
+                title: 'Surface Treatment Application Assembly',
+                shape: shape || 'round',
+                spongeFlavor: name(t.sponge),
+                spongeColor: flavorColorOf(t.sponge) || '#F5E6CA',
+                style: t.style || 'smooth',
+                styleName: name(t.style || 'Smooth Coating'),
+                texture: t.texture || '',
+                textureName: t.texture ? name(t.texture) : '',
+                isTextured: t.style === 'texturedButtercream',
+                finishFlavor: finishFlavorSubForSurface,
+                finishColor: finishChipColorForSurface,
+                surfaceMode: t.surface.mode,
+                surfaceModeName: name(t.surface.mode),
+                patternId,
+                patternName,
+                surfaceFlavorName,
+                surfaceColor: surfaceChipColor,
+                details: [
+                    ['Coated Base', `${finishFlavorSubForSurface} ${name(t.style || 'smooth')}${t.style === 'texturedButtercream' && t.texture ? ` (${name(t.texture)})` : ''}`],
+                    ['Surface Treatment', name(t.surface.mode)],
+                    ['Treatment Pattern', patternName],
+                    ['Drip Flavor / Color', surfaceFlavorName],
+                    ['Application Method', 'Pour glaze onto center of top tier; gently guide cascading drips over rim with squeeze bottle / spatula'],
+                    ['Setting Time', 'Allow glaze to drip naturally and set for 10–15 minutes before piping edge borders'],
+                ],
+                highlights: [
+                    'Step 1 (COATED): Chilled cake with set exterior finish ready for surface treatment application',
+                    `Step 2 (DRIP): Apply ${surfaceFlavorName} ${name(t.surface.mode)} glaze evenly across the crown, forming descending drips along perimeter`,
+                ],
             });
         }
 
@@ -615,6 +685,77 @@ export function buildBlueprintTierPlan(config = {}) {
                 ],
                 highlights: [
                     `${baseTypeDisplay}: ${name(t.side.mode)} design with ${baseFinishName.toLowerCase()} base (Front and Back views)`,
+                ],
+            });
+
+            // Dedicated ASSEMBLING page (Side Design Application): in-between SIDE and EDGE
+            // Left: Cake with Drip (or Coated) -> Right: Cake with Side Design Pattern Applied ("SIDE")
+            const hasSurface = Boolean(t.surface?.mode);
+            const surfaceChoice = hasSurface ? (t.surface[t.surface.mode] || {}) : {};
+            const surfacePatternIdForSide = surfaceChoice.setId
+              || t.surface?.pattern
+              || config.surfaceTreatment?.[config.surfaceTreatment?.mode]?.setId
+              || null;
+            const surfacePatternNameForSide = surfacePatternIdForSide ? name(surfacePatternIdForSide) : (hasSurface ? name(t.surface.mode) : '');
+            const surfaceSugarOverride = config.sugarColorOverrides?.[`surface-${t.i}`] || config.sugarColorOverrides?.surface;
+            const surfaceColorId = (surfaceSugarOverride?.mode === 'colorOverride' && surfaceSugarOverride.colorId)
+              ? surfaceSugarOverride.colorId
+              : (surfaceSugarOverride?.colorId
+                  || surfaceChoice.colorId
+                  || surfaceChoice.flavorId
+                  || surfaceChoice.flavor
+                  || t.surface?.colorId
+                  || config.surfaceTreatment?.colorId
+                  || config.sugarColor?.colorId
+                  || 'vanilla');
+            const isChoc = String(surfaceColorId || '').toLowerCase().includes('choc');
+            const surfaceChipColorForSide = isChoc ? '#301009' : (flavorColorOf(surfaceColorId) || '#F6DEAB');
+            const surfaceFlavorNameForSide = name(surfaceColorId);
+
+            const finishSugarOverrideForSide = config.sugarColorOverrides?.[`exterior-${t.i}`] || config.sugarColorOverrides?.exterior || config.sugarColor;
+            const finishColorIdForSide = finishSugarOverrideForSide?.colorId || t.frost || 'vanilla';
+            const finishChipColorForSide = flavorColorOf(finishColorIdForSide) || flavorColorOf(t.frost) || '#F6DEAB';
+            const finishFlavorSubForSide = name(finishColorIdForSide);
+
+            pages.push({
+                kind: 'side-assembly',
+                section: 'ASSEMBLING',
+                title: 'Side Design Application Assembly',
+                shape: shape || 'round',
+                spongeFlavor: name(t.sponge),
+                spongeColor: flavorColorOf(t.sponge) || '#F5E6CA',
+                style: t.style || 'smooth',
+                styleName: name(t.style || 'Smooth Coating'),
+                texture: t.texture || '',
+                textureName: t.texture ? name(t.texture) : '',
+                isTextured,
+                finishFlavor: finishFlavorSubForSide,
+                finishColor: finishChipColorForSide,
+                hasSurface,
+                surfaceMode: t.surface?.mode || '',
+                surfaceModeName: t.surface?.mode ? name(t.surface.mode) : '',
+                surfacePatternId: surfacePatternIdForSide,
+                surfacePatternName: surfacePatternNameForSide,
+                surfaceFlavorName: surfaceFlavorNameForSide,
+                surfaceColor: surfaceChipColorForSide,
+                treatmentId: t.side.mode,
+                treatmentName: name(t.side.mode),
+                variantId: choice.setId || null,
+                sidePatternName,
+                sideColorName,
+                sideColor: sideChipColor,
+                secondaryColor: choice.secondaryColorId ? (flavorColorOf(choice.secondaryColorId) || null) : null,
+                details: [
+                    ['Base Preparation', hasSurface ? `${surfaceFlavorNameForSide} ${name(t.surface.mode)} on ${finishFlavorSubForSide} ${name(t.style || 'smooth')}` : `${finishFlavorSubForSide} ${name(t.style || 'smooth')}`],
+                    ['Side Design', name(t.side.mode)],
+                    ['Pattern / Set', sidePatternName],
+                    ['Piping Color', sideColorName],
+                    ['Application Technique', 'Pipe design motifs uniformly around the circumference wall using steady hand pressure and consistent spacing'],
+                    ['Alignment', 'Verify vertical and radial alignment along tier perimeter before proceeding to border edges'],
+                ],
+                highlights: [
+                    `Step 1 (${hasSurface ? 'DRIP' : 'COATED'}): Prepared tier base ready for circumference wall decoration`,
+                    `Step 2 (SIDE): Pipe ${sideColorName} ${sidePatternName} motifs evenly along the cake wall with precision piping tip`,
                 ],
             });
         }
@@ -700,9 +841,9 @@ export function buildBlueprintTierPlan(config = {}) {
         const allRight = items.every((it) => (Number(it.x) || 0) > 0.2);
 
         if (items.length >= 6) {
-            if (allBack) return 'Arrange in an arc along the rear half of the top tier, inset 1.5 inches from the edge';
-            if (allFront) return 'Arrange in an arc along the front half of the top tier, inset 1.5 inches from the edge';
-            if (uniqueZones.length >= 5) return 'Distribute in an even circular ring around the top surface, keeping a uniform 1.5-inch border from the rim';
+            if (allBack) return 'Circular arc along rear perimeter, inset 1.5 inches from the edge';
+            if (allFront) return 'Circular arc along front perimeter, inset 1.5 inches from the edge';
+            if (uniqueZones.length >= 5) return 'Full perimeter ring arrangement, keeping a uniform 1.5-inch border from the rim';
         }
 
         if (allBack) return `Arrange across the rear top surface (${uniqueZones.join(', ')}) with even spacing`;
@@ -756,7 +897,7 @@ export function buildBlueprintTierPlan(config = {}) {
             callouts: [], // Remove CENTER pointing arrow & pill
             details: rows,
             highlights: [
-                `3 visual angles provided above: Top View (exact placement layout), Perspective (3D relief), and Side Profile (clearance & height)`,
+                `Top-view diagram showing where decorations are placed on the cake`,
                 `Bakery Placement Guide: Place center piece first, then align adjacent pieces symmetrically with equal spacing`,
                 `Ensure decorations are set firmly into the frosting and kept clear of the edge piping border`,
             ],

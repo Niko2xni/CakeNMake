@@ -40,6 +40,7 @@ export function drawSidePatternSchematic(doc, {
   color = '#3D2314',
   colorName = 'Chocolate',
   patternName = 'Straight Grid',
+  secondaryColor = null,
   baseFinish = '',
 }) {
   doc.saveGraphicsState?.();
@@ -76,23 +77,36 @@ export function drawSidePatternSchematic(doc, {
     treatmentId,
     variantId,
     rgb,
+    secondaryColor,
   });
 
   // 4. Bottom footer of card: Pattern & Color indicators
   const footerY = y + h - 5;
-  // Color chip circle
-  doc.setFillColor(...rgb);
-  doc.circle(x + 5, footerY, 2.2, 'F');
-  doc.setDrawColor(...INK);
-  doc.setLineWidth(0.3);
-  doc.circle(x + 5, footerY, 2.2, 'S');
+  if (secondaryColor) {
+    const secRgb = hexToRgb(secondaryColor);
+    doc.setFillColor(...rgb);
+    doc.circle(x + 4.2, footerY, 2.0, 'F');
+    doc.setFillColor(...secRgb);
+    doc.circle(x + 7.2, footerY, 2.0, 'F');
+    doc.setDrawColor(...INK);
+    doc.setLineWidth(0.3);
+    doc.circle(x + 4.2, footerY, 2.0, 'S');
+    doc.circle(x + 7.2, footerY, 2.0, 'S');
+  } else {
+    // Color chip circle
+    doc.setFillColor(...rgb);
+    doc.circle(x + 5, footerY, 2.2, 'F');
+    doc.setDrawColor(...INK);
+    doc.setLineWidth(0.3);
+    doc.circle(x + 5, footerY, 2.2, 'S');
+  }
 
   // Label text
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(6.8);
   doc.setTextColor(...INK);
   const titleText = `${String(patternName).toUpperCase()} · ${String(colorName).toUpperCase()}`;
-  doc.text(titleText, x + 9, footerY + 1.2);
+  doc.text(titleText, x + (secondaryColor ? 11 : 9), footerY + 1.2);
 
   doc.restoreGraphicsState?.();
 }
@@ -110,6 +124,7 @@ export function drawSurfaceTreatmentSchematic(doc, {
   color = '#3D2314',
   colorName = 'Chocolate',
   contour = null,
+  petitFours = false,
 }) {
   doc.saveGraphicsState?.();
 
@@ -144,6 +159,7 @@ export function drawSurfaceTreatmentSchematic(doc, {
     wallH,
     patternId,
     rgb,
+    natural: petitFours || /natural/i.test(String(patternName || '')) || /natural/i.test(String(patternId || '')),
   });
 
   // 4. Bottom footer of card
@@ -180,7 +196,7 @@ function drawBadge(doc, label, bx, by, bgColor = [35, 30, 30]) {
 // Geometric Shapes Generation for Side Designs
 // ─────────────────────────────────────────────────────────────────────────────
 
-function renderSideShapes(doc, { wallX, wallY, wallW, wallH, treatmentId, variantId, rgb }) {
+function renderSideShapes(doc, { wallX, wallY, wallW, wallH, treatmentId, variantId, rgb, secondaryColor = null }) {
   doc.setFillColor(...rgb);
   doc.setDrawColor(...rgb);
 
@@ -197,10 +213,13 @@ function renderSideShapes(doc, { wallX, wallY, wallW, wallH, treatmentId, varian
       // Grid dimensions: 9 columns for X pattern to replicate user diagram, 7 columns for diagonals & parallel
       const cols = isXPattern ? 9 : 7;
       const rows = 5;
-      const cellW = isXPattern ? 7.6 : 8.6;
-      const cellH = isXPattern ? 7.6 : 8.6;
-      const sqSize = isXPattern ? 6.2 : 6.8;
-      const pad = (cellW - sqSize) / 2;
+      const nominalCellW = isXPattern ? 7.6 : 8.6;
+      const nominalCellH = isXPattern ? 7.6 : 8.6;
+      const cellW = Math.min(nominalCellW, (wallW - 2) / cols);
+      const cellH = Math.min(nominalCellH, (wallH - 2) / rows);
+      const sqSize = Math.min(cellW * (isXPattern ? (6.2 / 7.6) : (6.8 / 8.6)), cellH * (isXPattern ? (6.2 / 7.6) : (6.8 / 8.6)));
+      const padX = (cellW - sqSize) / 2;
+      const padY = (cellH - sqSize) / 2;
       const startX = wallX + (wallW - cols * cellW) / 2;
       const startY = wallY + (wallH - rows * cellH) / 2;
 
@@ -237,7 +256,7 @@ function renderSideShapes(doc, { wallX, wallY, wallW, wallH, treatmentId, varian
           }
 
           if (shouldFill) {
-            doc.rect(startX + c * cellW + pad, startY + r * cellH + pad, sqSize, sqSize, 'F');
+            doc.rect(startX + c * cellW + padX, startY + r * cellH + padY, sqSize, sqSize, 'F');
           }
         }
       }
@@ -253,10 +272,13 @@ function renderSideShapes(doc, { wallX, wallY, wallW, wallH, treatmentId, varian
 
       const cols = isXPattern ? 9 : 7;
       const rows = 5;
-      const cellW = isXPattern ? 7.6 : 8.6;
-      const cellH = isXPattern ? 7.6 : 8.6;
-      const triSize = isXPattern ? 6.2 : 6.8;
-      const pad = (cellW - triSize) / 2;
+      const nominalCellW = isXPattern ? 7.6 : 8.6;
+      const nominalCellH = isXPattern ? 7.6 : 8.6;
+      const cellW = Math.min(nominalCellW, (wallW - 2) / cols);
+      const cellH = Math.min(nominalCellH, (wallH - 2) / rows);
+      const triSize = Math.min(cellW * (isXPattern ? (6.2 / 7.6) : (6.8 / 8.6)), cellH * (isXPattern ? (6.2 / 7.6) : (6.8 / 8.6)));
+      const padX = (cellW - triSize) / 2;
+      const padY = (cellH - triSize) / 2;
       const startX = wallX + (wallW - cols * cellW) / 2;
       const startY = wallY + (wallH - rows * cellH) / 2;
 
@@ -288,8 +310,8 @@ function renderSideShapes(doc, { wallX, wallY, wallW, wallH, treatmentId, varian
           }
 
           if (shouldFill) {
-            const bx = startX + c * cellW + pad;
-            const by = startY + r * cellH + pad;
+            const bx = startX + c * cellW + padX;
+            const by = startY + r * cellH + padY;
             // Upright triangle with flat bottom base and centered top apex
             doc.triangle(bx, by + triSize, bx + triSize, by + triSize, bx + triSize / 2, by, 'F');
           }
@@ -513,14 +535,15 @@ function renderSideShapes(doc, { wallX, wallY, wallW, wallH, treatmentId, varian
 
         const drawScroll = (isLeft) => {
           const sign = isLeft ? -1 : 1;
-          const spineX = cx + sign * 16.5; // Outer spine position
+          const spineX = cx + sign * Math.min(16.5, wallW * 0.26); // Outer spine position
+          const bend = Math.min(10.5, wallW * 0.17);
           const N = 40;
           const pts = [];
           for (let i = 0; i <= N; i++) {
             const u = (i / N) * 2 - 1; // -1 (top tip) to +1 (bottom tip)
             const py = cy + u * 12.5;
             // Spine curves outward at u=0, tips bend inward toward center
-            const px = spineX - sign * (u * u * 10.5);
+            const px = spineX - sign * (u * u * bend);
             pts.push([px, py]);
           }
 
@@ -1396,7 +1419,7 @@ function renderSideShapes(doc, { wallX, wallY, wallW, wallH, treatmentId, varian
     case 'borderPiping': {
       // 12 variants: Shell, Reverse Shell, Bead, Rope Twist, Rope Twist Classic, Elongated Shell (+ Alternating)
       const isAlt = str.includes('alt');
-      const altRgb = [Math.min(255, rgb[0] + 75), Math.min(255, rgb[1] + 75), Math.min(255, rgb[2] + 75)];
+      const altRgb = secondaryColor ? hexToRgb(secondaryColor) : [Math.min(255, rgb[0] + 75), Math.min(255, rgb[1] + 75), Math.min(255, rgb[2] + 75)];
       const rimY = wallY + wallH * 0.52;
 
       // Fluted shell unit (matches the 3D render): a stack of horizontal flutes whose
@@ -1791,7 +1814,7 @@ function renderSideShapes(doc, { wallX, wallY, wallW, wallH, treatmentId, varian
       const isSparse = str.includes('sparse');
       const isMedium = str.includes('medium') || (!isRound && !isSparse && !str.includes('continuous'));
       const isContinuous = !isSparse && !isMedium;
-      const altRgb = [Math.min(255, rgb[0] + 75), Math.min(255, rgb[1] + 75), Math.min(255, rgb[2] + 75)];
+      const altRgb = secondaryColor ? hexToRgb(secondaryColor) : [Math.min(255, rgb[0] + 75), Math.min(255, rgb[1] + 75), Math.min(255, rgb[2] + 75)];
       const cy = wallY + wallH * 0.5;
 
       let seed = 9001;
@@ -1971,7 +1994,7 @@ function renderSideShapes(doc, { wallX, wallY, wallW, wallH, treatmentId, varian
       const isAlt = str.includes('alt');
       const isCherry = str.includes('cherry');
       const isContinuous = str.includes('continuous');
-      const altRgb = [Math.min(255, rgb[0] + 75), Math.min(255, rgb[1] + 75), Math.min(255, rgb[2] + 75)];
+      const altRgb = secondaryColor ? hexToRgb(secondaryColor) : [Math.min(255, rgb[0] + 75), Math.min(255, rgb[1] + 75), Math.min(255, rgb[2] + 75)];
       const cy = wallY + wallH * 0.5;
 
       let seed = 31337;
@@ -2346,148 +2369,213 @@ function renderSideShapes(doc, { wallX, wallY, wallW, wallH, treatmentId, varian
 // Recreates the organic continuous wavy drip curve (matching user reference sketch)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function renderDripDrawing(doc, { wallX, wallY, wallW, wallH, patternId, rgb }) {
+function renderDripDrawing(doc, { wallX, wallY, wallW, wallH, patternId, rgb, natural = false }) {
   const str = String(patternId || '').toLowerCase();
+  const H = wallH - 3.0;            // glaze geometry height (the bottom edge sags a little below it)
+  let tang = 0.5;                    // Bezier tangent length (smaller = narrower, pointier tongues)
 
+  // wave coverage helper: 3 soft dips between crests
+  const wave = (dipY, crestY) => [
+    [0.00, crestY], [0.17, dipY], [0.33, crestY], [0.50, dipY], [0.66, crestY], [0.83, dipY], [1.00, crestY],
+  ];
+
+  const isNatural = natural || str.includes('natural');
   let keyNodes;
-  if (str.includes('alt')) {
-    // Long & Short Drips: alternating tall and short fingers
+  if (isNatural && !str.includes('tinytip') && !str.includes('curve') && !str.includes('uneven')) {
+    // Natural Tear: poured glaze with a lumpy lower edge and two long thin runs
+    // (checked first: the id 'naturalTear' contains the letters "alt" and used to match Long & Short Drips)
+    tang = 0.4;
     keyNodes = [
-      [0.00, 0.20],
-      [0.125, 0.86], [0.25, 0.20],
-      [0.375, 0.52], [0.50, 0.20],
-      [0.625, 0.86], [0.75, 0.20],
-      [0.875, 0.52], [1.00, 0.20],
+      [0.00, 0.34], [0.06, 0.34], [0.14, 0.86, 0.1], [0.21, 0.55, 0.3], [0.35, 0.44],
+      [0.50, 0.62], [0.62, 0.54], [0.70, 0.93, 0.1], [0.78, 0.27, 0.45], [0.88, 0.28], [0.95, 0.36], [1.00, 0.36],
+    ];
+  } else if (str.includes('alt')) {
+    // Long & Short Drips: one long narrow tongue, one short wide one (as in the render)
+    tang = 0.36;
+    keyNodes = [
+      [0.00, 0.14], [0.07, 0.50], [0.14, 0.19], [0.27, 0.95], [0.46, 0.17],
+      [0.64, 0.56], [0.82, 0.18], [0.95, 0.86], [1.00, 0.86],
     ];
   } else if (str.includes('short') && !str.includes('wave')) {
-    // Short Drips: uniform ring of equal short drips
-    const dripY = 0.52;
-    const crestY = 0.20;
+    // Short Drips: two shallow rounded drips between crests
+    tang = 0.42;
     keyNodes = [
-      [0.00, crestY],
-      [0.125, dripY],
-      [0.25, crestY],
-      [0.375, dripY],
-      [0.50, crestY],
-      [0.625, dripY],
-      [0.75, crestY],
-      [0.875, dripY],
-      [1.00, crestY],
+      [0.00, 0.50], [0.06, 0.52], [0.15, 0.20], [0.31, 0.56], [0.48, 0.18],
+      [0.69, 0.56], [0.87, 0.21], [0.95, 0.50], [1.00, 0.50],
     ];
   } else if (str.includes('longwave') || (str.includes('full') && str.includes('wave'))) {
-    // Full Coverage / Long Wave: soft ripple near base
-    const dripY = 0.86;
-    const crestY = 0.76;
-    keyNodes = [
-      [0.00, (dripY + crestY) / 2],
-      [0.10, dripY], [0.20, crestY],
-      [0.30, dripY], [0.40, crestY],
-      [0.50, dripY], [0.60, crestY],
-      [0.70, dripY], [0.80, crestY],
-      [0.90, dripY], [1.00, (dripY + crestY) / 2],
-    ];
+    tang = 0.5;
+    keyNodes = wave(0.88, 0.80);
   } else if (str.includes('midwave') || (str.includes('mid') && str.includes('wave'))) {
-    // Mid Coverage / Mid Wave: soft ripple midway down
-    const dripY = 0.54;
-    const crestY = 0.44;
-    keyNodes = [
-      [0.00, (dripY + crestY) / 2],
-      [0.10, dripY], [0.20, crestY],
-      [0.30, dripY], [0.40, crestY],
-      [0.50, dripY], [0.60, crestY],
-      [0.70, dripY], [0.80, crestY],
-      [0.90, dripY], [1.00, (dripY + crestY) / 2],
-    ];
+    tang = 0.5;
+    keyNodes = wave(0.53, 0.44);
   } else if (str.includes('shortwave') || (str.includes('short') && str.includes('wave'))) {
-    // Short Coverage / Short Wave: soft ripple near top
-    const dripY = 0.26;
-    const crestY = 0.16;
-    keyNodes = [
-      [0.00, (dripY + crestY) / 2],
-      [0.10, dripY], [0.20, crestY],
-      [0.30, dripY], [0.40, crestY],
-      [0.50, dripY], [0.60, crestY],
-      [0.70, dripY], [0.80, crestY],
-      [0.90, dripY], [1.00, (dripY + crestY) / 2],
-    ];
+    tang = 0.5;
+    keyNodes = wave(0.25, 0.14);
   } else if (str.includes('tinytip') || str.includes('curve')) {
-    // Wave Curve: soft undulating edge
-    const dripY = 0.40;
-    const crestY = 0.20;
-    keyNodes = [];
-    const count = 6;
-    for (let i = 0; i < count; i++) {
-      keyNodes.push([i / count, crestY]);
-      keyNodes.push([(i + 0.5) / count, dripY]);
-    }
-    keyNodes.push([1.00, crestY]);
-  } else if (str.includes('uneven') || str.includes('fall')) {
-    // Tear Fall: organic ganache coverage with varied teardrop drips
+    // Wave Curve: a glaze cap with a softly undulating edge (two dips, three white peaks)
+    tang = 0.5;
     keyNodes = [
-      [0.00, 0.22],
-      [0.125, 0.88], [0.25, 0.28],
-      [0.375, 0.55], [0.50, 0.22],
-      [0.625, 0.82], [0.75, 0.32],
-      [0.875, 0.60], [1.00, 0.25],
+      [0.00, 0.55], [0.13, 0.38], [0.30, 0.58], [0.46, 0.37], [0.66, 0.60], [0.82, 0.38], [0.95, 0.55], [1.00, 0.55],
+    ];
+  } else if (str.includes('uneven') || str.includes('fall')) {
+    // Tear Fall: wide rounded arches of cake between thin, long, uneven tails (3rd value = handle length)
+    tang = 0.45;
+    keyNodes = [
+      [0.00, 0.24], [0.06, 0.20, 0.5], [0.17, 0.80, 0.1], [0.31, 0.19, 0.5], [0.46, 0.53, 0.1],
+      [0.62, 0.20, 0.5], [0.77, 0.82, 0.1], [0.92, 0.22, 0.5], [1.00, 0.26],
     ];
   } else {
-    // Natural Tear / Long Gaps (Default):
-    // ALL DRIPS ARE EVENLY LENGTH at the drip (matching actual 3D render)
-    // Continuous flowing curve with evenly spaced, evenly long rounded drips
-    const dripY = 0.86;  // Consistent bottom depth for every drip
-    const crestY = 0.20; // Consistent upper arch height
+    // Long Drips (default / Natural Tear): two long tapering tongues, cake showing between
+    tang = 0.22;
     keyNodes = [
-      [0.00, crestY],
-      [0.125, dripY], // Drip 1 (equal long)
-      [0.25, crestY],  // Crest 1
-      [0.375, dripY], // Drip 2 (equal long)
-      [0.50, crestY],  // Crest 2
-      [0.625, dripY], // Drip 3 (equal long)
-      [0.75, crestY],  // Crest 3
-      [0.875, dripY], // Drip 4 (equal long)
-      [1.00, crestY],  // Crest 4
+      [0.00, 0.92], [0.03, 0.92], [0.10, 0.17], [0.28, 0.96], [0.50, 0.17],
+      [0.69, 0.96], [0.88, 0.17], [0.97, 0.92], [1.00, 0.92],
     ];
   }
 
-  // Generate smooth cubic Bezier curve points with horizontal extrema tangents
-  const curvePoints = [];
-  for (let i = 0; i < keyNodes.length - 1; i++) {
-    const p0 = { x: wallX + keyNodes[i][0] * wallW, y: wallY + keyNodes[i][1] * wallH };
-    const p3 = { x: wallX + keyNodes[i + 1][0] * wallW, y: wallY + keyNodes[i + 1][1] * wallH };
-    const dx = p3.x - p0.x;
-    const p1 = { x: p0.x + dx * 0.5, y: p0.y };
-    const p2 = { x: p3.x - dx * 0.5, y: p3.y };
+  // bottom edge of the cake (sags in the middle like the front of a cylinder)
+  const botY = (x) => {
+    const u = (x - wallX) / wallW;
+    return wallY + H + 2.4 * (1 - (2 * u - 1) ** 2);
+  };
 
-    const samples = 24;
-    for (let s = 0; s < samples; s++) {
-      const t = s / samples;
-      const mt = 1 - t;
-      const bx = mt * mt * mt * p0.x + 3 * mt * mt * t * p1.x + 3 * mt * t * t * p2.x + t * t * t * p3.x;
-      const by = mt * mt * mt * p0.y + 3 * mt * mt * t * p1.y + 3 * mt * t * t * p2.y + t * t * t * p3.y;
-      curvePoints.push({ x: bx, y: by });
+  // --- glaze edge curve ---
+  const curve = [];
+  for (let i = 0; i < keyNodes.length - 1; i++) {
+    const p0 = { x: wallX + keyNodes[i][0] * wallW, y: wallY + keyNodes[i][1] * H };
+    const p3 = { x: wallX + keyNodes[i + 1][0] * wallW, y: wallY + keyNodes[i + 1][1] * H };
+    const dx = p3.x - p0.x;
+    const k0 = keyNodes[i][2] ?? tang;
+    const k3 = keyNodes[i + 1][2] ?? tang;
+    const p1 = { x: p0.x + dx * k0, y: p0.y };
+    const p2 = { x: p3.x - dx * k3, y: p3.y };
+    for (let s = 0; s < 28; s++) {
+      const t = s / 28; const mt = 1 - t;
+      curve.push({
+        x: mt ** 3 * p0.x + 3 * mt * mt * t * p1.x + 3 * mt * t * t * p2.x + t ** 3 * p3.x,
+        y: mt ** 3 * p0.y + 3 * mt * mt * t * p1.y + 3 * mt * t * t * p2.y + t ** 3 * p3.y,
+      });
     }
   }
-  curvePoints.push({
-    x: wallX + keyNodes[keyNodes.length - 1][0] * wallW,
-    y: wallY + keyNodes[keyNodes.length - 1][1] * wallH,
-  });
+  const last = keyNodes[keyNodes.length - 1];
+  curve.push({ x: wallX + last[0] * wallW, y: wallY + last[1] * H });
+  curve.forEach((p) => { p.y = Math.min(p.y, botY(p.x) - 0.5); });
 
-  // 1. Fill the glaze curtain from the top rim down to the wavy drip curve
-  doc.setFillColor(...rgb);
-  for (let i = 0; i < curvePoints.length - 1; i++) {
-    const pt1 = curvePoints[i];
-    const pt2 = curvePoints[i + 1];
-    const stripW = Math.max(0.35, pt2.x - pt1.x + 0.12);
-    const bottomY = Math.max(pt1.y, pt2.y);
-    doc.rect(pt1.x, wallY, stripW, bottomY - wallY, 'F');
-  }
+  // deterministic rng
+  let seed = 2468;
+  const rnd = () => {
+    seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  if (doc.setLineCap) doc.setLineCap(1);
+  if (doc.setLineJoin) doc.setLineJoin(1);
 
-  // Smooth the bottom wavy drip contour in the drip's own color (NO dark/chocolate edge)
+  const taper = (pts, wMax, flat = false) => {
+    if (pts.length < 2) return;
+    const L = []; const R = [];
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[Math.max(0, i - 1)]; const b = pts[Math.min(pts.length - 1, i + 1)];
+      const tx = b[0] - a[0]; const ty = b[1] - a[1]; const l = Math.hypot(tx, ty) || 1;
+      const u = i / (pts.length - 1);
+      const w = (flat ? wMax : wMax * Math.sin(Math.PI * u) ** 0.6 + 0.03) / 2;
+      L.push([pts[i][0] - (ty / l) * w, pts[i][1] + (tx / l) * w]);
+      R.push([pts[i][0] + (ty / l) * w, pts[i][1] - (tx / l) * w]);
+    }
+    const poly = [...L, ...R.reverse()];
+    const segs = [];
+    for (let i = 1; i < poly.length; i++) segs.push([poly[i][0] - poly[i - 1][0], poly[i][1] - poly[i - 1][1]]);
+    doc.setFillColor(...rgb);
+    doc.lines(segs, poly[0][0], poly[0][1], [1, 1], 'F', true);
+  };
+
+  // 1. glaze curtain: light tint of the glaze colour, filled from the rim down to the edge curve
+  const tint = rgb.map((c) => Math.round(c + (255 - c) * 0.6));
+  doc.setFillColor(...tint);
+  const poly = [[wallX, wallY], [wallX + wallW, wallY], ...[...curve].reverse().map((p) => [p.x, p.y])];
+  const segs = [];
+  for (let i = 1; i < poly.length; i++) segs.push([poly[i][0] - poly[i - 1][0], poly[i][1] - poly[i - 1][1]]);
+  doc.lines(segs, poly[0][0], poly[0][1], [1, 1], 'F', true);
+
+  // 2. cake body outline: sides + sagging bottom
   doc.setDrawColor(...rgb);
-  doc.setLineWidth(0.4);
-  for (let i = 0; i < curvePoints.length - 1; i++) {
-    doc.line(curvePoints[i].x, curvePoints[i].y, curvePoints[i + 1].x, curvePoints[i + 1].y);
+  doc.setLineWidth(0.55);
+  doc.line(wallX, wallY, wallX, botY(wallX));
+  doc.line(wallX + wallW, wallY, wallX + wallW, botY(wallX + wallW));
+  let prev = null;
+  for (let i = 0; i <= 40; i++) {
+    const x = wallX + (wallW * i) / 40;
+    const p = [x, botY(x)];
+    if (prev) doc.line(prev[0], prev[1], p[0], p[1]);
+    prev = p;
   }
+
+  // 3. sponge stipple on the exposed cake, below the glaze edge
+  const stippleN = 420;
+  for (let i = 0, got = 0; i < 4000 && got < stippleN; i++) {
+    const x = wallX + 0.6 + rnd() * (wallW - 1.2);
+    const y = wallY + rnd() * (H + 2.4);
+    // find curve y at x
+    let cyAt = wallY;
+    for (let k = 0; k < curve.length - 1; k++) {
+      if (curve[k].x <= x && curve[k + 1].x >= x) { cyAt = curve[k].y; break; }
+    }
+    if (y < cyAt + 1.1 || y > botY(x) - 0.6) continue;
+    doc.setFillColor(...rgb);
+    doc.circle(x, y, 0.06 + rnd() * 0.08, 'F');
+    got++;
+  }
+
+  // 4. bold glaze edge with a thinner inner lip line, plus shading hatches just above the edge
+  for (let i = 0; i < curve.length - 1; i += 1) {
+    const a = curve[i]; const b = curve[i + 1];
+    doc.setLineWidth(0.62);
+    doc.line(a.x, a.y, b.x, b.y);
+  }
+  for (let i = 3; i < curve.length - 3; i += 2) {
+    const a = curve[i - 2]; const b = curve[i + 2];
+    const dx = b.x - a.x; const dy = b.y - a.y;
+    const slope = Math.abs(dy / (dx || 0.001));
+    // hatch strokes lean from the edge up into the glaze; longer on steep (shadowed) flanks
+    const len = (1.0 + 4.2 * Math.min(1, slope * 0.5)) * (0.7 + 0.6 * rnd());
+    if (rnd() < 0.15) continue;
+    const p = curve[i];
+    taper([[p.x, p.y - 0.25], [p.x + (dy > 0 ? 0.35 : -0.35) * len * 0.4, p.y - len]], 0.34);
+  }
+  // inner lip line (thin, broken) following the edge
+  let run = [];
+  for (let i = 0; i < curve.length; i++) {
+    const p = curve[i];
+    const off = 1.1;
+    const brk = Math.sin(i * 0.37) > 0.82;
+    if (brk) { taper(run, 0.22); run = []; continue; }
+    run.push([p.x, p.y - off]);
+  }
+  taper(run, 0.22);
+
+  // fold lines running down each tongue (local lowest points of the edge)
+  let lastFoldX = -1e9;
+  for (let i = 8; i < curve.length - 8; i++) {
+    const c = curve[i];
+    if (!str.includes('wave') && c.x - lastFoldX > wallW * 0.15 && c.x > wallX + wallW * 0.12 && c.x < wallX + wallW * 0.9 && c.y > wallY + H * 0.35 && c.y >= curve[i - 6].y && c.y >= curve[i + 6].y && c.y > curve[i - 8].y + 0.01) {
+      lastFoldX = c.x;
+      [-1, 1].forEach((sg) => {
+        const x = c.x + sg * Math.min(2.6, wallW * 0.035);
+        const yEnd = c.y - Math.min(4, (c.y - wallY) * 0.2);
+        taper([[x, wallY + 4], [x - sg * 0.3, (wallY + 4 + yEnd) / 2], [x, yEnd]], 0.26);
+      });
+    }
+  }
+
+  // 5. rim of the glaze at the top + soft vertical sheen lines on the cylinder
+  taper(Array.from({ length: 24 }, (_, i) => [wallX + (wallW * i) / 23, wallY + 1.7 + 0.25 * Math.sin((i / 23) * Math.PI)]), 0.3);
+  [[0.05, 0.9], [0.1, 0.7], [0.93, 0.8]].forEach(([fx, fy]) => {
+    const x = wallX + fx * wallW;
+    const yEnd = wallY + 3 + (Math.min(...curve.filter((p) => Math.abs(p.x - x) < 1.5).map((p) => p.y), wallY + H) - wallY - 3) * fy;
+    if (yEnd > wallY + 6) taper([[x, wallY + 3], [x + 0.2, (wallY + 3 + yEnd) / 2], [x, yEnd]], 0.2);
+  });
 }
 
 /**
@@ -2557,44 +2645,99 @@ export function drawTexturedFinishSchematic(doc, {
     Math.min(255, Math.round(rgb[2] + (255 - rgb[2]) * 0.65)),
   ];
 
-  // Base coat
-  doc.setFillColor(...crownRgb);
-  doc.rect(wallX, wallY, wallW, wallH, 'F');
-
   const str = String(texture || '').toLowerCase();
-  if (str.includes('ribbon')) {
-    // Ribbon Wrap: stacked horizontal convex ribbon bumps with upper highlight & lower groove shadow
-    const bands = 5;
-    const bandH = wallH / bands;
-    for (let b = 0; b < bands; b++) {
-      const by = wallY + b * bandH;
-      // 1. Upper convex highlight band
-      doc.setFillColor(...highlightRgb);
-      doc.rect(wallX, by, wallW, bandH * 0.22, 'F');
-      // 2. Upper transition swell
-      doc.setFillColor(...upperMidRgb);
-      doc.rect(wallX, by + bandH * 0.22, wallW, bandH * 0.20, 'F');
-      // 3. Central crown body
-      doc.setFillColor(...crownRgb);
-      doc.rect(wallX, by + bandH * 0.42, wallW, bandH * 0.33, 'F');
-      // 4. Lower curve bevel
-      doc.setFillColor(...lowerMidRgb);
-      doc.rect(wallX, by + bandH * 0.75, wallW, bandH * 0.17, 'F');
-      // 5. Underside groove shadow
-      doc.setFillColor(...shadowRgb);
-      doc.rect(wallX, by + bandH * 0.92, wallW, bandH * 0.08, 'F');
-      // 6. Specular crest glint line
-      doc.setDrawColor(...specularColor);
-      doc.setLineWidth(0.35);
-      doc.line(wallX, by + bandH * 0.14, wallX + wallW, by + bandH * 0.14);
-      // 7. Dark crease seam between bumps
-      if (b < bands - 1) {
-        doc.setDrawColor(...creaseRgb);
-        doc.setLineWidth(0.65);
-        doc.line(wallX, by + bandH, wallX + wallW, by + bandH);
+  const isVerticalTex = str.includes('vertical');
+  if (!isVerticalTex) {
+    // ---- Ink style front view for Ridge Comb / Ribbon Wrap (drawn from the 3D renders) ----
+    const isRibbonTex = str.includes('ribbon');
+    const count = isRibbonTex ? 24 : 13;
+    const amp = isRibbonTex ? 0.35 : 0.75;            // silhouette bump depth (mm)
+    const groveW = isRibbonTex ? 0.42 : 0.62;
+    const hatchFrac = isRibbonTex ? 0.34 : 0.42;
+    const sagA = 1.3;                                  // cylinder-front sag of every ridge line
+    const top = wallY + 1.6;
+    const bottom = wallY + wallH - 2.0;
+    const pitch = (bottom - top) / count;
+    const tintRgb = rgb.map((c) => Math.round(c + (255 - c) * 0.6));
+    let seed = 1357;
+    const rnd = () => {
+      seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    if (doc.setLineCap) doc.setLineCap(1);
+    if (doc.setLineJoin) doc.setLineJoin(1);
+    const sag = (xx) => { const u = (xx - wallX) / wallW; return sagA * (1 - (2 * u - 1) ** 2); };
+    const taperPoly = (pts, wMax, flat = false) => {
+      if (pts.length < 2) return;
+      const L = []; const R = [];
+      for (let i = 0; i < pts.length; i++) {
+        const pa = pts[Math.max(0, i - 1)]; const pb = pts[Math.min(pts.length - 1, i + 1)];
+        const tx = pb[0] - pa[0]; const ty = pb[1] - pa[1]; const l = Math.hypot(tx, ty) || 1;
+        const u = i / (pts.length - 1);
+        const w = (flat ? wMax : wMax * Math.sin(Math.PI * u) ** 0.5 + 0.03) / 2;
+        L.push([pts[i][0] - (ty / l) * w, pts[i][1] + (tx / l) * w]);
+        R.push([pts[i][0] + (ty / l) * w, pts[i][1] - (tx / l) * w]);
       }
+      const poly = [...L, ...R.reverse()];
+      const sg = [];
+      for (let i = 1; i < poly.length; i++) sg.push([poly[i][0] - poly[i - 1][0], poly[i][1] - poly[i - 1][1]]);
+      doc.setFillColor(...rgb);
+      doc.lines(sg, poly[0][0], poly[0][1], [1, 1], 'F', true);
+    };
+    const bottomY = (xx) => bottom + pitch * 0.5 + sag(xx) * 1.2;
+
+    // tinted body
+    doc.setFillColor(...tintRgb);
+    doc.rect(wallX, wallY, wallW, wallH, 'F');
+    // white corners outside the sagging bottom so the base reads as a curve
+    doc.setFillColor(255, 255, 255);
+    for (let i = 0; i < 40; i++) {
+      const x0 = wallX + (wallW * i) / 40;
+      doc.rect(x0, bottomY(x0 + wallW / 80), wallW / 40 + 0.05, wallY + wallH - bottomY(x0 + wallW / 80) + 0.01, 'F');
     }
-  } else if (str.includes('vertical')) {
+
+    // ridges: groove line, shadow hatching beneath it, soft highlight line on the crest
+    const N = 36;
+    for (let r = 0; r <= count; r++) {
+      const gy = top + r * pitch;               // groove (valley) line y at the edges
+      const line = Array.from({ length: N + 1 }, (_, i) => {
+        const xx = wallX + (wallW * i) / N;
+        return [xx, gy + sag(xx)];
+      });
+      if (r > 0 && r < count) taperPoly(line, groveW * (0.85 + 0.3 * rnd()), true);
+      if (r === count) continue;
+      // shadow hatching just below the groove line: evenly spaced, slightly jittered strokes
+      const stepX = isRibbonTex ? 0.9 : 1.1;
+      for (let xx = wallX + 0.8; xx < wallX + wallW - 0.6; xx += stepX) {
+        const jx = xx + (rnd() - 0.5) * 0.3;
+        const len = pitch * hatchFrac * (0.55 + 0.6 * rnd());
+        const y0 = gy + sag(jx) + 0.12;
+        taperPoly([[jx, y0], [jx - 0.1, y0 + len]], 0.2);
+      }
+      // highlight crest: thin continuous line across the upper part of the ridge
+      taperPoly(Array.from({ length: N + 1 }, (_, i) => {
+        const xx = wallX + (wallW * i) / N;
+        return [xx, gy + pitch * 0.62 + sag(xx)];
+      }), 0.14);
+    }
+
+    // top rim arc and bold scalloped side silhouette
+    taperPoly(Array.from({ length: N + 1 }, (_, i) => { const xx = wallX + (wallW * i) / N; return [xx, top - 0.6 + sag(xx) * 0.4]; }), 0.5);
+    const edgeL = []; const edgeR = [];
+    for (let i = 0; i <= count * 2; i++) {
+      const yy = top + (i * pitch) / 2;
+      const bump = (i % 2 === 0) ? amp : 0;          // inward at grooves, full at crests
+      edgeL.push([wallX + bump, yy]);
+      edgeR.push([wallX + wallW - bump, yy]);
+    }
+    taperPoly([[wallX, wallY], ...edgeL, [wallX, bottomY(wallX)]], 0.62, true);
+    taperPoly([[wallX + wallW, wallY], ...edgeR, [wallX + wallW, bottomY(wallX + wallW)]], 0.62, true);
+    taperPoly(Array.from({ length: N + 1 }, (_, i) => { const xx = wallX + (wallW * i) / N; return [xx, bottomY(xx)]; }), 0.7, true);
+  } else {
+    doc.setFillColor(...crownRgb);
+    doc.rect(wallX, wallY, wallW, wallH, 'F');
     // Vertical Piping: fluted vertical column bumps with side highlight & groove shadow
     const columns = 12;
     const colW = wallW / columns;
@@ -2615,38 +2758,12 @@ export function drawTexturedFinishSchematic(doc, {
         doc.line(cx + colW, wallY, cx + colW, wallY + wallH);
       }
     }
-  } else {
-    // Ridged Comb (default): horizontal combed ridges with upper highlight & lower groove shadow
-    const ridgeCount = 8;
-    const ridgeH = wallH / ridgeCount;
-    for (let r = 0; r < ridgeCount; r++) {
-      const ry = wallY + r * ridgeH;
-      // 1. Upper ridge highlight
-      doc.setFillColor(...highlightRgb);
-      doc.rect(wallX, ry, wallW, ridgeH * 0.30, 'F');
-      // 2. Central ridge crown
-      doc.setFillColor(...crownRgb);
-      doc.rect(wallX, ry + ridgeH * 0.30, wallW, ridgeH * 0.40, 'F');
-      // 3. Lower trough shadow
-      doc.setFillColor(...shadowRgb);
-      doc.rect(wallX, ry + ridgeH * 0.70, wallW, ridgeH * 0.30, 'F');
-      // 4. Specular glint line
-      doc.setDrawColor(...specularColor);
-      doc.setLineWidth(0.28);
-      doc.line(wallX, ry + ridgeH * 0.16, wallX + wallW, ry + ridgeH * 0.16);
-      // 5. Trough crease seam
-      if (r < ridgeCount - 1) {
-        doc.setDrawColor(...creaseRgb);
-        doc.setLineWidth(0.5);
-        doc.line(wallX, ry + ridgeH, wallX + wallW, ry + ridgeH);
-      }
-    }
   }
 
   // Crisp black outer boundary outline
   doc.setDrawColor(25, 20, 20);
   doc.setLineWidth(0.7);
-  doc.rect(wallX, wallY, wallW, wallH, 'S');
+  if (isVerticalTex) doc.rect(wallX, wallY, wallW, wallH, 'S');
 
   // 4. Bottom footer of card
   const footerY = y + h - 5;
@@ -3083,8 +3200,42 @@ export function drawFillingPipingSchematic(doc, {
   doc.restoreGraphicsState?.();
 }
 
+export function resolveEdgeTreatment(designId) {
+  const str = String(designId || '').toLowerCase();
+  if (
+    str.includes('beadedtrim') ||
+    str.includes('morsedot') ||
+    str.includes('grand') ||
+    str.includes('petite') ||
+    str.includes('trio')
+  ) {
+    return 'beadedTrim';
+  }
+  if (str.includes('dollop')) {
+    return 'dollops';
+  }
+  if (str.includes('whipped') || str.includes('cream')) {
+    return 'whippedCream';
+  }
+  if (
+    str.includes('strawberr') ||
+    str.includes('blueberr') ||
+    str.includes('mango') ||
+    str.includes('fruit') ||
+    str.includes('confection') ||
+    str.includes('cherry') ||
+    str.includes('hershey') ||
+    str.includes('ferrero')
+  ) {
+    return 'fruitConfection';
+  }
+  return 'borderPiping';
+}
+
 /**
  * Renders the 2D Pattern Drawing for Edge Border (Top or Bottom Edge)
+ * Delegates to the unified pattern schematic pipeline so Edge uses the exact 2D patterns
+ * (Border Piping traces, Beaded Trim, Dollops, Whipped Cream, Fruit & Confections).
  */
 export function drawEdgePatternSchematic(doc, {
   x,
@@ -3092,258 +3243,918 @@ export function drawEdgePatternSchematic(doc, {
   w = 88,
   h = 74,
   slot = 'top',
+  treatmentId = null,
   designId = 'shell',
+  variantId = null,
   designName = 'Shell Border',
+  patternName = null,
   color = '#F5E6C8',
   colorName = 'Vanilla',
   secondaryColor = null,
+  baseFinish = 'Frosted',
 }) {
-  doc.saveGraphicsState?.();
+  const vid = variantId || designId || 'shell';
+  const tid = treatmentId || resolveEdgeTreatment(vid);
+  const nameText = patternName || designName || vid;
+  const label = slot ? `${String(slot).toUpperCase()} BORDER · ${String(nameText).toUpperCase()}` : nameText;
 
-  // 1. Framed outer container (crisp white card)
-  doc.setFillColor(255, 255, 255);
-  doc.roundedRect(x, y, w, h, 2, 2, 'F');
+  return drawSidePatternSchematic(doc, {
+    x,
+    y,
+    w,
+    h,
+    treatmentId: tid,
+    variantId: vid,
+    color,
+    colorName,
+    patternName: label,
+    secondaryColor,
+    baseFinish,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3D Box & Curved Surface Projection Helpers for Assembling Schematics
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function isBoxShape(shape) {
+  const s = String(shape || '').toLowerCase();
+  return s.includes('rect') || s.includes('square') || s.includes('cube') || s.includes('petit');
+}
+
+function drawPolygon(doc, pts, style = 'F') {
+  if (!pts || pts.length < 3) return;
+  const segs = [];
+  for (let i = 1; i < pts.length; i++) {
+    segs.push([pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]]);
+  }
+  doc.lines(segs, pts[0][0], pts[0][1], [1, 1], style, true);
+}
+
+function reStrokeBoxOutlines(doc, { cx, topY, rx, ry, totalCoreH, botY }) {
   doc.setDrawColor(...INK);
-  doc.setLineWidth(0.6);
-  doc.roundedRect(x, y, w, h, 2, 2, 'S');
+  doc.setLineWidth(0.75);
+  // Top diamond
+  drawPolygon(doc, [
+    [cx, topY - ry],
+    [cx + rx, topY],
+    [cx, topY + ry],
+    [cx - rx, topY],
+  ], 'S');
+  // Left vertical edge
+  doc.line(cx - rx, topY, cx - rx, botY);
+  // Center vertical ridge
+  doc.line(cx, topY + ry, cx, botY + ry);
+  // Right vertical edge
+  doc.line(cx + rx, topY, cx + rx, botY);
+  // Bottom edges
+  doc.line(cx - rx, botY, cx, botY + ry);
+  doc.line(cx, botY + ry, cx + rx, botY);
+}
 
-  // Badge: 2D PATTERN DRAWING
-  drawBadge(doc, '2D PATTERN DRAWING', x + 3, y + 3, [35, 30, 30]);
-
-  // 2. Unrolled Rim Box
-  const wallMarginX = 8;
-  const wallTopY = y + 14;
-  const wallW = w - wallMarginX * 2;
-  const wallH = h - 25;
-  const wallX = x + wallMarginX;
-  const wallY = wallTopY;
-
-  const isTop = String(slot).toLowerCase().includes('top');
-  const rimY = isTop ? wallY + 12 : wallY + wallH - 12;
-
-  const str = String(designId || '').toLowerCase();
-  const isAlt = (str.endsWith('alt') || str.includes('alternat')) && Boolean(secondaryColor);
-  const rgb = hexToRgb(color);
-  const rgb2 = isAlt ? hexToRgb(secondaryColor) : rgb;
-
-  const highlightRgb = [
-    Math.min(255, Math.round(rgb[0] + (255 - rgb[0]) * 0.35)),
-    Math.min(255, Math.round(rgb[1] + (255 - rgb[1]) * 0.35)),
-    Math.min(255, Math.round(rgb[2] + (255 - rgb[2]) * 0.35)),
+function renderBoxAssembledCore(doc, { cx, topY, rx, ry, totalCoreH, botY, bands, spRgb, fillRgb }) {
+  const spongeHighlight = [
+    Math.min(255, spRgb[0] + 16),
+    Math.min(255, spRgb[1] + 16),
+    Math.min(255, spRgb[2] + 16),
   ];
-  const shadowRgb = [
-    Math.max(0, Math.round(rgb[0] * 0.65)),
-    Math.max(0, Math.round(rgb[1] * 0.65)),
-    Math.max(0, Math.round(rgb[2] * 0.65)),
-  ];
-  const creaseRgb = [
-    Math.max(0, Math.round(rgb[0] * 0.45)),
-    Math.max(0, Math.round(rgb[1] * 0.45)),
-    Math.max(0, Math.round(rgb[2] * 0.45)),
+  const spongeShadow = [
+    Math.max(0, spRgb[0] - 22),
+    Math.max(0, spRgb[1] - 22),
+    Math.max(0, spRgb[2] - 22),
   ];
 
-  const highlightRgb2 = [
-    Math.min(255, Math.round(rgb2[0] + (255 - rgb2[0]) * 0.35)),
-    Math.min(255, Math.round(rgb2[1] + (255 - rgb2[1]) * 0.35)),
-    Math.min(255, Math.round(rgb2[2] + (255 - rgb2[2]) * 0.35)),
+  let currentY = topY;
+  bands.forEach((band) => {
+    const isSponge = band.type === 'sponge';
+    const leftColor = isSponge ? spongeHighlight : fillRgb;
+    const rightColor = isSponge ? spongeShadow : [
+      Math.max(0, fillRgb[0] - 20),
+      Math.max(0, fillRgb[1] - 20),
+      Math.max(0, fillRgb[2] - 20),
+    ];
+
+    // Left face band quad
+    doc.setFillColor(...leftColor);
+    drawPolygon(doc, [
+      [cx - rx, currentY],
+      [cx, currentY + ry],
+      [cx, currentY + band.h + ry],
+      [cx - rx, currentY + band.h],
+    ], 'F');
+
+    // Right face band quad
+    doc.setFillColor(...rightColor);
+    drawPolygon(doc, [
+      [cx, currentY + ry],
+      [cx + rx, currentY],
+      [cx + rx, currentY + band.h],
+      [cx, currentY + band.h + ry],
+    ], 'F');
+
+    currentY += band.h;
+  });
+
+  // Top Diamond
+  doc.setFillColor(...spongeHighlight);
+  drawPolygon(doc, [
+    [cx, topY - ry],
+    [cx + rx, topY],
+    [cx, topY + ry],
+    [cx - rx, topY],
+  ], 'F');
+
+  // Seam lines between bands
+  let seamY = topY;
+  for (let i = 0; i < bands.length - 1; i++) {
+    seamY += bands[i].h;
+    const isFillingSeam = bands[i].type === 'filling' || bands[i + 1].type === 'filling';
+    doc.setDrawColor(25, 20, 20);
+    doc.setLineWidth(isFillingSeam ? 0.6 : 0.4);
+    doc.line(cx - rx, seamY, cx, seamY + ry);
+    doc.line(cx, seamY + ry, cx + rx, seamY);
+  }
+
+  // Outlines
+  reStrokeBoxOutlines(doc, { cx, topY, rx, ry, totalCoreH, botY });
+}
+
+function renderBoxCoatedBase(doc, { cx, topY, rx, ry, totalCoreH, botY, fnRgb, isTextured, texture }) {
+  const finishBase = fnRgb;
+  const finishHighlight = [
+    Math.min(255, fnRgb[0] + 16),
+    Math.min(255, fnRgb[1] + 16),
+    Math.min(255, fnRgb[2] + 16),
   ];
-  const shadowRgb2 = [
-    Math.max(0, Math.round(rgb2[0] * 0.65)),
-    Math.max(0, Math.round(rgb2[1] * 0.65)),
-    Math.max(0, Math.round(rgb2[2] * 0.65)),
+  const finishShadow = [
+    Math.max(0, fnRgb[0] - 24),
+    Math.max(0, fnRgb[1] - 24),
+    Math.max(0, fnRgb[2] - 24),
   ];
-  const creaseRgb2 = [
-    Math.max(0, Math.round(rgb2[0] * 0.45)),
-    Math.max(0, Math.round(rgb2[1] * 0.45)),
-    Math.max(0, Math.round(rgb2[2] * 0.45)),
+  const finishDeepShadow = [
+    Math.max(0, fnRgb[0] - 38),
+    Math.max(0, fnRgb[1] - 38),
+    Math.max(0, fnRgb[2] - 38),
   ];
 
-  // Subtle cake top rim baseline beneath the piping border
-  doc.setDrawColor(215, 205, 200);
-  doc.setLineWidth(0.6);
-  doc.line(wallX, rimY + (isTop ? 4.5 : -4.5), wallX + wallW, rimY + (isTop ? 4.5 : -4.5));
+  // 1. Left Face quad
+  doc.setFillColor(...finishBase);
+  drawPolygon(doc, [
+    [cx - rx, topY],
+    [cx, topY + ry],
+    [cx, botY + ry],
+    [cx - rx, botY],
+  ], 'F');
 
-  if (str.includes('bead') || str.includes('bracelet')) {
-    // Bead Piping / Beaded Trim / Bracelet Beads
-    const beadCount = 14;
-    const step = (wallW - 4) / (beadCount - 1);
-    const beadR = 2.4;
-    for (let b = 0; b < beadCount; b++) {
-      const bx = wallX + 2 + b * step;
-      const useAlt = isAlt && b % 2 === 1;
-      const beadRgb = useAlt ? rgb2 : rgb;
-      const bHigh = useAlt ? highlightRgb2 : highlightRgb;
-      const bShad = useAlt ? shadowRgb2 : shadowRgb;
+  // 2. Right Face quad
+  doc.setFillColor(...finishShadow);
+  drawPolygon(doc, [
+    [cx, topY + ry],
+    [cx + rx, topY],
+    [cx + rx, botY],
+    [cx, botY + ry],
+  ], 'F');
 
-      // 3D crescent shadow
-      doc.setFillColor(...bShad);
-      doc.circle(bx + 0.3, rimY + 0.3, beadR, 'F');
+  // 3. Texture lines on both faces (if textured)
+  if (isTextured) {
+    if (texture === 'ribbonWrap') {
+      const numRibbons = 7;
+      const ribbonH = totalCoreH / numRibbons;
+      for (let rIdx = 1; rIdx < numRibbons; rIdx++) {
+        const rY = topY + rIdx * ribbonH;
+        doc.setDrawColor(...finishDeepShadow);
+        doc.setLineWidth(0.65);
+        doc.line(cx - rx, rY, cx, rY + ry);
+        doc.line(cx, rY + ry, cx + rx, rY);
 
-      // Main bead body
-      doc.setFillColor(...beadRgb);
-      doc.circle(bx, rimY, beadR, 'F');
+        doc.setDrawColor(...finishHighlight);
+        doc.setLineWidth(0.35);
+        doc.line(cx - rx, rY + 0.5, cx, rY + ry + 0.5);
+        doc.line(cx, rY + ry + 0.5, cx + rx, rY + 0.5);
+      }
+    } else {
+      const numRidges = 12;
+      const ridgeH = totalCoreH / (numRidges + 1);
+      for (let rIdx = 1; rIdx <= numRidges; rIdx++) {
+        const rY = topY + rIdx * ridgeH;
+        doc.setDrawColor(...finishDeepShadow);
+        doc.setLineWidth(0.45);
+        doc.line(cx - rx, rY, cx, rY + ry);
+        doc.line(cx, rY + ry, cx + rx, rY);
 
-      // Upper highlight crescent
-      doc.setFillColor(...bHigh);
-      doc.circle(bx - 0.5, rimY - 0.5, beadR * 0.65, 'F');
-
-      // Crisp outline
-      doc.setDrawColor(25, 20, 20);
-      doc.setLineWidth(0.75);
-      doc.circle(bx, rimY, beadR, 'S');
-
-      // Specular glint
-      doc.setFillColor(255, 255, 255);
-      doc.circle(bx - 0.7, rimY - 0.7, 0.5, 'F');
-    }
-  } else if (str.includes('rope')) {
-    // Rope Twist / Rope Twist Classic:
-    // Authentic interlocking diagonal star-piped coils matching the 3D render:
-    // S-curved diagonal folds, 3 distinct star-tip fluting ridges, highlight crests,
-    // deep crease shadows between overlapping coils, and crisp boundary outlines.
-    const coilCount = 14;
-    const step = (wallW - 6) / (coilCount - 1);
-    const coilW = step * 1.45;
-    const coilH = 8.0;
-
-    for (let c = 0; c < coilCount; c++) {
-      const cx = wallX + 3 + c * step;
-      const useAlt = isAlt && c % 2 === 1;
-      const cRgb = useAlt ? rgb2 : rgb;
-      const cHigh = useAlt ? highlightRgb2 : highlightRgb;
-      const cShad = useAlt ? shadowRgb2 : shadowRgb;
-      const cCrease = useAlt ? creaseRgb2 : creaseRgb;
-
-      // 1. Lower tuck shadow behind previous coil
-      doc.setFillColor(...cShad);
-      doc.ellipse(cx + coilW * 0.08, rimY + 0.5, coilW * 0.46, coilH * 0.42, 'F');
-
-      // 2. Main piped body (angled diagonal swell)
-      doc.setFillColor(...cRgb);
-      doc.ellipse(cx, rimY, coilW * 0.48, coilH * 0.44, 'F');
-
-      // 3. Upper crest convex highlight flute
-      doc.setFillColor(...cHigh);
-      doc.ellipse(cx - coilW * 0.08, rimY - coilH * 0.16, coilW * 0.36, coilH * 0.24, 'F');
-
-      // 4. Star-tip fluting ridges (curved lines tracing the 8-point piping extrusion)
-      // Ridge 1: Upper crest specular highlight glint
-      doc.setDrawColor(255, 255, 255);
-      doc.setLineWidth(0.5);
-      doc.line(cx - coilW * 0.28, rimY - coilH * 0.12, cx + coilW * 0.15, rimY - coilH * 0.04);
-
-      // Ridge 2: Central fluting ridge line along the diagonal twist
-      doc.setDrawColor(25, 20, 20);
-      doc.setLineWidth(0.6);
-      doc.line(cx - coilW * 0.34, rimY + coilH * 0.06, cx + coilW * 0.28, rimY + coilH * 0.16);
-
-      // Ridge 3: Lower shaded fluting hollow
-      doc.setDrawColor(...cShad);
-      doc.setLineWidth(0.7);
-      doc.line(cx - coilW * 0.22, rimY + coilH * 0.24, cx + coilW * 0.26, rimY + coilH * 0.32);
-
-      // 5. Crisp hand-drawn coil boundary
-      doc.setDrawColor(25, 20, 20);
-      doc.setLineWidth(0.75);
-      doc.ellipse(cx, rimY, coilW * 0.48, coilH * 0.44, 'S');
-
-      // 6. Deep diagonal crease shadow where this coil tucks under the next coil
-      if (c < coilCount - 1) {
-        doc.setDrawColor(...cCrease);
-        doc.setLineWidth(0.8);
-        doc.line(cx + coilW * 0.28, rimY - coilH * 0.35, cx + coilW * 0.14, rimY + coilH * 0.38);
+        doc.setDrawColor(...finishHighlight);
+        doc.setLineWidth(0.25);
+        doc.line(cx - rx, rY + 0.4, cx, rY + ry + 0.4);
+        doc.line(cx, rY + ry + 0.4, cx + rx, rY + 0.4);
       }
     }
-  } else if (str.includes('curtain')) {
-    // Curtain: draped scalloped swag border with rosettes and drops
-    const swags = 6;
-    const swagW = wallW / swags;
-    for (let s = 0; s < swags; s++) {
-      const sx = wallX + s * swagW;
-      const midX = sx + swagW / 2;
-      const dropY = isTop ? rimY + 8 : rimY - 8;
+  }
 
-      doc.setFillColor(...shadowRgb);
-      doc.triangle(sx, rimY, sx + swagW, rimY, midX, dropY + 0.5, 'F');
-      doc.setFillColor(...rgb);
-      doc.triangle(sx, rimY, sx + swagW, rimY, midX, dropY, 'F');
+  // 4. Top Diamond surface
+  doc.setFillColor(...finishHighlight);
+  drawPolygon(doc, [
+    [cx, topY - ry],
+    [cx + rx, topY],
+    [cx, topY + ry],
+    [cx - rx, topY],
+  ], 'F');
 
-      doc.setDrawColor(255, 255, 255);
-      doc.setLineWidth(0.4);
-      doc.line(sx + 1, rimY, midX, dropY - (isTop ? 1.5 : -1.5));
+  if (isTextured) {
+    doc.setDrawColor(...finishShadow);
+    doc.setLineWidth(0.3);
+    drawPolygon(doc, [
+      [cx, topY - ry * 0.6],
+      [cx + rx * 0.6, topY],
+      [cx, topY + ry * 0.6],
+      [cx - rx * 0.6, topY],
+    ], 'S');
+  }
 
-      doc.setDrawColor(25, 20, 20);
-      doc.setLineWidth(0.9);
-      doc.line(sx, rimY, midX, dropY);
-      doc.line(midX, dropY, sx + swagW, rimY);
+  // 5. Outlines
+  reStrokeBoxOutlines(doc, { cx, topY, rx, ry, totalCoreH, botY });
+}
 
-      doc.setFillColor(...highlightRgb);
-      doc.circle(midX, dropY, 1.4, 'F');
-      doc.circle(midX, dropY, 1.4, 'S');
+function renderBoxDripGlaze(doc, { cx, topY, rx, ry, totalCoreH, botY, sRgb, patternId, patternName }) {
+  const sHighlight = [
+    Math.min(255, sRgb[0] + 32),
+    Math.min(255, sRgb[1] + 32),
+    Math.min(255, sRgb[2] + 32),
+  ];
+  const sShadow = [
+    Math.max(0, sRgb[0] - 25),
+    Math.max(0, sRgb[1] - 25),
+    Math.max(0, sRgb[2] - 25),
+  ];
+
+  // 1. Top Diamond glaze pool
+  doc.setFillColor(...sRgb);
+  drawPolygon(doc, [
+    [cx, topY - ry],
+    [cx + rx, topY],
+    [cx, topY + ry],
+    [cx - rx, topY],
+  ], 'F');
+
+  doc.setDrawColor(...sShadow);
+  doc.setLineWidth(0.4);
+  drawPolygon(doc, [
+    [cx, topY - ry],
+    [cx + rx, topY],
+    [cx, topY + ry],
+    [cx - rx, topY],
+  ], 'S');
+
+  // Sheen reflection on top glaze diamond
+  doc.setFillColor(...sHighlight);
+  drawPolygon(doc, [
+    [cx - rx * 0.2, topY - ry * 0.6],
+    [cx + rx * 0.2, topY - ry * 0.2],
+    [cx, topY + ry * 0.2],
+    [cx - rx * 0.4, topY - ry * 0.2],
+  ], 'F');
+
+  // 2. Drip curtain nodes along Left Face and Right Face
+  const str = String(patternId || patternName || '').toLowerCase();
+  let tang = 0.5;
+  const wave = (dipY, crestY) => [
+    [0.00, crestY], [0.17, dipY], [0.33, crestY], [0.50, dipY], [0.66, crestY], [0.83, dipY], [1.00, crestY],
+  ];
+
+  let keyNodes;
+  if (str.includes('alt') || str.includes('longshort')) {
+    tang = 0.36;
+    keyNodes = [
+      [0.00, 0.14], [0.07, 0.50], [0.14, 0.19], [0.27, 0.95], [0.46, 0.17],
+      [0.64, 0.56], [0.82, 0.18], [0.95, 0.86], [1.00, 0.86],
+    ];
+  } else if (str.includes('short') && !str.includes('wave') && !str.includes('cover')) {
+    tang = 0.42;
+    keyNodes = [
+      [0.00, 0.50], [0.06, 0.52], [0.15, 0.20], [0.31, 0.56], [0.48, 0.18],
+      [0.69, 0.56], [0.87, 0.21], [0.95, 0.50], [1.00, 0.50],
+    ];
+  } else if (str.includes('longwave') || str.includes('full') || str.includes('coverage')) {
+    tang = 0.5;
+    keyNodes = wave(0.85, 0.72);
+  } else if (str.includes('midwave') || (str.includes('mid') && str.includes('wave')) || (str.includes('mid') && str.includes('cover'))) {
+    tang = 0.5;
+    keyNodes = wave(0.53, 0.42);
+  } else if (str.includes('shortwave') || (str.includes('short') && str.includes('wave')) || (str.includes('short') && str.includes('cover'))) {
+    tang = 0.5;
+    keyNodes = wave(0.28, 0.16);
+  } else if (str.includes('tinytip') || str.includes('curve')) {
+    tang = 0.5;
+    keyNodes = [
+      [0.00, 0.55], [0.13, 0.38], [0.30, 0.58], [0.46, 0.37], [0.66, 0.60], [0.82, 0.38], [0.95, 0.55], [1.00, 0.55],
+    ];
+  } else if (str.includes('uneven') || str.includes('fall')) {
+    tang = 0.45;
+    keyNodes = [
+      [0.00, 0.24], [0.06, 0.20, 0.5], [0.17, 0.80, 0.1], [0.31, 0.19, 0.5], [0.46, 0.53, 0.1],
+      [0.62, 0.20, 0.5], [0.77, 0.82, 0.1], [0.92, 0.22, 0.5], [1.00, 0.26],
+    ];
+  } else if (str.includes('natural') || str.includes('tear') || str.includes('gap')) {
+    tang = 0.4;
+    keyNodes = [
+      [0.00, 0.34], [0.06, 0.34], [0.14, 0.86, 0.1], [0.21, 0.55, 0.3], [0.35, 0.44],
+      [0.50, 0.62], [0.62, 0.54], [0.70, 0.93, 0.1], [0.78, 0.27, 0.45], [0.88, 0.28], [0.95, 0.36], [1.00, 0.36],
+    ];
+  } else {
+    tang = 0.28;
+    keyNodes = [
+      [0.00, 0.85], [0.03, 0.85], [0.10, 0.18], [0.28, 0.92], [0.50, 0.18],
+      [0.69, 0.92], [0.88, 0.18], [0.97, 0.85], [1.00, 0.85],
+    ];
+  }
+
+  const dripCurve = [];
+  const maxDripH = totalCoreH - 5;
+  for (let i = 0; i < keyNodes.length - 1; i++) {
+    const p0 = { u: keyNodes[i][0], v: keyNodes[i][1] };
+    const p3 = { u: keyNodes[i + 1][0], v: keyNodes[i + 1][1] };
+    const du = p3.u - p0.u;
+    const k0 = keyNodes[i][2] ?? tang;
+    const k3 = keyNodes[i + 1][2] ?? tang;
+    const p1 = { u: p0.u + du * k0, v: p0.v };
+    const p2 = { u: p3.u - du * k3, v: p3.v };
+
+    const steps = 14;
+    for (let s = 0; s < steps; s++) {
+      const t = s / steps;
+      const mt = 1 - t;
+      const u = mt ** 3 * p0.u + 3 * mt * mt * t * p1.u + 3 * mt * t * t * p2.u + t ** 3 * p3.u;
+      const v = mt ** 3 * p0.v + 3 * mt * mt * t * p1.v + 3 * mt * t * t * p2.v + t ** 3 * p3.v;
+
+      const pt = projectSurface(u, 0, { cx, topY, rx, ry, totalCoreH, isBox: true });
+      const py = Math.min(botY + (u <= 0.5 ? (u / 0.5) * ry : (1 - (u - 0.5) / 0.5) * ry) - 1.5, pt.y + v * maxDripH);
+      dripCurve.push({ x: pt.x, y: py, u, v });
+    }
+  }
+  const lastNode = keyNodes[keyNodes.length - 1];
+  const ptLast = projectSurface(1, 0, { cx, topY, rx, ry, totalCoreH, isBox: true });
+  dripCurve.push({ x: ptLast.x, y: Math.min(botY - 1.5, ptLast.y + lastNode[1] * maxDripH), u: 1, v: lastNode[1] });
+
+  // Closed polygon of the drip curtain
+  const poly = [
+    ...dripCurve.map(p => [p.x, p.y]),
+    [cx + rx, topY],
+    [cx, topY + ry],
+    [cx - rx, topY],
+  ];
+
+  doc.setFillColor(...sRgb);
+  drawPolygon(doc, poly, 'F');
+
+  // Bottom edge line of drip curtain
+  doc.setDrawColor(...sShadow);
+  doc.setLineWidth(0.65);
+  for (let i = 0; i < dripCurve.length - 1; i++) {
+    doc.line(dripCurve[i].x, dripCurve[i].y, dripCurve[i + 1].x, dripCurve[i + 1].y);
+  }
+
+  // Corner ridge line down through drip curtain
+  const centerDripPt = dripCurve.find(p => Math.abs(p.u - 0.5) < 0.04);
+  if (centerDripPt) {
+    doc.setDrawColor(...sShadow);
+    doc.setLineWidth(0.5);
+    doc.line(cx, topY + ry, cx, centerDripPt.y);
+  }
+
+  // Re-stroke outer box outlines
+  reStrokeBoxOutlines(doc, { cx, topY, rx, ry, totalCoreH, botY });
+}
+
+function projectSurface(u, v, { cx, topY, rx, ry, totalCoreH, isBox }) {
+  if (isBox) {
+    if (u <= 0.5) {
+      const t = u / 0.5;
+      const x = cx - rx * (1 - t);
+      const rimY = topY + t * ry;
+      const y = rimY + v * totalCoreH;
+      return { x, y, face: 'left' };
+    } else {
+      const t = (u - 0.5) / 0.5;
+      const x = cx + t * rx;
+      const rimY = topY + ry * (1 - t);
+      const y = rimY + v * totalCoreH;
+      return { x, y, face: 'right' };
     }
   } else {
-    // Shell Border (default): overlapping piped shells with fan ridges, highlights and shadows
-    const shellCount = 10;
-    const shellW = (wallW - 4) / shellCount;
-    for (let s = 0; s < shellCount; s++) {
-      const sx = wallX + 2 + s * shellW;
-      const useAlt = isAlt && s % 2 === 1;
-      const cRgb = useAlt ? rgb2 : rgb;
-      const cHigh = useAlt ? highlightRgb2 : highlightRgb;
-      const cShad = useAlt ? shadowRgb2 : shadowRgb;
+    // Cylinder: front visible arc (-77 deg to +77 deg)
+    const thetaM = 1.34;
+    const theta = -thetaM + 2 * thetaM * u;
+    const x = cx + rx * Math.sin(theta);
+    const y = topY + v * totalCoreH + ry * Math.cos(theta);
+    return { x, y, face: 'front' };
+  }
+}
 
-      // Base shell body with underside shadow
-      doc.setFillColor(...cShad);
-      doc.ellipse(sx + shellW * 0.45, rimY + 0.4, shellW * 0.46, 3.4, 'F');
-      doc.setFillColor(...cRgb);
-      doc.ellipse(sx + shellW * 0.4, rimY, shellW * 0.46, 3.4, 'F');
-
-      // Upper highlight cap
-      doc.setFillColor(...cHigh);
-      doc.ellipse(sx + shellW * 0.35, rimY - 0.8, shellW * 0.32, 1.8, 'F');
-
-      // Crisp outline
-      doc.setDrawColor(25, 20, 20);
-      doc.setLineWidth(0.85);
-      doc.ellipse(sx + shellW * 0.4, rimY, shellW * 0.46, 3.4, 'S');
-
-      // Radiating fan fluting lines
-      doc.setDrawColor(255, 255, 255);
-      doc.setLineWidth(0.4);
-      doc.line(sx + shellW * 0.15, rimY - 0.4, sx + shellW * 0.72, rimY - 1.4);
-
-      doc.setDrawColor(25, 20, 20);
-      doc.setLineWidth(0.5);
-      doc.line(sx + shellW * 0.12, rimY + 0.2, sx + shellW * 0.75, rimY + 0.8);
+function renderSurfaceQuad(doc, u1, v1, u2, v2, params, fillColor, style = 'F') {
+  if (params.isBox) {
+    if (u1 < 0.5 && u2 > 0.5) {
+      renderSurfaceQuad(doc, u1, v1, 0.5, v2, params, fillColor, style);
+      renderSurfaceQuad(doc, 0.5, v1, u2, v2, params, fillColor, style);
+      return;
     }
   }
 
-  // 4. Bottom footer of card
-  const footerY = y + h - 5;
-  if (isAlt && secondaryColor) {
-    doc.setFillColor(...rgb);
-    doc.circle(x + 4.2, footerY, 2.0, 'F');
-    doc.setFillColor(...rgb2);
-    doc.circle(x + 7.2, footerY, 2.0, 'F');
-    doc.setDrawColor(...INK);
-    doc.setLineWidth(0.3);
-    doc.circle(x + 4.2, footerY, 2.0, 'S');
-    doc.circle(x + 7.2, footerY, 2.0, 'S');
+  let pts;
+  if (!params.isBox && Math.abs(u2 - u1) > 0.04) {
+    const um = (u1 + u2) / 2;
+    const pTL = projectSurface(u1, v1, params);
+    const pTM = projectSurface(um, v1, params);
+    const pTR = projectSurface(u2, v1, params);
+    const pBR = projectSurface(u2, v2, params);
+    const pBM = projectSurface(um, v2, params);
+    const pBL = projectSurface(u1, v2, params);
+    pts = [
+      [pTL.x, pTL.y],
+      [pTM.x, pTM.y],
+      [pTR.x, pTR.y],
+      [pBR.x, pBR.y],
+      [pBM.x, pBM.y],
+      [pBL.x, pBL.y],
+    ];
   } else {
-    doc.setFillColor(...rgb);
-    doc.circle(x + 5, footerY, 2.2, 'F');
-    doc.setDrawColor(...INK);
-    doc.setLineWidth(0.3);
-    doc.circle(x + 5, footerY, 2.2, 'S');
+    const pTL = projectSurface(u1, v1, params);
+    const pTR = projectSurface(u2, v1, params);
+    const pBR = projectSurface(u2, v2, params);
+    const pBL = projectSurface(u1, v2, params);
+    pts = [
+      [pTL.x, pTL.y],
+      [pTR.x, pTR.y],
+      [pBR.x, pBR.y],
+      [pBL.x, pBL.y],
+    ];
   }
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(6.8);
-  doc.setTextColor(...INK);
-  const titleText = `${String(slot).toUpperCase()} BORDER · ${String(designName).toUpperCase()} · ${String(colorName).toUpperCase()}`;
-  doc.text(titleText, x + (isAlt && secondaryColor ? 11 : 9), footerY + 1.2);
+  if (params.isBox && u1 >= 0.5 && Array.isArray(fillColor)) {
+    const shaded = [
+      Math.max(0, fillColor[0] - 18),
+      Math.max(0, fillColor[1] - 18),
+      Math.max(0, fillColor[2] - 18),
+    ];
+    doc.setFillColor(...shaded);
+  } else if (Array.isArray(fillColor)) {
+    doc.setFillColor(...fillColor);
+  }
 
-  doc.restoreGraphicsState?.();
+  drawPolygon(doc, pts, style);
+}
+
+function renderSurfaceTriangle(doc, u1, v1, u2, v2, params, fillColor) {
+  if (params.isBox && u1 < 0.5 && u2 > 0.5) {
+    renderSurfaceTriangle(doc, u1, v1, 0.5, v2, params, fillColor);
+    renderSurfaceTriangle(doc, 0.5, v1, u2, v2, params, fillColor);
+    return;
+  }
+  const uApex = (u1 + u2) / 2;
+  const pApex = projectSurface(uApex, v1, params);
+  const pBL = projectSurface(u1, v2, params);
+  const pBR = projectSurface(u2, v2, params);
+
+  if (params.isBox && u1 >= 0.5 && Array.isArray(fillColor)) {
+    const shaded = [
+      Math.max(0, fillColor[0] - 18),
+      Math.max(0, fillColor[1] - 18),
+      Math.max(0, fillColor[2] - 18),
+    ];
+    doc.setFillColor(...shaded);
+  } else if (Array.isArray(fillColor)) {
+    doc.setFillColor(...fillColor);
+  }
+
+  doc.triangle(pBL.x, pBL.y, pBR.x, pBR.y, pApex.x, pApex.y, 'F');
+}
+
+function renderProjectedSidePattern(doc, {
+  cx,
+  topY,
+  rx,
+  ry,
+  totalCoreH,
+  botY,
+  isBox,
+  treatmentId,
+  variantId,
+  rgb,
+  secondaryColor = null,
+  hasSurface = false,
+}) {
+  const params = { cx, topY, rx, ry, totalCoreH, botY, isBox };
+  const str = String(variantId || '').toLowerCase();
+  doc.setFillColor(...rgb);
+  doc.setDrawColor(...rgb);
+
+  switch (treatmentId) {
+    case 'checkeredPattern': {
+      const isXPattern = str.includes('x');
+      const isLeftDiagonal = str.includes('side') || str.includes('left');
+      const isRightDiagonal = str.includes('right');
+      const isParallelOuter = str.includes('outer') || str.includes('bottom');
+      const isParallelInner = str.includes('inner') || str.includes('top');
+
+      const cols = isXPattern ? 9 : 11;
+      const rows = 5;
+      const uStart = 0.04;
+      const uEnd = 0.96;
+      const uRange = uEnd - uStart;
+      const uStep = uRange / cols;
+
+      const vStart = 0.10;
+      const vEnd = 0.88;
+      const vRange = vEnd - vStart;
+      const vStep = vRange / rows;
+
+      const sqU = uStep * 0.74;
+      const sqV = vStep * 0.74;
+      const padU = (uStep - sqU) / 2;
+      const padV = (vStep - sqV) / 2;
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          let shouldFill = false;
+
+          if (isXPattern) {
+            shouldFill =
+              ((r === 0 || r === 2 || r === 4) && (c === 1 || c === 3 || c === 5 || c === 7)) ||
+              (r === 1 && (c === 2 || c === 6)) ||
+              (r === 3 && (c === 0 || c === 4 || c === 8));
+          } else if (isLeftDiagonal) {
+            shouldFill = (c + r) % 3 === 2;
+          } else if (isRightDiagonal) {
+            shouldFill = (c - r + 30) % 3 === 1;
+          } else if (isParallelOuter) {
+            shouldFill = (r === 0 || r === rows - 1) && (c % 2 === 0);
+          } else if (isParallelInner) {
+            shouldFill = (r === 1 || r === rows - 2) && (c % 2 === 1);
+          } else {
+            shouldFill = (r + c) % 2 === 0;
+          }
+
+          if (shouldFill) {
+            const u1 = uStart + c * uStep + padU;
+            const u2 = u1 + sqU;
+            const v1 = vStart + r * vStep + padV;
+            const v2 = v1 + sqV;
+            renderSurfaceQuad(doc, u1, v1, u2, v2, params, rgb, 'F');
+          }
+        }
+      }
+      break;
+    }
+
+    case 'trianglePattern': {
+      const isXPattern = str.includes('x');
+      const isLeftDiagonal = str.includes('side') || str.includes('left');
+      const isRightDiagonal = str.includes('right');
+      const isParallelOuter = str.includes('outer') || str.includes('bottom');
+      const isParallelInner = str.includes('inner') || str.includes('top');
+
+      const cols = isXPattern ? 9 : 11;
+      const rows = 5;
+      const uStart = 0.04;
+      const uEnd = 0.96;
+      const uRange = uEnd - uStart;
+      const uStep = uRange / cols;
+
+      const vStart = 0.10;
+      const vEnd = 0.88;
+      const vRange = vEnd - vStart;
+      const vStep = vRange / rows;
+
+      const triU = uStep * 0.74;
+      const triV = vStep * 0.74;
+      const padU = (uStep - triU) / 2;
+      const padV = (vStep - triV) / 2;
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          let shouldFill = false;
+
+          if (isXPattern) {
+            shouldFill =
+              ((r === 0 || r === 2 || r === 4) && (c === 1 || c === 3 || c === 5 || c === 7)) ||
+              (r === 1 && (c === 2 || c === 6)) ||
+              (r === 3 && (c === 0 || c === 4 || c === 8));
+          } else if (isLeftDiagonal) {
+            shouldFill = (c + r) % 3 === 2;
+          } else if (isRightDiagonal) {
+            shouldFill = (c - r + 30) % 3 === 1;
+          } else if (isParallelOuter) {
+            shouldFill = (r === 0 || r === rows - 1) && (c % 2 === 0);
+          } else if (isParallelInner) {
+            shouldFill = (r === 1 || r === rows - 2) && (c % 2 === 1);
+          } else {
+            shouldFill = (r + c) % 2 === 0;
+          }
+
+          if (shouldFill) {
+            const u1 = uStart + c * uStep + padU;
+            const u2 = u1 + triU;
+            const v1 = vStart + r * vStep + padV;
+            const v2 = v1 + triV;
+            renderSurfaceTriangle(doc, u1, v1, u2, v2, params, rgb);
+          }
+        }
+      }
+      break;
+    }
+
+    case 'chevronPattern': {
+      const isWide = str.includes('wide');
+      const isTight = str.includes('tight');
+      const isGapped = str.includes('gap');
+      const isTwoTone = str.includes('two');
+      const isThreeTone = str.includes('three');
+
+      const waves = isWide ? 3 : isTight ? 7 : 5;
+      const segs = isWide ? 8 : isTight ? 22 : 12;
+      const ampV = (isWide ? 3.6 : isTight ? 1.6 : 2.5) / totalCoreH;
+      const lineWidth = isWide ? 1.8 : isTight ? 0.6 : 1.0;
+
+      doc.setDrawColor(...rgb);
+      doc.setLineWidth(lineWidth);
+
+      for (let w = 1; w <= waves; w++) {
+        if (isGapped && (w === 2 || w === 4)) continue;
+
+        const vBase = 0.10 + w * (0.80 / (waves + 1));
+
+        if (typeof doc.setLineDashPattern === 'function') {
+          if (isThreeTone) {
+            if (w === 1 || w === 3 || w === 5) {
+              doc.setLineDashPattern([2.2, 1.4], 0);
+            } else {
+              doc.setLineDashPattern([], 0);
+            }
+          } else if (isTwoTone) {
+            if (w === 2 || w === 4) {
+              doc.setLineDashPattern([2.2, 1.4], 0);
+            } else {
+              doc.setLineDashPattern([], 0);
+            }
+          } else {
+            doc.setLineDashPattern([], 0);
+          }
+        }
+
+        const subSteps = 3;
+        let prevPt = projectSurface(0.04, vBase - ampV, params);
+        for (let s = 0; s < segs; s++) {
+          const u0 = 0.04 + s * (0.92 / segs);
+          const u1 = 0.04 + (s + 1) * (0.92 / segs);
+          const v0 = vBase + (s % 2 === 0 ? -ampV : ampV);
+          const v1 = vBase + (s % 2 === 0 ? ampV : -ampV);
+          for (let k = 1; k <= subSteps; k++) {
+            const t = k / subSteps;
+            const u = u0 + t * (u1 - u0);
+            const v = v0 + t * (v1 - v0);
+            const currPt = projectSurface(u, v, params);
+            doc.line(prevPt.x, prevPt.y, currPt.x, currPt.y);
+            prevPt = currPt;
+          }
+        }
+      }
+
+      if (typeof doc.setLineDashPattern === 'function') {
+        doc.setLineDashPattern([], 0);
+      }
+      break;
+    }
+
+    case 'scatterPearls': {
+      const isBorder = str.includes('border');
+      const isDiamond = (str.includes('diamond') || str.includes('grid')) && !isBorder;
+      const isRows = str.includes('row') || str.includes('horizontal');
+      const isBig = str.includes('big');
+      const isSmall = str.includes('small');
+
+      if (isDiamond || isBorder) {
+        const lines = 4;
+        const pearlR = 1.3;
+        for (let r = 1; r <= lines; r++) {
+          if (isBorder && (r === 2 || r === 3)) continue;
+          const vr = 0.12 + r * (0.76 / 5);
+          const count = (r % 2 === 1) ? 11 : 10;
+          const offset = (r % 2 === 1) ? 0 : 0.5;
+          const spacing = 0.88 / 10;
+          for (let c = 0; c < count; c++) {
+            const u = 0.06 + (c + offset) * spacing;
+            if (u > 0.96) continue;
+            const pt = projectSurface(u, vr, params);
+            doc.setFillColor(...rgb);
+            doc.circle(pt.x, pt.y, pearlR, 'F');
+          }
+        }
+      } else if (isRows) {
+        const lines = 4;
+        const count = 11;
+        const spacing = 0.88 / 10;
+        for (let r = 1; r <= lines; r++) {
+          const vr = 0.12 + r * (0.76 / 5);
+          for (let c = 0; c < count; c++) {
+            const u = 0.06 + c * spacing;
+            const pr = (c % 2 === 0) ? 1.8 : 1.0;
+            const pt = projectSurface(u, vr, params);
+            doc.setFillColor(...rgb);
+            doc.circle(pt.x, pt.y, pr, 'F');
+          }
+        }
+      } else {
+        const scatterCoords = [
+          [0.08, 0.18, 'md'], [0.18, 0.42, 'lg'], [0.12, 0.72, 'sm'], [0.22, 0.88, 'md'],
+          [0.24, 0.22, 'sm'], [0.32, 0.58, 'md'], [0.30, 0.82, 'lg'], [0.38, 0.14, 'lg'],
+          [0.42, 0.38, 'sm'], [0.44, 0.76, 'md'], [0.52, 0.22, 'md'], [0.50, 0.55, 'lg'],
+          [0.54, 0.88, 'sm'], [0.62, 0.35, 'sm'], [0.60, 0.70, 'md'], [0.68, 0.15, 'lg'],
+          [0.72, 0.48, 'md'], [0.70, 0.85, 'sm'], [0.78, 0.28, 'sm'], [0.82, 0.65, 'lg'],
+          [0.86, 0.15, 'md'], [0.88, 0.88, 'md'], [0.92, 0.42, 'sm'], [0.15, 0.55, 'sm'],
+          [0.28, 0.35, 'md'], [0.46, 0.92, 'lg'], [0.65, 0.52, 'lg'], [0.75, 0.75, 'md'],
+          [0.36, 0.70, 'sm'], [0.84, 0.38, 'lg']
+        ];
+        scatterCoords.forEach(([uRel, vRel, sizeCategory]) => {
+          const u = 0.06 + uRel * 0.88;
+          const v = 0.12 + vRel * 0.76;
+          let pr;
+          if (isBig) pr = 2.4;
+          else if (isSmall) pr = 0.9;
+          else pr = sizeCategory === 'lg' ? 1.9 : sizeCategory === 'md' ? 1.4 : 0.9;
+          const pt = projectSurface(u, v, params);
+          doc.setFillColor(...rgb);
+          doc.circle(pt.x, pt.y, pr, 'F');
+        });
+      }
+      break;
+    }
+
+    case 'pipingScrolls': {
+      const isWave = str.includes('wave') || str.includes('rope');
+      const isPaired = str.includes('pair') || str.includes('opposing') || str.includes('scroll');
+      const isFleur = str.includes('fleur') || str.includes('lis');
+      const isShell = str.includes('shell');
+      const isVine = str.includes('vine') || str.includes('tendril');
+
+      if (isWave) {
+        const N = 80;
+        const ampV = 11.0 / totalCoreH;
+        doc.setLineWidth(1.8);
+        doc.setDrawColor(...rgb);
+        doc.setFillColor(...rgb);
+
+        let prevPt = projectSurface(0.05, 0.50 + ampV, params);
+        for (let i = 1; i <= N; i++) {
+          const u = 0.05 + (i / N) * 0.90;
+          const theta = (i / N) * 2 * 2 * Math.PI;
+          const v = 0.50 + ampV * Math.cos(theta);
+          const currPt = projectSurface(u, v, params);
+          doc.line(prevPt.x, prevPt.y, currPt.x, currPt.y);
+          prevPt = currPt;
+        }
+
+        const p1 = projectSurface(0.05 + 0.90 * 0.25, 0.50 - ampV - 0.07, params);
+        const p2 = projectSurface(0.05 + 0.90 * 0.75, 0.50 - ampV - 0.07, params);
+        const v1 = projectSurface(0.05 + 0.90 * 0.50, 0.50 + ampV + 0.07, params);
+        doc.circle(p1.x, p1.y, 1.4, 'F');
+        doc.circle(p2.x, p2.y, 1.4, 'F');
+        doc.circle(v1.x, v1.y, 1.4, 'F');
+      } else if (isPaired) {
+        doc.setLineWidth(1.8);
+        doc.setDrawColor(...rgb);
+        doc.setFillColor(...rgb);
+
+        const drawScroll = (centerU, isLeft) => {
+          const sign = isLeft ? -1 : 1;
+          const N = 36;
+          const pts = [];
+          for (let i = 0; i <= N; i++) {
+            const t = (i / N) * 2 - 1;
+            const v = 0.50 + t * 0.28;
+            const u = centerU - sign * (t * t * 0.12);
+            pts.push(projectSurface(u, v, params));
+          }
+          for (let i = 0; i < pts.length - 1; i++) {
+            doc.line(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]);
+          }
+          const topPt = pts[0];
+          doc.circle(topPt[0], topPt[1] + (isLeft ? 2.5 : 2.5), 1.3, 'F');
+          const botPt = pts[pts.length - 1];
+          doc.circle(botPt[0], botPt[1] - (isLeft ? 2.5 : 2.5), 1.3, 'F');
+        };
+
+        drawScroll(0.28, true);
+        drawScroll(0.72, false);
+      } else if (isFleur) {
+        const drawFleurMotif = (centerU) => {
+          doc.setFillColor(...rgb);
+          doc.setDrawColor(...rgb);
+          doc.setLineWidth(0.4);
+
+          const drawBlade = (uOff, vOff, lenV, widthU) => {
+            const pTop = projectSurface(centerU + uOff, 0.48 + vOff - lenV * 0.5, params);
+            const pL = projectSurface(centerU + uOff - widthU * 0.5, 0.48 + vOff, params);
+            const pR = projectSurface(centerU + uOff + widthU * 0.5, 0.48 + vOff, params);
+            const pBot = projectSurface(centerU + uOff, 0.48 + vOff + lenV * 0.5, params);
+            drawPolygon(doc, [[pTop.x, pTop.y], [pR.x, pR.y], [pBot.x, pBot.y], [pL.x, pL.y]], 'F');
+          };
+
+          drawBlade(0, 0, 0.38, 0.05);
+          drawBlade(-0.045, 0.03, 0.30, 0.045);
+          drawBlade(0.045, 0.03, 0.30, 0.045);
+          const pearlPt = projectSurface(centerU, 0.74, params);
+          doc.circle(pearlPt.x, pearlPt.y, 1.3, 'F');
+        };
+
+        [0.26, 0.50, 0.74].forEach(drawFleurMotif);
+      } else if (isShell) {
+        const drawShellMotif = (centerU) => {
+          doc.setFillColor(...rgb);
+          doc.setDrawColor(...rgb);
+          doc.setLineWidth(0.4);
+
+          const drawSpike = (uOff, vOff, lenV, widthU) => {
+            const pTop = projectSurface(centerU + uOff, 0.48 + vOff - lenV * 0.5, params);
+            const pL = projectSurface(centerU + uOff - widthU * 0.5, 0.48 + vOff, params);
+            const pR = projectSurface(centerU + uOff + widthU * 0.5, 0.48 + vOff, params);
+            const pBot = projectSurface(centerU + uOff, 0.48 + vOff + lenV * 0.5, params);
+            drawPolygon(doc, [[pTop.x, pTop.y], [pR.x, pR.y], [pBot.x, pBot.y], [pL.x, pL.y]], 'F');
+          };
+
+          drawSpike(0, 0, 0.38, 0.045);
+          drawSpike(-0.035, 0.02, 0.32, 0.04);
+          drawSpike(0.035, 0.02, 0.32, 0.04);
+          drawSpike(-0.07, 0.05, 0.26, 0.035);
+          drawSpike(0.07, 0.05, 0.26, 0.035);
+          const pearlPt = projectSurface(centerU, 0.74, params);
+          doc.circle(pearlPt.x, pearlPt.y, 1.3, 'F');
+        };
+
+        [0.26, 0.50, 0.74].forEach(drawShellMotif);
+      } else if (isVine) {
+        doc.setLineWidth(1.8);
+        doc.setDrawColor(...rgb);
+        doc.setFillColor(...rgb);
+
+        const steps = 60;
+        let prevPt = projectSurface(0.06, 0.78, params);
+        for (let s = 1; s <= steps; s++) {
+          const t = s / steps;
+          const u = 0.06 + t * 0.88;
+          const v = 0.50 + Math.cos(t * Math.PI) * 0.28;
+          const currPt = projectSurface(u, v, params);
+          doc.line(prevPt.x, prevPt.y, currPt.x, currPt.y);
+          prevPt = currPt;
+        }
+
+        const lLoopPt = projectSurface(0.32, 0.44, params);
+        doc.circle(lLoopPt.x, lLoopPt.y, 1.8, 'S');
+        const rLoopPt = projectSurface(0.68, 0.56, params);
+        doc.circle(rLoopPt.x, rLoopPt.y, 1.8, 'S');
+      } else {
+        doc.setLineWidth(1.6);
+        doc.setDrawColor(...rgb);
+        doc.setFillColor(...rgb);
+
+        [0.28, 0.50, 0.72].forEach((centerU) => {
+          const N = 40;
+          let prevP = null;
+          for (let i = 0; i <= N; i++) {
+            const theta = (i / N) * 2 * Math.PI;
+            const u = centerU + Math.cos(theta) * 0.10;
+            const v = 0.50 + Math.sin(theta) * 0.24;
+            const currP = projectSurface(u, v, params);
+            if (prevP) {
+              doc.line(prevP.x, prevP.y, currP.x, currP.y);
+            }
+            prevP = currP;
+          }
+          const dotPt = projectSurface(centerU, 0.50, params);
+          doc.circle(dotPt.x, dotPt.y, 1.2, 'F');
+        });
+      }
+      break;
+    }
+
+    default: {
+      const cols = 11;
+      const rows = 5;
+      const uStep = 0.92 / cols;
+      const vStep = 0.78 / rows;
+      const sqU = uStep * 0.74;
+      const sqV = vStep * 0.74;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          if ((r + c) % 2 === 0) {
+            const u1 = 0.04 + c * uStep;
+            const u2 = u1 + sqU;
+            const v1 = 0.10 + r * vStep;
+            const v2 = v1 + sqV;
+            renderSurfaceQuad(doc, u1, v1, u2, v2, params, rgb, 'F');
+          }
+        }
+      }
+      break;
+    }
+  }
 }
 
 /**
@@ -3356,6 +4167,7 @@ export function drawAssemblyExplodedSchematic(doc, {
   y,
   w = 84,
   h = 88,
+  shape = 'round',
   layers = 1,
   spongeFlavor = 'Vanilla',
   spongeColor = '#F5E6CA',
@@ -3373,6 +4185,7 @@ export function drawAssemblyExplodedSchematic(doc, {
 
   drawBadge(doc, '2D LAYER-BY-LAYER ASSEMBLY', x + 3, y + 3, [35, 30, 30]);
 
+  const isBox = isBoxShape(shape);
   const numFilling = Math.max(1, Math.min(4, Number(layers) || 1));
   const totalSlabs = numFilling + 1;
 
@@ -3412,80 +4225,206 @@ export function drawAssemblyExplodedSchematic(doc, {
     const isEnclosing = s === 0;
     const fillingIdx = numFilling - s + 1;
 
-    if (isEnclosing) {
-      // Enclosing sponge slab
-      doc.setFillColor(...spongeShadow);
-      doc.rect(cx - rx, slabY, rx * 2, slabH, 'F');
-      doc.ellipse(cx, slabY + slabH, rx, ry, 'F');
+    if (isBox) {
+      if (isEnclosing) {
+        // Enclosing sponge box slab
+        doc.setFillColor(...spongeHighlight);
+        drawPolygon(doc, [
+          [cx - rx, slabY],
+          [cx, slabY + ry],
+          [cx, slabY + slabH + ry],
+          [cx - rx, slabY + slabH],
+        ], 'F');
 
-      doc.setFillColor(...spongeHighlight);
-      doc.ellipse(cx, slabY, rx, ry, 'F');
+        doc.setFillColor(...spongeShadow);
+        drawPolygon(doc, [
+          [cx, slabY + ry],
+          [cx + rx, slabY],
+          [cx + rx, slabY + slabH],
+          [cx, slabY + slabH + ry],
+        ], 'F');
 
-      doc.setDrawColor(...INK);
-      doc.setLineWidth(0.65);
-      doc.ellipse(cx, slabY, rx, ry, 'S');
-      doc.line(cx - rx, slabY, cx - rx, slabY + slabH);
-      doc.line(cx + rx, slabY, cx + rx, slabY + slabH);
-      doc.ellipse(cx, slabY + slabH, rx, ry, 'S');
+        doc.setFillColor(...spongeHighlight);
+        drawPolygon(doc, [
+          [cx, slabY - ry],
+          [cx + rx, slabY],
+          [cx, slabY + ry],
+          [cx - rx, slabY],
+        ], 'F');
 
-      // Label on the left: ENCLOSING with arrow
-      const labelY = slabY + slabH / 2;
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(6.8);
-      doc.setTextColor(...INK);
-      doc.text('ENCLOSING', textX, labelY + 1.2);
+        reStrokeBoxOutlines(doc, { cx, topY: slabY, rx, ry, totalCoreH: slabH, botY: slabY + slabH });
 
-      const tw = doc.getTextWidth('ENCLOSING');
-      const arrowStartX = textX + tw + 2;
-      if (arrowTargetX > arrowStartX + 3) {
-        doc.setDrawColor(...INK);
-        doc.setLineWidth(0.6);
-        doc.line(arrowStartX, labelY, arrowTargetX, labelY);
-        doc.setFillColor(...INK);
-        doc.triangle(arrowTargetX, labelY, arrowTargetX - 2.2, labelY - 1.2, arrowTargetX - 2.2, labelY + 1.2, 'FD');
+        // Label on the left: ENCLOSING with arrow
+        const labelY = slabY + slabH / 2;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(6.8);
+        doc.setTextColor(...INK);
+        doc.text('ENCLOSING', textX, labelY + 1.2);
+
+        const tw = doc.getTextWidth('ENCLOSING');
+        const arrowStartX = textX + tw + 2;
+        if (arrowTargetX > arrowStartX + 3) {
+          doc.setDrawColor(...INK);
+          doc.setLineWidth(0.6);
+          doc.line(arrowStartX, labelY, arrowTargetX, labelY);
+          doc.setFillColor(...INK);
+          doc.triangle(arrowTargetX, labelY, arrowTargetX - 2.2, labelY - 1.2, arrowTargetX - 2.2, labelY + 1.2, 'FD');
+        }
+      } else {
+        // Filling Layer box slab
+        const fillThickness = Math.max(2.0, slabH * 0.35);
+
+        // Sponge slice below
+        doc.setFillColor(...spongeHighlight);
+        drawPolygon(doc, [
+          [cx - rx, slabY + fillThickness],
+          [cx, slabY + fillThickness + ry],
+          [cx, slabY + slabH + ry],
+          [cx - rx, slabY + slabH],
+        ], 'F');
+
+        doc.setFillColor(...spongeShadow);
+        drawPolygon(doc, [
+          [cx, slabY + fillThickness + ry],
+          [cx + rx, slabY + fillThickness],
+          [cx + rx, slabY + slabH],
+          [cx, slabY + slabH + ry],
+        ], 'F');
+
+        // Filling slice above
+        doc.setFillColor(...fillRgb);
+        drawPolygon(doc, [
+          [cx - rx, slabY],
+          [cx, slabY + ry],
+          [cx, slabY + fillThickness + ry],
+          [cx - rx, slabY + fillThickness],
+        ], 'F');
+
+        const fillShadow = [
+          Math.max(0, fillRgb[0] - 22),
+          Math.max(0, fillRgb[1] - 22),
+          Math.max(0, fillRgb[2] - 22),
+        ];
+        doc.setFillColor(...fillShadow);
+        drawPolygon(doc, [
+          [cx, slabY + ry],
+          [cx + rx, slabY],
+          [cx + rx, slabY + fillThickness],
+          [cx, slabY + fillThickness + ry],
+        ], 'F');
+
+        // Top diamond
+        doc.setFillColor(...fillRgb);
+        drawPolygon(doc, [
+          [cx, slabY - ry],
+          [cx + rx, slabY],
+          [cx, slabY + ry],
+          [cx - rx, slabY],
+        ], 'F');
+
+        // Seam between filling and sponge
+        doc.setDrawColor(25, 20, 20);
+        doc.setLineWidth(0.5);
+        doc.line(cx - rx, slabY + fillThickness, cx, slabY + fillThickness + ry);
+        doc.line(cx, slabY + fillThickness + ry, cx + rx, slabY + fillThickness);
+
+        reStrokeBoxOutlines(doc, { cx, topY: slabY, rx, ry, totalCoreH: slabH, botY: slabY + slabH });
+
+        // Label on the left: FILLING LAYER X
+        const labelText = `FILLING LAYER ${fillingIdx}`;
+        const labelY = slabY + fillThickness / 2;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(6.8);
+        doc.setTextColor(...INK);
+        doc.text(labelText, textX, labelY + 1.2);
+
+        const tw = doc.getTextWidth(labelText);
+        const arrowStartX = textX + tw + 2;
+        if (arrowTargetX > arrowStartX + 3) {
+          doc.setDrawColor(...INK);
+          doc.setLineWidth(0.6);
+          doc.line(arrowStartX, labelY, arrowTargetX, labelY);
+          doc.setFillColor(...INK);
+          doc.triangle(arrowTargetX, labelY, arrowTargetX - 2.2, labelY - 1.2, arrowTargetX - 2.2, labelY + 1.2, 'FD');
+        }
       }
     } else {
-      // Filling Layer slab
-      const fillThickness = Math.max(2.0, slabH * 0.35);
-      const spThickness = slabH - fillThickness;
+      // Cylinder slab
+      if (isEnclosing) {
+        // Enclosing sponge slab
+        doc.setFillColor(...spongeShadow);
+        doc.rect(cx - rx, slabY, rx * 2, slabH, 'F');
+        doc.ellipse(cx, slabY + slabH, rx, ry, 'F');
 
-      doc.setFillColor(...spongeShadow);
-      doc.rect(cx - rx, slabY + fillThickness, rx * 2, spThickness, 'F');
-      doc.ellipse(cx, slabY + slabH, rx, ry, 'F');
+        doc.setFillColor(...spongeHighlight);
+        doc.ellipse(cx, slabY, rx, ry, 'F');
 
-      doc.setFillColor(...fillRgb);
-      doc.rect(cx - rx, slabY, rx * 2, fillThickness, 'F');
-      doc.ellipse(cx, slabY + fillThickness, rx, ry, 'F');
-      doc.ellipse(cx, slabY, rx, ry, 'F');
-
-      doc.setDrawColor(...INK);
-      doc.setLineWidth(0.65);
-      doc.ellipse(cx, slabY, rx, ry, 'S');
-      doc.line(cx - rx, slabY, cx - rx, slabY + slabH);
-      doc.line(cx + rx, slabY, cx + rx, slabY + slabH);
-      doc.setDrawColor(25, 20, 20);
-      doc.setLineWidth(0.5);
-      doc.ellipse(cx, slabY + fillThickness, rx, ry, 'S');
-      doc.setDrawColor(...INK);
-      doc.setLineWidth(0.65);
-      doc.ellipse(cx, slabY + slabH, rx, ry, 'S');
-
-      // Label on the left: FILLING LAYER X
-      const labelText = `FILLING LAYER ${fillingIdx}`;
-      const labelY = slabY + fillThickness / 2;
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(6.8);
-      doc.setTextColor(...INK);
-      doc.text(labelText, textX, labelY + 1.2);
-
-      const tw = doc.getTextWidth(labelText);
-      const arrowStartX = textX + tw + 2;
-      if (arrowTargetX > arrowStartX + 3) {
         doc.setDrawColor(...INK);
-        doc.setLineWidth(0.6);
-        doc.line(arrowStartX, labelY, arrowTargetX, labelY);
-        doc.setFillColor(...INK);
-        doc.triangle(arrowTargetX, labelY, arrowTargetX - 2.2, labelY - 1.2, arrowTargetX - 2.2, labelY + 1.2, 'FD');
+        doc.setLineWidth(0.65);
+        doc.ellipse(cx, slabY, rx, ry, 'S');
+        doc.line(cx - rx, slabY, cx - rx, slabY + slabH);
+        doc.line(cx + rx, slabY, cx + rx, slabY + slabH);
+        doc.ellipse(cx, slabY + slabH, rx, ry, 'S');
+
+        // Label on the left: ENCLOSING with arrow
+        const labelY = slabY + slabH / 2;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(6.8);
+        doc.setTextColor(...INK);
+        doc.text('ENCLOSING', textX, labelY + 1.2);
+
+        const tw = doc.getTextWidth('ENCLOSING');
+        const arrowStartX = textX + tw + 2;
+        if (arrowTargetX > arrowStartX + 3) {
+          doc.setDrawColor(...INK);
+          doc.setLineWidth(0.6);
+          doc.line(arrowStartX, labelY, arrowTargetX, labelY);
+          doc.setFillColor(...INK);
+          doc.triangle(arrowTargetX, labelY, arrowTargetX - 2.2, labelY - 1.2, arrowTargetX - 2.2, labelY + 1.2, 'FD');
+        }
+      } else {
+        // Filling Layer slab
+        const fillThickness = Math.max(2.0, slabH * 0.35);
+        const spThickness = slabH - fillThickness;
+
+        doc.setFillColor(...spongeShadow);
+        doc.rect(cx - rx, slabY + fillThickness, rx * 2, spThickness, 'F');
+        doc.ellipse(cx, slabY + slabH, rx, ry, 'F');
+
+        doc.setFillColor(...fillRgb);
+        doc.rect(cx - rx, slabY, rx * 2, fillThickness, 'F');
+        doc.ellipse(cx, slabY + fillThickness, rx, ry, 'F');
+        doc.ellipse(cx, slabY, rx, ry, 'F');
+
+        doc.setDrawColor(...INK);
+        doc.setLineWidth(0.65);
+        doc.ellipse(cx, slabY, rx, ry, 'S');
+        doc.line(cx - rx, slabY, cx - rx, slabY + slabH);
+        doc.line(cx + rx, slabY, cx + rx, slabY + slabH);
+        doc.setDrawColor(25, 20, 20);
+        doc.setLineWidth(0.5);
+        doc.ellipse(cx, slabY + fillThickness, rx, ry, 'S');
+        doc.setDrawColor(...INK);
+        doc.setLineWidth(0.65);
+        doc.ellipse(cx, slabY + slabH, rx, ry, 'S');
+
+        // Label on the left: FILLING LAYER X
+        const labelText = `FILLING LAYER ${fillingIdx}`;
+        const labelY = slabY + fillThickness / 2;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(6.8);
+        doc.setTextColor(...INK);
+        doc.text(labelText, textX, labelY + 1.2);
+
+        const tw = doc.getTextWidth(labelText);
+        const arrowStartX = textX + tw + 2;
+        if (arrowTargetX > arrowStartX + 3) {
+          doc.setDrawColor(...INK);
+          doc.setLineWidth(0.6);
+          doc.line(arrowStartX, labelY, arrowTargetX, labelY);
+          doc.setFillColor(...INK);
+          doc.triangle(arrowTargetX, labelY, arrowTargetX - 2.2, labelY - 1.2, arrowTargetX - 2.2, labelY + 1.2, 'FD');
+        }
       }
     }
 
@@ -3536,6 +4475,7 @@ export function drawAssemblyCompleteSchematic(doc, {
   y,
   w = 84,
   h = 88,
+  shape = 'round',
   layers = 1,
   spongeFlavor = 'Vanilla',
   spongeColor = '#F5E6CA',
@@ -3553,6 +4493,7 @@ export function drawAssemblyCompleteSchematic(doc, {
 
   drawBadge(doc, 'COMPLETE ASSEMBLED LOOK', x + 3, y + 3, [35, 30, 30]);
 
+  const isBox = isBoxShape(shape);
   const numFilling = Math.max(1, Math.min(4, Number(layers) || 1));
   const numSponge = numFilling + 1;
 
@@ -3569,11 +4510,11 @@ export function drawAssemblyCompleteSchematic(doc, {
     Math.max(0, spRgb[2] - 22),
   ];
 
-  // Cylinder dimensions
-  const coreW = 44;
-  const rx = coreW / 2;
-  const ry = 5.2;
-  const cx = x + w / 2 - 5;
+  // Core dimensions
+  const coreW = 50;
+  const rx = coreW / 2; // 25mm
+  const ry = 5.6;
+  const cx = x + 35;
   const topY = y + 17;
   const totalCoreH = 52;
   const botY = topY + totalCoreH;
@@ -3589,50 +4530,54 @@ export function drawAssemblyCompleteSchematic(doc, {
   }
   bands.push({ type: 'sponge', label: 'Base Foundation Sponge', h: spongeBandH });
 
-  // 1. Draw entire cylinder background body
-  doc.setFillColor(...spongeShadow);
-  doc.rect(cx - rx, topY, rx * 2, totalCoreH, 'F');
-  doc.ellipse(cx, botY, rx, ry, 'F');
+  if (isBox) {
+    renderBoxAssembledCore(doc, { cx, topY, rx, ry, totalCoreH, botY, bands, spRgb, fillRgb });
+  } else {
+    // 1. Draw entire cylinder background body
+    doc.setFillColor(...spongeShadow);
+    doc.rect(cx - rx, topY, rx * 2, totalCoreH, 'F');
+    doc.ellipse(cx, botY, rx, ry, 'F');
 
-  // 2. Draw each band's fill and curved bottom seam
-  let currentY = topY;
-  bands.forEach((band) => {
-    const isSponge = band.type === 'sponge';
-    const bandColor = isSponge ? spongeShadow : fillRgb;
-    doc.setFillColor(...bandColor);
-    doc.rect(cx - rx, currentY, rx * 2, band.h, 'F');
-    doc.ellipse(cx, currentY + band.h, rx, ry, 'F');
+    // 2. Draw each band's fill and curved bottom seam
+    let currentY = topY;
+    bands.forEach((band) => {
+      const isSponge = band.type === 'sponge';
+      const bandColor = isSponge ? spongeShadow : fillRgb;
+      doc.setFillColor(...bandColor);
+      doc.rect(cx - rx, currentY, rx * 2, band.h, 'F');
+      doc.ellipse(cx, currentY + band.h, rx, ry, 'F');
 
-    if (isSponge && band.h > 4) {
-      doc.setDrawColor(...spongeHighlight);
-      doc.setLineWidth(0.3);
-      doc.line(cx - rx * 0.7, currentY + band.h * 0.45, cx + rx * 0.7, currentY + band.h * 0.45);
+      if (isSponge && band.h > 4) {
+        doc.setDrawColor(...spongeHighlight);
+        doc.setLineWidth(0.3);
+        doc.line(cx - rx * 0.7, currentY + band.h * 0.45, cx + rx * 0.7, currentY + band.h * 0.45);
+      }
+
+      currentY += band.h;
+    });
+
+    // 3. Top surface ellipse
+    doc.setFillColor(...spongeHighlight);
+    doc.ellipse(cx, topY, rx, ry, 'F');
+
+    // 4. Raw line drawing strokes
+    doc.setDrawColor(...INK);
+    doc.setLineWidth(0.75);
+
+    doc.ellipse(cx, topY, rx, ry, 'S');
+    doc.line(cx - rx, topY, cx - rx, botY);
+    doc.line(cx + rx, topY, cx + rx, botY);
+    doc.ellipse(cx, botY, rx, ry, 'S');
+
+    // Seam lines between bands
+    let seamY = topY;
+    for (let i = 0; i < bands.length - 1; i++) {
+      seamY += bands[i].h;
+      const isFillingSeam = bands[i].type === 'filling' || bands[i + 1].type === 'filling';
+      doc.setDrawColor(25, 20, 20);
+      doc.setLineWidth(isFillingSeam ? 0.6 : 0.4);
+      doc.ellipse(cx, seamY, rx, ry, 'S');
     }
-
-    currentY += band.h;
-  });
-
-  // 3. Top surface ellipse
-  doc.setFillColor(...spongeHighlight);
-  doc.ellipse(cx, topY, rx, ry, 'F');
-
-  // 4. Raw line drawing strokes
-  doc.setDrawColor(...INK);
-  doc.setLineWidth(0.75);
-
-  doc.ellipse(cx, topY, rx, ry, 'S');
-  doc.line(cx - rx, topY, cx - rx, botY);
-  doc.line(cx + rx, topY, cx + rx, botY);
-  doc.ellipse(cx, botY, rx, ry, 'S');
-
-  // Seam lines between bands
-  let seamY = topY;
-  for (let i = 0; i < bands.length - 1; i++) {
-    seamY += bands[i].h;
-    const isFillingSeam = bands[i].type === 'filling' || bands[i + 1].type === 'filling';
-    doc.setDrawColor(25, 20, 20);
-    doc.setLineWidth(isFillingSeam ? 0.6 : 0.4);
-    doc.ellipse(cx, seamY, rx, ry, 'S');
   }
 
   // 5. Right-side callout annotations
@@ -3656,6 +4601,950 @@ export function drawAssemblyCompleteSchematic(doc, {
   doc.setFontSize(6.4);
   doc.setTextColor(...INK);
   doc.text(`ASSEMBLED CORE · ${numSponge} SPONGE SLICES · ${numFilling} FILLING SEAM${numFilling > 1 ? 'S' : ''}`, x + 5, footerY);
+
+  doc.restoreGraphicsState?.();
+}
+
+/**
+ * Renders the Exterior Coating Assembly schematic (matching user sketch with FILLING -> COATED).
+ * Left: Assembled cake cylinder showing alternating sponge and filling seams (labeled "FILLING").
+ * Center: Transition arrow (->) indicating crumb-coating and frosting application.
+ * Right: Fully coated cake cylinder covered with Frosting or Textured Buttercream (labeled "COATED").
+ */
+export function drawAssemblyCoatingSchematic(doc, {
+  x,
+  y,
+  w = 182,
+  h = 88,
+  shape = 'round',
+  layers = 1,
+  spongeFlavor = 'Vanilla',
+  spongeColor = '#F5E6CA',
+  fillingFlavor = 'Chocolate',
+  fillingColor = '#7A4B2A',
+  style = 'smooth',
+  styleName = 'Smooth Coating',
+  texture = '',
+  textureName = '',
+  isTextured = false,
+  finishFlavor = 'Vanilla',
+  finishColor = '#F6DEAB',
+}) {
+  doc.saveGraphicsState?.();
+
+  // 1. Outer container
+  doc.setFillColor(252, 250, 248);
+  doc.roundedRect(x, y, w, h, 2, 2, 'F');
+  doc.setDrawColor(...INK);
+  doc.setLineWidth(0.6);
+  doc.roundedRect(x, y, w, h, 2, 2, 'S');
+
+  // Top badges
+  drawBadge(doc, 'CRUMB COAT & EXTERIOR FINISH ASSEMBLY', x + 3, y + 3, [35, 30, 30]);
+
+  const finishBadgeText = isTextured && textureName
+    ? `${String(styleName).toUpperCase()} · ${String(textureName).toUpperCase()}`
+    : `${String(styleName).toUpperCase()} · ${String(finishFlavor).toUpperCase()}`;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.4);
+  const badgeTw = doc.getTextWidth(finishBadgeText);
+  drawBadge(doc, finishBadgeText, x + w - badgeTw - 14, y + 3, [80, 70, 65]);
+
+  const isBox = isBoxShape(shape);
+  const coreW = 58;
+  const rx = coreW / 2; // 29mm
+  const ry = 6.2;
+  const topY = y + 16;
+  const totalCoreH = 46;
+  const botY = topY + totalCoreH;
+
+  // -------------------------------------------------------------
+  // LEFT: Assembled Core (Fundamentals + Filling) -> "FILLING"
+  // -------------------------------------------------------------
+  const cx1 = x + 42;
+
+  const numFilling = Math.max(1, Math.min(4, Number(layers) || 1));
+  const numSponge = numFilling + 1;
+
+  const spRgb = hexToRgb(spongeColor, [245, 230, 202]);
+  const fillRgb = hexToRgb(fillingColor, [122, 75, 42]);
+  const spongeHighlight = [
+    Math.min(255, spRgb[0] + 16),
+    Math.min(255, spRgb[1] + 16),
+    Math.min(255, spRgb[2] + 16),
+  ];
+  const spongeShadow = [
+    Math.max(0, spRgb[0] - 22),
+    Math.max(0, spRgb[1] - 22),
+    Math.max(0, spRgb[2] - 22),
+  ];
+
+  const fillBandH = Math.min(3.2, Math.max(2.0, 11 / numFilling));
+  const totalFillH = numFilling * fillBandH;
+  const spongeBandH = (totalCoreH - totalFillH) / numSponge;
+
+  const bands = [];
+  for (let k = 0; k < numFilling; k++) {
+    bands.push({ type: 'sponge', h: spongeBandH });
+    bands.push({ type: 'filling', h: fillBandH });
+  }
+  bands.push({ type: 'sponge', h: spongeBandH });
+
+  if (isBox) {
+    renderBoxAssembledCore(doc, { cx: cx1, topY, rx, ry, totalCoreH, botY, bands, spRgb, fillRgb });
+  } else {
+    // Draw cylinder background
+    doc.setFillColor(...spongeShadow);
+    doc.rect(cx1 - rx, topY, rx * 2, totalCoreH, 'F');
+    doc.ellipse(cx1, botY, rx, ry, 'F');
+
+    // Draw each alternating band
+    let currentY = topY;
+    bands.forEach((band) => {
+      const isSponge = band.type === 'sponge';
+      const bandColor = isSponge ? spongeShadow : fillRgb;
+      doc.setFillColor(...bandColor);
+      doc.rect(cx1 - rx, currentY, rx * 2, band.h, 'F');
+      doc.ellipse(cx1, currentY + band.h, rx, ry, 'F');
+
+      if (isSponge && band.h > 4) {
+        doc.setDrawColor(...spongeHighlight);
+        doc.setLineWidth(0.3);
+        doc.line(cx1 - rx * 0.7, currentY + band.h * 0.45, cx1 + rx * 0.7, currentY + band.h * 0.45);
+      }
+      currentY += band.h;
+    });
+
+    // Top surface ellipse
+    doc.setFillColor(...spongeHighlight);
+    doc.ellipse(cx1, topY, rx, ry, 'F');
+
+    // Outline strokes
+    doc.setDrawColor(...INK);
+    doc.setLineWidth(0.75);
+    doc.ellipse(cx1, topY, rx, ry, 'S');
+    doc.line(cx1 - rx, topY, cx1 - rx, botY);
+    doc.line(cx1 + rx, topY, cx1 + rx, botY);
+    doc.ellipse(cx1, botY, rx, ry, 'S');
+
+    // Seam lines between bands
+    let seamY = topY;
+    for (let i = 0; i < bands.length - 1; i++) {
+      seamY += bands[i].h;
+      const isFillingSeam = bands[i].type === 'filling' || bands[i + 1].type === 'filling';
+      doc.setDrawColor(25, 20, 20);
+      doc.setLineWidth(isFillingSeam ? 0.6 : 0.4);
+      doc.ellipse(cx1, seamY, rx, ry, 'S');
+    }
+  }
+
+  // Label under Left Cake: "FILLING"
+  const labelY1 = botY + ry + 6;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(...INK);
+  const fillingText = 'FILLING';
+  doc.text(fillingText, cx1 - doc.getTextWidth(fillingText) / 2, labelY1);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.2);
+  doc.setTextColor(110, 100, 95);
+  const subFillingText = `${spongeFlavor} + ${fillingFlavor}`;
+  doc.text(subFillingText, cx1 - doc.getTextWidth(subFillingText) / 2, labelY1 + 4.5);
+
+
+  // -------------------------------------------------------------
+  // CENTER: Transition Arrow (->)
+  // -------------------------------------------------------------
+  const arrowCx = x + w * 0.5;
+  const arrowY = topY + totalCoreH * 0.48;
+  const arrowLen = 10;
+
+  doc.setDrawColor(...INK);
+  doc.setLineWidth(1.4);
+  doc.line(arrowCx - arrowLen, arrowY, arrowCx + arrowLen - 2, arrowY);
+
+  doc.setFillColor(...INK);
+  doc.triangle(
+    arrowCx + arrowLen + 3, arrowY,
+    arrowCx + arrowLen - 3, arrowY - 3.5,
+    arrowCx + arrowLen - 3, arrowY + 3.5,
+    'FD'
+  );
+
+  // Arrow step text
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.8);
+  doc.setTextColor(...INK);
+  const stepText = 'CRUMB COAT & COVER';
+  doc.text(stepText, arrowCx - doc.getTextWidth(stepText) / 2, arrowY - 5.5);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.0);
+  doc.setTextColor(120, 110, 105);
+  const actionText = isTextured && textureName ? `APPLY ${String(textureName).toUpperCase()}` : 'APPLY SMOOTH COAT';
+  doc.text(actionText, arrowCx - doc.getTextWidth(actionText) / 2, arrowY + 8);
+
+
+  // -------------------------------------------------------------
+  // RIGHT: Coated Cake (Frosting or Textured) -> "COATED"
+  // -------------------------------------------------------------
+  const cx2 = x + 140;
+  const fnRgb = hexToRgb(finishColor, [246, 222, 171]);
+
+  if (isBox) {
+    renderBoxCoatedBase(doc, { cx: cx2, topY, rx, ry, totalCoreH, botY, fnRgb, isTextured, texture });
+  } else {
+    renderCylinderCoatedBase(doc, { cx: cx2, topY, rx, ry, totalCoreH, botY, fnRgb, isTextured, texture });
+  }
+
+  // Label under Right Cylinder: "COATED" (matching user sketch)
+  const labelY2 = botY + ry + 6;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(...INK);
+  const coatedText = 'COATED';
+  doc.text(coatedText, cx2 - doc.getTextWidth(coatedText) / 2, labelY2);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.2);
+  doc.setTextColor(110, 100, 95);
+  const subCoatedText = isTextured && textureName ? `${styleName} · ${textureName}` : `${styleName} (${finishFlavor})`;
+  doc.text(subCoatedText, cx2 - doc.getTextWidth(subCoatedText) / 2, labelY2 + 4.5);
+
+
+  // -------------------------------------------------------------
+  // FOOTER NOTE
+  // -------------------------------------------------------------
+  const footerY = y + h - 3.5;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.0);
+  doc.setTextColor(...INK);
+  doc.text('STEP 1: ASSEMBLED CORE (FILLING)  ->  STEP 2: SEALING CRUMB COAT  ->  STEP 3: FULL EXTERIOR COATING (COATED)', x + 5, footerY);
+
+  doc.restoreGraphicsState?.();
+}
+
+/**
+ * Renders the Surface Treatment / Drip Application Assembly schematic (matching user sketch with COATED -> DRIP).
+ * Left: Fully coated cake cylinder (labeled "COATED").
+ * Center: Transition arrow (->) indicating glaze pouring & drizzling.
+ * Right: Cake cylinder with surface treatment (drip cascading down from top glaze pool,
+ *        with dispenser bottle nozzle above it pouring glaze, labeled "DRIP").
+ */
+export function drawAssemblySurfaceSchematic(doc, {
+  x,
+  y,
+  w = 182,
+  h = 88,
+  shape = 'round',
+  style = 'smooth',
+  styleName = 'Smooth Coating',
+  texture = '',
+  textureName = '',
+  isTextured = false,
+  finishFlavor = 'Vanilla',
+  finishColor = '#F6DEAB',
+  surfaceMode = 'drip',
+  surfaceModeName = 'Drip',
+  patternId = 'naturalTear',
+  patternName = 'Natural Tear',
+  surfaceFlavorName = 'Chocolate',
+  surfaceColor = '#301009',
+}) {
+  doc.saveGraphicsState?.();
+
+  // 1. Outer container
+  doc.setFillColor(252, 250, 248);
+  doc.roundedRect(x, y, w, h, 2, 2, 'F');
+  doc.setDrawColor(...INK);
+  doc.setLineWidth(0.6);
+  doc.roundedRect(x, y, w, h, 2, 2, 'S');
+
+  // Top badges
+  drawBadge(doc, 'SURFACE TREATMENT APPLICATION ASSEMBLY', x + 3, y + 3, [35, 30, 30]);
+
+  const topBadgeText = `${String(surfaceModeName || 'DRIP').toUpperCase()} · ${String(patternName || 'GLAZE').toUpperCase()}`;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.4);
+  const badgeTw = doc.getTextWidth(topBadgeText);
+  drawBadge(doc, topBadgeText, x + w - badgeTw - 14, y + 3, [80, 70, 65]);
+
+  const isBox = isBoxShape(shape);
+  const coreW = 58;
+  const rx = coreW / 2; // 29mm
+  const ry = 6.2;
+  const topY = y + 16;
+  const totalCoreH = 46;
+  const botY = topY + totalCoreH;
+
+  const fnRgb = hexToRgb(finishColor, [246, 222, 171]);
+  const sRgb = hexToRgb(surfaceColor, [48, 16, 9]);
+
+  // -------------------------------------------------------------
+  // LEFT: Coated Cake -> "COATED"
+  // -------------------------------------------------------------
+  const cx1 = x + 42;
+  if (isBox) {
+    renderBoxCoatedBase(doc, { cx: cx1, topY, rx, ry, totalCoreH, botY, fnRgb, isTextured, texture });
+  } else {
+    renderCylinderCoatedBase(doc, { cx: cx1, topY, rx, ry, totalCoreH, botY, fnRgb, isTextured, texture });
+  }
+
+  // Label under Left Cake: "COATED"
+  const labelY1 = botY + ry + 6;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(...INK);
+  const coatedTitle = 'COATED';
+  doc.text(coatedTitle, cx1 - doc.getTextWidth(coatedTitle) / 2, labelY1);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.2);
+  doc.setTextColor(110, 100, 95);
+  const subCoatedTitle = isTextured && textureName ? `${styleName} · ${textureName}` : `${styleName} (${finishFlavor})`;
+  doc.text(subCoatedTitle, cx1 - doc.getTextWidth(subCoatedTitle) / 2, labelY1 + 4.5);
+
+
+  // -------------------------------------------------------------
+  // CENTER: Transition Arrow (->)
+  // -------------------------------------------------------------
+  const arrowCx = x + w * 0.5;
+  const arrowY = topY + totalCoreH * 0.48;
+  const arrowLen = 10;
+
+  doc.setDrawColor(...INK);
+  doc.setLineWidth(1.4);
+  doc.line(arrowCx - arrowLen, arrowY, arrowCx + arrowLen - 2, arrowY);
+
+  doc.setFillColor(...INK);
+  doc.triangle(
+    arrowCx + arrowLen + 3, arrowY,
+    arrowCx + arrowLen - 3, arrowY - 3.5,
+    arrowCx + arrowLen - 3, arrowY + 3.5,
+    'FD'
+  );
+
+  // Arrow step text
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.8);
+  doc.setTextColor(...INK);
+  const stepText = 'POUR & DRIZZLE';
+  doc.text(stepText, arrowCx - doc.getTextWidth(stepText) / 2, arrowY - 5.5);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.0);
+  doc.setTextColor(120, 110, 105);
+  const actionText = `APPLY ${String(surfaceModeName || 'DRIP').toUpperCase()}`;
+  doc.text(actionText, arrowCx - doc.getTextWidth(actionText) / 2, arrowY + 8);
+
+
+  // -------------------------------------------------------------
+  // RIGHT: Cake with Surface Treatment / Drips -> "DRIP"
+  // -------------------------------------------------------------
+  const cx2 = x + 140;
+  if (isBox) {
+    renderBoxCoatedBase(doc, { cx: cx2, topY, rx, ry, totalCoreH, botY, fnRgb, isTextured, texture });
+    renderBoxDripGlaze(doc, { cx: cx2, topY, rx, ry, totalCoreH, botY, sRgb, patternId, patternName });
+  } else {
+    renderCylinderCoatedBase(doc, { cx: cx2, topY, rx, ry, totalCoreH, botY, fnRgb, isTextured, texture });
+    renderCylinderDripGlaze(doc, { cx: cx2, topY, rx, ry, totalCoreH, botY, sRgb, patternId, patternName });
+  }
+
+  // Label under Right Cylinder: "DRIP" (matching user sketch)
+  const labelY2 = botY + ry + 6;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(...INK);
+  const dripTitle = 'DRIP';
+  doc.text(dripTitle, cx2 - doc.getTextWidth(dripTitle) / 2, labelY2);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.2);
+  doc.setTextColor(110, 100, 95);
+  const subDripTitle = `${patternName} (${surfaceFlavorName})`;
+  doc.text(subDripTitle, cx2 - doc.getTextWidth(subDripTitle) / 2, labelY2 + 4.5);
+
+
+  // -------------------------------------------------------------
+  // FOOTER NOTE
+  // -------------------------------------------------------------
+  const footerY = y + h - 3.5;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.0);
+  doc.setTextColor(...INK);
+  doc.text('STEP 1: CHILLED COATED BASE (COATED)  ->  STEP 2: DRIZZLE GLAZE FROM NOZZLE  ->  STEP 3: CASCADING SURFACE FINISH (DRIP)', x + 5, footerY);
+
+  doc.restoreGraphicsState?.();
+}
+
+/**
+ * Shared helper: renders coated cylinder base (body, shading, texture ridges, top surface, rim outlines)
+ */
+function renderCylinderCoatedBase(doc, { cx, topY, rx, ry, totalCoreH, botY, fnRgb, isTextured, texture }) {
+  const finishBase = fnRgb;
+  const finishHighlight = [
+    Math.min(255, fnRgb[0] + 16),
+    Math.min(255, fnRgb[1] + 16),
+    Math.min(255, fnRgb[2] + 16),
+  ];
+  const finishShadow = [
+    Math.max(0, fnRgb[0] - 24),
+    Math.max(0, fnRgb[1] - 24),
+    Math.max(0, fnRgb[2] - 24),
+  ];
+  const finishDeepShadow = [
+    Math.max(0, fnRgb[0] - 38),
+    Math.max(0, fnRgb[1] - 38),
+    Math.max(0, fnRgb[2] - 38),
+  ];
+
+  // Cylinder body
+  doc.setFillColor(...finishBase);
+  doc.rect(cx - rx, topY, rx * 2, totalCoreH, 'F');
+  doc.ellipse(cx, botY, rx, ry, 'F');
+
+  // Soft shadow on right
+  doc.setFillColor(...finishShadow);
+  doc.rect(cx + rx * 0.45, topY, rx * 0.55, totalCoreH, 'F');
+  doc.ellipse(cx, botY, rx, ry, 'F');
+
+  // Specular highlight on left
+  doc.setFillColor(...finishHighlight);
+  doc.rect(cx - rx * 0.65, topY, rx * 0.35, totalCoreH, 'F');
+  doc.ellipse(cx, botY, rx, ry, 'F');
+
+  // Texture lines (if textured buttercream)
+  if (isTextured) {
+    if (texture === 'ribbonWrap') {
+      const numRibbons = 7;
+      const ribbonH = totalCoreH / numRibbons;
+      for (let rIdx = 1; rIdx < numRibbons; rIdx++) {
+        const rY = topY + rIdx * ribbonH;
+        doc.setDrawColor(...finishDeepShadow);
+        doc.setLineWidth(0.65);
+        doc.ellipse(cx, rY, rx, ry, 'S');
+
+        doc.setDrawColor(...finishHighlight);
+        doc.setLineWidth(0.35);
+        doc.ellipse(cx, rY + 0.5, rx, ry, 'S');
+      }
+    } else {
+      const numRidges = 12;
+      const ridgeH = totalCoreH / (numRidges + 1);
+      for (let rIdx = 1; rIdx <= numRidges; rIdx++) {
+        const rY = topY + rIdx * ridgeH;
+        doc.setDrawColor(...finishDeepShadow);
+        doc.setLineWidth(0.45);
+        doc.ellipse(cx, rY, rx, ry, 'S');
+
+        doc.setDrawColor(...finishHighlight);
+        doc.setLineWidth(0.25);
+        doc.ellipse(cx, rY + 0.4, rx, ry, 'S');
+      }
+    }
+  }
+
+  // Top surface
+  doc.setFillColor(...finishHighlight);
+  doc.ellipse(cx, topY, rx, ry, 'F');
+
+  if (isTextured) {
+    doc.setDrawColor(...finishShadow);
+    doc.setLineWidth(0.3);
+    doc.ellipse(cx, topY, rx * 0.65, ry * 0.65, 'S');
+    doc.ellipse(cx, topY, rx * 0.35, ry * 0.35, 'S');
+  }
+
+  // Outer strokes
+  doc.setDrawColor(...INK);
+  doc.setLineWidth(0.75);
+  doc.ellipse(cx, topY, rx, ry, 'S');
+  doc.line(cx - rx, topY, cx - rx, botY);
+  doc.line(cx + rx, topY, cx + rx, botY);
+  doc.ellipse(cx, botY, rx, ry, 'S');
+}
+
+/**
+ * Shared helper: renders Drip Glaze on top of cylinder based on selected drip pattern
+ */
+function renderCylinderDripGlaze(doc, { cx, topY, rx, ry, totalCoreH, botY, sRgb, patternId, patternName }) {
+  const sHighlight = [
+    Math.min(255, sRgb[0] + 32),
+    Math.min(255, sRgb[1] + 32),
+    Math.min(255, sRgb[2] + 32),
+  ];
+  const sShadow = [
+    Math.max(0, sRgb[0] - 25),
+    Math.max(0, sRgb[1] - 25),
+    Math.max(0, sRgb[2] - 25),
+  ];
+
+  // Top surface glaze pool
+  doc.setFillColor(...sRgb);
+  doc.ellipse(cx, topY, rx, ry, 'F');
+  doc.setDrawColor(...sShadow);
+  doc.setLineWidth(0.4);
+  doc.ellipse(cx, topY, rx, ry, 'S');
+
+  // Sheen reflection on top glaze
+  doc.setFillColor(...sHighlight);
+  doc.ellipse(cx - rx * 0.28, topY - 0.6, rx * 0.48, ry * 0.5, 'F');
+
+  // Overlay Drip Glaze based on actual selected Drip Pattern (matching renderDripDrawing)
+  const str = String(patternId || patternName || '').toLowerCase();
+  let tang = 0.5;
+
+  const wave = (dipY, crestY) => [
+    [0.00, crestY], [0.17, dipY], [0.33, crestY], [0.50, dipY], [0.66, crestY], [0.83, dipY], [1.00, crestY],
+  ];
+
+  let keyNodes;
+  if (str.includes('alt') || str.includes('longshort')) {
+    tang = 0.36;
+    keyNodes = [
+      [0.00, 0.14], [0.07, 0.50], [0.14, 0.19], [0.27, 0.95], [0.46, 0.17],
+      [0.64, 0.56], [0.82, 0.18], [0.95, 0.86], [1.00, 0.86],
+    ];
+  } else if (str.includes('short') && !str.includes('wave') && !str.includes('cover')) {
+    tang = 0.42;
+    keyNodes = [
+      [0.00, 0.50], [0.06, 0.52], [0.15, 0.20], [0.31, 0.56], [0.48, 0.18],
+      [0.69, 0.56], [0.87, 0.21], [0.95, 0.50], [1.00, 0.50],
+    ];
+  } else if (str.includes('longwave') || str.includes('full') || str.includes('coverage')) {
+    tang = 0.5;
+    keyNodes = wave(0.85, 0.72);
+  } else if (str.includes('midwave') || (str.includes('mid') && str.includes('wave')) || (str.includes('mid') && str.includes('cover'))) {
+    tang = 0.5;
+    keyNodes = wave(0.53, 0.42);
+  } else if (str.includes('shortwave') || (str.includes('short') && str.includes('wave')) || (str.includes('short') && str.includes('cover'))) {
+    tang = 0.5;
+    keyNodes = wave(0.28, 0.16);
+  } else if (str.includes('tinytip') || str.includes('curve')) {
+    tang = 0.5;
+    keyNodes = [
+      [0.00, 0.55], [0.13, 0.38], [0.30, 0.58], [0.46, 0.37], [0.66, 0.60], [0.82, 0.38], [0.95, 0.55], [1.00, 0.55],
+    ];
+  } else if (str.includes('uneven') || str.includes('fall')) {
+    tang = 0.45;
+    keyNodes = [
+      [0.00, 0.24], [0.06, 0.20, 0.5], [0.17, 0.80, 0.1], [0.31, 0.19, 0.5], [0.46, 0.53, 0.1],
+      [0.62, 0.20, 0.5], [0.77, 0.82, 0.1], [0.92, 0.22, 0.5], [1.00, 0.26],
+    ];
+  } else if (str.includes('natural') || str.includes('tear') || str.includes('gap')) {
+    tang = 0.4;
+    keyNodes = [
+      [0.00, 0.34], [0.06, 0.34], [0.14, 0.86, 0.1], [0.21, 0.55, 0.3], [0.35, 0.44],
+      [0.50, 0.62], [0.62, 0.54], [0.70, 0.93, 0.1], [0.78, 0.27, 0.45], [0.88, 0.28], [0.95, 0.36], [1.00, 0.36],
+    ];
+  } else {
+    tang = 0.28;
+    keyNodes = [
+      [0.00, 0.85], [0.03, 0.85], [0.10, 0.18], [0.28, 0.92], [0.50, 0.18],
+      [0.69, 0.92], [0.88, 0.18], [0.97, 0.85], [1.00, 0.85],
+    ];
+  }
+
+  // Evaluate Bezier drip contour points along front of cylinder
+  const dripCurve = [];
+  const maxDripH = totalCoreH - 5;
+  for (let i = 0; i < keyNodes.length - 1; i++) {
+    const p0 = { u: keyNodes[i][0], v: keyNodes[i][1] };
+    const p3 = { u: keyNodes[i + 1][0], v: keyNodes[i + 1][1] };
+    const du = p3.u - p0.u;
+    const k0 = keyNodes[i][2] ?? tang;
+    const k3 = keyNodes[i + 1][2] ?? tang;
+    const p1 = { u: p0.u + du * k0, v: p0.v };
+    const p2 = { u: p3.u - du * k3, v: p3.v };
+
+    const steps = 14;
+    for (let s = 0; s < steps; s++) {
+      const t = s / steps;
+      const mt = 1 - t;
+      const u = mt ** 3 * p0.u + 3 * mt * mt * t * p1.u + 3 * mt * t * t * p2.u + t ** 3 * p3.u;
+      const v = mt ** 3 * p0.v + 3 * mt * mt * t * p1.v + 3 * mt * t * t * p2.v + t ** 3 * p3.v;
+
+      const px = cx - rx + u * (2 * rx);
+      const rimY = topY + ry * Math.sqrt(Math.max(0, 1 - ((px - cx) / rx) ** 2));
+      const py = Math.min(botY - 1.5, rimY + v * maxDripH);
+      dripCurve.push({ x: px, y: py, u, v });
+    }
+  }
+  const lastNode = keyNodes[keyNodes.length - 1];
+  const pxLast = cx + rx;
+  const pyLast = Math.min(botY - 1.5, topY + lastNode[1] * maxDripH);
+  dripCurve.push({ x: pxLast, y: pyLast, u: 1, v: lastNode[1] });
+
+  // Closed polygon of the drip curtain:
+  const rimSteps = 24;
+  const rimArc = [];
+  for (let i = rimSteps; i >= 0; i--) {
+    const u = i / rimSteps;
+    const rxPos = cx - rx + u * (2 * rx);
+    const ryPos = topY + ry * Math.sqrt(Math.max(0, 1 - ((rxPos - cx) / rx) ** 2));
+    rimArc.push([rxPos, ryPos]);
+  }
+
+  const poly = [
+    ...dripCurve.map(p => [p.x, p.y]),
+    ...rimArc,
+  ];
+
+  const segs = [];
+  for (let i = 1; i < poly.length; i++) {
+    segs.push([poly[i][0] - poly[i - 1][0], poly[i][1] - poly[i - 1][1]]);
+  }
+  doc.setFillColor(...sRgb);
+  doc.lines(segs, poly[0][0], poly[0][1], [1, 1], 'F', true);
+
+  // Bottom edge line of drip curtain
+  doc.setDrawColor(...sShadow);
+  doc.setLineWidth(0.65);
+  for (let i = 0; i < dripCurve.length - 1; i++) {
+    doc.line(dripCurve[i].x, dripCurve[i].y, dripCurve[i + 1].x, dripCurve[i + 1].y);
+  }
+
+  // Inner highlight reflection along the bottom wavy rim
+  doc.setDrawColor(...sHighlight);
+  doc.setLineWidth(0.35);
+  for (let i = 2; i < dripCurve.length - 3; i += 2) {
+    if (i % 5 !== 0) {
+      doc.line(dripCurve[i].x, dripCurve[i].y - 0.7, dripCurve[i + 1].x, dripCurve[i + 1].y - 0.7);
+    }
+  }
+
+  // For drip patterns with distinct dripping tongues, render rounded bulb droplets at tongue tips
+  const isWavePattern = str.includes('wave') || str.includes('full') || str.includes('coverage');
+  if (!isWavePattern) {
+    for (let i = 2; i < dripCurve.length - 2; i++) {
+      const prevY = dripCurve[i - 1].y;
+      const curY = dripCurve[i].y;
+      const nextY = dripCurve[i + 1].y;
+      if (curY >= prevY && curY >= nextY && curY > topY + ry + 7) {
+        const bulbR = Math.min(2.3, Math.max(1.3, (curY - (topY + ry)) * 0.08));
+        doc.setFillColor(...sRgb);
+        doc.circle(dripCurve[i].x, curY - 0.2, bulbR, 'F');
+        doc.setDrawColor(...sShadow);
+        doc.setLineWidth(0.35);
+        doc.circle(dripCurve[i].x, curY - 0.2, bulbR, 'S');
+
+        // Glint highlight on teardrop bulb
+        doc.setFillColor(...sHighlight);
+        doc.circle(dripCurve[i].x - bulbR * 0.35, curY - 0.2 - bulbR * 0.35, bulbR * 0.35, 'F');
+      }
+    }
+  }
+
+  // Specular sheen reflection streaks down deeper portions of the glaze
+  doc.setDrawColor(...sHighlight);
+  doc.setLineWidth(0.45);
+  [-0.6, -0.2, 0.25, 0.65].forEach((uOff) => {
+    const streakX = cx + rx * uOff;
+    const pt = dripCurve.find(p => Math.abs(p.x - streakX) < 1.6);
+    if (pt && pt.y > topY + ry + 8) {
+      const rimYAt = topY + ry * Math.sqrt(Math.max(0, 1 - uOff ** 2));
+      doc.line(streakX, rimYAt + 2.0, streakX, pt.y - 2.5);
+    }
+  });
+
+  // Re-stroke outer cylinder edges
+  doc.setDrawColor(...INK);
+  doc.setLineWidth(0.75);
+  doc.ellipse(cx, topY, rx, ry, 'S');
+  doc.line(cx - rx, topY, cx - rx, botY);
+  doc.line(cx + rx, topY, cx + rx, botY);
+  doc.ellipse(cx, botY, rx, ry, 'S');
+}
+
+/**
+ * Shared helper: renders Dispenser Nozzle pouring glaze above cylinder (matching user sketch)
+ */
+function renderDispenserNozzle(doc, { cx, topY, sRgb }) {
+  const nozW = 8;
+  const nozH = 4.5;
+  const nozY = topY - 12;
+
+  // Dispenser bottle/cup reservoir
+  doc.setFillColor(244, 242, 240);
+  doc.rect(cx - nozW / 2, nozY, nozW, nozH, 'F');
+  doc.ellipse(cx, nozY, nozW / 2, 1.2, 'F');
+  doc.ellipse(cx, nozY + nozH, nozW / 2, 1.2, 'F');
+
+  // Glaze inside reservoir
+  doc.setFillColor(...sRgb);
+  doc.rect(cx - nozW / 2 + 0.6, nozY + 1.2, nozW - 1.2, nozH - 1.2, 'F');
+
+  // Dispenser bottle outlines
+  doc.setDrawColor(...INK);
+  doc.setLineWidth(0.5);
+  doc.ellipse(cx, nozY, nozW / 2, 1.2, 'S');
+  doc.line(cx - nozW / 2, nozY, cx - nozW / 2, nozY + nozH);
+  doc.line(cx + nozW / 2, nozY, cx + nozW / 2, nozY + nozH);
+
+  // Tapered funnel to nozzle
+  doc.setFillColor(244, 242, 240);
+  doc.triangle(cx - nozW / 2, nozY + nozH, cx + nozW / 2, nozY + nozH, cx, nozY + nozH + 3.2, 'FD');
+
+  // Nozzle tip
+  doc.setFillColor(...sRgb);
+  doc.rect(cx - 0.9, nozY + nozH + 2.4, 1.8, 2.2, 'FD');
+
+  // Stream of glaze falling into center of top surface
+  doc.setDrawColor(...sRgb);
+  doc.setLineWidth(0.9);
+  doc.line(cx, nozY + nozH + 4.6, cx, topY - 0.5);
+  doc.setFillColor(...sRgb);
+  doc.circle(cx, topY - 1.2, 0.7, 'F');
+}
+
+/**
+ * Shared helper: renders Piping Nozzle / Tip above cylinder (matching user sketch)
+ */
+function renderPipingNozzle(doc, { cx, topY, sideRgb }) {
+  const pNozW = 8.5;
+  const pNozH = 4.2;
+  const pNozY = topY - 12.5;
+
+  // Coupler / piping bag collar
+  doc.setFillColor(246, 244, 242);
+  doc.rect(cx - pNozW / 2, pNozY, pNozW, pNozH, 'F');
+  doc.ellipse(cx, pNozY, pNozW / 2, 1.2, 'F');
+  doc.ellipse(cx, pNozY + pNozH, pNozW / 2, 1.2, 'F');
+
+  // Frosting inside coupler
+  doc.setFillColor(...sideRgb);
+  doc.rect(cx - pNozW / 2 + 0.6, pNozY + 1.2, pNozW - 1.2, pNozH - 1.2, 'F');
+
+  doc.setDrawColor(...INK);
+  doc.setLineWidth(0.5);
+  doc.ellipse(cx, pNozY, pNozW / 2, 1.2, 'S');
+  doc.line(cx - pNozW / 2, pNozY, cx - pNozW / 2, pNozY + pNozH);
+  doc.line(cx + pNozW / 2, pNozY, cx + pNozW / 2, pNozY + pNozH);
+
+  // Metallic piping tip cone
+  doc.setFillColor(220, 222, 225);
+  doc.triangle(cx - pNozW / 2, pNozY + pNozH, cx + pNozW / 2, pNozY + pNozH, cx, pNozY + pNozH + 3.8, 'FD');
+
+  // Piping tip nozzle opening with frosting
+  doc.setFillColor(...sideRgb);
+  doc.rect(cx - 1.0, pNozY + pNozH + 2.8, 2.0, 2.0, 'FD');
+
+  // Piped bead droplet at tip
+  doc.setFillColor(...sideRgb);
+  doc.circle(cx, pNozY + pNozH + 5.5, 0.9, 'F');
+}
+
+/**
+ * Renders the Side Design Application Assembly schematic (in-between SIDE and EDGE, matching user sketch DRIP -> SIDE).
+ * Left: Cake with Surface Treatment / Drip (or Coated Base), labeled "DRIP" (or "COATED").
+ * Center: Transition arrow (->) indicating piping & decorating perimeter motifs.
+ * Right: Cake cylinder with side design pattern applied along the wall and piping nozzle above it, labeled "SIDE".
+ */
+export function drawAssemblySideSchematic(doc, {
+  x,
+  y,
+  w = 182,
+  h = 88,
+  shape = 'round',
+  style = 'smooth',
+  styleName = 'Smooth Coating',
+  texture = '',
+  textureName = '',
+  isTextured = false,
+  finishFlavor = 'Vanilla',
+  finishColor = '#F6DEAB',
+  hasSurface = false,
+  surfaceMode = 'drip',
+  surfaceModeName = 'Drip',
+  surfacePatternId = 'naturalTear',
+  surfacePatternName = 'Natural Tear',
+  surfaceFlavorName = 'Chocolate',
+  surfaceColor = '#301009',
+  treatmentId = 'checkeredPattern',
+  treatmentName = 'Checkered Pattern',
+  variantId = 'straightGrid',
+  sidePatternName = 'Straight Grid',
+  sideColorName = 'Chocolate',
+  sideColor = '#3D2314',
+  secondaryColor = null,
+}) {
+  doc.saveGraphicsState?.();
+
+  // 1. Outer container
+  doc.setFillColor(252, 250, 248);
+  doc.roundedRect(x, y, w, h, 2, 2, 'F');
+  doc.setDrawColor(...INK);
+  doc.setLineWidth(0.6);
+  doc.roundedRect(x, y, w, h, 2, 2, 'S');
+
+  // Top badges
+  drawBadge(doc, 'SIDE DESIGN APPLICATION ASSEMBLY', x + 3, y + 3, [35, 30, 30]);
+
+  const topBadgeText = `${String(treatmentName || 'SIDE').toUpperCase()} · ${String(sidePatternName || 'PATTERN').toUpperCase()}`;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.4);
+  const badgeTw = doc.getTextWidth(topBadgeText);
+  drawBadge(doc, topBadgeText, x + w - badgeTw - 14, y + 3, [80, 70, 65]);
+
+  const isBox = isBoxShape(shape);
+  const coreW = 58;
+  const rx = coreW / 2; // 29mm
+  const ry = 6.2;
+  const topY = y + 16;
+  const totalCoreH = 46;
+  const botY = topY + totalCoreH;
+
+  const fnRgb = hexToRgb(finishColor, [246, 222, 171]);
+  const sRgb = hexToRgb(surfaceColor, [48, 16, 9]);
+  const sideRgb = hexToRgb(sideColor, [61, 35, 20]);
+
+  // -------------------------------------------------------------
+  // LEFT: Prepared Tier Base -> "DRIP" (or "COATED")
+  // -------------------------------------------------------------
+  const cx1 = x + 42;
+  if (isBox) {
+    renderBoxCoatedBase(doc, { cx: cx1, topY, rx, ry, totalCoreH, botY, fnRgb, isTextured, texture });
+    if (hasSurface) {
+      renderBoxDripGlaze(doc, { cx: cx1, topY, rx, ry, totalCoreH, botY, sRgb, patternId: surfacePatternId, patternName: surfacePatternName });
+    }
+  } else {
+    renderCylinderCoatedBase(doc, { cx: cx1, topY, rx, ry, totalCoreH, botY, fnRgb, isTextured, texture });
+    if (hasSurface) {
+      renderCylinderDripGlaze(doc, { cx: cx1, topY, rx, ry, totalCoreH, botY, sRgb, patternId: surfacePatternId, patternName: surfacePatternName });
+    }
+  }
+
+  if (hasSurface) {
+    // Label: "DRIP"
+    const labelY1 = botY + ry + 6;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...INK);
+    const dripTitle = 'DRIP';
+    doc.text(dripTitle, cx1 - doc.getTextWidth(dripTitle) / 2, labelY1);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.2);
+    doc.setTextColor(110, 100, 95);
+    const subDripTitle = `${surfacePatternName || surfaceModeName} (${surfaceFlavorName})`;
+    doc.text(subDripTitle, cx1 - doc.getTextWidth(subDripTitle) / 2, labelY1 + 4.5);
+  } else {
+    // Label: "COATED"
+    const labelY1 = botY + ry + 6;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...INK);
+    const coatedTitle = 'COATED';
+    doc.text(coatedTitle, cx1 - doc.getTextWidth(coatedTitle) / 2, labelY1);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.2);
+    doc.setTextColor(110, 100, 95);
+    const subCoatedTitle = isTextured && textureName ? `${styleName} · ${textureName}` : `${styleName} (${finishFlavor})`;
+    doc.text(subCoatedTitle, cx1 - doc.getTextWidth(subCoatedTitle) / 2, labelY1 + 4.5);
+  }
+
+  // -------------------------------------------------------------
+  // CENTER: Transition Arrow (->)
+  // -------------------------------------------------------------
+  const arrowCx = x + w * 0.5;
+  const arrowY = topY + totalCoreH * 0.48;
+  const arrowLen = 10;
+
+  doc.setDrawColor(...INK);
+  doc.setLineWidth(1.4);
+  doc.line(arrowCx - arrowLen, arrowY, arrowCx + arrowLen - 2, arrowY);
+
+  doc.setFillColor(...INK);
+  doc.triangle(
+    arrowCx + arrowLen + 3, arrowY,
+    arrowCx + arrowLen - 3, arrowY - 3.5,
+    arrowCx + arrowLen - 3, arrowY + 3.5,
+    'FD'
+  );
+
+  // Arrow step text
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.8);
+  doc.setTextColor(...INK);
+  const stepText = 'PIPE & DECORATE';
+  doc.text(stepText, arrowCx - doc.getTextWidth(stepText) / 2, arrowY - 5.5);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.0);
+  doc.setTextColor(120, 110, 105);
+  const actionText = `APPLY ${String(sidePatternName || treatmentName || 'SIDE').toUpperCase()}`;
+  doc.text(actionText, arrowCx - doc.getTextWidth(actionText) / 2, arrowY + 8);
+
+  // -------------------------------------------------------------
+  // RIGHT: Cake with Side Design Applied -> "SIDE"
+  // -------------------------------------------------------------
+  const cx2 = x + 140;
+  // 1. Render base coated base
+  if (isBox) {
+    renderBoxCoatedBase(doc, { cx: cx2, topY, rx, ry, totalCoreH, botY, fnRgb, isTextured, texture });
+    if (hasSurface) {
+      renderBoxDripGlaze(doc, { cx: cx2, topY, rx, ry, totalCoreH, botY, sRgb, patternId: surfacePatternId, patternName: surfacePatternName });
+    }
+  } else {
+    renderCylinderCoatedBase(doc, { cx: cx2, topY, rx, ry, totalCoreH, botY, fnRgb, isTextured, texture });
+    if (hasSurface) {
+      renderCylinderDripGlaze(doc, { cx: cx2, topY, rx, ry, totalCoreH, botY, sRgb, patternId: surfacePatternId, patternName: surfacePatternName });
+    }
+  }
+
+  // 2. Render side design shapes projected onto the surface (bent/curved with cake body and spread across full width)
+  renderProjectedSidePattern(doc, {
+    cx: cx2,
+    topY,
+    rx,
+    ry,
+    totalCoreH,
+    botY,
+    isBox,
+    treatmentId,
+    variantId,
+    rgb: sideRgb,
+    secondaryColor,
+    hasSurface,
+  });
+
+  // 3. Re-stroke outer edges for crisp boundary
+  if (isBox) {
+    reStrokeBoxOutlines(doc, { cx: cx2, topY, rx, ry, totalCoreH, botY });
+  } else {
+    doc.setDrawColor(...INK);
+    doc.setLineWidth(0.75);
+    doc.ellipse(cx2, topY, rx, ry, 'S');
+    doc.line(cx2 - rx, topY, cx2 - rx, botY);
+    doc.line(cx2 + rx, topY, cx2 + rx, botY);
+    doc.ellipse(cx2, botY, rx, ry, 'S');
+  }
+
+  // Label under Right Cylinder: "SIDE" (matching user sketch)
+  const labelY2 = botY + ry + 6;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(...INK);
+  const sideTitle = 'SIDE';
+  doc.text(sideTitle, cx2 - doc.getTextWidth(sideTitle) / 2, labelY2);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.2);
+  doc.setTextColor(110, 100, 95);
+  const subSideTitle = `${sidePatternName} (${sideColorName})`;
+  doc.text(subSideTitle, cx2 - doc.getTextWidth(subSideTitle) / 2, labelY2 + 4.5);
+
+  // -------------------------------------------------------------
+  // FOOTER NOTE
+  // -------------------------------------------------------------
+  const footerY = y + h - 3.5;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.0);
+  doc.setTextColor(...INK);
+  const footerBase = hasSurface ? 'DRIP' : 'COATED';
+  doc.text(`STEP 1: PREPARED BASE (${footerBase})  ->  STEP 2: PRECISION PIPING TIP  ->  STEP 3: CIRCUMFERENCE WALL MOTIFS (SIDE)`, x + 5, footerY);
 
   doc.restoreGraphicsState?.();
 }

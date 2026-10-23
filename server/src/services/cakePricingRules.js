@@ -281,16 +281,16 @@ const DEFAULT_RATES = {
       classicCube: 400, largeCube: 600, miniBento: 350, standardBento: 450, largeBento: 550, squareBento2x2: 400, squareBento3x3: 500
     },
     frosted: {
-      '6x4': 550, '8x6': 750, '10x8': 950, '12x10': 1150,
-      '6x6': 550, '8x8': 750, '10x10': 950, '12x10': 1150,
-      big: 750, small: 550,
-      classicCube: 500, largeCube: 800, miniBento: 500, standardBento: 600, largeBento: 750, squareBento2x2: 500, squareBento3x3: 650
+      '6x4': 350, '8x6': 550, '10x8': 750, '12x10': 950,
+      '6x6': 350, '8x8': 550, '10x10': 750, '12x12': 950,
+      big: 550, small: 350,
+      classicCube: 400, largeCube: 600, miniBento: 350, standardBento: 450, largeBento: 550, squareBento2x2: 400, squareBento3x3: 500
     },
     textured: {
-      '6x4': 550, '8x6': 750, '10x8': 950, '12x10': 1150,
-      '6x6': 550, '8x8': 750, '10x10': 950, '12x12': 1150,
-      big: 750, small: 550,
-      classicCube: 500, largeCube: 800, miniBento: 500, standardBento: 600, largeBento: 750, squareBento2x2: 500, squareBento3x3: 650
+      '6x4': 350, '8x6': 550, '10x8': 750, '12x10': 950,
+      '6x6': 350, '8x8': 550, '10x10': 750, '12x12': 950,
+      big: 550, small: 350,
+      classicCube: 400, largeCube: 600, miniBento: 350, standardBento: 450, largeBento: 550, squareBento2x2: 400, squareBento3x3: 500
     },
   },
   flavors: {
@@ -315,11 +315,12 @@ const DEFAULT_RATES = {
   },
   finishAddon: {
     naked: 0,
-    frosted: 200,
-    textured: 200,
+    pickColor: 0,
+    frosted: 0,
+    textured: 0,
   },
-  // Two tiers set default
-  twoTier: { naked: 900, frosted: 1300, textured: 1300 },
+  // Two tiers set default: 8x6 vanilla (550) + 6x4 vanilla (350) = 900
+  twoTier: { naked: 900, frosted: 900, textured: 900 },
 
   // Glaze / drip: included (₱0)
   glazePerTier: 0,
@@ -450,7 +451,7 @@ const frostClass = (style) => {
   return 'frosted';
 };
 
-function calculateTierPrice(sizeClass, spongeFlavor, finishCls, rates, colorOverride = null) {
+function calculateTierPrice(sizeClass, spongeFlavor, finishCls, rates, colorOverride = null, finishFlavor = null) {
   const cls = finishCls || 'naked';
 
   if (sizeClass === 'classicCube' || sizeClass === 'largeCube') {
@@ -479,14 +480,14 @@ function calculateTierPrice(sizeClass, spongeFlavor, finishCls, rates, colorOver
   }
 
   const flavorKey = String(spongeFlavor || 'vanilla').toLowerCase();
-  const isPickColor = (colorOverride && colorOverride.mode === 'colorOverride' && !['plain', 'vanilla', 'chocolate', 'strawberry', 'cheese', 'ube', 'mocha'].includes(colorOverride.colorId)) || flavorKey === 'pickcolor' || (!['plain', 'vanilla', 'chocolate', 'strawberry', 'cheese', 'ube', 'mocha'].includes(flavorKey) && flavorKey !== 'vanilla');
+  const isPickColor = (colorOverride && colorOverride.target === 'sponge' && colorOverride.mode === 'colorOverride') || flavorKey === 'pickcolor' || (!['plain', 'vanilla', 'chocolate', 'strawberry', 'cheese', 'ube', 'mocha'].includes(flavorKey) && flavorKey !== 'vanilla');
   const flavorBase = isPickColor
     ? (rates?.flavors?.pickColor ?? FLAVOR_PRICES.pickColor ?? 400)
     : (rates?.flavors?.[flavorKey] ?? FLAVOR_PRICES[flavorKey] ?? 350);
   const sizeAddon = rates?.sizes?.[sizeClass] ?? SIZE_ADDONS[sizeClass] ?? 0;
-  const finishAddon = (cls === 'frosted' || cls === 'textured') ? (rates?.finishAddon?.[cls] ?? 200) : 0;
 
-  return flavorBase + sizeAddon + finishAddon;
+  // Finish style is solely visual and has no price factor (+₱0)
+  return flavorBase + sizeAddon;
 }
 
 function bracketPrice(brackets, quantity) {
@@ -585,15 +586,70 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
 
     const pipingColor = title(rawPipingColor || 'Vanilla');
 
-    return [
-      tierLabel,
-      dims,
-      finish,
-      spongeName,
-      fillingName,
+    // Drip details for this tier (Included in Size at ₱0)
+    const surface = config.surfaceTreatment || {};
+    const tierSurface = isIndividual
+      ? (surface.layerTreatments?.[tierIndex] || surface || {})
+      : (surface || {});
+    let dripDetail = null;
+    if (tierSurface.mode === 'glaze') {
+      const patternId = tierSurface.pattern || 'naturalTear2';
+      const dripItem = DRIP_SECTIONS[0]?.items?.find((it) => it.id === patternId);
+      const dripLabel = dripItem?.label || title(patternId);
+      dripDetail = `Drip: ${dripLabel} (Included)`;
+    }
+
+    // Side details for this tier (Included in Size at ₱0)
+    const sideTier = isIndividual ? config.side?.layerTreatments?.[tierIndex] || config.side || {} : config.side || {};
+    let sideDetail = null;
+    if (sideTier.mode) {
+      const setId = sideTier[sideTier.mode]?.setId;
+      const sideKey = `${sideTier.mode}.${setId}`;
+      const sideItem = SIDE_SECTIONS.flatMap((s) => s.items).find((it) => it.key === sideKey || it.id === setId);
+      const sideDesignLabel = sideItem?.label || title(setId || sideTier.mode);
+      sideDetail = `Side: ${sideDesignLabel} (Included)`;
+    }
+
+    // Edge details for this tier (Included in Size at ₱0)
+    const edge = config.edge || {};
+    let edgeTopDetail = null;
+    let edgeBottomDetail = null;
+    if (edge.mode === 'both') {
+      if (edge.both && (edge.both.piping?.tip || edge.both.decorations?.setId)) {
+        const tip = edge.both.piping?.tip || edge.both.decorations?.setId;
+        const edgeItem = EDGE_SECTIONS.flatMap((s) => s.items).find((it) => it.id === tip);
+        const edgeLabel = edgeItem?.label || title(tip);
+        edgeTopDetail = `Edge Top: ${edgeLabel} (Included)`;
+        edgeBottomDetail = `Edge Bottom: ${edgeLabel} (Included)`;
+      }
+    } else {
+      if (edge.top && (edge.top.piping?.tip || edge.top.decorations?.setId)) {
+        const tip = edge.top.piping?.tip || edge.top.decorations?.setId;
+        const edgeItem = EDGE_SECTIONS.flatMap((s) => s.items).find((it) => it.id === tip);
+        const edgeLabel = edgeItem?.label || title(tip);
+        edgeTopDetail = `Edge Top: ${edgeLabel} (Included)`;
+      }
+      if (edge.bottom && (edge.bottom.piping?.tip || edge.bottom.decorations?.setId)) {
+        const tip = edge.bottom.piping?.tip || edge.bottom.decorations?.setId;
+        const edgeItem = EDGE_SECTIONS.flatMap((s) => s.items).find((it) => it.id === tip);
+        const edgeLabel = edgeItem?.label || title(tip);
+        edgeBottomDetail = `Edge Bottom: ${edgeLabel} (Included)`;
+      }
+    }
+
+    const specs = [
+      `Size: ${dims} (${tierLabel})`,
+      `${finish} (Included)`,
+      `${fillingName} (Included)`,
       `Piping Design: ${pipingTip}`,
       `Piping Sugar Color: ${pipingColor}`,
     ];
+    if (dripDetail) specs.push(dripDetail);
+    if (sideDetail) specs.push(sideDetail);
+    if (edgeTopDetail) specs.push(edgeTopDetail);
+    if (edgeBottomDetail) specs.push(edgeBottomDetail);
+
+    return specs;
   };
 
   if (isPetitsFour) {
@@ -614,18 +670,66 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
         add(`sponge-variation-${p}`, `Petit Four — Variant ${p + 1} (${finishLabel(cls)}, ${dims})`, piecePrice, 1, specs);
       }
     }
+  } else if (['miniBento', 'standardBento', 'largeBento', 'squareBento2x2', 'squareBento3x3'].includes(structure.size)) {
+    const cls = frostClass(styleOfTier(0));
+    const size = structure.size;
+    const price = calculateTierPrice(size, 'vanilla', cls, rates);
+    const dims = size === 'miniBento' ? '3.5x2' : size === 'standardBento' ? '4x2' : size === 'largeBento' ? '5x3' : size === 'squareBento2x2' ? '2x2' : '3x3';
+    const specs = getTierSpecs(0, size, '1 Tier Bento', cls);
+    add('sponge', `1 Tier ${finishLabel(cls)} Cake (${dims})`, price, 1, specs);
+  } else if (rates && rates !== DEFAULT_RATES && rates.sponge && !rates.flavors) {
+    // Legacy price book without separate flavor breakdown
+    if (tiers === 1) {
+      const cls = frostClass(styleOfTier(0));
+      const size = structure.size || '8x6';
+      const price = calculateTierPrice(size, 'vanilla', cls, rates);
+      const dims = size === '12x10' || size === '12x12' ? '12x10' : size === '10x8' || size === '10x10' ? '10x8' : size === '6x4' || size === '6x6' || size === 'small' ? '6x4' : '8x6';
+      const specs = getTierSpecs(0, size, '1 Tier', cls);
+      if (price == null) missing(`1 tier ${cls} sponge ${dims}`, 'no price configured');
+      else add('sponge', `1 Tier ${finishLabel(cls)} Cake (${dims})`, price, 1, specs);
+    } else {
+      const bottom = frostClass(styleOfTier(0));
+      const top = frostClass(styleOfTier(1));
+      const baseSize = structure.size || '8x6';
+      const topSize = (baseSize === '12x10' || baseSize === '12x12') ? '10x8'
+        : (baseSize === '10x8' || baseSize === '10x10') ? '8x6'
+        : (baseSize === '6x4' || baseSize === '6x6' || baseSize === 'small') ? '4x3'
+        : '6x4';
+      const b = calculateTierPrice(baseSize, 'vanilla', bottom, rates);
+      const t = calculateTierPrice(topSize, 'vanilla', top, rates);
+      if (b == null || t == null) {
+        missing('2 tier sponge', 'no price configured');
+      } else {
+        const baseDims = baseSize === '12x10' || baseSize === '12x12' ? '12x10' : baseSize === '10x8' || baseSize === '10x10' ? '10x8' : baseSize === '6x4' || baseSize === '6x6' || baseSize === 'small' ? '6x4' : '8x6';
+        const topDims = topSize === '10x8' ? '10x8' : topSize === '8x6' ? '8x6' : topSize === '4x3' ? '4x3' : '6x4';
+        const d0 = getTierSpecs(0, baseSize, 'Bottom Tier', bottom);
+        const d1 = getTierSpecs(1, topSize, 'Top Tier', top);
+        add('sponge', `Bottom Tier ${finishLabel(bottom)} Cake (${baseDims})`, b, 1, d0);
+        add('sponge-top', `Top Tier ${finishLabel(top)} Cake (${topDims})`, t, 1, d1);
+      }
+    }
   } else if (tiers === 1) {
     const cls = frostClass(styleOfTier(0));
     const size = structure.size || '8x6';
     const flavor = (isIndividual ? config.sponge?.layerFlavors?.[0] : null) || config.sponge?.flavor || 'vanilla';
     const exteriorColorOverride = config.sugarColorOverrides?.exterior || config.sugarColor;
-    const price = calculateTierPrice(size, flavor, cls, rates, exteriorColorOverride);
-    const dims = size === 'miniBento' ? '3.5x2' : size === 'standardBento' ? '4x2' : size === 'largeBento' ? '5x3' : size === 'squareBento2x2' ? '2x2' : size === 'squareBento3x3' ? '3x3' : size === '12x10' || size === '12x12' ? '12x10' : size === '10x8' || size === '10x10' ? '10x8' : size === '6x4' || size === '6x6' || size === 'small' ? '6x4' : '8x6';
+    const flavorKey = String(flavor || 'vanilla').toLowerCase();
+    const isPickColor = (exteriorColorOverride && exteriorColorOverride.target === 'sponge' && exteriorColorOverride.mode === 'colorOverride') || flavorKey === 'pickcolor' || (!['plain', 'vanilla', 'chocolate', 'strawberry', 'cheese', 'ube', 'mocha'].includes(flavorKey) && flavorKey !== 'vanilla');
+    const flavorBase = isPickColor
+      ? (rates?.flavors?.pickColor ?? FLAVOR_PRICES.pickColor ?? 400)
+      : (rates?.flavors?.[flavorKey] ?? FLAVOR_PRICES[flavorKey] ?? 350);
+    const sizePrice = rates?.sizes?.[size] ?? SIZE_ADDONS[size] ?? 0;
+    const dims = size === '12x10' || size === '12x12' ? '12x10' : size === '10x8' || size === '10x10' ? '10x8' : size === '6x4' || size === '6x6' || size === 'small' ? '6x4' : '8x6';
     const specs = getTierSpecs(0, size, '1 Tier', cls);
-    if (price == null) missing(`1 tier ${cls} sponge ${dims}`, 'no price configured');
-    else add('sponge', `1 Tier ${finishLabel(cls)} Cake (${dims})`, price, 1, specs);
+
+    // Highlighted Kind 1: Size (with all treatments included inside specs)
+    add('sponge-size', `Size: ${dims} (1 Tier)`, sizePrice, 1, specs);
+
+    // Highlighted Kind 2: Flavor
+    const spongeDisplay = isPickColor ? 'Custom Pick Color' : `${title(flavor)} Sponge`;
+    add('sponge-flavor', `Flavor: ${spongeDisplay}`, flavorBase, 1);
   } else {
-    // 2 Tiers: Split into independent Bottom Tier and Top Tier line items
+    // 2 Tiers
     const bottom = frostClass(styleOfTier(0));
     const top = frostClass(styleOfTier(1));
     const baseSize = structure.size || '8x6';
@@ -639,225 +743,32 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
     const bottomExtColor = (isIndividual ? config.sugarColorOverrides?.['exterior-0'] : null) || config.sugarColorOverrides?.exterior || config.sugarColor;
     const topExtColor = (isIndividual ? config.sugarColorOverrides?.['exterior-1'] : null) || config.sugarColorOverrides?.exterior || config.sugarColor;
 
-    const b = calculateTierPrice(baseSize, bottomFlavor, bottom, rates, bottomExtColor);
-    const t = calculateTierPrice(topSize, topFlavor, top, rates, topExtColor);
+    const bFlvKey = String(bottomFlavor || 'vanilla').toLowerCase();
+    const isBPickColor = (bottomExtColor && bottomExtColor.target === 'sponge' && bottomExtColor.mode === 'colorOverride') || bFlvKey === 'pickcolor' || (!['plain', 'vanilla', 'chocolate', 'strawberry', 'cheese', 'ube', 'mocha'].includes(bFlvKey) && bFlvKey !== 'vanilla');
+    const bottomFlavorPrice = isBPickColor
+      ? (rates?.flavors?.pickColor ?? FLAVOR_PRICES.pickColor ?? 400)
+      : (rates?.flavors?.[bFlvKey] ?? FLAVOR_PRICES[bFlvKey] ?? 350);
+    const bottomSizePrice = rates?.sizes?.[baseSize] ?? SIZE_ADDONS[baseSize] ?? (baseSize === '8x6' ? 200 : 0);
 
-    if (b == null || t == null) {
-      missing('2 tier sponge', 'no price configured');
-    } else {
-      const baseDims = baseSize === '12x10' || baseSize === '12x12' ? '12x10' : baseSize === '10x8' || baseSize === '10x10' ? '10x8' : baseSize === '6x4' || baseSize === '6x6' || baseSize === 'small' ? '6x4' : '8x6';
-      const topDims = topSize === '10x8' ? '10x8' : topSize === '8x6' ? '8x6' : topSize === '4x3' ? '4x3' : '6x4';
-      const d0 = getTierSpecs(0, baseSize, 'Bottom Tier', bottom);
-      const d1 = getTierSpecs(1, topSize, 'Top Tier', top);
-      add('sponge', `Bottom Tier ${finishLabel(bottom)} Cake (${baseDims})`, b, 1, d0);
-      add('sponge-top', `Top Tier ${finishLabel(top)} Cake (${topDims})`, t, 1, d1);
-    }
-  }
+    const tFlvKey = String(topFlavor || 'vanilla').toLowerCase();
+    const isTPickColor = (topExtColor && topExtColor.target === 'sponge' && topExtColor.mode === 'colorOverride') || tFlvKey === 'pickcolor' || (!['plain', 'vanilla', 'chocolate', 'strawberry', 'cheese', 'ube', 'mocha'].includes(tFlvKey) && tFlvKey !== 'vanilla');
+    const topFlavorPrice = isTPickColor
+      ? (rates?.flavors?.pickColor ?? FLAVOR_PRICES.pickColor ?? 400)
+      : (rates?.flavors?.[tFlvKey] ?? FLAVOR_PRICES[tFlvKey] ?? 350);
+    const topSizePrice = rates?.sizes?.[topSize] ?? SIZE_ADDONS[topSize] ?? 0;
 
-  // ── Fundamentals: drip, per drip tier ──────────────────────────────────
-  const surface = config.surfaceTreatment || {};
-  if (tiers === 2) {
-    const dripSlots = [
-      { tierIdx: 1, slotKey: 'top', label: 'Drip Top' },
-      { tierIdx: 0, slotKey: 'bottom', label: 'Drip Bottom' },
-    ];
-    for (const { tierIdx, slotKey, label } of dripSlots) {
-      const tierSurface = isIndividual
-        ? (surface.layerTreatments?.[tierIdx] || surface || {})
-        : (surface || {});
-      if (tierSurface.mode === 'glaze') {
-        const patternId = tierSurface.pattern || 'naturalTear2';
-        const specificDripPrice = rates.drip?.[patternId] ?? DEFAULT_DRIP_RATES[patternId] ?? rates.glazePerTier ?? 0;
-        const dripLabel = DRIP_SECTIONS[0]?.items?.find((it) => it.id === patternId)?.label || title(patternId);
-        if (specificDripPrice == null) {
-          missing(`${label} — ${dripLabel}`, 'no price configured');
-        } else {
-          const colorId = config.sugarColorOverrides?.[`surface-${tierIdx}`]?.colorId
-            || config.sugarColorOverrides?.surface?.colorId
-            || config.sugarColorOverrides?.surfaceTreatment?.colorId
-            || tierSurface.colorId
-            || config.sugarColor?.colorId
-            || 'vanilla';
-          const colorText = title(colorId);
+    const baseDims = baseSize === '12x10' || baseSize === '12x12' ? '12x10' : baseSize === '10x8' || baseSize === '10x10' ? '10x8' : baseSize === '6x4' || baseSize === '6x6' || baseSize === 'small' ? '6x4' : '8x6';
+    const topDims = topSize === '10x8' ? '10x8' : topSize === '8x6' ? '8x6' : topSize === '4x3' ? '4x3' : '6x4';
+    const d0 = getTierSpecs(0, baseSize, 'Bottom Tier', bottom);
+    const d1 = getTierSpecs(1, topSize, 'Top Tier', top);
 
-          const dripDetails = [
-            `${label}:`,
-            `Design: ${dripLabel}`,
-            `Sugar Color: ${colorText}`,
-          ];
-          add(`glaze-${slotKey}`, `${label} — ${dripLabel}`, specificDripPrice, 1, dripDetails);
-        }
-      }
-    }
-  } else {
-    // 1 Tier Drip
-    if (surface.mode === 'glaze') {
-      const patternId = surface.pattern || 'naturalTear2';
-      const specificDripPrice = rates.drip?.[patternId] ?? DEFAULT_DRIP_RATES[patternId] ?? rates.glazePerTier ?? 0;
-      const dripLabel = DRIP_SECTIONS[0]?.items?.find((it) => it.id === patternId)?.label || title(patternId);
-      if (specificDripPrice == null) {
-        missing('Drip', 'no price configured');
-      } else {
-        const colorId = config.sugarColorOverrides?.surface?.colorId
-          || config.sugarColorOverrides?.surfaceTreatment?.colorId
-          || surface.colorId
-          || config.sugarColor?.colorId
-          || 'vanilla';
-        const colorText = title(colorId);
+    // Bottom Tier: Size & Flavor
+    add('sponge-size-bottom', `Size (Bottom Tier): ${baseDims}`, bottomSizePrice, 1, d0);
+    add('sponge-flavor-bottom', `Flavor (Bottom Tier): ${isBPickColor ? 'Custom Pick Color' : `${title(bottomFlavor)} Sponge`}`, bottomFlavorPrice, 1);
 
-        const dripDetails = [
-          'Drip:',
-          `Design: ${dripLabel}`,
-          `Sugar Color: ${colorText}`,
-        ];
-        add('glaze', `Drip — ${dripLabel}`, specificDripPrice, 1, dripDetails);
-      }
-    }
-  }
-
-  // ── Side: independent per tier ─────────────────────────────────────────
-  if (tiers === 2) {
-    for (let i = 0; i < 2; i++) {
-      const tierLabel = i === 0 ? 'Bottom Tier' : 'Top Tier';
-      const sideTier = isIndividual ? config.side?.layerTreatments?.[i] || config.side || {} : config.side || {};
-      if (sideTier.mode) {
-        const setId = sideTier[sideTier.mode]?.setId;
-        const sideKey = `${sideTier.mode}.${setId}`;
-        const specificPrice = rates.side?.[sideKey] ?? rates.side?.[sideTier.mode]?.[setId];
-        const qty = rates.sideQuantity?.[sideKey];
-        const legacyPrice = qty ? rates.sideEdge?.[qty] : null;
-        const price = specificPrice !== undefined ? specificPrice : (legacyPrice ?? DEFAULT_SIDE_RATES[sideKey] ?? 0);
-        if (price == null) {
-          missing(`Side (${tierLabel}) — ${setId || sideTier.mode}`, 'no price configured for this design');
-        } else {
-          const sideItem = SIDE_SECTIONS.flatMap((s) => s.items).find((it) => it.key === sideKey || it.id === setId);
-          const sideDesignLabel = sideItem?.label || title(setId || sideTier.mode);
-          const sideColorId = config.sugarColorOverrides?.[`side-${i}`]?.colorId
-            || config.sugarColorOverrides?.side?.colorId
-            || sideTier[sideTier.mode]?.colorId
-            || config.sugarColor?.colorId
-            || 'vanilla';
-          const sideFlavorId = sideTier[sideTier.mode]?.flavorId;
-          const colorText = sideFlavorId && sideFlavorId !== sideColorId
-            ? `${title(sideColorId)} / ${title(sideFlavorId)}`
-            : title(sideColorId);
-
-          const sideDetails = [
-            `Side (${tierLabel}):`,
-            `Design: ${sideDesignLabel}`,
-            `Sugar Color: ${colorText}`,
-          ];
-          add(`side-${i === 0 ? 'bottom' : 'top'}`, `Side (${tierLabel}) — ${sideDesignLabel}`, price, 1, sideDetails);
-        }
-      }
-    }
-  } else {
-    // 1 Tier Side
-    const side = config.side || {};
-    if (side.mode) {
-      const setId = side[side.mode]?.setId;
-      const sideKey = `${side.mode}.${setId}`;
-      const specificPrice = rates.side?.[sideKey] ?? rates.side?.[side.mode]?.[setId];
-      const qty = rates.sideQuantity?.[sideKey];
-      const legacyPrice = qty ? rates.sideEdge?.[qty] : null;
-      const price = specificPrice !== undefined ? specificPrice : (legacyPrice ?? DEFAULT_SIDE_RATES[sideKey] ?? 0);
-      if (price == null) {
-        missing(`Side — ${setId || side.mode}`, 'no price configured for this design');
-      } else {
-        const sideItem = SIDE_SECTIONS.flatMap((s) => s.items).find((it) => it.key === sideKey || it.id === setId);
-        const sideDesignLabel = sideItem?.label || title(setId || side.mode);
-        const sideColorId = config.sugarColorOverrides?.side?.colorId || side[side.mode]?.colorId || config.sugarColor?.colorId || 'vanilla';
-        const sideFlavorId = side[side.mode]?.flavorId;
-        const colorText = sideFlavorId && sideFlavorId !== sideColorId
-          ? `${title(sideColorId)} / ${title(sideFlavorId)}`
-          : title(sideColorId);
-
-        const sideDetails = [
-          'Side:',
-          `Design: ${sideDesignLabel}`,
-          `Sugar Color: ${colorText}`,
-        ];
-        add('side', `Side — ${sideDesignLabel}`, price, 1, sideDetails);
-      }
-    }
-  }
-
-  // ── Edge: independent per slot (Edge Top, Edge Middle, Edge Bottom) ────
-  const edge = config.edge || {};
-  const isBoth = edge.mode === 'both';
-  const slotsToProcess = [];
-
-  if (isBoth) {
-    if (edge.both && (edge.both.piping?.tip || edge.both.decorations?.setId)) {
-      slotsToProcess.push({ slotKey: 'top', slotLabel: 'Edge Top', slotData: edge.both });
-      if (tiers > 1) {
-        const midData = edge.middle && (edge.middle.piping?.tip || edge.middle.decorations?.setId) ? edge.middle : edge.both;
-        slotsToProcess.push({ slotKey: 'middle', slotLabel: 'Edge Middle', slotData: midData });
-      }
-      slotsToProcess.push({ slotKey: 'bottom', slotLabel: 'Edge Bottom', slotData: edge.both });
-    }
-  } else {
-    if (edge.top && (edge.top.piping?.tip || edge.top.decorations?.setId)) {
-      slotsToProcess.push({ slotKey: 'top', slotLabel: 'Edge Top', slotData: edge.top });
-    }
-    if (tiers > 1 && edge.middle && (edge.middle.piping?.tip || edge.middle.decorations?.setId)) {
-      slotsToProcess.push({ slotKey: 'middle', slotLabel: 'Edge Middle', slotData: edge.middle });
-    }
-    if (edge.bottom && (edge.bottom.piping?.tip || edge.bottom.decorations?.setId)) {
-      slotsToProcess.push({ slotKey: 'bottom', slotLabel: 'Edge Bottom', slotData: edge.bottom });
-    }
-  }
-
-  for (const { slotKey, slotLabel, slotData } of slotsToProcess) {
-    const tip = slotData.piping?.tip || slotData.decorations?.setId;
-    if (!tip) continue;
-
-    const specificPrice = rates.edge?.[tip];
-    const legacyQty = rates.edgeQuantity?.[tip];
-    const legPrice = legacyQty ? rates.sideEdge?.[legacyQty] : null;
-    const price = specificPrice !== undefined ? specificPrice : (legPrice ?? DEFAULT_EDGE_RATES[tip] ?? 0);
-
-    if (price == null) {
-      missing(`${slotLabel} — ${tip}`, 'no price configured for this design');
-    } else {
-      const edgeItem = EDGE_SECTIONS.flatMap((s) => s.items).find((it) => it.id === tip);
-      const edgeDesignLabel = edgeItem?.label || title(tip);
-
-      const slotOverride = slotKey === 'top'
-        ? (config.sugarColorOverrides?.edgeTop?.colorId || config.sugarColorOverrides?.edgeBoth?.colorId)
-        : slotKey === 'middle'
-        ? (config.sugarColorOverrides?.edgeMiddle?.colorId || config.sugarColorOverrides?.edgeBoth?.colorId)
-        : (config.sugarColorOverrides?.edgeBottom?.colorId || config.sugarColorOverrides?.edgeBoth?.colorId);
-
-      const edgeColorId = slotOverride
-        || config.sugarColorOverrides?.edge?.colorId
-        || slotData.piping?.colorId
-        || slotData.decorations?.colorId
-        || config.sugarColor?.colorId
-        || 'vanilla';
-
-      const secOverride = slotKey === 'top'
-        ? (config.sugarColorOverrides?.edgeTopSecondary?.colorId || config.sugarColorOverrides?.edgeBothSecondary?.colorId)
-        : slotKey === 'middle'
-        ? (config.sugarColorOverrides?.edgeMiddleSecondary?.colorId || config.sugarColorOverrides?.edgeBothSecondary?.colorId)
-        : (config.sugarColorOverrides?.edgeBottomSecondary?.colorId || config.sugarColorOverrides?.edgeBothSecondary?.colorId);
-
-      const secColorId = slotData.piping?.secondaryColorId || secOverride;
-      const isAlt = tip.toLowerCase().includes('alt') || Boolean(secColorId);
-      const colorText = (isAlt && secColorId && secColorId !== edgeColorId)
-        ? `${title(edgeColorId)} / ${title(secColorId)}`
-        : title(edgeColorId);
-
-      const isEdibleDelicate = EDGE_SECTIONS.find((s) => s.id === 'edibleDelicates')?.items.some((it) => it.id === tip);
-
-      const edgeDetails = [
-        `${slotLabel}:`,
-        `Design: ${edgeDesignLabel}`,
-        ...(isEdibleDelicate ? [] : [`Sugar Color: ${colorText}`]),
-      ];
-
-      add(`edge-${slotKey}`, `${slotLabel} — ${edgeDesignLabel}`, price, 1, edgeDetails);
-    }
+    // Top Tier: Size & Flavor
+    add('sponge-size-top', `Size (Top Tier): ${topDims}`, topSizePrice, 1, d1);
+    add('sponge-flavor-top', `Flavor (Top Tier): ${isTPickColor ? 'Custom Pick Color' : `${title(topFlavor)} Sponge`}`, topFlavorPrice, 1);
   }
 
 const CENTER_RADII = {

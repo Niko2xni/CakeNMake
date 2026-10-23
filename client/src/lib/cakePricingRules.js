@@ -254,16 +254,16 @@ export const DEFAULT_RATES = {
       classicCube: 400, largeCube: 600, miniBento: 350, standardBento: 450, largeBento: 550, squareBento2x2: 400, squareBento3x3: 500
     },
     frosted: {
-      '6x4': 550, '8x6': 750, '10x8': 950, '12x10': 1150,
-      '6x6': 550, '8x8': 750, '10x10': 950, '12x10': 1150,
-      big: 750, small: 550,
-      classicCube: 500, largeCube: 800, miniBento: 500, standardBento: 600, largeBento: 750, squareBento2x2: 500, squareBento3x3: 650
+      '6x4': 350, '8x6': 550, '10x8': 750, '12x10': 950,
+      '6x6': 350, '8x8': 550, '10x10': 750, '12x12': 950,
+      big: 550, small: 350,
+      classicCube: 400, largeCube: 600, miniBento: 350, standardBento: 450, largeBento: 550, squareBento2x2: 400, squareBento3x3: 500
     },
     textured: {
-      '6x4': 550, '8x6': 750, '10x8': 950, '12x10': 1150,
-      '6x6': 550, '8x8': 750, '10x10': 950, '12x10': 1150,
-      big: 750, small: 550,
-      classicCube: 500, largeCube: 800, miniBento: 500, standardBento: 600, largeBento: 750, squareBento2x2: 500, squareBento3x3: 650
+      '6x4': 350, '8x6': 550, '10x8': 750, '12x10': 950,
+      '6x6': 350, '8x8': 550, '10x10': 750, '12x12': 950,
+      big: 550, small: 350,
+      classicCube: 400, largeCube: 600, miniBento: 350, standardBento: 450, largeBento: 550, squareBento2x2: 400, squareBento3x3: 500
     },
   },
   flavors: {
@@ -288,10 +288,11 @@ export const DEFAULT_RATES = {
   },
   finishAddon: {
     naked: 0,
-    frosted: 200,
-    textured: 200,
+    pickColor: 0,
+    frosted: 0,
+    textured: 0,
   },
-  twoTier: { naked: 900, frosted: 1300, textured: 1300 },
+  twoTier: { naked: 900, frosted: 900, textured: 900 },
   glazePerTier: 0,
 
   // Independent Drip Item Rates:

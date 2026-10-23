@@ -1,5 +1,10 @@
 import { jsPDF } from 'jspdf';
-import { drawSidePatternSchematic } from './blueprintSchematics';
+import {
+  drawSidePatternSchematic,
+  drawSurfaceTreatmentSchematic,
+  drawTexturedFinishSchematic,
+  drawTexturedFinishSideSchematic,
+} from './blueprintSchematics';
 import {
   CHECKERED_PATTERN_SETS,
   TRIANGLE_PATTERN_SETS,
@@ -13,7 +18,29 @@ import {
   DOLLOPS_VARIATIONS_DELUXE,
   WHIPPED_CREAM_VARIATIONS,
   FRUIT_CONFECTION_RIM_OPTIONS,
+  GLAZE_PATTERNS,
+  PETIT_FOURS_GLAZE_PATTERNS,
+  BUTTERCREAM_TEXTURES,
 } from './cakeConfig';
+
+export const SURFACE_TREATMENT_PATTERNS = [
+  { id: 'longGaps', label: 'Long Drips', description: 'Tall dripping fingers with clear gaps between them' },
+  { id: 'longShortAlt', label: 'Long & Short Drips', description: 'Tall fingers alternating with shorter ones' },
+  { id: 'shortDrips', label: 'Short Drips', description: 'A uniform ring of short, shallow drips' },
+  { id: 'naturalTear', label: 'Natural Tear', description: 'Long, hand-poured drips with an uneven, natural flow', petitsFoursOnly: true },
+  { id: 'unevenCombo', label: 'Tear Fall', description: 'Organic ganache coverage with flowing, varied teardrop drips', petitsFoursOnly: true },
+  { id: 'tinyTip', label: 'Wave Curve', description: 'A smooth glaze cap with a softly undulating edge', petitsFoursOnly: true },
+  { id: 'longWave', label: 'Full Coverage', description: 'Reaches almost to the base, with a soft rippled edge' },
+  { id: 'midWave', label: 'Mid Coverage', description: 'Reaches about halfway down, with a soft rippled edge' },
+  { id: 'shortWave', label: 'Short Coverage', description: 'A shallow coat near the top, with a soft rippled edge' },
+];
+
+export const BUTTERCREAM_TEXTURE_PATTERNS = [
+  { id: 'ridged', label: 'Ridged Comb (Front View)', description: 'Horizontal spatula-dragged ridges' },
+  { id: 'ridged_profile', label: 'Ridged Comb (Profile)', description: 'Side elevation cross-section profile' },
+  { id: 'ribbonWrap', label: 'Ribbon Wrap (Front View)', description: 'Stacked horizontal ribbon bands' },
+  { id: 'ribbonWrap_profile', label: 'Ribbon Wrap (Profile)', description: 'Side elevation cross-section profile' },
+];
 
 export const PATTERNS_CATEGORIES_CONFIG = [
   // Side Designs
@@ -30,13 +57,17 @@ export const PATTERNS_CATEGORIES_CONFIG = [
   { id: 'dollops', label: 'Dollops', section: 'Edge', sets: DOLLOPS_VARIATIONS_DELUXE },
   { id: 'whippedCream', label: 'Whipped Cream', section: 'Edge', sets: WHIPPED_CREAM_VARIATIONS },
   { id: 'fruitConfection', label: 'Fruit & Confection Rim', section: 'Edge', sets: FRUIT_CONFECTION_RIM_OPTIONS },
+  // Surface Treatment
+  { id: 'surfaceTreatment', label: 'Surface Treatment', section: 'Surface', sets: SURFACE_TREATMENT_PATTERNS },
+  // Textured Buttercream (Finish / Texture)
+  { id: 'buttercreamTexture', label: 'Textured Buttercream', section: 'Texture', sets: BUTTERCREAM_TEXTURE_PATTERNS },
 ];
 
 export const SIDE_CATEGORIES_CONFIG = PATTERNS_CATEGORIES_CONFIG;
 
 /**
  * Builds a multi-page PDF catalog containing all 2D vector pattern schematics
- * (both Side and Edge designs) so bakery admins can inspect and review all designs in one place.
+ * (Side, Edge, Surface Treatment, and Textured Buttercream) so bakery admins can inspect and review all designs in one place.
  */
 export function buildSidePatternsCatalogPdf({
   category = 'all',
@@ -47,7 +78,11 @@ export function buildSidePatternsCatalogPdf({
 
   const activeCategories = category === 'all'
     ? PATTERNS_CATEGORIES_CONFIG
-    : PATTERNS_CATEGORIES_CONFIG.filter((c) => c.id === category);
+    : PATTERNS_CATEGORIES_CONFIG.filter((c) =>
+        c.id === category ||
+        (category === 'glaze' && (c.id === 'surfaceTreatment' || c.id === 'glaze')) ||
+        (category === 'texturedButtercream' && c.id === 'buttercreamTexture')
+      );
 
   // Group active categories into pages (up to 6 cards per page)
   const pages = [];
@@ -102,18 +137,57 @@ export function buildSidePatternsCatalogPdf({
       const cardX = col === 0 ? col0X : col1X;
       const cardY = rowY[row] || 32;
 
-      drawSidePatternSchematic(doc, {
-        x: cardX,
-        y: cardY,
-        w: cardW,
-        h: cardH,
-        treatmentId: cat.id,
-        variantId: variant.id,
-        color,
-        colorName,
-        patternName: variant.label,
-        baseFinish: 'Frosted',
-      });
+      if (cat.id === 'surfaceTreatment' || cat.id === 'glaze' || cat.id === 'petitFoursGlaze' || cat.section === 'Surface') {
+        drawSurfaceTreatmentSchematic(doc, {
+          x: cardX,
+          y: cardY,
+          w: cardW,
+          h: cardH,
+          patternId: variant.id,
+          patternName: variant.label,
+          color,
+          colorName,
+          petitFours: variant.petitsFoursOnly || variant.id === 'naturalTear' || variant.id === 'unevenCombo' || variant.id === 'tinyTip',
+        });
+      } else if (cat.id === 'buttercreamTexture' || cat.section === 'Texture' || cat.section === 'Finish') {
+        if (String(variant.id).includes('profile')) {
+          drawTexturedFinishSideSchematic(doc, {
+            x: cardX,
+            y: cardY,
+            w: cardW,
+            h: cardH,
+            texture: variant.id.replace('_profile', ''),
+            textureName: variant.label,
+            color,
+            colorName,
+          });
+        } else {
+          drawTexturedFinishSchematic(doc, {
+            x: cardX,
+            y: cardY,
+            w: cardW,
+            h: cardH,
+            texture: variant.id,
+            textureName: variant.label,
+            color,
+            colorName,
+            badge: '2D PATTERN DRAWING',
+          });
+        }
+      } else {
+        drawSidePatternSchematic(doc, {
+          x: cardX,
+          y: cardY,
+          w: cardW,
+          h: cardH,
+          treatmentId: cat.id,
+          variantId: variant.id,
+          color,
+          colorName,
+          patternName: variant.label,
+          baseFinish: 'Frosted',
+        });
+      }
     });
 
     // 3. Page Footer
@@ -127,3 +201,4 @@ export function buildSidePatternsCatalogPdf({
 }
 
 export const buildPatternsCatalogPdf = buildSidePatternsCatalogPdf;
+

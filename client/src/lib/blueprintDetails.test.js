@@ -25,10 +25,10 @@ describe('internal blueprint', () => {
     const backStage = plan.stages.find((s) => s.key === 'surface-back');
     expect(frontStage).toBeDefined();
     expect(frontStage.azimuth).toBe(18);
-    expect(frontStage.fit).toBe(0.86);
+    expect(frontStage.fit).toBe(0.82);
     expect(backStage).toBeDefined();
     expect(backStage.azimuth).toBe(198);
-    expect(backStage.fit).toBe(0.86);
+    expect(backStage.fit).toBe(0.82);
 
     const details = buildBlueprintDetails(config, null);
     const doc = buildBlueprintPdf({
@@ -153,6 +153,186 @@ describe('internal blueprint', () => {
     expect(doc.getNumberOfPages()).toBeGreaterThan(3);
   });
 
+  it('renders coating assembly page in-between exterior finish and surface treatment showing FILLING to COATED', () => {
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.sponge = { flavor: 'vanilla' };
+    config.filling = { enabled: true, flavor: 'chocolate', layers: 2 };
+    config.exteriorFinish = { style: 'texturedButtercream', flavor: 'strawberry', buttercreamTexture: 'ribbonWrap' };
+    config.surfaceTreatment = { mode: 'drip', drip: { setId: 'naturalTear', flavor: 'chocolate' } };
+
+    const plan = buildBlueprintTierPlan(config);
+    const pages = plan.groups[0].pages;
+
+    const finishIdx = pages.findIndex((p) => p.kind === 'finish');
+    const coatingIdx = pages.findIndex((p) => p.kind === 'coating-assembly');
+    const surfaceIdx = pages.findIndex((p) => p.kind === 'surface');
+
+    expect(finishIdx).toBeGreaterThan(-1);
+    expect(coatingIdx).toBe(finishIdx + 1); // Directly in-between
+    expect(surfaceIdx).toBe(coatingIdx + 1);
+
+    const coatingPage = pages[coatingIdx];
+    expect(coatingPage.section).toBe('ASSEMBLING');
+    expect(coatingPage.spongeFlavor).toBe('Vanilla');
+    expect(coatingPage.fillingFlavor).toBe('Chocolate');
+    expect(coatingPage.layers).toBe(2);
+    expect(coatingPage.style).toBe('texturedButtercream');
+    expect(coatingPage.isTextured).toBe(true);
+    expect(coatingPage.texture).toBe('ribbonWrap');
+    expect(coatingPage.finishFlavor).toBe('Strawberry');
+
+    const details = buildBlueprintDetails(config, null);
+    const doc = buildBlueprintPdf({
+      details,
+      tiers: { groups: plan.groups, images: {}, anchors: {} },
+    });
+    expect(doc.getNumberOfPages()).toBeGreaterThan(4);
+  });
+
+  it('renders coating assembly page with smooth frosting coating', () => {
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.sponge = { flavor: 'chocolate' };
+    config.filling = { enabled: true, flavor: 'strawberry', layers: 1 };
+    config.exteriorFinish = { style: 'smooth', flavor: 'vanilla' };
+
+    const plan = buildBlueprintTierPlan(config);
+    const coatingPage = plan.groups[0].pages.find((p) => p.kind === 'coating-assembly');
+    expect(coatingPage).toBeDefined();
+    expect(coatingPage.section).toBe('ASSEMBLING');
+    expect(coatingPage.isTextured).toBe(false);
+    expect(coatingPage.style).toBe('smooth');
+    expect(coatingPage.finishFlavor).toBe('Vanilla');
+
+    const details = buildBlueprintDetails(config, null);
+    const doc = buildBlueprintPdf({
+      details,
+      tiers: { groups: plan.groups, images: {}, anchors: {} },
+    });
+    expect(doc.getNumberOfPages()).toBeGreaterThan(3);
+  });
+
+  it('renders surface treatment assembly page in-between surface treatment and side showing COATED to DRIP', () => {
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.sponge = { flavor: 'vanilla' };
+    config.exteriorFinish = { style: 'smooth', flavor: 'vanilla' };
+    config.surfaceTreatment = { mode: 'drip', drip: { setId: 'naturalTear', flavor: 'chocolate' } };
+    config.side = { mode: 'checkeredPattern', checkeredPattern: { setId: 'straightGrid', colorId: 'chocolate' } };
+
+    const plan = buildBlueprintTierPlan(config);
+    const pages = plan.groups[0].pages;
+
+    const surfaceIdx = pages.findIndex((p) => p.kind === 'surface');
+    const surfaceAssemblyIdx = pages.findIndex((p) => p.kind === 'surface-assembly');
+    const sideIdx = pages.findIndex((p) => p.kind === 'side');
+
+    expect(surfaceIdx).toBeGreaterThan(-1);
+    expect(surfaceAssemblyIdx).toBe(surfaceIdx + 1); // Directly in-between SURFACE and SIDE
+    expect(sideIdx).toBe(surfaceAssemblyIdx + 1);
+
+    const surfaceAssemblyPage = pages[surfaceAssemblyIdx];
+    expect(surfaceAssemblyPage.section).toBe('ASSEMBLING');
+    expect(surfaceAssemblyPage.surfaceMode).toBe('drip');
+    expect(surfaceAssemblyPage.surfaceFlavorName).toBe('Chocolate');
+    expect(surfaceAssemblyPage.patternName).toBe('Natural Tear');
+
+    const details = buildBlueprintDetails(config, null);
+    const doc = buildBlueprintPdf({
+      details,
+      tiers: { groups: plan.groups, images: {}, anchors: {} },
+    });
+    expect(doc.getNumberOfPages()).toBeGreaterThan(4);
+  });
+
+  it('renders surface treatment assembly page with Full Coverage drip wave pattern', () => {
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.sponge = { flavor: 'vanilla' };
+    config.exteriorFinish = { style: 'texturedButtercream', flavor: 'mocha', buttercreamTexture: 'ribbonWrap' };
+    config.surfaceTreatment = { mode: 'drip', drip: { setId: 'longWave', flavor: 'ube' } };
+
+    const plan = buildBlueprintTierPlan(config);
+    const pages = plan.groups[0].pages;
+
+    const surfaceAssemblyPage = pages.find((p) => p.kind === 'surface-assembly');
+    expect(surfaceAssemblyPage).toBeDefined();
+    expect(surfaceAssemblyPage.section).toBe('ASSEMBLING');
+    expect(surfaceAssemblyPage.patternName).toBe('Full Coverage');
+    expect(surfaceAssemblyPage.surfaceFlavorName).toBe('Ube');
+
+    const details = buildBlueprintDetails(config, null);
+    const doc = buildBlueprintPdf({
+      details,
+      tiers: { groups: plan.groups, images: {}, anchors: {} },
+    });
+    expect(doc.getNumberOfPages()).toBeGreaterThan(3);
+  });
+
+  it('renders side design assembly page in-between side and edge showing DRIP to SIDE', () => {
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.sponge = { flavor: 'vanilla' };
+    config.exteriorFinish = { style: 'smooth', flavor: 'vanilla' };
+    config.surfaceTreatment = { mode: 'drip', drip: { setId: 'naturalTear', flavor: 'chocolate' } };
+    config.side = { mode: 'checkeredPattern', checkeredPattern: { setId: 'straightGrid', colorId: 'chocolate' } };
+    config.edge = { top: { piping: { tip: 'shell', colorId: 'vanilla' } } };
+
+    const plan = buildBlueprintTierPlan(config);
+    const pages = plan.groups[0].pages;
+
+    const surfaceAssemblyIdx = pages.findIndex((p) => p.kind === 'surface-assembly');
+    const sideIdx = pages.findIndex((p) => p.kind === 'side');
+    const sideAssemblyIdx = pages.findIndex((p) => p.kind === 'side-assembly');
+    const edgeIdx = pages.findIndex((p) => p.kind === 'edge');
+
+    expect(surfaceAssemblyIdx).toBeGreaterThan(-1);
+    expect(sideIdx).toBe(surfaceAssemblyIdx + 1);
+    expect(sideAssemblyIdx).toBe(sideIdx + 1); // Directly in-between SIDE and EDGE
+    expect(edgeIdx).toBe(sideAssemblyIdx + 1);
+
+    const sideAssemblyPage = pages[sideAssemblyIdx];
+    expect(sideAssemblyPage.section).toBe('ASSEMBLING');
+    expect(sideAssemblyPage.treatmentId).toBe('checkeredPattern');
+    expect(sideAssemblyPage.hasSurface).toBe(true);
+    expect(sideAssemblyPage.surfaceFlavorName).toBe('Chocolate');
+    expect(sideAssemblyPage.sideColorName).toBe('Chocolate');
+    expect(sideAssemblyPage.sidePatternName).toBe('Straight Grid');
+
+    const details = buildBlueprintDetails(config, null);
+    const doc = buildBlueprintPdf({
+      details,
+      tiers: { groups: plan.groups, images: {}, anchors: {} },
+    });
+    expect(doc.getNumberOfPages()).toBeGreaterThan(5);
+  });
+
+  it('renders side design assembly page without surface treatment showing COATED to SIDE', () => {
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.sponge = { flavor: 'vanilla' };
+    config.exteriorFinish = { style: 'texturedButtercream', flavor: 'strawberry', buttercreamTexture: 'ribbonWrap' };
+    config.surfaceTreatment = { mode: null };
+    config.side = { mode: 'checkeredPattern', checkeredPattern: { setId: 'straightGrid', colorId: 'matcha' } };
+
+    const plan = buildBlueprintTierPlan(config);
+    const pages = plan.groups[0].pages;
+
+    const sideIdx = pages.findIndex((p) => p.kind === 'side');
+    const sideAssemblyIdx = pages.findIndex((p) => p.kind === 'side-assembly');
+
+    expect(sideIdx).toBeGreaterThan(-1);
+    expect(sideAssemblyIdx).toBe(sideIdx + 1);
+
+    const sideAssemblyPage = pages[sideAssemblyIdx];
+    expect(sideAssemblyPage.section).toBe('ASSEMBLING');
+    expect(sideAssemblyPage.hasSurface).toBe(false);
+    expect(sideAssemblyPage.isTextured).toBe(true);
+    expect(sideAssemblyPage.sideColorName).toBe('Matcha');
+
+    const details = buildBlueprintDetails(config, null);
+    const doc = buildBlueprintPdf({
+      details,
+      tiers: { groups: plan.groups, images: {}, anchors: {} },
+    });
+    expect(doc.getNumberOfPages()).toBeGreaterThan(3);
+  });
+
   it('preserves quote charges and total without assigning invented decoration prices', () => {
     const config = structuredClone(DEFAULT_CONFIG);
     config.side.mode = 'sunshinePlay';
@@ -268,7 +448,7 @@ describe('internal blueprint', () => {
     expect(surfaceBack?.zoom).toBeDefined();
     expect(surfaceBack.zoom.mode).toBe('pattern');
     expect(surfaceBack.zoom.fullHeight).toBe(true);
-    expect(surfaceBack.zoom.fit).toBe(1.0);
+    expect(surfaceBack.zoom.fit).toBe(0.82);
 
     const fillingZoom = plan.stages.find((s) => s.key === 'filling-zoom-0');
     expect(fillingZoom?.zoom).toBeDefined();
@@ -641,6 +821,86 @@ describe('internal blueprint', () => {
     const details = buildBlueprintDetails(config, null);
     const topEdgeDetail = details.sections.find((s) => s.title === 'Edge').items.find((i) => i.label.includes('Top Border Piping'));
     expect(topEdgeDetail.detail).toBe('Rope Twist Classic · Vanilla');
+  });
+
+  it('renders assembling pages with 3D box equivalent for square shape cake', () => {
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.structure = { ...config.structure, shape: 'square' };
+    config.sponge = { flavor: 'chocolate' };
+    config.filling = { enabled: true, flavor: 'strawberry', layers: 2 };
+    config.exteriorFinish = { style: 'texturedButtercream', flavor: 'vanilla', buttercreamTexture: 'ribbonWrap' };
+    config.surfaceTreatment = { mode: 'drip', drip: { setId: 'naturalTear', flavor: 'chocolate' } };
+    config.side = { mode: 'checkeredPattern', checkeredPattern: { setId: 'straightGrid', colorId: 'vanilla' } };
+
+    const plan = buildBlueprintTierPlan(config);
+    const pages = plan.groups[0].pages;
+
+    const assemblingPage = pages.find((p) => p.kind === 'assembling');
+    const coatingPage = pages.find((p) => p.kind === 'coating-assembly');
+    const surfaceAssemblyPage = pages.find((p) => p.kind === 'surface-assembly');
+    const sideAssemblyPage = pages.find((p) => p.kind === 'side-assembly');
+
+    expect(assemblingPage.shape).toBe('square');
+    expect(coatingPage.shape).toBe('square');
+    expect(surfaceAssemblyPage.shape).toBe('square');
+    expect(sideAssemblyPage.shape).toBe('square');
+
+    const details = buildBlueprintDetails(config, null);
+    const doc = buildBlueprintPdf({
+      details,
+      tiers: { groups: plan.groups, images: {}, anchors: {} },
+    });
+    expect(doc.getNumberOfPages()).toBeGreaterThan(5);
+  });
+
+  it('renders assembling pages with 3D box equivalent for rectangle shape cake', () => {
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.structure = { ...config.structure, shape: 'rectangle' };
+    config.sponge = { flavor: 'vanilla' };
+    config.filling = { enabled: true, flavor: 'chocolate', layers: 1 };
+    config.exteriorFinish = { style: 'smooth', flavor: 'ube' };
+    config.surfaceTreatment = { mode: 'drip', drip: { setId: 'longWave', flavor: 'chocolate' } };
+    config.side = { mode: 'trianglePattern', trianglePattern: { setId: 'xPattern', colorId: 'vanilla' } };
+
+    const plan = buildBlueprintTierPlan(config);
+    const pages = plan.groups[0].pages;
+
+    const sideAssemblyPage = pages.find((p) => p.kind === 'side-assembly');
+    expect(sideAssemblyPage.shape).toBe('rectangle');
+    expect(sideAssemblyPage.treatmentId).toBe('trianglePattern');
+
+    const details = buildBlueprintDetails(config, null);
+    const doc = buildBlueprintPdf({
+      details,
+      tiers: { groups: plan.groups, images: {}, anchors: {} },
+    });
+    expect(doc.getNumberOfPages()).toBeGreaterThan(4);
+  });
+
+  it('renders all side design pattern variants spread across cylinder and box', () => {
+    const treatments = [
+      { mode: 'checkeredPattern', setId: 'straightGrid' },
+      { mode: 'trianglePattern', setId: 'diagonalLeft' },
+      { mode: 'chevronPattern', setId: 'wideZigzag' },
+      { mode: 'scatterPearls', setId: 'diamondGrid' },
+      { mode: 'pipingScrolls', setId: 'waveRope' },
+    ];
+
+    for (const t of treatments) {
+      const config = structuredClone(DEFAULT_CONFIG);
+      config.sponge = { flavor: 'vanilla' };
+      config.filling = { enabled: true, flavor: 'chocolate', layers: 1 };
+      config.exteriorFinish = { style: 'smooth', flavor: 'vanilla' };
+      config.side = { mode: t.mode, [t.mode]: { setId: t.setId, colorId: 'chocolate' } };
+
+      const plan = buildBlueprintTierPlan(config);
+      const details = buildBlueprintDetails(config, null);
+      const doc = buildBlueprintPdf({
+        details,
+        tiers: { groups: plan.groups, images: {}, anchors: {} },
+      });
+      expect(doc.getNumberOfPages()).toBeGreaterThan(3);
+    }
   });
 });
 
