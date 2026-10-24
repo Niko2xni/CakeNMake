@@ -3,6 +3,7 @@ import { pricingApi } from '@/services/api';
 
 export default function useCakeQuote(config) {
   const [quote, setQuote] = useState(null);
+  const [previousQuote, setPreviousQuote] = useState(null);
   const [quotedConfig, setQuotedConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -33,7 +34,10 @@ export default function useCakeQuote(config) {
       try {
         const next = await pricingApi.quoteCake(config);
         if (cancelled) return;
-        if (previousVersionRef.current !== null && previousVersionRef.current !== next.pricingVersion) setVersionChanged(true);
+        if (previousVersionRef.current !== null && previousVersionRef.current !== next.pricingVersion) {
+          setVersionChanged(true);
+          setPreviousQuote(quote);
+        }
         previousVersionRef.current = next.pricingVersion;
         window.localStorage.setItem('cakenmake:last-pricing-version', String(next.pricingVersion));
         setQuote(next);
@@ -47,5 +51,5 @@ export default function useCakeQuote(config) {
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [config, refreshKey]);
 
-  return { quote, quotedConfig, loading, error, versionChanged, dismissVersionChanged: () => setVersionChanged(false) };
+  return { quote, previousQuote, quotedConfig, loading, error, versionChanged, dismissVersionChanged: () => setVersionChanged(false) };
 }

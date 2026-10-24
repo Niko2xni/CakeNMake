@@ -1,4 +1,7 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
+const Reservation = require('../models/Reservation');
+const Blueprint = require('../models/Blueprint');
 const { synchronizeAccount } = require('../services/accountSyncService');
 const { firebaseAdminAuth, firebaseAdminConfigured } = require('../config/firebaseAdmin');
 const { requestOtp, verifyOtp } = require('../services/emailOtpService');
@@ -202,10 +205,241 @@ async function verifyEmailLinkOtp(req, res) {
     }
 }
 
+async function getCustomerTransactions(req, res) {
+    try {
+        const user = await User.findOne({ firebaseUid: req.auth.uid });
+        if (!user) {
+            return res.status(404).json({
+                code: 'ACCOUNT_NOT_FOUND',
+                message: 'Application account not found.',
+            });
+        }
+
+        const reservations = await Reservation.find({ user: user._id })
+            .populate('platform', 'name')
+            .populate('design', 'name thumbnail config')
+            .populate('blueprint', 'designName deliveryDate status quoteSnapshot orderPricingSnapshot designSnapshot')
+            .sort({ createdAt: -1 })
+            .lean();
+
+        const existingBlueprintIds = new Set(
+            reservations.map((r) => String(r.blueprint?._id || r.blueprint || '')).filter(Boolean)
+        );
+
+        const transactions = reservations.map((r) => {
+            const downPayment = r.downPayment || { amount: Math.ceil((r.totalPrice || 0) / 2), isPaid: true, method: 'gcash' };
+            const finalPayment = r.finalPayment || { amount: 0, isPaid: false };
+            const total = Number(r.totalPrice || 0);
+            const downAmount = downPayment.isPaid ? Number(downPayment.amount || 0) : 0;
+            const finalAmount = finalPayment.isPaid ? Number(finalPayment.amount || (total - downAmount)) : 0;
+            const remainingBalance = Math.max(0, total - downAmount - finalAmount);
+
+            return {
+                id: String(r._id),
+                reservationId: String(r._id),
+                blueprintId: r.blueprint?._id ? String(r.blueprint._id) : (r.blueprint ? String(r.blueprint) : null),
+                designId: r.design?._id ? String(r.design._id) : (r.design ? String(r.design) : null),
+                designName: r.designName || r.blueprint?.designName || r.design?.name || 'Custom Cake Design',
+                thumbnail: r.design?.thumbnail || null,
+                bakeryName: r.platform?.name || 'AH TINAPS BAKESHOP',
+                totalPrice: r.totalPrice,
+                downPayment,
+                finalPayment,
+                remainingBalance,
+                pricingSnapshot: (r.pricingSnapshot?.lineItems?.some((it) => it.details?.length > 0)
+                    ? r.pricingSnapshot
+                    : (r.blueprint?.orderPricingSnapshot || r.blueprint?.quoteSnapshot || r.pricingSnapshot || null)),
+                pickupDate: r.pickupDate,
+                status: r.status || 'confirmed',
+                createdAt: r.createdAt,
+                checkoutMode: r.checkoutMode || 'simulated',
+            };
+        });
+
+        const blueprints = await Blueprint.find({ customer: user._id })
+            .populate('platform', 'name')
+            .sort({ createdAt: -1 })
+            .lean();
+
+        for (const bp of blueprints) {
+            if (!existingBlueprintIds.has(String(bp._id))) {
+                const totalPesos = bp.quoteSnapshot?.totalMinor
+                    ? bp.quoteSnapshot.totalMinor / 100
+                    : (bp.orderPricingSnapshot?.totalMinor ? bp.orderPricingSnapshot.totalMinor / 100 : 0);
+                const downAmount = Math.ceil(totalPesos / 2);
+                transactions.push({
+                    id: String(bp._id),
+                    reservationId: null,
+                    blueprintId: String(bp._id),
+                    designId: null,
+                    designName: bp.designName || 'Custom Cake Design',
+                    thumbnail: null,
+                    bakeryName: bp.platform?.name || 'AH TINAPS BAKESHOP',
+                    totalPrice: totalPesos,
+                    downPayment: { amount: downAmount, isPaid: true, method: 'gcash' },
+                    finalPayment: { amount: 0, isPaid: false },
+                    remainingBalance: Math.max(0, totalPesos - downAmount),
+                    pricingSnapshot: bp.orderPricingSnapshot || bp.quoteSnapshot || null,
+                    pickupDate: bp.deliveryDate,
+                    status: bp.status === 'ready' ? 'confirmed' : bp.status,
+                    createdAt: bp.createdAt,
+                    checkoutMode: bp.paymentMode || 'simulated',
+                });
+            }
+        }
+
+        transactions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        return res.json({ transactions });
+    } catch (error) {
+        console.error('Failed to load customer transactions:', error);
+        return res.status(500).json({
+            code: 'TRANSACTIONS_LOAD_FAILED',
+            message: 'Failed to load transaction history.',
+            error: error.message,
+        });
+    }
+}
+
+async function payTransactionBalance(req, res) {
+    const { id } = req.params;
+    const { paymentReference, method = 'gcash' } = req.body || {};
+
+    try {
+        const firebaseUid = req.auth?.uid || req.user?.uid;
+        if (!firebaseUid) {
+            return res.status(401).json({ message: 'Authentication is required.' });
+        }
+
+        const user = await User.findOne({ firebaseUid });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        let reservation = null;
+        if (mongoose.isValidObjectId(id)) {
+            reservation = await Reservation.findOne({ _id: id, user: user._id })
+                || await Reservation.findOne({ blueprint: id, user: user._id })
+                || await Reservation.findOne({ design: id, user: user._id })
+                || await Reservation.findById(id)
+                || await Reservation.findOne({ blueprint: id })
+                || await Reservation.findOne({ design: id });
+        }
+
+        if (!reservation) {
+            // Check if there is an un-migrated Blueprint belonging to this customer
+            const bp = (mongoose.isValidObjectId(id) && await Blueprint.findOne({ _id: id, customer: user._id }))
+                || (mongoose.isValidObjectId(id) && await Blueprint.findById(id));
+            if (bp) {
+                if (!bp.customer) {
+                    bp.customer = user._id;
+                    await bp.save().catch(() => {});
+                }
+                const checkout = require('../services/checkoutReservationService');
+                reservation = await checkout.ensureCheckoutReservation(bp);
+            }
+        }
+
+        if (!reservation && typeof id === 'string' && id.length >= 6) {
+            reservation = await Reservation.findOne({
+                user: user._id,
+                $expr: {
+                    $regexMatch: {
+                        input: { $toString: '$_id' },
+                        regex: `${id}$`,
+                        options: 'i',
+                    },
+                },
+            }) || await Reservation.findOne({
+                $expr: {
+                    $regexMatch: {
+                        input: { $toString: '$_id' },
+                        regex: `${id}$`,
+                        options: 'i',
+                    },
+                },
+            });
+        }
+
+        if (!reservation) {
+            return res.status(404).json({ message: 'Order reservation not found.' });
+        }
+
+        if (!reservation.user) {
+            reservation.user = user._id;
+        }
+
+        if (reservation.finalPayment?.isPaid) {
+            return res.status(400).json({ message: 'The balance for this order is already paid.' });
+        }
+
+        const totalPrice = Number(reservation.totalPrice || 0);
+        const downPaymentAmount = Number(reservation.downPayment?.amount || Math.ceil(totalPrice / 2));
+        const balanceAmount = Math.max(0, totalPrice - downPaymentAmount);
+
+        const ref = paymentReference?.trim() || `DEMO-BAL-${balanceAmount}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+        reservation.finalPayment = {
+            amount: balanceAmount,
+            isPaid: true,
+            paidAt: new Date(),
+            method: method || 'gcash',
+            paymentReference: ref,
+        };
+
+        // Automatic switch: confirmed -> in_production
+        if (reservation.status === 'confirmed' || reservation.status === 'pending_payment' || !reservation.status) {
+            reservation.status = 'in_production';
+        }
+
+        await reservation.save();
+
+        if (reservation.blueprint) {
+            await Blueprint.findByIdAndUpdate(reservation.blueprint, {
+                status: 'in_production',
+            }).catch(() => {});
+        }
+
+        // Emit live socket update to bakery platform room
+        const io = req.app?.get ? req.app.get('io') : null;
+        if (io && reservation.platform) {
+            const populated = await Reservation.findById(reservation._id)
+                .populate('user', 'displayName email name')
+                .populate('design', 'name thumbnail')
+                .populate('blueprint', 'designName')
+                .lean()
+                .catch(() => null);
+
+            io.to(`platform:${reservation.platform}`).emit('reservation:updated', populated || reservation);
+            io.to(`platform:${reservation.platform}`).emit('bakery:notification', {
+                type: 'in_production',
+                title: 'Balance Paid! (Order In Production)',
+                message: `${populated?.user?.displayName || populated?.user?.name || user?.displayName || 'Customer'} paid the remaining balance (₱${Number(reservation.finalPayment?.amount || balanceAmount).toLocaleString()}) for "${populated?.design?.name || populated?.blueprint?.designName || populated?.designName || 'Custom Cake'}". Status changed to In Production!`,
+                reservationId: String(reservation._id),
+                status: 'in_production',
+                timestamp: new Date(),
+            });
+        }
+
+        return res.json({
+            message: 'Balance payment completed successfully. Order is now in production!',
+            reservationId: String(reservation._id),
+            status: reservation.status,
+            finalPayment: reservation.finalPayment,
+            remainingBalance: 0,
+        });
+    } catch (err) {
+        console.error('Failed to complete balance payment:', err);
+        return res.status(500).json({ message: 'Could not process balance payment. Please try again.' });
+    }
+}
+
 module.exports = {
     syncAccount,
     getCurrentAccount,
     updateCurrentAccount,
     requestEmailLinkOtp,
     verifyEmailLinkOtp,
+    getCustomerTransactions,
+    payTransactionBalance,
 };

@@ -6355,6 +6355,11 @@ const CakeScene = React.forwardRef(function CakeScene({
             updateSelectionOverlay(e.clientX, e.clientY);
             return;
           }
+          if (selectedCenterItemIdRef.current) {
+            onCenterItemSelectRef.current?.(null);
+            updateSelectionOverlay(e.clientX, e.clientY);
+            return;
+          }
           if (!activeToolRef.current) {
             onCenterItemSelectRef.current?.(null);
             updateSelectionOverlay(e.clientX, e.clientY);
@@ -6396,12 +6401,11 @@ const CakeScene = React.forwardRef(function CakeScene({
         const hasSelectedItem = Boolean(selectedCenterItemIdRef.current);
         if (!hasArmedTool && !hasSelectedItem) return;
         e.preventDefault();
-        if (hasArmedTool) {
-          onSelectToolRef.current?.(null);
-          activeToolRef.current = null;
-        }
         if (hasSelectedItem) {
           onCenterItemSelectRef.current?.(null);
+        } else if (hasArmedTool) {
+          onSelectToolRef.current?.(null);
+          activeToolRef.current = null;
         }
         refreshGhostRef.current?.();
         refreshSelectionOverlayRef.current?.();
@@ -6472,11 +6476,11 @@ const CakeScene = React.forwardRef(function CakeScene({
             refreshSelectionOverlayRef.current?.();
             return;
           }
-          if (activeToolRef.current) {
+          if (selectedCenterItemIdRef.current) {
+            onCenterItemSelectRef.current?.(null);
+          } else if (activeToolRef.current) {
             onSelectToolRef.current?.(null);
             activeToolRef.current = null;
-          } else {
-            onCenterItemSelectRef.current?.(null);
           }
           refreshGhostRef.current?.();
           refreshSelectionOverlayRef.current?.();

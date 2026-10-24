@@ -61,6 +61,14 @@ const designSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  paymentCompleted: {
+    type: Boolean,
+    default: false
+  },
+  orderContext: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null
+  },
   isDuplicated: {
     type: Boolean,
     default: false

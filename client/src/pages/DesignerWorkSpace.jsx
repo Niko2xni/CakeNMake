@@ -5,11 +5,12 @@ import CakeScene from '@/components/cake/CakeScene.jsx';
 import PageLoadingSkeleton from '@/components/shared/PageLoadingSkeleton';
 import ToolPanel from '@/components/cake/ToolPanel';
 import PricingPanel from '@/components/cake/PricingPanel';
+import PricingUpdateModal from '@/components/cake/PricingUpdateModal';
 import SendBakeryModal from '@/components/bakery/SendBakeryModal';
 import useDesignAiChat from '@/hooks/useDesignAiChat';
 import GuestAuthModal from '@/components/auth/GuestAuthModal';
 import DesignerTutorial, { TUTORIAL_STEPS } from '@/components/tutorial/DesignerTutorial';
-import { Home, X, Send, Cloud, CloudOff, Loader2, RotateCcw, SlidersHorizontal, HelpCircle, LogIn, AlertCircle } from 'lucide-react';
+import { Home, X, Send, Cloud, CloudOff, Loader2, RotateCcw, RotateCw, SlidersHorizontal, HelpCircle, LogIn, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { blueprintApi, designApi, pricingApi, templateApi } from '@/services/api';
@@ -87,11 +88,23 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
   const navigate = useNavigate();
   const [isDesignLoading, setIsDesignLoading] = useState(() => Boolean(searchParams.get('designId') || searchParams.get('templateId')));
   const [config, setConfig] = useState(INITIAL_CONFIG);
-  const { quote, quotedConfig, loading: quoteLoading, error: quoteError, versionChanged, dismissVersionChanged } = useCakeQuote(config);
+  const { quote, previousQuote, quotedConfig, loading: quoteLoading, error: quoteError, versionChanged, dismissVersionChanged } = useCakeQuote(config);
+  const [showPricingUpdateModal, setShowPricingUpdateModal] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const [isBreakdownOpen, setIsBreakdownOpen] = useState(false);
   const [activeTool, setActiveTool] = useState(null);
+  const activeToolRef = useRef(activeTool);
+  useEffect(() => {
+    activeToolRef.current = activeTool;
+  }, [activeTool]);
+
   const [selectedCenterItemId, setSelectedCenterItemId] = useState(null);
+  const selectedCenterItemIdRef = useRef(selectedCenterItemId);
+  useEffect(() => {
+    selectedCenterItemIdRef.current = selectedCenterItemId;
+  }, [selectedCenterItemId]);
+
+  const lastActiveToolBeforeSelectionRef = useRef(null);
   const [title, setTitle] = useState('Unnamed 1');
   const [activeCategory, setActiveCategory] = useState(null);
   const [bakeryOpen, setBakeryOpen] = useState(false);
@@ -104,6 +117,18 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
   const [activeEdgeSlot, setActiveEdgeSlot] = useState('top');
   const [toolPanelModeUi, setToolPanelModeUi] = useState('design');
   const location = useLocation();
+  const [isSentToBakery, setIsSentToBakery] = useState(() => Boolean(
+    location.state?.sentToBakery ||
+    searchParams.get('sent') === 'true' ||
+    searchParams.get('sentToBakery') === 'true'
+  ));
+  const [isPaymentCompleted, setIsPaymentCompleted] = useState(() => Boolean(
+    location.state?.paymentCompleted ||
+    searchParams.get('resend') === 'true'
+  ));
+  const [orderContext, setOrderContext] = useState(null);
+  const [resendingToBakery, setResendingToBakery] = useState(false);
+  const [resendNotification, setResendNotification] = useState('');
   const [guestAuthModalOpen, setGuestAuthModalOpen] = useState(() => Boolean(location.state?.guestAuthOpen));
   const [guestAuthAction, setGuestAuthAction] = useState(() => location.state?.action || 'general');
   const [guestAuthInitialEmail, setGuestAuthInitialEmail] = useState(() => location.state?.email || '');
@@ -476,10 +501,13 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
       setConfig(adaptedConfig);
       setTitle(design.name);
       setDesignId(design._id);
-      if (design.sentToBakery) {
-        setOrderComplete(true);
-      } else {
-        setOrderComplete(false);
+      const isSent = Boolean(design.sentToBakery);
+      const isPaid = Boolean(design.paymentCompleted);
+      setIsSentToBakery(isSent);
+      setOrderComplete(isSent);
+      setIsPaymentCompleted(isPaid);
+      if (design.orderContext) {
+        setOrderContext(design.orderContext);
       }
       setHasUnsavedChanges(false);
       setSaveStatus('saved');
@@ -664,7 +692,7 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
     return () => clearTimeout(timer);
   }, [config, captureThumbnail]);
 
-  const saveDesign = useCallback(async ({ skipThumbnail = false, sentToBakery = false } = {}) => {
+  const saveDesign = useCallback(async ({ skipThumbnail = false, sentToBakery = false, paymentCompleted, orderContext: customOrderContext } = {}) => {
     if (tutorialOpen || !account) return null;
 
     try {
@@ -682,6 +710,8 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
         } : null,
         isPublic: false,
         ...(sentToBakery ? { sentToBakery: true } : {}),
+        ...(paymentCompleted !== undefined ? { paymentCompleted: Boolean(paymentCompleted) } : {}),
+        ...(customOrderContext !== undefined ? { orderContext: customOrderContext } : {}),
       };
 
       let savedDesign;
@@ -842,6 +872,19 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
       }
     }
 
+    const formattedDeliveryDate = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+    const activeFulfillment = fulfillmentDetails || orderContext?.fulfillment || null;
+
+    // Immediately record payment as completed so a delivery failure never charges again
+    setIsPaymentCompleted(true);
+    const contextData = {
+      deliveryDate: formattedDeliveryDate,
+      fulfillment: activeFulfillment,
+      paidAt: new Date().toISOString(),
+    };
+    setOrderContext(contextData);
+    await saveDesign({ paymentCompleted: true, orderContext: contextData }).catch(() => {});
+
     // Internal artifact for future bakery handoff. Never expose a customer URL.
     if (!submittedBlueprintRef.current) {
       const submittedConfig = structuredClone(config);
@@ -850,9 +893,9 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
       const snapshot = {
         config: submittedConfig, designName: submittedName, views: blueprintViewsRef.current, tiers: blueprintTiersRef.current, quote: submittedQuote, pdf: null,
         submissionId: crypto.randomUUID(),
-        deliveryDate: `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`,
+        deliveryDate: formattedDeliveryDate,
         customerName: account?.displayName || 'Guest',
-        fulfillment: fulfillmentDetails || null,
+        fulfillment: activeFulfillment,
       };
       submittedBlueprintRef.current = snapshot;
       try {
@@ -863,6 +906,10 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
     }
 
     const snapshot = submittedBlueprintRef.current;
+    if (!snapshot.views && cakeSceneRef.current?.captureBlueprintViews) {
+      snapshot.views = cakeSceneRef.current.captureBlueprintViews();
+      blueprintViewsRef.current = snapshot.views;
+    }
     if (!snapshot.views) throw new Error('Could not capture the cake. Please reload and try again.');
     if (!snapshot.pdf) {
       snapshot.details = buildBlueprintDetails(snapshot.config, snapshot.quote, snapshot.designName);
@@ -890,10 +937,6 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
     if (result.status !== 'ready') throw new Error('Your order is still being processed. Please retry shortly.');
     snapshot.platformId = result.platformId;
 
-    const savedId = await saveDesign({ sentToBakery: true });
-    if (savedId) await saveThumbnail(savedId);
-    setOrderComplete(true);
-
     const convos = await chatApi.listConversations();
     let convoId = convos.conversations?.find(
       (conversation) => conversation.platform?.id === snapshot.platformId,
@@ -902,7 +945,7 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
       const created = await chatApi.createConversation(snapshot.platformId);
       convoId = created?.conversation?.id;
     }
-    if (!convoId) throw new Error('Your order was submitted, but the bakery chat could not be opened. Please try again.');
+    if (!convoId) throw new Error('Your order was submitted, but the bakery chat could not be opened. Please retry.');
     activeOrderConvoIdRef.current = convoId;
     snapshot.convoId = convoId;
 
@@ -910,7 +953,7 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
     const downpayment = Math.ceil(totalPesos / 2);
     const remaining = totalPesos - downpayment;
     const formattedDate = selectedDate ? format(selectedDate, 'MMM d, yyyy') : 'Scheduled Date';
-    const fulfillment = snapshot.fulfillment || fulfillmentDetails;
+    const fulfillment = snapshot.fulfillment || activeFulfillment;
     const fulfillmentLines = fulfillment ? [
       `• Fulfillment: ${fulfillment.type === 'delivery' ? 'Courier Delivery (Client-Booked)' : 'Store Pickup (AH Tinaps Bakeshop)'}`,
       `• Date: ${formattedDate}${fulfillment.timeWindow ? ` (${fulfillment.type === 'delivery' ? 'Dispatch' : 'Pickup'}: ${fulfillment.timeWindow})` : ''}`,
@@ -918,6 +961,7 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
       fulfillment.notes ? `• Notes: ${fulfillment.notes}` : null,
     ].filter(Boolean).join('\n') : `• Reservation Date: ${formattedDate}`;
 
+    let chatError = null;
     try {
       await chatApi.sendMessage(convoId, {
         clientMessageId: `order_${snapshot.submissionId}`,
@@ -925,13 +969,54 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
       });
     } catch (err) {
       console.warn('Failed to send automated initial chat message:', err);
+      chatError = err;
     }
     try {
       await chatApi.sendOrderAcknowledgement(convoId, snapshot.submissionId);
     } catch (err) {
       console.warn('Failed to send order acknowledgement:', err);
     }
-  }, [account, config, title, quote, quotedConfig, saveDesign, saveThumbnail]);
+
+    if (chatError) {
+      throw new Error('Order details saved, but the bakery chat message encountered an issue. Please click "Resend Order to Bakery".');
+    }
+
+    const savedId = await saveDesign({ sentToBakery: true, paymentCompleted: true, orderContext: contextData });
+    if (savedId) await saveThumbnail(savedId);
+    setIsSentToBakery(true);
+    setOrderComplete(true);
+  }, [account, config, title, quote, quotedConfig, orderContext, saveDesign, saveThumbnail]);
+
+  const handleResendToBakery = useCallback(async () => {
+    if (resendingToBakery || tutorialOpen) return;
+    setResendingToBakery(true);
+    setResendNotification('Sending your order details and bakery chat...');
+    try {
+      let targetDate = new Date();
+      if (orderContext?.deliveryDate) {
+        const parts = String(orderContext.deliveryDate).split('-');
+        if (parts.length === 3) targetDate = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      } else {
+        targetDate.setDate(targetDate.getDate() + 3);
+      }
+      await handlePaymentComplete(targetDate, orderContext?.fulfillment || null);
+      setResendNotification('Order successfully sent to bakery!');
+      setTimeout(() => {
+        const targetConvoId = activeOrderConvoIdRef.current || submittedBlueprintRef.current?.convoId;
+        if (targetConvoId) {
+          navigate(`/chats?conversation=${encodeURIComponent(targetConvoId)}`);
+        } else {
+          navigate('/chats');
+        }
+      }, 900);
+    } catch (err) {
+      console.error('Failed to resend order to bakery:', err);
+      setResendNotification(err.message || 'Could not send order to bakery. Please try again.');
+      setTimeout(() => setResendNotification(''), 6000);
+    } finally {
+      setResendingToBakery(false);
+    }
+  }, [resendingToBakery, tutorialOpen, orderContext, handlePaymentComplete, navigate]);
 
   const handleOrderComplete = useCallback(async (selectedDate) => {
     setOrderComplete(true);
@@ -1148,45 +1233,77 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
     });
   }, [setPlaceItems, setActiveTool, config?.structure, tutorialOpen]);
 
+  const handleSelectTool = useCallback((tool) => {
+    if (tool) {
+      lastActiveToolBeforeSelectionRef.current = null;
+      setActiveTool(tool);
+    } else {
+      if (!selectedCenterItemIdRef.current) {
+        lastActiveToolBeforeSelectionRef.current = null;
+      }
+      setActiveTool(null);
+    }
+  }, []);
+
   const handleDeleteSelectedCenterItem = useCallback(() => {
     if (!selectedCenterItemId) return;
     setPlaceItems((items) => items.filter((item) => item.id !== selectedCenterItemId));
     setSelectedCenterItemId(null);
+    selectedCenterItemIdRef.current = null;
+    if (lastActiveToolBeforeSelectionRef.current) {
+      setActiveTool(lastActiveToolBeforeSelectionRef.current);
+      lastActiveToolBeforeSelectionRef.current = null;
+    }
   }, [selectedCenterItemId, setPlaceItems]);
 
   const handleCenterItemSelect = useCallback((id) => {
-    setSelectedCenterItemId(id);
-    if (!id) return;
-
-    setActiveTab('center');
-
-    setConfig((prev) => {
-      const items = prev.place?.items || [];
-      const item = items.find((it) => it.id === id);
-      if (!item) return prev;
-
-      const isLetter = typeof item.type === 'string' && (item.type.startsWith('center-letter') || item.type.startsWith('letter-'));
-      const isVariation = item.source === 'variation' || item.source?.startsWith('variation') || (typeof item.id === 'string' && item.id.startsWith('center-var-'));
-
-      let nextMode = 'decorations';
-      if (isVariation) {
-        nextMode = 'variations';
-      } else if (isLetter) {
-        nextMode = 'text';
+    if (id) {
+      // User entered Decoration selected mode
+      if (activeToolRef.current) {
+        lastActiveToolBeforeSelectionRef.current = activeToolRef.current;
       }
+      selectedCenterItemIdRef.current = id;
+      setSelectedCenterItemId(id);
+      setActiveTool(null);
 
-      const currentCenter = prev.center || {};
-      if (currentCenter.mode === nextMode) return prev;
+      setActiveTab('center');
 
-      return {
-        ...prev,
-        center: {
-          ...currentCenter,
-          mode: nextMode,
-          ...(nextMode === 'text' ? { textCategory: 'buttercream' } : {}),
-        },
-      };
-    });
+      setConfig((prev) => {
+        const items = prev.place?.items || [];
+        const item = items.find((it) => it.id === id);
+        if (!item) return prev;
+
+        const isLetter = typeof item.type === 'string' && (item.type.startsWith('center-letter') || item.type.startsWith('letter-'));
+        const isVariation = item.source === 'variation' || item.source?.startsWith('variation') || (typeof item.id === 'string' && item.id.startsWith('center-var-'));
+
+        let nextMode = 'decorations';
+        if (isVariation) {
+          nextMode = 'variations';
+        } else if (isLetter) {
+          nextMode = 'text';
+        }
+
+        const currentCenter = prev.center || {};
+        if (currentCenter.mode === nextMode) return prev;
+
+        return {
+          ...prev,
+          center: {
+            ...currentCenter,
+            mode: nextMode,
+            ...(nextMode === 'text' ? { textCategory: 'buttercream' } : {}),
+          },
+        };
+      });
+    } else {
+      // User exited Decoration selected mode by clicking away
+      selectedCenterItemIdRef.current = null;
+      setSelectedCenterItemId(null);
+      if (lastActiveToolBeforeSelectionRef.current) {
+        setActiveTool(lastActiveToolBeforeSelectionRef.current);
+        lastActiveToolBeforeSelectionRef.current = null;
+      }
+    }
   }, []);
 
   const handleCenterTextColorModeChange = useCallback((nextMode) => {
@@ -1235,7 +1352,7 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
   }, []);
 
   if (isDesignLoading) {
-    return <PageLoadingSkeleton path="/designer" />;
+    return <PageLoadingSkeleton path="/designer" sentToBakery={isSentToBakery} />;
   }
 
   return (
@@ -1246,10 +1363,29 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
             initial={{ opacity: 0, y: -12, x: '-50%' }}
             animate={{ opacity: 1, y: 0, x: '-50%' }}
             exit={{ opacity: 0, y: -12, x: '-50%' }}
-            className="fixed left-1/2 top-20 z-50 flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-sm shadow-xl"
+            className="fixed left-1/2 top-20 z-50 flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-2xl border border-primary/25 bg-card/95 backdrop-blur-md px-4 py-3 text-sm shadow-2xl"
           >
-            <span>The bakery updated its prices. Your estimate has been recalculated.</span>
-            <button type="button" onClick={dismissVersionChanged} className="shrink-0 font-semibold text-primary hover:underline">Got it</button>
+            <div className="flex items-center gap-2 text-foreground font-medium">
+              <span className="flex h-2 w-2 rounded-full bg-primary animate-ping shrink-0" />
+              <span>The bakery updated its prices. Your estimate has been recalculated.</span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowPricingUpdateModal(true)}
+                className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <span>View Changes & Reason</span>
+              </button>
+              <button
+                type="button"
+                onClick={dismissVersionChanged}
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors cursor-pointer"
+                title="Dismiss banner"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -1350,10 +1486,10 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
             <Button
               onClick={handleSaveDesign}
               disabled={saveStatus === 'saving' || aiChatSession?.thinking || tutorialOpen}
-              className="flex items-center gap-2 rounded-xl font-semibold"
+              className={`flex items-center gap-2 rounded-xl font-semibold ${tutorialOpen ? 'opacity-40 pointer-events-none cursor-not-allowed' : ''}`}
               size="sm"
               variant="outline"
-              title={aiChatSession?.thinking ? 'AI is currently editing the cake' : undefined}
+              title={tutorialOpen ? 'Disabled during tutorial' : aiChatSession?.thinking ? 'AI is currently editing the cake' : undefined}
             >
               {saveStatus === 'saving' ? (
                 <>
@@ -1371,23 +1507,46 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
             </Button>
           )}
 
-          {/* Send Bakery - only when no order yet */}
+          {/* Send Bakery / Resend Order - only when no order completed yet */}
           {!orderComplete && (
-            <Button
-              onClick={handleSendToBakery}
-              disabled={aiChatSession?.thinking}
-              data-tutorial="send-bakery"
-              className="flex items-center gap-2 rounded-xl font-semibold"
-              size="sm"
-              title={aiChatSession?.thinking ? 'AI is currently editing the cake' : undefined}
-            >
-              <Send className="w-4 h-4" />
-              <span className="inline sm:hidden">Send</span>
-              <span className="hidden sm:inline">Send Bakery</span>
-            </Button>
+            isPaymentCompleted && !isSentToBakery ? (
+              <Button
+                onClick={handleResendToBakery}
+                disabled={resendingToBakery || aiChatSession?.thinking || tutorialOpen}
+                data-tutorial="resend-bakery"
+                className={`flex items-center gap-2 rounded-xl font-semibold bg-amber-600 hover:bg-amber-700 text-white shadow-sm transition-all ${tutorialOpen ? 'opacity-40 pointer-events-none cursor-not-allowed' : ''}`}
+                size="sm"
+                title="Payment confirmed! Click to resend your order details and bakery chat."
+              >
+                <RotateCw className={`w-4 h-4 ${resendingToBakery ? 'animate-spin' : ''}`} />
+                <span className="inline sm:hidden">Resend</span>
+                <span className="hidden sm:inline">{resendingToBakery ? 'Resending…' : 'Resend Order to Bakery'}</span>
+              </Button>
+            ) : (
+              <Button
+                onClick={handleSendToBakery}
+                disabled={aiChatSession?.thinking || tutorialOpen}
+                data-tutorial="send-bakery"
+                className={`flex items-center gap-2 rounded-xl font-semibold ${tutorialOpen ? 'opacity-40 pointer-events-none cursor-not-allowed' : ''}`}
+                size="sm"
+                title={tutorialOpen ? 'Disabled during tutorial' : aiChatSession?.thinking ? 'AI is currently editing the cake' : undefined}
+              >
+                <Send className="w-4 h-4" />
+                <span className="inline sm:hidden">Send</span>
+                <span className="hidden sm:inline">Send Bakery</span>
+              </Button>
+            )
           )}
         </div>
       </header>
+
+      {/* Resend status toast */}
+      {resendNotification && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-amber-600 text-white text-xs font-semibold px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+          <RotateCw className={`w-3.5 h-3.5 ${resendingToBakery ? 'animate-spin' : ''}`} />
+          <span>{resendNotification}</span>
+        </div>
+      )}
 
       {/* Main content - split in 2 on mobile (top: 3D render, bottom: toolpanel), side-by-side on desktop */}
       <div ref={mainAreaRef} className="flex-1 flex flex-col md:flex-row relative overflow-hidden min-h-0">
@@ -1407,7 +1566,7 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
             disabled={isBreakdownOpen || aiChatSession?.thinking}
             readOnly={orderComplete}
             onPlace={handlePlace}
-            onSelectTool={setActiveTool}
+            onSelectTool={handleSelectTool}
             onPlacementBlocked={handlePlacementBlocked}
             selectedCenterItemId={selectedCenterItemId}
             onCenterItemSelect={handleCenterItemSelect}
@@ -1468,7 +1627,10 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setActiveTool(null)}
+                    onClick={() => {
+                      lastActiveToolBeforeSelectionRef.current = null;
+                      setActiveTool(null);
+                    }}
                     className="ml-1 rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors shrink-0"
                     title="Exit Placement Mode"
                     aria-label="Exit Placement Mode"
@@ -1509,13 +1671,14 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
               onChange={setConfig}
               onReset={() => {
                 setConfig(INITIAL_CONFIG);
+                lastActiveToolBeforeSelectionRef.current = null;
                 setActiveTool(null);
                 placeUndoStackRef.current = [];
                 placeRedoStackRef.current = [];
                 setPlaceHistoryVersion(v => v + 1);
               }}
               activeTool={activeTool}
-              onSelectTool={setActiveTool}
+              onSelectTool={handleSelectTool}
               onPlaceChange={setPlaceItems}
               onPlaceUndo={handlePlaceUndo}
               onPlaceRedo={handlePlaceRedo}
@@ -1620,6 +1783,15 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
           </div>
         </div>
       )}
+      <PricingUpdateModal
+        isOpen={showPricingUpdateModal}
+        onClose={() => {
+          setShowPricingUpdateModal(false);
+          dismissVersionChanged();
+        }}
+        quote={quote}
+        previousQuote={previousQuote}
+      />
     </div>
   );
 }

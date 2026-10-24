@@ -44,7 +44,28 @@ async function submitBlueprint(req, res) {
       if (req.user && String(existing.customer) !== String(req.user._id)) return res.status(403).json({ message: 'Submission belongs to another account.' });
       if (existing.submissionHash !== submissionHash) return res.status(409).json({ message: 'Submission ID already belongs to a different blueprint.' });
       if (existing.status !== 'failed') {
-        if (existing.status === 'ready') await checkout.ensureCheckoutReservation(existing);
+        if (existing.status === 'ready') {
+          const reservation = await checkout.ensureCheckoutReservation(existing);
+          const io = req.app?.get ? req.app.get('io') : null;
+          if (io && reservation?._id) {
+            try {
+              const populated = await Reservation.findById(reservation._id)
+                .populate('user', 'displayName email name')
+                .populate('design', 'thumbnail name');
+              io.to(`platform:${platform._id}`).emit('reservation:created', populated || reservation);
+              io.to(`platform:${platform._id}`).emit('bakery:notification', {
+                type: 'confirmed',
+                title: 'New Order Confirmed! (Deposit Paid)',
+                message: `${populated?.user?.displayName || populated?.user?.name || existing.customerName || 'Customer'} placed an order for "${existing.designName || 'Custom Cake'}" (Deposit: ₱${Number(reservation.downPayment?.amount || 0).toLocaleString()}). Status is now Confirmed.`,
+                reservationId: String(reservation._id),
+                status: 'confirmed',
+                timestamp: new Date(),
+              });
+            } catch {
+              io.to(`platform:${platform._id}`).emit('reservation:created', reservation);
+            }
+          }
+        }
         return res.status(existing.status === 'ready' ? 200 : 202).json({
           submissionId,
           status: existing.status,
@@ -79,9 +100,17 @@ async function submitBlueprint(req, res) {
       if (reservation?._id) {
         try {
           const populated = await Reservation.findById(reservation._id)
-            .populate('user', 'displayName email')
-            .populate('design', 'thumbnail');
+            .populate('user', 'displayName email name')
+            .populate('design', 'thumbnail name');
           io.to(`platform:${platform._id}`).emit('reservation:created', populated || reservation);
+          io.to(`platform:${platform._id}`).emit('bakery:notification', {
+            type: 'confirmed',
+            title: 'New Order Confirmed! (Deposit Paid)',
+            message: `${populated?.user?.displayName || populated?.user?.name || record.customerName || 'Customer'} placed an order for "${record.designName || 'Custom Cake'}" (Deposit: ₱${Number(reservation.downPayment?.amount || 0).toLocaleString()}). Status is now Confirmed.`,
+            reservationId: String(reservation._id),
+            status: 'confirmed',
+            timestamp: new Date(),
+          });
         } catch {
           io.to(`platform:${platform._id}`).emit('reservation:created', reservation);
         }

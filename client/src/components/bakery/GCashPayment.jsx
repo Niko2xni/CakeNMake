@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { format } from 'date-fns';
-import { ChevronLeft, ShieldCheck, Smartphone, Lock } from 'lucide-react';
+import { ChevronLeft, ShieldCheck, Smartphone, Lock, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 
@@ -146,10 +146,32 @@ export default function GCashPayment({ total, selectedDate, fulfillment, onPaid,
       {done ? (
         <div className="text-center py-2">
           <p className="text-2xl mb-1">🎉</p>
-          <p className="font-heading font-bold text-sm text-green-600">{submitted ? 'Order submitted!' : 'Simulated checkout complete'}</p>
-          <p className="text-xs text-muted-foreground mb-4">{submitted ? 'Your order has been sent to the bakery.' : submitting ? 'Sending your order to the bakery…' : submissionError ? 'The order or bakery confirmation may still be pending. Retry to finish submitting it.' : 'Your order has not been sent yet.'}</p>
-          {submissionError && <p role="alert" className="text-xs text-destructive mb-3">{submissionError}</p>}
-          {!submitted && !submitting && <Button className="w-full mb-2" onClick={submitOrder}>Retry sending order</Button>}
+          <p className="font-heading font-bold text-sm text-green-600">{submitted ? 'Order submitted!' : 'Payment Verified'}</p>
+          <p className="text-xs text-muted-foreground mb-4">
+            {submitted
+              ? 'Your order has been sent to the bakery.'
+              : submitting
+              ? 'Sending your order to the bakery…'
+              : submissionError
+              ? 'Payment was successful! However, sending your order details to the bakery encountered an interruption. Your payment is safe — please click below to resend your order.'
+              : 'Payment confirmed. Sending order to the bakery…'}
+          </p>
+          {submissionError && (
+            <div role="alert" className="p-2.5 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs mb-3 text-left">
+              <p className="font-semibold mb-0.5">Order Transmission Pending</p>
+              <p className="text-[11px] leading-relaxed">{submissionError}</p>
+            </div>
+          )}
+          {!submitted && !submitting && (
+            <Button
+              aria-label="Retry sending order"
+              className="w-full mb-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold flex items-center justify-center gap-2"
+              onClick={submitOrder}
+            >
+              <RotateCw className="w-4 h-4" />
+              Resend Order to Bakery
+            </Button>
+          )}
           <Button className="w-full" onClick={openBakeryChat} disabled={!submitted || submitting || openingChat}>
             {openingChat ? 'Opening Bakery Chat…' : 'Open Bakery Chat'}
           </Button>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Search, ChevronRight, X, Calendar, Banknote, FileText, MessageCircle, User, Store, Truck, Clock, ShieldCheck, MapPin, Phone, Info } from 'lucide-react';
+import { Search, ChevronRight, X, Calendar, Banknote, FileText, MessageCircle, User, Store, Truck, Clock, ShieldCheck, MapPin, Phone, Info, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import CustomScrollbar from '@/components/shared/CustomScrollbar';
 import { AdminRowsSkeleton } from '@/components/shared/PageLoadingSkeleton';
 import { safeExternalUrl } from '@/lib/safe-url';
@@ -65,10 +65,14 @@ export default function BakeryReservations({ reservations, loading, selected, se
   const [chatError, setChatError] = useState('');
   const [blueprintError, setBlueprintError] = useState('');
   const [previewUrl, setPreviewUrl] = useState(null);
+  const [completeConfirmOpen, setCompleteConfirmOpen] = useState(false);
+  const [completeInputText, setCompleteInputText] = useState('');
   useEffect(() => {
     setChatError('');
     setBlueprintError('');
     setPreviewUrl(null);
+    setCompleteConfirmOpen(false);
+    setCompleteInputText('');
   }, [selected?._id]);
   useEffect(() => {
     if (!selected || previewUrl) return undefined;
@@ -428,28 +432,177 @@ export default function BakeryReservations({ reservations, loading, selected, se
               {/* Order Stage */}
               <div className="pt-2 border-t border-gray-100">
                 {statusError && <p role="alert" className="mb-2 text-xs text-red-600">{statusError}</p>}
-                <p className="text-xs font-semibold text-gray-700 mb-1.5">Order Stage</p>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {ORDER_STAGES.map((tab) => (
-                    <button
-                      key={tab.key}
-                      disabled={updatingStatus}
-                      onClick={() => onStatusChange(selected._id, tab.key)}
-                      className={`text-xs py-1.5 px-2 rounded-lg border font-medium transition-colors text-center truncate ${
-                        selected.status === tab.key
-                          ? 'bg-pink-600 text-white border-pink-600 shadow-xs'
-                          : 'border-gray-200 text-gray-600 hover:bg-pink-50/50 hover:border-pink-200'
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-xs font-semibold text-gray-700">Order Stage</p>
+                  <span className="text-[10px] text-gray-400">Stages 1 & 2 are automatic</span>
                 </div>
+                {(() => {
+                  const downAmount = Number(selected.downPayment?.amount || 0);
+                  const remBal = Math.max(0, Number(selected.totalPrice || 0) - downAmount);
+                  const isBalPaid = remBal === 0 || Boolean(selected.finalPayment?.isPaid);
+                  const isConfirmed = selected.status === 'confirmed' || selected.status === 'pending_payment';
+                  const isInProduction = selected.status === 'in_production';
+                  const isCompleted = selected.status === 'completed';
+
+                  return (
+                    <>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {/* 1. Confirmed - Automated stage */}
+                        <div
+                          className={`text-xs py-1.5 px-2 rounded-lg border font-medium text-center truncate select-none ${
+                            isConfirmed
+                              ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-xs'
+                              : isCompleted || isInProduction
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'border-gray-200 text-gray-400 bg-gray-50'
+                          }`}
+                          title="Stage 1: Confirmed automatically upon order placement and deposit"
+                        >
+                          {isInProduction || isCompleted ? 'Confirmed ✓' : 'Confirmed'}
+                        </div>
+
+                        {/* 2. In Production - Automated upon client balance payment */}
+                        <div
+                          className={`text-xs py-1.5 px-2 rounded-lg border font-medium text-center truncate select-none ${
+                            isInProduction
+                              ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                              : isCompleted
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'border-gray-200 text-gray-400 bg-gray-50 opacity-60'
+                          }`}
+                          title={
+                            isInProduction
+                              ? 'Stage 2: In Production (Client balance is paid)'
+                              : isCompleted
+                              ? 'Stage 2: Completed production'
+                              : 'Stage 2: Switches to In Production automatically when client pays balance'
+                          }
+                        >
+                          {isCompleted ? 'In Prod ✓' : 'In Production'}
+                        </div>
+
+                        {/* 3. Completed - ONLY manual bakery action */}
+                        <button
+                          type="button"
+                          disabled={updatingStatus || !isInProduction || isCompleted}
+                          title={
+                            isCompleted
+                              ? 'Order has been completed'
+                              : !isInProduction
+                              ? 'Client must pay the remaining balance to enter In Production before order can be completed'
+                              : 'Click to mark this order as Completed'
+                          }
+                          onClick={() => {
+                            setCompleteConfirmOpen(true);
+                            setCompleteInputText('');
+                          }}
+                          className={`text-xs py-1.5 px-2 rounded-lg border font-medium transition-colors text-center truncate ${
+                            isCompleted
+                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs cursor-default'
+                              : isInProduction
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-600 hover:text-white cursor-pointer shadow-xs font-semibold'
+                              : 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed opacity-60'
+                          }`}
+                        >
+                          {isCompleted ? 'Completed ✓' : 'Completed'}
+                        </button>
+                      </div>
+
+                      {/* Helper status text */}
+                      {isConfirmed && (
+                        <p className="mt-1.5 text-[10px] text-amber-700 leading-tight">
+                          * Status automatically switches to <strong>In Production</strong> once the client pays the remaining balance.
+                        </p>
+                      )}
+                      {isInProduction && (
+                        <p className="mt-1.5 text-[10px] text-emerald-700 leading-tight font-medium">
+                          * Remaining balance is paid! Cake is in production. Click <strong>Completed</strong> when baking and pickup/delivery are finished.
+                        </p>
+                      )}
+                      {isCompleted && (
+                        <p className="mt-1.5 text-[10px] text-gray-500 leading-tight">
+                          ✓ This cake reservation is completed.
+                        </p>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </CustomScrollbar>
           </div>
         )}
       </div>
+
+      {/* Complete Order Confirmation Modal */}
+      <Dialog
+        open={completeConfirmOpen}
+        onOpenChange={(open) => {
+          setCompleteConfirmOpen(open);
+          if (!open) setCompleteInputText('');
+        }}
+      >
+        <DialogContent className="max-w-md bg-white rounded-2xl p-6 shadow-2xl border border-gray-100">
+          <DialogHeader>
+            <div className="w-12 h-12 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center mb-2 mx-auto shadow-xs">
+              <CheckCircle2 className="w-6 h-6" />
+            </div>
+            <DialogTitle className="text-center text-lg font-bold text-gray-900">
+              Mark Order as Completed?
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 pt-1">
+            <div className="p-3 bg-amber-50/90 border border-amber-200/90 rounded-xl text-xs text-amber-900 leading-relaxed">
+              <p className="font-bold flex items-center gap-1.5 text-amber-800 mb-1">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                This action cannot be undone
+              </p>
+              Once confirmed, this order will be permanently completed. The status cannot be reverted or changed back.
+            </div>
+
+            <div>
+              <label htmlFor="confirm-complete-input" className="block text-xs font-semibold text-gray-700 mb-1">
+                Please type <span className="font-bold text-emerald-700">"Complete"</span> to proceed:
+              </label>
+              <input
+                id="confirm-complete-input"
+                type="text"
+                autoFocus
+                placeholder="Complete"
+                value={completeInputText}
+                onChange={(e) => setCompleteInputText(e.target.value)}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-medium"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setCompleteConfirmOpen(false);
+                  setCompleteInputText('');
+                }}
+                className="flex-1 py-2 px-3 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={updatingStatus || completeInputText.trim().toLowerCase() !== 'complete'}
+                onClick={async () => {
+                  if (completeInputText.trim().toLowerCase() !== 'complete') return;
+                  await onStatusChange(selected._id, 'completed');
+                  setCompleteConfirmOpen(false);
+                  setCompleteInputText('');
+                }}
+                className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-white transition-colors shadow-xs cursor-pointer"
+              >
+                {updatingStatus ? 'Completing...' : 'Confirm Completed'}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

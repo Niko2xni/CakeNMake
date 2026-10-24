@@ -53,7 +53,7 @@ function queryVisible(selector) {
  *  - desktop, anything else (3D area)   → card sits low in the 3D area, no arrow
  *  - mobile                             → card goes to whichever half does NOT hold the target
  */
-function getLayout({ rect, cardH, vw, vh }) {
+function getLayout({ rect, cardH, vw, vh, step, stepIndex, groupIdx }) {
     const mobile = vw < 768;
     const pad = 12;
     const w = mobile ? Math.min(vw - pad * 2, 400) : 340;
@@ -65,7 +65,26 @@ function getLayout({ rect, cardH, vw, vh }) {
 
     if (mobile) {
         left = Math.round((vw - w) / 2);
-        top = 58; // locked just under the header, over the 3D render, never over the tool panel
+        const isStep1Or2 =
+            stepIndex === 0 ||
+            stepIndex === 1 ||
+            step?.group === 1 ||
+            step?.group === 2 ||
+            groupIdx === 0 ||
+            groupIdx === 1 ||
+            step?.id === 'cam-rotate' ||
+            step?.id === 'cam-zoom';
+        const isStep8PlaceOrSelect =
+            step?.id === 'center-place' ||
+            step?.id === 'center-select' ||
+            step?.title === 'Place it' ||
+            step?.title === 'Select an item';
+
+        if (isStep1Or2 || isStep8PlaceOrSelect) {
+            top = Math.max(pad, vh - h - 16);
+        } else {
+            top = 58; // locked just under the header, over the 3D render, never over the tool panel
+        }
     } else if (rect && rect.left > vw * 0.55) {
         const cy = rect.top + rect.height / 2;
         left = rect.left - w - 18;
@@ -226,7 +245,15 @@ export default function DesignerTutorial({
         })()
         : null;
 
-    const layout = getLayout({ rect: union, cardH, vw: viewport.w, vh: viewport.h });
+    const layout = getLayout({
+        rect: union,
+        cardH,
+        vw: viewport.w,
+        vh: viewport.h,
+        step,
+        stepIndex: currentStepIndex,
+        groupIdx,
+    });
 
     const advance = (e) => {
         e?.stopPropagation?.();

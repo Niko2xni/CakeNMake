@@ -10,6 +10,7 @@ const pricingSnapshotSchema = new mongoose.Schema({
     quantity: { type: Number, required: true },
     unitPriceMinor: { type: Number, required: true },
     lineTotalMinor: { type: Number, required: true },
+    details: [{ type: String }],
   }],
   totalMinor: { type: Number, required: true },
   calculatedAt: { type: Date, required: true },
@@ -51,6 +52,14 @@ const reservationSchema = new mongoose.Schema(
       paidAt: { type: Date, default: null },
       recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
       method: { type: String, enum: ['gcash', 'cash', 'bank_transfer', 'other'], default: null },
+    },
+
+    finalPayment: {
+      amount: { type: Number, default: 0 },
+      isPaid: { type: Boolean, default: false },
+      paymentReference: { type: String, default: null },
+      paidAt: { type: Date, default: null },
+      method: { type: String, enum: ['gcash', 'cash', 'bank_transfer', 'other'], default: 'gcash' },
     },
 
     // Set once the BullMQ/Puppeteer/jsPDF background pipeline finishes.

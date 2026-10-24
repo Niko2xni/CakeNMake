@@ -56,4 +56,27 @@ describe('PageLoadingSkeleton', () => {
     expect(container.querySelector('.occasion-strip')).toBeInTheDocument();
     expect(container.querySelector('.cn-sidebar')).not.toBeInTheDocument();
   });
+
+  it('removes the right panel skeleton for designer when sentToBakery is true', () => {
+    const { container: regularContainer } = render(
+      <MemoryRouter initialEntries={['/designer']}>
+        <PageLoadingSkeleton />
+      </MemoryRouter>,
+    );
+    expect(regularContainer.querySelector('section.w-80')).toBeInTheDocument();
+
+    const { container: sentPropContainer } = render(
+      <MemoryRouter initialEntries={['/designer']}>
+        <PageLoadingSkeleton sentToBakery />
+      </MemoryRouter>,
+    );
+    expect(sentPropContainer.querySelector('section.w-80')).not.toBeInTheDocument();
+
+    const { container: sentQueryContainer } = render(
+      <MemoryRouter initialEntries={['/designer?sentToBakery=true']}>
+        <PageLoadingSkeleton />
+      </MemoryRouter>,
+    );
+    expect(sentQueryContainer.querySelector('section.w-80')).not.toBeInTheDocument();
+  });
 });

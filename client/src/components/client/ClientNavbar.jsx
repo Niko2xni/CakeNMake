@@ -6,6 +6,7 @@ import {
   LogOut,
   MessageSquare,
   Plus,
+  Receipt,
   Settings,
   Trash2,
   User,
@@ -17,6 +18,7 @@ import LogoutConfirmation from '@/components/shared/LogoutConfirmation';
 const primaryItems = [
   { to: '/client', icon: Clock, label: 'Recents' },
   { to: '/templates', icon: LayoutTemplate, label: 'Templates' },
+  { to: '/transactions', icon: Receipt, label: 'Transactions' },
   { to: '/trash', icon: Trash2, label: 'Trash' },
 ];
 

@@ -4,7 +4,7 @@ const authenticate = require('../middleware/authenticate');
 const { loadAppUser, requireRole } = require('../middleware/authorize');
 
 // GET /api/bakery/billing/usage
-router.get('/usage', authenticate, loadAppUser, requireRole('bakery_staff', 'bakery_admin', 'platform_admin'), async (req, res) => {
+router.get('/usage', authenticate, loadAppUser, requireRole('bakery_admin', 'platform_admin'), async (req, res) => {
   try {
     const nextDate = new Date();
     nextDate.setMonth(nextDate.getMonth() + 1);
@@ -29,7 +29,7 @@ router.get('/usage', authenticate, loadAppUser, requireRole('bakery_staff', 'bak
 });
 
 // GET /api/bakery/billing/invoices
-router.get('/invoices', authenticate, loadAppUser, requireRole('bakery_staff', 'bakery_admin', 'platform_admin'), async (req, res) => {
+router.get('/invoices', authenticate, loadAppUser, requireRole('bakery_admin', 'platform_admin'), async (req, res) => {
   try {
     const now = new Date();
     const invoices = [

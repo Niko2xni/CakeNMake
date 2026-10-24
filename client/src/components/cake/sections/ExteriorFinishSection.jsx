@@ -2,6 +2,7 @@ import React from 'react';
 import { FLAVORS, FROSTING_FILLING_FLAVOR_ORDER } from '@/lib/cakeFlavors';
 import { FINISH_STYLES, BUTTERCREAM_TEXTURES, isPetitsFourStructure } from '@/lib/cakeConfig';
 import SugarColorSection from './SugarColorSection';
+import ButtercreamTextureIcon from './ButtercreamTextureIcons';
 
 export default function ExteriorFinishSection({ exterior, structure, activeLayer, onChange, sugarColor, onSugarColorChange }) {
   const isPetitsFour = isPetitsFourStructure(structure);
@@ -140,16 +141,24 @@ export default function ExteriorFinishSection({ exterior, structure, activeLayer
                   return (
                     <button
                       key={texture.id}
+                      type="button"
                       onClick={() => updateButtercreamTexture(texture.id)}
-                      className={`py-2 px-3 rounded-lg text-left transition-all duration-150 border-2 ${
+                      title={texture.label}
+                      className={`flex flex-col items-center justify-center gap-1.5 rounded-xl p-2.5 text-center transition-all duration-200 border-2 ${
                         active
-                          ? 'bg-primary text-primary-foreground border-primary shadow-md'
-                          : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
+                          ? 'bg-primary text-primary-foreground border-primary shadow-md scale-[1.02]'
+                          : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30 hover:bg-muted/80'
                       }`}
                     >
-                      <span className="block text-xs font-semibold">{texture.label}</span>
-                      <span className={`block text-[10px] mt-0.5 ${active ? 'text-primary-foreground/80' : 'text-muted-foreground/70'}`}>
-                        {texture.description}
+                      <div className={`w-8 h-8 rounded-full p-0.5 border flex items-center justify-center flex-shrink-0 ${
+                        active
+                          ? 'border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground'
+                          : 'border-border/60 bg-background/50 text-foreground'
+                      }`}>
+                        <ButtercreamTextureIcon textureId={texture.id} className="w-full h-full" />
+                      </div>
+                      <span className="block text-xs font-semibold leading-tight line-clamp-2">
+                        {texture.label}
                       </span>
                     </button>
                   );

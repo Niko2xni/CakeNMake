@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Palette } from 'lucide-react';
+import { Palette, Search, X } from 'lucide-react';
 import { bakeryApi } from '@/services/api';
 import { getChatSocket } from '@/lib/chat-socket';
 import { safeExternalUrl } from '@/lib/safe-url';
@@ -9,6 +9,7 @@ import SidePatternsGalleryModal from '@/components/bakery/SidePatternsGalleryMod
 
 export default function BakeryBlueprints() {
   const [records, setRecords] = useState([]);
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [refresh, setRefresh] = useState(0);
@@ -63,11 +64,47 @@ export default function BakeryBlueprints() {
     } catch (err) { setError(err.message); }
     finally { setBusy(null); }
   }
+
+  const filteredRecords = records.filter((record) => {
+    if (!search.trim()) return true;
+    const q = search.trim().toLowerCase();
+    const customer = (record.customerName || '').toLowerCase();
+    const design = (record.designName || '').toLowerCase();
+    const status = (record.status || '').toLowerCase();
+    const id = (record.id || '').toLowerCase();
+    const dateStr = record.deliveryDate ? new Date(record.deliveryDate).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).toLowerCase() : '';
+    return customer.includes(q) || design.includes(q) || status.includes(q) || id.includes(q) || dateStr.includes(q);
+  });
+
   return (
     <div className="h-full rounded-2xl border border-pink-100 shadow-xl bg-white flex flex-col overflow-hidden">
-      <header className="shrink-0 border-b border-pink-100 px-6 py-4 flex justify-between items-center">
-        <div><h1 className="text-lg font-bold">Blueprints</h1><p className="text-sm text-gray-500">Production PDFs submitted after simulated payment confirmation</p></div>
-        <div className="flex items-center gap-3">
+      <header className="shrink-0 border-b border-pink-100 px-6 py-4 flex flex-wrap gap-4 justify-between items-center">
+        <div>
+          <h1 className="text-lg font-bold">Blueprints</h1>
+          <p className="text-sm text-gray-500">Production PDFs submitted after simulated payment confirmation</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative w-64 sm:w-80">
+            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
+            <input
+              type="text"
+              aria-label="Search blueprints"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search customer, cake, or status..."
+              className="h-9 w-full rounded-xl border border-pink-200 bg-pink-50/40 pl-9 pr-9 text-xs sm:text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-400 focus:bg-white transition-all"
+            />
+            {search && (
+              <button
+                type="button"
+                aria-label="Clear blueprint search"
+                onClick={() => setSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
           <button
             type="button"
             onClick={() => setSideGalleryOpen(true)}
@@ -76,14 +113,26 @@ export default function BakeryBlueprints() {
             <Palette className="w-4 h-4" />
             Preview 2D Patterns
           </button>
-          <button onClick={() => setRefresh((n) => n + 1)} className="text-sm text-pink-600">Refresh</button>
+          <button onClick={() => setRefresh((n) => n + 1)} className="text-sm font-medium text-pink-600 hover:text-pink-700 transition-colors">Refresh</button>
         </div>
       </header>
       <CustomScrollbar className="flex-1" contentClassName="p-4 space-y-2">
         {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
         {loading && <div role="status" aria-label="Loading blueprints"><AdminRowsSkeleton count={6} /></div>}
-        {!loading && !error && !records.length && <p className="text-sm text-gray-500">No blueprints submitted yet.</p>}
-        {records.map((record) => (
+        {!loading && !error && !records.length && <p className="text-sm text-gray-500 py-8 text-center">No blueprints submitted yet.</p>}
+        {!loading && !error && records.length > 0 && !filteredRecords.length && (
+          <div className="py-12 text-center">
+            <p className="text-sm font-semibold text-gray-700">No blueprints matching "{search}".</p>
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="mt-3 inline-flex items-center gap-1.5 text-xs text-pink-600 font-semibold hover:underline"
+            >
+              Clear search
+            </button>
+          </div>
+        )}
+        {filteredRecords.map((record) => (
           <div key={record.id} className="flex flex-wrap items-center gap-4 rounded-xl border border-pink-100 px-4 py-3">
             <div className="flex-1 min-w-0">
               <div className="flex gap-2 items-center"><p className="text-sm font-semibold">{record.customerName}</p><span className="text-xs text-pink-600">{{ ready: 'Ready', uploading: 'Uploading', failed: 'Failed' }[record.status] || record.status}</span></div>

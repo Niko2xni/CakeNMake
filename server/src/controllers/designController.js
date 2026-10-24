@@ -130,6 +130,8 @@ exports.createDesign = async (req, res) => {
       thumbnailFallback: typeof thumbnailFallback === 'string' ? thumbnailFallback : undefined,
       thumbnailAsset: thumbnailAsset && typeof thumbnailAsset === 'object' ? thumbnailAsset : undefined,
       sentToBakery: req.body.sentToBakery === true,
+      paymentCompleted: req.body.paymentCompleted === true,
+      orderContext: req.body.orderContext && typeof req.body.orderContext === 'object' ? req.body.orderContext : undefined,
       isDuplicated: req.body.isDuplicated === true,
     });
     return res.status(201).json(await design.save());
@@ -166,6 +168,8 @@ exports.updateDesign = async (req, res) => {
     if (req.body.isDuplicated !== undefined) updates.isDuplicated = Boolean(req.body.isDuplicated);
     if (req.body.lastEstimate !== undefined) updates.lastEstimate = req.body.lastEstimate;
     if (req.body.sentToBakery !== undefined) updates.sentToBakery = Boolean(req.body.sentToBakery);
+    if (req.body.paymentCompleted !== undefined) updates.paymentCompleted = Boolean(req.body.paymentCompleted);
+    if (req.body.orderContext !== undefined) updates.orderContext = req.body.orderContext;
 
     const design = await Design.findOneAndUpdate(
       ownedDesignFilter(req),

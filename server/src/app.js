@@ -45,6 +45,7 @@ const transactionRoutes = require('./routes/transactionRoutes');
 app.use('/api/bakery/transactions', transactionRoutes);
 app.use('/api/bakery/blueprints', require('./routes/bakeryBlueprintRoutes'));
 app.use('/api/bakery/billing', require('./routes/billingRoutes'));
+app.use('/api/bakery/employees', require('./routes/employeeRoutes'));
 app.use('/api/templates', require('./routes/templateRoutes'));
 app.use('/api/bakery/templates', require('./routes/templateRoutes'));
 app.use(require('./middleware/bodyErrors'));

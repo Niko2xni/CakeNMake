@@ -137,19 +137,24 @@ describe('Orders', () => {
   });
 
   it('refreshes both views after an update and keeps customer details', async () => {
+    const inProdOrder = { ...order, status: 'in_production', finalPayment: { isPaid: true } };
+    bakeryApi.getReservations.mockResolvedValue([inProdOrder, unpaid]);
+    transactionApi.getTransactions.mockResolvedValue({ transactions: [inProdOrder, unpaid], summary });
     setup('/bakery/orders?tab=payments');
     fireEvent.click(await screen.findByRole('button', { name: 'Open reservation for Ana Cruz' }));
-    const updated = { ...order, status: 'in_production' };
+    const updated = { ...inProdOrder, status: 'completed' };
     bakeryApi.updateReservationStatus.mockResolvedValue({ ...updated, user: 'raw-user-id' });
     bakeryApi.getReservations.mockResolvedValue([updated, unpaid]);
     transactionApi.getTransactions.mockResolvedValue({ transactions: [updated, unpaid], summary });
     const detail = screen.getByText('Reservation Details').parentElement.parentElement;
-    fireEvent.click(within(detail).getByRole('button', { name: 'In Production' }));
+    fireEvent.click(within(detail).getByRole('button', { name: 'Completed' }));
+    fireEvent.change(screen.getByPlaceholderText('Complete'), { target: { value: 'Complete' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Completed' }));
     await waitFor(() => expect(bakeryApi.getReservations).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(transactionApi.getTransactions).toHaveBeenCalledTimes(2));
     expect(screen.getByText('ana@example.com')).toBeVisible();
     fireEvent.click(tab('Payment History'));
-    expect(within(await screen.findByRole('button', { name: 'Open reservation for Ana Cruz' })).getByText('In Production')).toBeVisible();
+    expect(within(await screen.findByRole('button', { name: 'Open reservation for Ana Cruz' })).getByText('Completed')).toBeVisible();
   });
 
   it('shows a retryable payment error while reservations remain usable', async () => {
@@ -163,11 +168,16 @@ describe('Orders', () => {
   });
 
   it('shows an update failure without changing the displayed order', async () => {
+    const inProdOrder = { ...order, status: 'in_production', finalPayment: { isPaid: true } };
+    bakeryApi.getReservations.mockResolvedValue([inProdOrder, unpaid]);
+    transactionApi.getTransactions.mockResolvedValue({ transactions: [inProdOrder, unpaid], summary });
     bakeryApi.updateReservationStatus.mockRejectedValue(new Error('offline'));
     setup('/bakery/orders?tab=payments');
     fireEvent.click(await screen.findByRole('button', { name: 'Open reservation for Ana Cruz' }));
     const detail = screen.getByText('Reservation Details').parentElement.parentElement;
     fireEvent.click(within(detail).getByRole('button', { name: 'Completed' }));
+    fireEvent.change(screen.getByPlaceholderText('Complete'), { target: { value: 'Complete' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Completed' }));
     await screen.findByText('Could not update the order status. Please try again.');
     expect(bakeryApi.getReservations).toHaveBeenCalledTimes(1);
   });

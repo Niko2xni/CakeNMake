@@ -20,6 +20,51 @@
   --cn-rail: 84px;
 }
 
+/* ==========================================================================
+   Client Pages Scrollbar: Persistent Gutter & Adaptive Thumb
+   ========================================================================== */
+html:has(.cn-app-page),
+html:has(.cn-chat-page),
+html:has(.cn-auth-page) {
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+}
+
+/* Custom scrollbar matching CakeNMake Client paper/rose theme */
+html:has(.cn-app-page)::-webkit-scrollbar,
+html:has(.cn-chat-page)::-webkit-scrollbar,
+html:has(.cn-auth-page)::-webkit-scrollbar {
+  width: 10px;
+}
+
+html:has(.cn-app-page)::-webkit-scrollbar-track,
+html:has(.cn-chat-page)::-webkit-scrollbar-track,
+html:has(.cn-auth-page)::-webkit-scrollbar-track {
+  background: var(--cn-paper, #f5eee2);
+}
+
+html:has(.cn-app-page)::-webkit-scrollbar-thumb,
+html:has(.cn-chat-page)::-webkit-scrollbar-thumb,
+html:has(.cn-auth-page)::-webkit-scrollbar-thumb {
+  background-color: rgba(143, 32, 74, 0.22);
+  border-radius: 999px;
+  border: 2px solid var(--cn-paper, #f5eee2);
+}
+
+html:has(.cn-app-page)::-webkit-scrollbar-thumb:hover,
+html:has(.cn-chat-page)::-webkit-scrollbar-thumb:hover,
+html:has(.cn-auth-page)::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(143, 32, 74, 0.45);
+}
+
+/* Firefox standard scrollbar */
+html:has(.cn-app-page),
+html:has(.cn-chat-page),
+html:has(.cn-auth-page) {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(143, 32, 74, 0.28) var(--cn-paper, #f5eee2);
+}
+
 .cn-app-page,
 .cn-chat-page,
 .cn-auth-page,
@@ -764,6 +809,7 @@ input[data-input-otp]:focus,
   transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
 }
 .cn-design-card:hover, .cn-design-card:focus-within { border-color: rgba(var(--cn-brand-rgb), 0.42); box-shadow: 0 17px 38px rgba(44, 23, 19, 0.12); transform: translateY(-2px); z-index: 2; }
 .cn-design-card.is-menu-open,
@@ -803,14 +849,16 @@ input[data-input-otp]:focus,
   align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
-  padding: 13px 14px 14px;
-  min-height: 84px;
+  padding: 13px 14px 10px;
+  min-height: 72px;
   box-sizing: border-box;
   position: relative;
 }
 .cn-design-meta-info {
   flex: 1 1 0%;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 .cn-design-title-link {
   display: block;

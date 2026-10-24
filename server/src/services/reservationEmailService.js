@@ -33,6 +33,7 @@ function safeHeader(value) {
 }
 
 function buildEmailContent({
+  orderRef = 'CONFIRMED',
   customerName,
   designName,
   bakeryName = 'AH TINAPS BAKESHOP',
@@ -64,6 +65,17 @@ Reservation Details:
 • Remaining Balance: ₱${remainingBalance} ${balanceNote}
 • Status: ${statusDisplay}
 
+----------------------------------------------------
+🧾 ORDER PICKUP SLIP (Optional for collection)
+Order Reference: #${orderRef}
+Cake: "${designName}"
+Bakery Store: ${displayBakeryName}
+Scheduled Date: ${deliveryDate}
+Down Payment: ₱${downPayment} ${downPaymentNote}
+Remaining Balance on Pickup: ₱${remainingBalance}
+(Showing this slip is optional. You can simply show this email, mention your order reference, or state your name at the counter.)
+----------------------------------------------------
+
 Important Note:
 Please note that while your reservation is confirmed, cake production will only begin once the whole payment for the cake is done.
 
@@ -75,7 +87,7 @@ Thank you,
 The CakeNMake Team`;
 
   const values = Object.fromEntries(Object.entries({
-    subject, customerName, designName, bakeryName: displayBakeryName, deliveryDate, totalPrice, downPayment, remainingBalance, statusDisplay, downPaymentNote, balanceNote,
+    subject, orderRef, customerName, designName, bakeryName: displayBakeryName, deliveryDate, totalPrice, downPayment, remainingBalance, statusDisplay, downPaymentNote, balanceNote,
   }).map(([key, value]) => [key, escapeHtml(value)]));
 
   const statusColor = isDownPaymentPaid ? '#16a34a' : '#ea580c';
@@ -103,6 +115,29 @@ The CakeNMake Team`;
           <tr><td style="color: #6b7280;">Status:</td><td style="color: ${statusColor}; font-weight: 600;">${values.statusDisplay}</td></tr>
         </table>
       </td></tr></table>
+
+      <!-- Optional Digital Pickup Slip -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border: 2px dashed #f43f5e; border-radius: 12px; margin-bottom: 24px;">
+        <tr><td style="padding: 18px 20px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="font-size: 14px; font-weight: 700; color: #e11d48;">🧾 Order Pickup Slip</td>
+              <td style="text-align: right; font-size: 11px; color: #6b7280; font-family: monospace;">Ref: #${values.orderRef}</td>
+            </tr>
+          </table>
+          <p style="font-size: 12px; color: #6b7280; margin: 8px 0 12px; line-height: 1.5;">
+            Showing this slip is <strong>completely optional</strong> when claiming your cake. You can simply show this email, mention your order reference, or state your name at the counter.
+          </p>
+          <div style="background-color: #fdf2f8; border-radius: 8px; padding: 12px 14px; font-size: 13px; line-height: 1.6;">
+            <div><strong>Cake:</strong> ${values.designName}</div>
+            <div><strong>Bakery:</strong> ${values.bakeryName}</div>
+            <div><strong>Pickup Date:</strong> ${values.deliveryDate}</div>
+            <div><strong>Down Payment Paid:</strong> ₱${values.downPayment}</div>
+            <div style="color: #9f1239; font-weight: 700;"><strong>Balance on Pickup:</strong> ₱${values.remainingBalance}</div>
+          </div>
+        </td></tr>
+      </table>
+
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #fffbeb; border: 1px solid #fef3c7; border-left: 4px solid #f59e0b; border-radius: 8px; margin-bottom: 24px;">
         <tr><td style="padding: 14px 16px;">
           <p style="margin: 0 0 4px; font-size: 13px; font-weight: 700; color: #92400e;">
@@ -165,7 +200,10 @@ function createReservationEmailService({
     const totalNum = Number(reservation.totalPrice || 0);
     const downNum = Number(reservation.downPayment?.amount || Math.ceil(totalNum / 2));
     const isPaid = reservation.downPayment?.isPaid !== false;
+    const resId = reservation._id ? String(reservation._id) : '';
+    const orderRef = resId ? resId.slice(-8).toUpperCase() : 'CONFIRMED';
     const message = buildEmailContent({
+      orderRef,
       customerName: user.displayName || user.email.split('@')[0] || 'Valued Customer',
       designName: reservation.designName || 'Custom Cake',
       bakeryName: resolvedBakeryName,

@@ -23,7 +23,9 @@ import {
   Flame,
   Search,
   Filter,
+  Lock,
 } from 'lucide-react';
+import { useAuth } from '@/lib/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import CustomScrollbar from '@/components/shared/CustomScrollbar';
 import { pricingApi } from '@/services/api';
@@ -401,12 +403,12 @@ export default function BakeryPricing() {
   const [simSize, setSimSize] = useState('8x6');
   const [simTier2Size, setSimTier2Size] = useState('6x4');
   const [simFinish, setSimFinish] = useState('frosted');
-  const [simFrostingFlavor, setSimFrostingFlavor] = useState('Vanilla');
   const [simSpongeFlavor, setSimSpongeFlavor] = useState('Vanilla');
   const [simFilling, setSimFilling] = useState('Chocolate');
   const [simGlaze, setSimGlaze] = useState(true);
   const [simSideKey, setSimSideKey] = useState('none');
   const [simEdgeId, setSimEdgeId] = useState('none');
+  const [simTopperType, setSimTopperType] = useState('strawberry');
   const [simStrawberries, setSimStrawberries] = useState(4);
   const [simBear, setSimBear] = useState(0);
   const [simButtercreamLetters, setSimButtercreamLetters] = useState(0);
@@ -432,12 +434,15 @@ export default function BakeryPricing() {
     load();
   }, []);
 
+  const { account } = useAuth();
+  const canEditPricing = account?.role === 'bakery_admin' || account?.role === 'platform_admin';
+
   const activeRates = workspace?.active?.rates || DEFAULT_RATES;
-  const isDraftActive = Boolean(draft);
+  const isDraftActive = canEditPricing && Boolean(draft);
   const hasChanges = useMemo(() => {
-    if (!draft) return false;
+    if (!draft || !canEditPricing) return false;
     return !isDeepEqual(rates, activeRates);
-  }, [draft, rates, activeRates]);
+  }, [draft, rates, activeRates, canEditPricing]);
 
   const changedItems = useMemo(() => {
     return computePricingChanges(rates, activeRates);
@@ -506,14 +511,6 @@ export default function BakeryPricing() {
     const next = JSON.parse(JSON.stringify(rates));
     if (!next.sizes) next.sizes = { ...DEFAULT_RATES.sizes };
     next.sizes[sizeKey] = price;
-    syncSpongeRates(next);
-    updateRates(next);
-  };
-
-  const setFinishAddon = (finishKey, price) => {
-    const next = JSON.parse(JSON.stringify(rates));
-    if (!next.finishAddon) next.finishAddon = { ...DEFAULT_RATES.finishAddon };
-    next.finishAddon[finishKey] = price;
     syncSpongeRates(next);
     updateRates(next);
   };
@@ -617,37 +614,39 @@ export default function BakeryPricing() {
 
     // Finish styles, Filling, Drip, Side piping, and Edge borders are Included (₱0)
 
-    // Strawberries bracket (Center Decoration: 1-4 = 200, 5+ = 300)
+    // Center Topper Brackets (Strawberries, Cherries, etc.)
     if (simStrawberries > 0) {
-      const brackets = currentRates.center?.brackets?.strawberry || [
+      const topperKey = simTopperType || 'strawberry';
+      const brackets = currentRates.center?.brackets?.[topperKey] || [
         { maxQty: 4, price: 200 },
         { maxQty: 10, price: 300 },
       ];
       const hit = brackets.find((b) => simStrawberries <= b.maxQty);
       if (hit) total += hit.price;
-      else total += 300;
+      else total += brackets[brackets.length - 1]?.price || 300;
     }
 
-    // Bear figure (Center Decoration)
+    // Bear figure (Center Decoration: Per-Piece Figure Rate)
     if (simBear > 0) {
-      const brackets = currentRates.center?.brackets?.chocolateBear;
-      if (brackets && brackets.length > 0) {
-        const hit = brackets.find((b) => simBear <= b.maxQty);
-        if (hit) total += hit.price;
-        else total += (brackets[brackets.length - 1]?.price || 300);
-      } else {
-        total += (currentRates.center?.perPiece?.chocolateBear || 200) * simBear;
-      }
+      const perPiece = currentRates.center?.perPiece?.chocolateBear ?? 200;
+      total += perPiece * simBear;
     }
 
-    // 3D Buttercream / Fondant Letters (Text Pricing)
+    // 3D Buttercream / Fondant Letters (Text Pricing Brackets)
     if (simButtercreamLetters > 0) {
-      const brackets = currentRates.center?.brackets?.buttercreamText || [];
+      const brackets = currentRates.center?.brackets?.buttercreamText || [
+        { maxQty: 10, price: 50 },
+        { maxQty: 20, price: 100 },
+        { maxQty: 30, price: 150 },
+        { maxQty: 40, price: 200 },
+        { maxQty: 50, price: 250 },
+      ];
       const hit = brackets.find((b) => simButtercreamLetters <= b.maxQty);
       if (hit) total += hit.price;
+      else total += brackets[brackets.length - 1]?.price || 250;
     }
     return total;
-  }, [rates, simLayers, simSize, simTier2Size, simFinish, simFrostingFlavor, simSpongeFlavor, simStrawberries, simBear, simButtercreamLetters]);
+  }, [rates, simLayers, simSize, simTier2Size, simFinish, simSpongeFlavor, simStrawberries, simBear, simButtercreamLetters, simTopperType]);
 
   const selectedSideLabel = useMemo(() => {
     if (simSideKey === 'none') return 'None';
@@ -724,7 +723,12 @@ export default function BakeryPricing() {
             )}
           </div>
 
-          {!draft ? (
+          {!canEditPricing ? (
+            <div className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2 text-xs font-semibold text-gray-600 shadow-2xs">
+              <Lock className="h-3.5 w-3.5 text-gray-500" />
+              <span>Read-Only (Bakery Staff)</span>
+            </div>
+          ) : !draft ? (
             <button
               type="button"
               onClick={ensureDraft}
@@ -787,7 +791,7 @@ export default function BakeryPricing() {
         <div className="flex w-full flex-col gap-4 lg:w-80 shrink-0">
           <div className="rounded-2xl border border-pink-100 bg-white p-3 shadow-sm space-y-1">
             {[
-              { id: 'fundamentals', label: 'Fundamentals', icon: Cake, desc: 'Flavors, sizes & finish add-ons' },
+              { id: 'fundamentals', label: 'Fundamentals', icon: Cake, desc: 'Flavors & sizes (finishes included)' },
               { id: 'center', label: 'Center', icon: Tag, desc: 'Decorations & 3D text rates' },
               { id: 'simulator', label: 'Live Quote Tester', icon: SlidersHorizontal, desc: 'Simulate custom cake estimates' },
             ].map((tab) => {
@@ -1515,30 +1519,49 @@ export default function BakeryPricing() {
                       </div>
 
                       {/* Center Decorations Simulation */}
+                      {/* Center Decorations Simulation */}
                       <div className="pt-2 border-t border-pink-100/60 space-y-3">
-                        <span className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">Center Decorations</span>
-                        <div>
-                          <label className="text-xs font-semibold text-gray-600 block mb-1">
-                            Strawberries ({simStrawberries} pcs) · {simStrawberries === 0 ? 'None' : simStrawberries <= 4 ? '+₱200 (1–4)' : '+₱300 (5+)'}
-                          </label>
-                          <input
-                            type="range"
-                            min={0}
-                            max={10}
-                            value={simStrawberries}
-                            onChange={(e) => setSimStrawberries(Number(e.target.value))}
-                            className="w-full accent-primary"
-                          />
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">Center Decorations</span>
+                          <span className="text-[10px] text-pink-600 font-semibold">Brackets & Per-Piece</span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-xs font-semibold text-gray-600 block mb-1">Topper Design</label>
+                            <select
+                              value={simTopperType}
+                              onChange={(e) => setSimTopperType(e.target.value)}
+                              className="w-full rounded-xl border border-pink-100 bg-white p-2 text-xs font-semibold text-gray-800 outline-none"
+                            >
+                              {Object.entries(CENTER_DECORATION_META).map(([id, meta]) => (
+                                <option key={id} value={id}>{meta.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-xs font-semibold text-gray-600 block mb-1">
+                              Quantity ({simStrawberries} pcs)
+                            </label>
+                            <input
+                              type="range"
+                              min={0}
+                              max={10}
+                              value={simStrawberries}
+                              onChange={(e) => setSimStrawberries(Number(e.target.value))}
+                              className="w-full accent-primary mt-2"
+                            />
+                          </div>
                         </div>
 
                         <div>
                           <label className="text-xs font-semibold text-gray-600 block mb-1">
-                            Chocolate Bears ({simBear} pcs) · {simBear === 0 ? 'None' : simBear <= 4 ? '+₱200 (1–4)' : '+₱300 (5+)'}
+                            Chocolate Bear Figures ({simBear} pcs) · {simBear === 0 ? 'None' : `+₱${(rates.center?.perPiece?.chocolateBear ?? 200) * simBear} (₱${rates.center?.perPiece?.chocolateBear ?? 200}/ea)`}
                           </label>
                           <input
                             type="range"
                             min={0}
-                            max={8}
+                            max={6}
                             value={simBear}
                             onChange={(e) => setSimBear(Number(e.target.value))}
                             className="w-full accent-primary"
@@ -1551,7 +1574,7 @@ export default function BakeryPricing() {
                         <span className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">Text Pricings</span>
                         <div>
                           <label className="text-xs font-semibold text-gray-600 block mb-1">
-                            3D Fondant Letters ({simButtercreamLetters} letters)
+                            3D Fondant Letters ({simButtercreamLetters} letters) · {simButtercreamLetters === 0 ? 'None' : `+₱${((rates.center?.brackets?.buttercreamText || []).find((b) => simButtercreamLetters <= b.maxQty)?.price || 250)}`}
                           </label>
                           <input
                             type="range"
@@ -1650,38 +1673,51 @@ export default function BakeryPricing() {
                         )}
 
                         {/* Center Decorations & Text */}
-                        {simStrawberries > 0 && (
-                          <div className="flex justify-between py-1 text-gray-700">
-                            <span>Strawberries ({simStrawberries} pcs {simStrawberries <= 4 ? '1–4 bracket' : '5+ bracket'})</span>
-                            <span className="font-bold">
-                              {money(
-                                (rates.center?.brackets?.strawberry || []).find((b) => simStrawberries <= b.maxQty)?.price || 300
-                              )}
-                            </span>
-                          </div>
-                        )}
+                        {simStrawberries > 0 && (() => {
+                          const topperKey = simTopperType || 'strawberry';
+                          const topperMeta = CENTER_DECORATION_META[topperKey] || { label: 'Topper' };
+                          const brackets = rates.center?.brackets?.[topperKey] || [
+                            { maxQty: 4, price: 200 },
+                            { maxQty: 10, price: 300 },
+                          ];
+                          const hit = brackets.find((b) => simStrawberries <= b.maxQty);
+                          const price = hit?.price ?? (brackets[brackets.length - 1]?.price || 300);
+                          const bracketLabel = hit ? `1–${hit.maxQty} bracket` : `5+ bracket`;
+                          return (
+                            <div className="flex justify-between py-1 text-gray-700">
+                              <span>{topperMeta.label} ({simStrawberries} pcs · {bracketLabel})</span>
+                              <span className="font-bold">{money(price)}</span>
+                            </div>
+                          );
+                        })()}
 
                         {simBear > 0 && (
                           <div className="flex justify-between py-1 text-gray-700">
-                            <span>Chocolate Bear ({simBear} pcs {simBear <= 4 ? '1–4 bracket' : '5+ bracket'})</span>
+                            <span>Chocolate Bear ({simBear} pc{simBear > 1 ? 's' : ''} @ ₱{rates.center?.perPiece?.chocolateBear ?? 200}/ea)</span>
                             <span className="font-bold">
-                              {money(
-                                (rates.center?.brackets?.chocolateBear || []).find((b) => simBear <= b.maxQty)?.price || 300
-                              )}
+                              {money((rates.center?.perPiece?.chocolateBear ?? 200) * simBear)}
                             </span>
                           </div>
                         )}
 
-                        {simButtercreamLetters > 0 && (
-                          <div className="flex justify-between py-1 text-gray-700">
-                            <span>3D Fondant Letters ({simButtercreamLetters} letters bracket)</span>
-                            <span className="font-bold">
-                              {money(
-                                (rates.center?.brackets?.buttercreamText || []).find((b) => simButtercreamLetters <= b.maxQty)?.price || 0
-                              )}
-                            </span>
-                          </div>
-                        )}
+                        {simButtercreamLetters > 0 && (() => {
+                          const brackets = rates.center?.brackets?.buttercreamText || [
+                            { maxQty: 10, price: 50 },
+                            { maxQty: 20, price: 100 },
+                            { maxQty: 30, price: 150 },
+                            { maxQty: 40, price: 200 },
+                            { maxQty: 50, price: 250 },
+                          ];
+                          const hit = brackets.find((b) => simButtercreamLetters <= b.maxQty);
+                          const price = hit?.price ?? (brackets[brackets.length - 1]?.price || 250);
+                          const bracketLabel = hit ? `up to ${hit.maxQty} letters` : '50+ letters';
+                          return (
+                            <div className="flex justify-between py-1 text-gray-700">
+                              <span>3D Fondant Letters ({simButtercreamLetters} letters · {bracketLabel})</span>
+                              <span className="font-bold">{money(price)}</span>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
 

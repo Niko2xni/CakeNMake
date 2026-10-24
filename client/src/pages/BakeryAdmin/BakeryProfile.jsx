@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Store, Clock, MapPin, Mail, Check, Pencil } from 'lucide-react';
+import { Store, Clock, MapPin, Mail, Check, Pencil, Lock } from 'lucide-react';
+import { useAuth } from '@/lib/AuthContext';
 
 const initialProfile = {
   name: 'AH TINAPS BAKESHOP',
@@ -41,6 +42,9 @@ export default function BakeryProfile() {
     { key: 'description', label: 'Description', icon: Store, multiline: true },
   ];
 
+  const { account } = useAuth();
+  const isAdmin = account?.role === 'bakery_admin' || account?.role === 'platform_admin';
+
   return (
     <div className="h-full rounded-2xl border border-pink-100 shadow-xl bg-white flex flex-col overflow-hidden">
       <header className="flex-shrink-0 border-b border-pink-100 px-6 py-4 flex items-center justify-between">
@@ -48,7 +52,12 @@ export default function BakeryProfile() {
           <h1 className="text-lg font-bold text-gray-900">Branch Profile</h1>
           <p className="text-sm text-gray-500">Information displayed to customers</p>
         </div>
-        {!editing ? (
+        {!isAdmin ? (
+          <div className="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-1.5 rounded-full border border-gray-200 bg-gray-50 text-gray-500">
+            <Lock className="w-3.5 h-3.5" />
+            Read-Only (Bakery Staff)
+          </div>
+        ) : !editing ? (
           <button
             onClick={startEdit}
             className="flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-full border border-pink-200 text-pink-600 hover:bg-pink-50 transition-colors"

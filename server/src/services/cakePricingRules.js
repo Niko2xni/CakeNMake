@@ -284,13 +284,13 @@ const DEFAULT_RATES = {
       '6x4': 350, '8x6': 550, '10x8': 750, '12x10': 950,
       '6x6': 350, '8x8': 550, '10x10': 750, '12x12': 950,
       big: 550, small: 350,
-      classicCube: 400, largeCube: 600, miniBento: 350, standardBento: 450, largeBento: 550, squareBento2x2: 400, squareBento3x3: 500
+      classicCube: 500, largeCube: 800, miniBento: 500, standardBento: 600, largeBento: 750, squareBento2x2: 500, squareBento3x3: 650
     },
     textured: {
       '6x4': 350, '8x6': 550, '10x8': 750, '12x10': 950,
       '6x6': 350, '8x8': 550, '10x10': 750, '12x12': 950,
       big: 550, small: 350,
-      classicCube: 400, largeCube: 600, miniBento: 350, standardBento: 450, largeBento: 550, squareBento2x2: 400, squareBento3x3: 500
+      classicCube: 500, largeCube: 800, miniBento: 500, standardBento: 600, largeBento: 750, squareBento2x2: 500, squareBento3x3: 650
     },
   },
   flavors: {
@@ -312,12 +312,6 @@ const DEFAULT_RATES = {
     '8x8': 200,
     '10x10': 400,
     '12x12': 600,
-  },
-  finishAddon: {
-    naked: 0,
-    pickColor: 0,
-    frosted: 0,
-    textured: 0,
   },
   // Two tiers set default: 8x6 vanilla (550) + 6x4 vanilla (350) = 900
   twoTier: { naked: 900, frosted: 900, textured: 900 },
@@ -635,6 +629,18 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
         const edgeLabel = edgeItem?.label || title(tip);
         edgeBottomDetail = `Edge Bottom: ${edgeLabel} (Included)`;
       }
+    }
+
+    if (isPetitsFour || (rates && rates !== DEFAULT_RATES && rates.sponge && !rates.flavors)) {
+      return [
+        tierLabel,
+        dims,
+        finish,
+        spongeName,
+        fillingName,
+        `Piping Design: ${pipingTip}`,
+        `Piping Sugar Color: ${pipingColor}`,
+      ];
     }
 
     const specs = [

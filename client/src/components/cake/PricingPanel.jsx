@@ -8,8 +8,9 @@ const formatMoney = (minor = 0) => new Intl.NumberFormat('en-PH', {
   style: 'currency', currency: 'PHP', minimumFractionDigits: minor % 100 === 0 ? 0 : 2,
 }).format(minor / 100);
 
-function LineItem({ label, details, lineTotalMinor = 0, quantity = 1, unitPriceMinor = 0, showDetails = false }) {
+function LineItem({ label, details, lineTotalMinor = 0, quantity = 1, unitPriceMinor = 0, showDetails = false, componentKey = '' }) {
   const isCenterText = label?.startsWith('Center Text') || (Array.isArray(details) && details.some(d => typeof d === 'string' && d.startsWith('Letters x')));
+  const isFlavor = label?.toLowerCase().startsWith('flavor') || componentKey?.includes('flavor');
 
   if (isCenterText) {
     let displayDetails = Array.isArray(details) && details.length > 0 ? details : [];
@@ -54,7 +55,7 @@ function LineItem({ label, details, lineTotalMinor = 0, quantity = 1, unitPriceM
             )}
           </div>
         ) : (
-          <span className="min-w-0 text-foreground/80 font-medium">
+          <span className={`min-w-0 ${(isFlavor && showDetails) ? 'font-bold text-foreground text-xs' : 'text-foreground/80 font-medium'}`}>
             {label}
             {quantity > 1 && <span className="ml-1 text-[10px] text-muted-foreground">({quantity} × {formatMoney(unitPriceMinor)})</span>}
           </span>

@@ -21,6 +21,7 @@ import ResetPassword from '@/pages/ResetPassword';
 import LoginSuccess from '@/pages/LoginSuccess';
 import GoogleCallback from '@/pages/GoogleCallback';
 import Templates from '@/pages/Client/Templates';
+import Transactions from '@/pages/Client/Transactions';
 import CakeAI from '@/pages/Client/CakeAI';
 import Trash from '@/pages/Client/Trash';
 import Chats from '@/pages/Client/Chats';
@@ -35,6 +36,7 @@ import BakeryBlueprints from '@/pages/BakeryAdmin/BakeryBlueprints';
 import BakeryTemplates from '@/pages/BakeryAdmin/BakeryTemplates';
 import BakeryDesigner from '@/pages/BakeryAdmin/BakeryDesigner';
 import BakeryProfile from '@/pages/BakeryAdmin/BakeryProfile';
+import BakeryEmployees from '@/pages/BakeryAdmin/BakeryEmployees';
 
 const AuthenticatedApp = () => {
   const { user, isLoadingAuth, authChecked, isLoadingPublicSettings, authError, navigateToLogin, retryAccountSync } = useAuth();
@@ -105,6 +107,7 @@ const AuthenticatedApp = () => {
           <Route path="/profile" element={<Profile />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/templates" element={<Templates />} />
+          <Route path="/transactions" element={<Transactions />} />
           <Route path="/cake-ai" element={<CakeAI />} />
           <Route path="/trash" element={<Trash />} />
           <Route path="/chats" element={<Chats />} />
@@ -124,6 +127,7 @@ const AuthenticatedApp = () => {
             <Route path="chats" element={<BakeryChatsSection />} />
             <Route path="assets" element={<Navigate to="/bakery/orders" replace />} />
             <Route path="billing" element={<BakeryBilling />} />
+            <Route path="employees" element={<BakeryEmployees />} />
             <Route path="blueprints" element={<BakeryBlueprints />} />
             <Route path="profile" element={<BakeryProfile />} />
           </Route>

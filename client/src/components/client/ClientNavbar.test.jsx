@@ -25,7 +25,8 @@ describe('ClientNavbar', () => {
     expect(screen.getByRole('link', { name: /cakenmake dashboard/i })).toHaveTextContent('CNM');
     expect(screen.getByRole('link', { name: /create/i })).toHaveAttribute('href', '/designer');
     expect(screen.getByRole('link', { name: /recents/i })).toHaveAttribute('href', '/client');
-    expect(screen.queryByRole('link', { name: /templates/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /templates/i })).toHaveAttribute('href', '/templates');
+    expect(screen.getByRole('link', { name: /transactions/i })).toHaveAttribute('href', '/transactions');
     expect(screen.getByRole('link', { name: /trash/i })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: /chats/i })).toHaveAttribute('href', '/chats');
   });

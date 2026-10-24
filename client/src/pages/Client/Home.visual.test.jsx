@@ -22,9 +22,15 @@ const pricingMocks = vi.hoisted(() => ({
   quoteCake: vi.fn().mockResolvedValue({ totalMinor: 250000, lineItems: [] }),
 }));
 
+const accountMocks = vi.hoisted(() => ({
+  getTransactions: vi.fn().mockResolvedValue({ transactions: [] }),
+  payBalance: vi.fn().mockResolvedValue({ message: 'Success', status: 'in_production' }),
+}));
+
 vi.mock('@/services/api', () => ({
   designApi: apiMocks,
   pricingApi: pricingMocks,
+  accountApi: accountMocks,
 }));
 
 const designs = [
@@ -166,5 +172,83 @@ describe('ClientHome presentation', () => {
     fireEvent.click(createBtn);
 
     expect(await screen.findByRole('heading', { name: /maximum design capacity reached \(20\/20\)/i })).toBeInTheDocument();
+  });
+
+  it('displays Pay Balance button on design card when associated order has remaining balance, and completes payment to In Progress', async () => {
+    const testDesign = {
+      _id: 'design-bal-1',
+      name: 'Strawberry Birthday Cake',
+      lastEdited: '2026-10-24T09:00:00Z',
+      thumbnail: 'strawberry.png',
+      config: {},
+      sentToBakery: true,
+    };
+    apiMocks.getDesigns.mockResolvedValue([testDesign]);
+    accountMocks.getTransactions.mockResolvedValue({
+      transactions: [
+        {
+          id: 'res-order-99',
+          designId: 'design-bal-1',
+          designName: 'Strawberry Birthday Cake',
+          totalPrice: 2000,
+          downPayment: { amount: 1000, isPaid: true },
+          remainingBalance: 1000,
+          status: 'confirmed',
+        },
+      ],
+    });
+    accountMocks.payBalance.mockResolvedValue({
+      message: 'Payment complete',
+      status: 'in_production',
+      finalPayment: { amount: 1000, isPaid: true, method: 'gcash' },
+    });
+
+    renderHome();
+
+    // Verify "Pay Balance (₱1,000)" button appears inside the design box
+    const payBalBtn = await screen.findByRole('button', { name: /pay balance \(₱1,000\)/i });
+    expect(payBalBtn).toBeInTheDocument();
+
+    // Click it to open the GCash payment dialog
+    fireEvent.click(payBalBtn);
+
+    expect(await screen.findByText('Complete Cake Balance')).toBeInTheDocument();
+    expect(screen.getByText(/order #ORDER-99/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /pay ₱1,000 with gcash/i })).toBeInTheDocument();
+
+    // Complete simulated payment
+    fireEvent.click(screen.getByRole('button', { name: /pay ₱1,000 with gcash/i }));
+
+    expect(await screen.findByText('Payment Complete!')).toBeInTheDocument();
+    expect(screen.getByText(/status switched to in production!/i)).toBeInTheDocument();
+  });
+
+  it('does not display Pay Balance button on designs where sentToBakery is false', async () => {
+    apiMocks.getDesigns.mockResolvedValue([
+      {
+        _id: 'unsent-design-1',
+        name: 'Draft Unsent Cake',
+        sentToBakery: false,
+        lastEdited: '2026-09-20T10:00:00Z',
+      },
+    ]);
+    accountMocks.getTransactions.mockResolvedValue({
+      transactions: [
+        {
+          id: 'res-order-101',
+          designId: 'unsent-design-1',
+          designName: 'Draft Unsent Cake',
+          totalPrice: 1500,
+          downPayment: { amount: 750, isPaid: true },
+          remainingBalance: 750,
+          status: 'confirmed',
+        },
+      ],
+    });
+
+    renderHome();
+
+    expect(await screen.findByText('Draft Unsent Cake')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /pay balance/i })).not.toBeInTheDocument();
   });
 });

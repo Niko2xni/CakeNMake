@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertCircle,
@@ -18,9 +18,15 @@ import {
   Loader2,
   Search,
   CornerDownLeft,
+  Smartphone,
+  RotateCw,
+  CheckCircle2,
+  Store,
+  Palette,
 } from 'lucide-react';
 import ClientNavbar from '@/components/client/ClientNavbar';
-import { designApi, pricingApi } from '@/services/api';
+import { designApi, pricingApi, accountApi } from '@/services/api';
+import PayBalanceModal from '@/components/client/PayBalanceModal';
 import { useDragToScroll } from '@/hooks/useDragToScroll';
 
 const formatMoney = (minor = 0) => new Intl.NumberFormat('en-PH', {
@@ -79,6 +85,8 @@ export default function ClientHome() {
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [trashNotification, setTrashNotification] = useState(null);
   const [trashConfirmTarget, setTrashConfirmTarget] = useState(null);
+  const [userTransactions, setUserTransactions] = useState([]);
+  const [payingBalanceTx, setPayingBalanceTx] = useState(null);
   const [showMoveAllConfirm, setShowMoveAllConfirm] = useState(false);
   const [showCapacityLimitModal, setShowCapacityLimitModal] = useState(false);
   const [showTrashFullWarning, setShowTrashFullWarning] = useState(false);
@@ -185,11 +193,18 @@ export default function ClientHome() {
     setLoading(true);
     setLoadError('');
     try {
-      const designs = await designApi.getDesigns();
+      const txPromise = accountApi?.getTransactions
+        ? accountApi.getTransactions().catch(() => ({ transactions: [] }))
+        : Promise.resolve({ transactions: [] });
+      const [designs, txRes] = await Promise.all([
+        designApi.getDesigns(),
+        txPromise,
+      ]);
       const activeDesigns = (Array.isArray(designs) ? designs : [])
         .filter((design) => !design.isTrashed)
         .sort((first, second) => new Date(second.lastEdited || 0) - new Date(first.lastEdited || 0));
       setRecentDesigns(activeDesigns);
+      setUserTransactions(txRes?.transactions || []);
       if (selectedDesign) {
         const refreshed = activeDesigns.find((d) => d._id === selectedDesign._id);
         setSelectedDesign(refreshed || null);
@@ -200,6 +215,73 @@ export default function ClientHome() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const designTransactionsMap = useMemo(() => {
+    if (!userTransactions.length || !recentDesigns.length) return new Map();
+    const map = new Map();
+    const usedTxIds = new Set();
+
+    const sentDesigns = recentDesigns.filter((d) => Boolean(d.sentToBakery));
+
+    // Pass 1: exact designId match
+    for (const design of sentDesigns) {
+      const match = userTransactions.find((tx) => {
+        if (usedTxIds.has(tx.id)) return false;
+        const txDesignId = String(tx.designId?._id || tx.designId || '');
+        return txDesignId && txDesignId === String(design._id);
+      });
+      if (match) {
+        map.set(String(design._id), match);
+        usedTxIds.add(match.id);
+      }
+    }
+
+    // Pass 2: exact designName match
+    for (const design of sentDesigns) {
+      if (map.has(String(design._id))) continue;
+      const designName = (design.name || '').trim().toLowerCase();
+      if (!designName) continue;
+      const match = userTransactions.find((tx) => {
+        if (usedTxIds.has(tx.id)) return false;
+        const txName = (tx.designName || '').trim().toLowerCase();
+        return txName === designName;
+      });
+      if (match) {
+        map.set(String(design._id), match);
+        usedTxIds.add(match.id);
+      }
+    }
+
+    // Pass 3: prefix / substring match for names with duplicates/copies
+    for (const design of sentDesigns) {
+      if (map.has(String(design._id))) continue;
+      const designName = (design.name || '').trim().toLowerCase();
+      const match = userTransactions.find((tx) => {
+        if (usedTxIds.has(tx.id)) return false;
+        const txName = (tx.designName || '').trim().toLowerCase();
+        return txName && designName && (txName.startsWith(designName) || designName.startsWith(txName));
+      });
+      if (match) {
+        map.set(String(design._id), match);
+        usedTxIds.add(match.id);
+      }
+    }
+
+    // Pass 4: assign remaining unmapped sent designs to remaining transactions
+    const remainingSent = sentDesigns.filter((d) => !map.has(String(d._id)));
+    const remainingTxs = userTransactions.filter((tx) => !usedTxIds.has(tx.id));
+    for (let i = 0; i < Math.min(remainingSent.length, remainingTxs.length); i++) {
+      map.set(String(remainingSent[i]._id), remainingTxs[i]);
+      usedTxIds.add(remainingTxs[i].id);
+    }
+
+    return map;
+  }, [userTransactions, recentDesigns]);
+
+  const getDesignTransaction = (design) => {
+    if (!design || !design.sentToBakery) return null;
+    return designTransactionsMap.get(String(design._id)) || null;
   };
 
   const formatDate = (dateString) => {
@@ -401,8 +483,8 @@ export default function ClientHome() {
     }
   };
 
-  const handleOpenInNewTab = (designId) => {
-    window.open(`/designer?designId=${designId}`, '_blank');
+  const handleOpenInNewTab = (designId, isSent = false) => {
+    window.open(`/designer?designId=${designId}${isSent ? '&sentToBakery=true' : ''}`, '_blank');
     setActiveMenu(null);
   };
 
@@ -574,6 +656,16 @@ export default function ClientHome() {
                   {displayedDesigns.slice(0, 20).map((design, index) => {
                     const isSelected = selectedDesign?._id === design._id;
                     const isMenuOpen = (typeof activeMenu === 'string' ? activeMenu === design._id : activeMenu?.id === design._id);
+                    const isSentToBakery = Boolean(design.sentToBakery);
+                    const relatedTx = isSentToBakery ? getDesignTransaction(design) : null;
+                    const isPaidInFull = Boolean(isSentToBakery && relatedTx && (Boolean(relatedTx?.finalPayment?.isPaid) || Number(relatedTx?.remainingBalance) === 0));
+                    const remainingBal = isPaidInFull
+                      ? 0
+                      : (relatedTx?.remainingBalance != null
+                          ? Number(relatedTx.remainingBalance)
+                          : Math.max(0, Number(relatedTx?.totalPrice || 0) - Number(relatedTx?.downPayment?.amount || 0)));
+                    const hasBalanceDue = Boolean(isSentToBakery && relatedTx && remainingBal > 0 && !isPaidInFull);
+
                     return (
                       <article
                         key={design._id}
@@ -581,12 +673,18 @@ export default function ClientHome() {
                       >
                         <Link
                           to={`/designer?designId=${design._id}`}
+                          state={{ sentToBakery: Boolean(design.sentToBakery) }}
                           className="cn-design-thumbnail-link"
                           tabIndex={-1}
                           aria-hidden="true"
                         >
                           <div className="cn-design-thumbnail">
                             {index === 0 && <span className="cn-latest-badge">Latest</span>}
+                            {Boolean(design.paymentCompleted && !isSentToBakery) && (
+                              <span className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white shadow-xs">
+                                Payment Verified • Pending Send
+                              </span>
+                            )}
                             {design.thumbnail ? (
                               <img
                                 src={design.thumbnail}
@@ -609,13 +707,18 @@ export default function ClientHome() {
                           <div className="cn-design-meta-info">
                             <Link
                               to={`/designer?designId=${design._id}`}
+                              state={{ sentToBakery: Boolean(design.sentToBakery) }}
                               className="cn-design-title-link"
                               aria-label={`Open ${design.name || 'untitled design'}, ${design.isDuplicated ? 'duplicated' : `edited ${formatDate(design.lastEdited)}`}`}
                             >
                               <h3>{design.name || 'Untitled design'}</h3>
                             </Link>
                             <p>{design.isDuplicated ? 'Duplicated' : `Edited ${formatDate(design.lastEdited)}`}</p>
-                            <Link to={`/designer?designId=${design._id}`} className="cn-continue-label">
+                            <Link
+                              to={`/designer?designId=${design._id}`}
+                              state={{ sentToBakery: Boolean(design.sentToBakery) }}
+                              className="cn-continue-label"
+                            >
                               {design.sentToBakery
                                 ? 'View design →'
                                 : index === 0
@@ -671,7 +774,7 @@ export default function ClientHome() {
                                 <button
                                   type="button"
                                   role="menuitem"
-                                  onClick={() => handleOpenInNewTab(design._id)}
+                                  onClick={() => handleOpenInNewTab(design._id, design.sentToBakery)}
                                 >
                                   <ExternalLink aria-hidden="true" /> Open in new tab
                                 </button>
@@ -697,6 +800,60 @@ export default function ClientHome() {
                             )}
                           </div>
                         </div>
+
+                        {/* Action buttons / badges at bottom of design card - keeps all cards perfectly balanced */}
+                        {hasBalanceDue ? (
+                          <div className="px-3 pb-3 pt-0 mt-auto">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setPayingBalanceTx(relatedTx);
+                              }}
+                              className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-[#007DFF] hover:bg-[#0068D9] text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                            >
+                              <Smartphone className="w-3.5 h-3.5" />
+                              Pay Balance ({formatMoney(remainingBal * 100)})
+                            </button>
+                          </div>
+                        ) : Boolean(isSentToBakery && relatedTx && isPaidInFull) ? (
+                          <div className="px-3 pb-3 pt-0 mt-auto">
+                            <div className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-purple-50 border border-purple-200 text-purple-700 text-xs font-semibold">
+                              <RotateCw className="w-3 h-3 text-purple-600 animate-spin" />
+                              In Progress • Fully Paid
+                            </div>
+                          </div>
+                        ) : Boolean(isSentToBakery) ? (
+                          <div className="px-3 pb-3 pt-0 mt-auto">
+                            <div className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold">
+                              <Store className="w-3.5 h-3.5 text-amber-600" />
+                              Sent to Bakery
+                            </div>
+                          </div>
+                        ) : Boolean(design.paymentCompleted && !isSentToBakery) ? (
+                          <div className="px-3 pb-3 pt-0 mt-auto">
+                            <Link
+                              to={`/designer?designId=${design._id}&resend=true`}
+                              state={{ sentToBakery: false, paymentCompleted: true }}
+                              className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-colors shadow-xs cursor-pointer"
+                            >
+                              <RotateCw className="w-3.5 h-3.5" />
+                              Resend to Bakery
+                            </Link>
+                          </div>
+                        ) : (
+                          <div className="px-3 pb-3 pt-0 mt-auto">
+                            <Link
+                              to={`/designer?designId=${design._id}`}
+                              state={{ sentToBakery: false }}
+                              className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-[#5c382c]/8 hover:bg-[#5c382c]/14 text-[#5c382c] text-xs font-bold transition-colors border border-[#5c382c]/12 shadow-xs cursor-pointer"
+                            >
+                              <Palette className="w-3.5 h-3.5 text-[#b04a5a]" />
+                              {index === 0 ? 'Continue Designing' : 'Customize Cake'}
+                            </Link>
+                          </div>
+                        )}
                       </article>
                     );
                   })}
@@ -834,18 +991,30 @@ export default function ClientHome() {
               )}
               <Link
                 to={`/designer?designId=${selectedDesign._id}`}
+                state={{ sentToBakery: Boolean(selectedDesign?.sentToBakery) }}
                 className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1.5"
               >
                 {selectedDesign?.sentToBakery ? 'View in Designer' : 'Open in Designer'} <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
 
-            <Link
-              to={`/designer?designId=${selectedDesign._id}`}
-              className="w-full mb-5 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-[var(--cn-cherry)] hover:bg-[var(--cn-cherry-dark)] text-white text-xs font-bold shadow-md shadow-[rgba(var(--cn-brand-rgb),0.2)] transition-colors"
-            >
-              {selectedDesign?.sentToBakery ? 'View in Designer' : 'Open in Designer'} <ArrowRight className="w-4 h-4" />
-            </Link>
+            {selectedDesign?.paymentCompleted && !selectedDesign?.sentToBakery ? (
+              <Link
+                to={`/designer?designId=${selectedDesign._id}&resend=true`}
+                state={{ sentToBakery: false, paymentCompleted: true }}
+                className="w-full mb-5 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-md shadow-amber-600/20 transition-colors"
+              >
+                <RotateCw className="w-4 h-4" /> Resend Order to Bakery
+              </Link>
+            ) : (
+              <Link
+                to={`/designer?designId=${selectedDesign._id}`}
+                state={{ sentToBakery: Boolean(selectedDesign?.sentToBakery) }}
+                className="w-full mb-5 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-[var(--cn-cherry)] hover:bg-[var(--cn-cherry-dark)] text-white text-xs font-bold shadow-md shadow-[rgba(var(--cn-brand-rgb),0.2)] transition-colors"
+              >
+                {selectedDesign?.sentToBakery ? 'View in Designer' : 'Open in Designer'} <ArrowRight className="w-4 h-4" />
+              </Link>
+            )}
 
             {/* Design Specifications */}
             <div className="space-y-3 pb-4 border-b border-[var(--cn-line)] text-xs">
@@ -859,6 +1028,14 @@ export default function ClientHome() {
                     <span className="font-semibold text-[var(--cn-ink)] text-right">{spec.value}</span>
                   </div>
                 ))}
+                {Boolean(selectedDesign?.paymentCompleted && !selectedDesign?.sentToBakery) && (
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium">Payment Status</span>
+                    <span className="font-semibold text-amber-600">
+                      Paid • Ready to Resend
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium">Sent to Bakery</span>
                   <span className="font-semibold text-[var(--cn-ink)]">
@@ -877,6 +1054,63 @@ export default function ClientHome() {
                 </div>
               </div>
             </div>
+
+            {/* Bakery Order & Balance Section if design has an active order */}
+            {(() => {
+              const selectedTx = getDesignTransaction(selectedDesign);
+              if (!selectedTx) return null;
+              const isSelectedPaid = Boolean(selectedTx.finalPayment?.isPaid) || Number(selectedTx.remainingBalance) === 0;
+              const selBal = isSelectedPaid
+                ? 0
+                : (selectedTx.remainingBalance != null
+                    ? Number(selectedTx.remainingBalance)
+                    : Math.max(0, Number(selectedTx.totalPrice || 0) - Number(selectedTx.downPayment?.amount || 0)));
+
+              return (
+                <div className="my-3 p-3 rounded-xl border border-pink-100 bg-pink-50/40 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-gray-900 flex items-center gap-1.5 text-xs">
+                      <Store className="w-3.5 h-3.5 text-pink-600" />
+                      Bakery Order
+                    </span>
+                    <span className="text-[10px] font-mono bg-white px-2 py-0.5 rounded border border-pink-200 text-gray-600">
+                      #{selectedTx.id.slice(-8).toUpperCase()}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-500">Order Status:</span>
+                    <span className={`font-semibold px-2 py-0.5 rounded-full text-[10px] ${
+                      isSelectedPaid ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                    }`}>
+                      {isSelectedPaid ? 'In Progress' : 'Confirmed (Awaiting Balance)'}
+                    </span>
+                  </div>
+
+                  {selBal > 0 && !isSelectedPaid ? (
+                    <div className="pt-1.5 border-t border-pink-100 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-600 font-medium">Remaining Balance:</span>
+                        <span className="font-bold text-[#007DFF]">{formatMoney(selBal * 100)}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPayingBalanceTx(selectedTx)}
+                        className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-[#007DFF] hover:bg-[#0068D9] text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                      >
+                        <Smartphone className="w-3.5 h-3.5" />
+                        Pay Balance ({formatMoney(selBal * 100)})
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="pt-1.5 border-t border-pink-100 flex items-center gap-1.5 text-[11px] text-emerald-700 font-medium">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Balance settled via GCash (In Progress)</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Full Pricing Breakdown */}
             <div className="my-4 space-y-3 pb-4 border-b border-[var(--cn-line)] text-xs">
@@ -1209,6 +1443,34 @@ export default function ClientHome() {
           </div>
         </div>
       )}
+      {/* Pay Balance Modal */}
+      <PayBalanceModal
+        isOpen={Boolean(payingBalanceTx)}
+        transaction={payingBalanceTx}
+        onClose={() => setPayingBalanceTx(null)}
+        onSuccess={(res, tx) => {
+          const updatedStatus = res.status || 'in_production';
+          const finalPayment = res.finalPayment || {
+            amount: tx.remainingBalance,
+            isPaid: true,
+            method: 'gcash',
+            paidAt: new Date().toISOString(),
+          };
+          setUserTransactions((prev) =>
+            prev.map((t) => {
+              if (t.id === tx.id || t.reservationId === tx.id) {
+                return {
+                  ...t,
+                  status: updatedStatus,
+                  remainingBalance: 0,
+                  finalPayment,
+                };
+              }
+              return t;
+            })
+          );
+        }}
+      />
     </div>
   );
 }

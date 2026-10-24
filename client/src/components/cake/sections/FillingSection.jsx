@@ -3,6 +3,7 @@ import { FLAVORS, FROSTING_FILLING_FLAVOR_ORDER } from '@/lib/cakeFlavors';
 import { FILLING_LAYER_OPTIONS, FILLING_PIPING_DESIGNS, isPetitsFourStructure } from '@/lib/cakeConfig';
 import SetPicker from '../SetPicker';
 import SugarColorSection from './SugarColorSection';
+import FillingDesignIcon from './FillingDesignIcons';
 
 const DEFAULT_PIPING = { tip: null, colorId: 'vanilla' };
 
@@ -192,6 +193,8 @@ export default function FillingSection({ filling, structure, exteriorFinish, int
             numberFromNone
             showColorPicker={false}
             shape="box"
+            noneIcon={<FillingDesignIcon designId="none" />}
+            renderIcon={(tipId) => <FillingDesignIcon designId={tipId} />}
           />
 
           {/* Filling Flavor — the filling's own eating flavor. For most

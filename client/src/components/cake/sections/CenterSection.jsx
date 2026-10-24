@@ -709,13 +709,14 @@ export default function CenterSection({
 
   const handleCancel = () => {
     onItemSelect?.(null);
-    onSelectTool?.(null);
+    if (!selectedItemId) {
+      onSelectTool?.(null);
+    }
   };
 
   const handleDelete = () => {
     if (selectedItemId) {
       onDeleteSelectedItem?.();
-      onSelectTool?.(null);
       onItemSelect?.(null);
     }
   };

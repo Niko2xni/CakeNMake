@@ -159,22 +159,18 @@ function ChatSkeleton() {
   );
 }
 
-function DesignerSkeleton({ admin = false }) {
+function DesignerSkeleton({ admin = false, sentToBakery = false }) {
   const page = (
-    <div className="flex h-full min-h-[500px] min-w-0 gap-4 p-4">
-      <section className="hidden w-64 shrink-0 space-y-4 rounded-2xl border border-pink-100 bg-white p-4 lg:block">
-        <Skeleton className="h-6 w-2/3" />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-40 w-full rounded-xl" />
-      </section>
+    <div className={`flex h-full min-h-[500px] min-w-0 p-4 ${sentToBakery ? '' : 'gap-4'}`}>
       <Skeleton className="min-h-[400px] min-w-0 flex-1 rounded-2xl" />
-      <section className="hidden w-80 shrink-0 space-y-4 rounded-2xl border border-pink-100 bg-white p-4 sm:block">
-        <Skeleton className="h-6 w-1/2" />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-24 w-full rounded-xl" />
-        <Skeleton className="h-24 w-full rounded-xl" />
-      </section>
+      {!sentToBakery && (
+        <section className="hidden w-80 shrink-0 space-y-4 rounded-2xl border border-pink-100 bg-white p-4 sm:block">
+          <Skeleton className="h-6 w-1/2" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-24 w-full rounded-xl" />
+          <Skeleton className="h-24 w-full rounded-xl" />
+        </section>
+      )}
     </div>
   );
   return admin ? (
@@ -234,7 +230,7 @@ function AuthFormSkeleton({ title = "Welcome back", subtitle = "Choose how you'd
   );
 }
 
-function PageSkeletonContent({ path }) {
+function PageSkeletonContent({ path = '', sentToBakery = false } = {}) {
   if (path === '/') return <LandingPageSkeleton />;
   if (path === '/client') {
     return <ClientPage wide><Skeleton className="mx-auto h-10 w-2/3" /><Skeleton className="mx-auto h-11 w-full max-w-xl rounded-full" /><div className="space-y-4"><Skeleton className="h-6 w-40" /><DesignCards /></div></ClientPage>;
@@ -257,8 +253,8 @@ function PageSkeletonContent({ path }) {
   if (path === '/cake-ai') {
     return <ClientPage wide><div className="flex h-[70dvh] min-h-[500px] overflow-hidden rounded-2xl border border-pink-100 bg-white"><section className="hidden w-72 shrink-0 space-y-4 border-r border-pink-100 p-4 md:block"><Skeleton className="h-8 w-full rounded-full" /><AdminRowsSkeleton count={6} /></section><section className="flex min-w-0 flex-1 flex-col p-5"><Skeleton className="h-8 w-52" /><div className="flex-1 space-y-6 py-12"><Skeleton className="h-14 w-3/5 rounded-2xl" /><Skeleton className="ml-auto h-20 w-3/4 rounded-2xl" /></div><Skeleton className="h-16 w-full rounded-2xl" /></section></div></ClientPage>;
   }
-  if (path === '/designer' || path === '/guest-designer') return <DesignerSkeleton />;
-  if (path === '/bakery/designer') return <DesignerSkeleton />;
+  if (path === '/designer' || path === '/guest-designer') return <DesignerSkeleton sentToBakery={sentToBakery} />;
+  if (path === '/bakery/designer') return <DesignerSkeleton admin sentToBakery={sentToBakery} />;
   if (path === '/bakery/chats') return <TableSkeleton summary />;
   if (path === '/support') return <ClientPage><Skeleton className="h-8 w-60" /><AdminRowsSkeleton count={5} /></ClientPage>;
   if (['/bakery', '/bakery/assets', '/bakery/orders', '/bakery/reservations', '/bakery/transactions'].includes(path)) return <TableSkeleton summary />;
@@ -274,12 +270,19 @@ function PageSkeletonContent({ path }) {
   return <div className="flex min-h-screen items-center justify-center bg-[var(--cn-paper,#f5eee2)] p-6"><div className="w-full max-w-5xl space-y-6"><Skeleton className="h-12 w-2/3" /><Skeleton className="h-80 w-full rounded-3xl" /><Skeleton className="h-12 w-40 rounded-full" /></div></div>;
 }
 
-export default function PageLoadingSkeleton({ path: explicitPath }) {
+export default function PageLoadingSkeleton({ path: explicitPath, sentToBakery: explicitSentToBakery }) {
   const location = useLocation();
   const path = explicitPath || location.pathname;
   const routePath = path === '/' ? '/' : path.replace(/\/+$/, '') || '/';
   const isAuthRoute = ['/login', '/forgot-password', '/reset-password', '/login-success'].includes(routePath);
   const isClientRoute = ['/client', '/templates', '/trash', '/profile', '/settings', '/chats', '/cake-ai'].includes(routePath);
+
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams();
+  const sentToBakery = explicitSentToBakery ?? Boolean(
+    location.state?.sentToBakery ||
+    searchParams.get('sent') === 'true' ||
+    searchParams.get('sentToBakery') === 'true'
+  );
 
   return (
     <div
@@ -289,7 +292,7 @@ export default function PageLoadingSkeleton({ path: explicitPath }) {
       role="status"
       aria-label={`Loading ${routePath === '/' ? 'home page' : 'page'}`}
     >
-      <PageSkeletonContent path={routePath} />
+      <PageSkeletonContent path={routePath} sentToBakery={sentToBakery} />
       <span className="sr-only">Loading page content</span>
     </div>
   );

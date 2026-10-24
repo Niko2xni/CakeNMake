@@ -58,9 +58,12 @@ export default function SetPicker({
   numberFromNone = false,
   showNoneButton = true,
   shape = 'circle',
+  noneIcon = null,
+  renderIcon = null,
 }) {
   const showColors = !!activeSetId && showColorPicker;
   const isBox = shape === 'box';
+  const resolvedNoneIcon = noneIcon ?? (renderIcon ? renderIcon('none', null) : null);
 
   return (
     <div className="space-y-3">
@@ -97,19 +100,20 @@ export default function SetPicker({
           >
             {isBox ? (
               <>
-                <span className="w-8 h-8 rounded-full border-2 border-current/20 bg-current/5 flex items-center justify-center text-xs font-semibold">
-                  {numberFromNone ? 1 : '—'}
+                <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold overflow-hidden ${resolvedNoneIcon ? 'p-0 border-0' : 'border-2 border-current/20 bg-current/5'}`}>
+                  {resolvedNoneIcon ?? (numberFromNone ? 1 : '—')}
                 </span>
                 <span className="text-center leading-tight">None</span>
               </>
             ) : (
-              numberFromNone ? 1 : '—'
+              resolvedNoneIcon ?? (numberFromNone ? 1 : '—')
             )}
           </button>
         )}
         {sets.map((set, i) => {
           const active = activeSetId === set.id;
           const itemDisabled = disabled || (disabledItemIds && disabledItemIds.includes(set.id)) || (isItemDisabled && isItemDisabled(set.id)) || Boolean(set.disabled);
+          const itemIcon = set.icon ?? (renderIcon ? renderIcon(set.id, set, i) : null);
           return (
             <button
               key={set.id}
@@ -136,13 +140,13 @@ export default function SetPicker({
             >
               {isBox ? (
                 <>
-                  <span className="w-8 h-8 rounded-full border-2 border-current/20 bg-current/5 flex items-center justify-center text-xs font-semibold">
-                    {set.icon ?? i + (numberFromNone ? 2 : 1)}
+                  <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold overflow-hidden ${itemIcon ? 'p-0 border-0' : 'border-2 border-current/20 bg-current/5'}`}>
+                    {itemIcon ?? i + (numberFromNone ? 2 : 1)}
                   </span>
                   <span className="text-center leading-tight">{set.label}</span>
                 </>
               ) : (
-                set.icon ?? i + (numberFromNone ? 2 : 1)
+                itemIcon ?? i + (numberFromNone ? 2 : 1)
               )}
             </button>
           );

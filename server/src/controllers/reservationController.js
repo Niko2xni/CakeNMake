@@ -24,6 +24,16 @@ async function recordDownPayment(req, res) {
     if (!updated) return res.status(409).json({ message: 'Order changed. Refresh before recording payment.' });
     const io = req.app?.get ? req.app.get('io') : null;
     io?.to(`platform:${req.platformId}`).emit('reservation:updated', updated);
+    if (updated.status === 'confirmed') {
+      io?.to(`platform:${req.platformId}`).emit('bakery:notification', {
+        type: 'confirmed',
+        title: 'Down Payment Verified • Confirmed',
+        message: `Down payment of ₱${Number(updated.downPayment?.amount || 0).toLocaleString()} recorded. Order is now Confirmed.`,
+        reservationId: String(updated._id),
+        status: 'confirmed',
+        timestamp: new Date(),
+      });
+    }
     return res.json(updated);
   } catch (error) { return res.status(500).json({ message: 'Could not record down payment.' }); }
 }
@@ -87,18 +97,28 @@ async function updateStatus(req, res) {
   try {
     const { status } = req.body;
 
-    const allowed = ['confirmed', 'in_production', 'completed'];
-    if (!allowed.includes(status)) {
-      return res.status(400).json({ message: 'Invalid status value' });
+    // Only 'completed' can be manually updated by the bakery staff.
+    // 'confirmed' is set upon order creation / downpayment.
+    // 'in_production' switches automatically when the customer completes balance payment.
+    if (status !== 'completed') {
+      return res.status(400).json({
+        message: 'Only "Completed" status can be manually updated. "Confirmed" is set on order placement, and "In Production" switches automatically when the customer completes balance payment.',
+      });
     }
 
     const reservation = await Reservation.findOneAndUpdate(
       { _id: req.params.id, platform: req.platformId },
-      { status },
+      { status: 'completed' },
       { new: true }
     );
 
     if (!reservation) return res.status(404).json({ message: 'Reservation not found' });
+
+    if (reservation.blueprint) {
+      const Blueprint = require('../models/Blueprint');
+      await Blueprint.findByIdAndUpdate(reservation.blueprint, { status: 'completed' }).catch(() => {});
+    }
+
     const io = req.app?.get ? req.app.get('io') : null;
     io?.to(`platform:${req.platformId}`).emit('reservation:updated', reservation);
     res.json(reservation);

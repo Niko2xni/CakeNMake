@@ -28,14 +28,14 @@ test('reservation status updates use the trusted platform membership', async () 
   let capturedFilter;
   mock.method(Reservation, 'findOneAndUpdate', async (filter) => {
     capturedFilter = filter;
-    return { _id: 'reservation-1', status: 'confirmed' };
+    return { _id: 'reservation-1', status: 'completed' };
   });
 
   const req = {
     params: { id: 'reservation-1' },
     platformId: 'trusted-platform',
     body: {
-      status: 'confirmed',
+      status: 'completed',
       platformSlug: 'attacker-controlled-platform',
     },
   };

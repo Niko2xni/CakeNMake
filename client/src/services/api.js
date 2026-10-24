@@ -153,6 +153,11 @@ export const accountApi = {
     method: 'PATCH',
     body: JSON.stringify(updates),
   }),
+  getTransactions: () => requestAuthenticatedJson(`${API_BASE_URL}/account/transactions`),
+  payBalance: (id, payload) => requestAuthenticatedJson(`${API_BASE_URL}/account/transactions/${id}/pay-balance`, {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+  }),
   requestEmailLinkOtp: (email) => requestAuthenticatedJson(`${API_BASE_URL}/account/email/request-otp`, {
     method: 'POST',
     body: JSON.stringify({ email }),
@@ -426,9 +431,21 @@ export const billingApi = {
   getInvoiceHistory: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/billing/invoices`),
 };
 
+export const employeeApi = {
+  getEmployees: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/employees`),
+  addEmployee: (email, role = 'bakery_staff') => requestAuthenticatedJson(`${API_BASE_URL}/bakery/employees`, {
+    method: 'POST',
+    body: JSON.stringify({ email, role }),
+  }),
+  removeEmployee: (id) => requestAuthenticatedJson(`${API_BASE_URL}/bakery/employees/${id}`, {
+    method: 'DELETE',
+  }),
+};
+
 export const transactionApi = {
   getTransactions: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/transactions`),
 };
+
 
 const thumbnailQueue = createThumbnailQueue(
   { getItem: key => localStorage.getItem(key), setItem: (key, value) => localStorage.setItem(key, value) },

@@ -333,7 +333,18 @@ export default function BakeryDesigner() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [isBreakdownOpen, setIsBreakdownOpen] = useState(false);
   const [activeTool, setActiveTool] = useState(null);
+  const activeToolRef = useRef(activeTool);
+  useEffect(() => {
+    activeToolRef.current = activeTool;
+  }, [activeTool]);
+
   const [selectedCenterItemId, setSelectedCenterItemId] = useState(null);
+  const selectedCenterItemIdRef = useRef(selectedCenterItemId);
+  useEffect(() => {
+    selectedCenterItemIdRef.current = selectedCenterItemId;
+  }, [selectedCenterItemId]);
+
+  const lastActiveToolBeforeSelectionRef = useRef(null);
   const [activeTab, setActiveTab] = useState('fundamentals');
   const [activeLayer, setActiveLayer] = useState(0);
   const [activeEdgeSlot, setActiveEdgeSlot] = useState('top');
@@ -624,11 +635,76 @@ export default function BakeryDesigner() {
     });
   }, [setPlaceItems]);
 
+  const handleSelectTool = useCallback((tool) => {
+    if (tool) {
+      lastActiveToolBeforeSelectionRef.current = null;
+      setActiveTool(tool);
+    } else {
+      if (!selectedCenterItemIdRef.current) {
+        lastActiveToolBeforeSelectionRef.current = null;
+      }
+      setActiveTool(null);
+    }
+  }, []);
+
   const handleDeleteSelectedCenterItem = useCallback(() => {
     if (!selectedCenterItemId) return;
     setPlaceItems((items) => items.filter((item) => item.id !== selectedCenterItemId));
     setSelectedCenterItemId(null);
+    selectedCenterItemIdRef.current = null;
+    if (lastActiveToolBeforeSelectionRef.current) {
+      setActiveTool(lastActiveToolBeforeSelectionRef.current);
+      lastActiveToolBeforeSelectionRef.current = null;
+    }
   }, [selectedCenterItemId, setPlaceItems]);
+
+  const handleCenterItemSelect = useCallback((id) => {
+    if (id) {
+      if (activeToolRef.current) {
+        lastActiveToolBeforeSelectionRef.current = activeToolRef.current;
+      }
+      selectedCenterItemIdRef.current = id;
+      setSelectedCenterItemId(id);
+      setActiveTool(null);
+
+      setActiveTab('center');
+
+      setCakeConfig((prev) => {
+        const items = prev.place?.items || [];
+        const item = items.find((it) => it.id === id);
+        if (!item) return prev;
+
+        const isLetter = typeof item.type === 'string' && (item.type.startsWith('center-letter') || item.type.startsWith('letter-'));
+        const isVariation = item.source === 'variation' || item.source?.startsWith('variation') || (typeof item.id === 'string' && item.id.startsWith('center-var-'));
+
+        let nextMode = 'decorations';
+        if (isVariation) {
+          nextMode = 'variations';
+        } else if (isLetter) {
+          nextMode = 'text';
+        }
+
+        const currentCenter = prev.center || {};
+        if (currentCenter.mode === nextMode) return prev;
+
+        return {
+          ...prev,
+          center: {
+            ...currentCenter,
+            mode: nextMode,
+            ...(nextMode === 'text' ? { textCategory: 'buttercream' } : {}),
+          },
+        };
+      });
+    } else {
+      selectedCenterItemIdRef.current = null;
+      setSelectedCenterItemId(null);
+      if (lastActiveToolBeforeSelectionRef.current) {
+        setActiveTool(lastActiveToolBeforeSelectionRef.current);
+        lastActiveToolBeforeSelectionRef.current = null;
+      }
+    }
+  }, []);
 
   const handleCenterTextColorModeChange = useCallback((nextMode) => {
     setCakeConfig((prev) => {
@@ -906,10 +982,10 @@ export default function BakeryDesigner() {
             activeTool={isBreakdownOpen ? null : activeTool}
             disabled={isBreakdownOpen}
             onPlace={handlePlace}
-            onSelectTool={setActiveTool}
+            onSelectTool={handleSelectTool}
             onPlacementBlocked={handlePlacementBlocked}
             selectedCenterItemId={selectedCenterItemId}
-            onCenterItemSelect={setSelectedCenterItemId}
+            onCenterItemSelect={handleCenterItemSelect}
             onDeleteCenterItem={handleDeleteSelectedCenterItem}
             onPlacedItemsChange={setPlaceItems}
           />
@@ -962,7 +1038,10 @@ export default function BakeryDesigner() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setActiveTool(null)}
+                    onClick={() => {
+                      lastActiveToolBeforeSelectionRef.current = null;
+                      setActiveTool(null);
+                    }}
                     className="ml-1 rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors shrink-0"
                     title="Exit Placement Mode"
                     aria-label="Exit Placement Mode"
@@ -1000,20 +1079,21 @@ export default function BakeryDesigner() {
             onChange={handleConfigChange}
             onReset={() => {
               setCakeConfig(DEFAULT_CONFIG);
+              lastActiveToolBeforeSelectionRef.current = null;
               setActiveTool(null);
               placeUndoStackRef.current = [];
               placeRedoStackRef.current = [];
               setPlaceHistoryVersion((v) => v + 1);
             }}
             activeTool={activeTool}
-            onSelectTool={setActiveTool}
+            onSelectTool={handleSelectTool}
             onPlaceChange={setPlaceItems}
             onPlaceUndo={handlePlaceUndo}
             onPlaceRedo={handlePlaceRedo}
             canPlaceUndo={placeUndoStackRef.current.length > 0}
             canPlaceRedo={placeRedoStackRef.current.length > 0}
             selectedCenterItemId={selectedCenterItemId}
-            onCenterItemSelect={setSelectedCenterItemId}
+            onCenterItemSelect={handleCenterItemSelect}
             onDeleteSelectedCenterItem={handleDeleteSelectedCenterItem}
             onCenterTextColorModeChange={handleCenterTextColorModeChange}
             tab={activeTab}

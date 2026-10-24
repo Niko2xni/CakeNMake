@@ -14,7 +14,9 @@ import {
   CreditCard,
   Menu,
   X,
+  Users,
 } from 'lucide-react';
+import { useAuth } from '@/lib/AuthContext';
 
 const NAV_ITEMS = [
   { to: '/bakery/orders', icon: ClipboardList, label: 'Orders' },
@@ -27,13 +29,26 @@ const NAV_ITEMS = [
 ];
 
 export default function BakeryNavbar() {
+  const { account } = useAuth();
+  const isAdmin = account?.role === 'bakery_admin' || account?.role === 'platform_admin';
   const { handleLogout, requestLogout, isLoggingOut, logoutConfirmationOpen, changeLogoutConfirmation } = useLogout();
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreButtonRef = useRef(null);
 
-  const mobilePrimaryItems = NAV_ITEMS.slice(0, 4);
-  const mobileMoreItems = NAV_ITEMS.slice(4);
+  const navItems = [
+    { to: '/bakery/orders', icon: ClipboardList, label: 'Orders' },
+    { to: '/bakery/pricing', icon: Tag, label: 'Pricing' },
+    { to: '/bakery/templates', icon: LayoutTemplate, label: 'Templates' },
+    ...(isAdmin ? [{ to: '/bakery/billing', icon: CreditCard, label: 'Billing' }] : []),
+    { to: '/bakery/chats', icon: MessageCircle, label: 'Chats' },
+    { to: '/bakery/blueprints', icon: FileText, label: 'Blueprints' },
+    { to: '/bakery/profile', icon: Store, label: 'Profile' },
+    ...(isAdmin ? [{ to: '/bakery/employees', icon: Users, label: 'Employees' }] : []),
+  ];
+
+  const mobilePrimaryItems = navItems.slice(0, 4);
+  const mobileMoreItems = navItems.slice(4);
 
   useEffect(() => {
     setMoreOpen(false);
@@ -72,7 +87,7 @@ export default function BakeryNavbar() {
 
       {/* Nav items */}
       <div className="flex-1 flex flex-col items-center gap-1 w-full overflow-y-auto">
-        {NAV_ITEMS.map(({ to, icon: Icon, label }) => {
+        {navItems.map(({ to, icon: Icon, label }) => {
           const active = isActive(to);
           return (
             <Link

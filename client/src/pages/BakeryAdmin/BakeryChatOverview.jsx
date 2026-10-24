@@ -4,7 +4,8 @@ import { getChatSocket } from '@/lib/chat-socket';
 import { philippineTime, suspensionExpiry } from '@/lib/moderation';
 import SupportThread from '@/components/shared/SupportThread';
 import CustomScrollbar from '@/components/shared/CustomScrollbar';
-import { ShieldCheck, MessageSquareWarning, Clock3, Ban, LifeBuoy, Search, ChevronRight, RefreshCw, Users } from 'lucide-react';
+import { ShieldCheck, MessageSquareWarning, Clock3, Ban, LifeBuoy, Search, ChevronRight, RefreshCw, Users, Lock } from 'lucide-react';
+import { useAuth } from '@/lib/AuthContext';
 
 const button = 'rounded-lg border border-pink-200 px-3 py-2 text-sm hover:bg-pink-50 disabled:opacity-50';
 

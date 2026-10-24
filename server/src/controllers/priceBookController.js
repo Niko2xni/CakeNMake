@@ -235,7 +235,12 @@ async function quoteCake(req, res) {
     if (!platform) return res.status(404).json({ message: 'Bakery platform not found.' });
     await ensureInitialBook(platform._id);
     const priceBook = await getActivePriceBook(platform._id);
-    res.json(buildQuote(req.body.config || {}, priceBook));
+    const previousBook = await PriceBook.findOne({
+      platform: platform._id,
+      status: { $in: ['active', 'archived'] },
+      version: { $lt: priceBook.version },
+    }).sort({ version: -1 });
+    res.json(buildQuote(req.body.config || {}, priceBook, previousBook));
   } catch (error) {
     res.status(500).json({ message: 'Failed to calculate cake estimate', error: error.message });
   }

@@ -18,6 +18,12 @@ import SideSection from './sections/SideSection';
 import LayerTabStrip from './sections/LayerTabStrip';
 import TierDesignControl from './sections/TierDesignControl';
 import AIChatPanel from './AIChatPanel';
+import {
+  SpongeFlavorSectionIcon,
+  FillingSectionIcon,
+  ExteriorFinishSectionIcon,
+  SurfaceTreatmentSectionIcon,
+} from './sections/FundamentalsSectionIcons';
 import { syncTierDesignOnToggle } from '@/lib/tierDesignSync';
 
 // Nav rework — see CAKE_SETS_REWORK_SPEC.md §2. Two rows of three
@@ -703,7 +709,7 @@ export default function ToolPanel({
                         >
                           <CollapsibleTrigger className="flex items-center justify-between w-full">
                             <div className="flex items-center gap-2">
-                              <Cake className="w-4 h-4 text-primary/60" />
+                              <SpongeFlavorSectionIcon className="w-4 h-4 text-primary/70" />
                               <span className="text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">
                                 Sponge Flavor
                               </span>
@@ -749,7 +755,7 @@ export default function ToolPanel({
                         >
                           <CollapsibleTrigger className="flex items-center justify-between w-full">
                             <div className="flex items-center gap-2">
-                              <Sparkles className="w-4 h-4 text-primary/60" />
+                              <FillingSectionIcon className="w-4 h-4 text-primary/70" />
                               <span className="text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">
                                 Filling
                               </span>
@@ -791,7 +797,7 @@ export default function ToolPanel({
                         >
                           <CollapsibleTrigger className="flex items-center justify-between w-full">
                             <div className="flex items-center gap-2">
-                              <Palette className="w-4 h-4 text-primary/60" />
+                              <ExteriorFinishSectionIcon className="w-4 h-4 text-primary/70" />
                               <span className="text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">
                                 Exterior Finish
                               </span>
@@ -877,7 +883,7 @@ export default function ToolPanel({
                         >
                           <CollapsibleTrigger className="flex items-center justify-between w-full">
                             <div className="flex items-center gap-2">
-                              <Sparkles className="w-4 h-4 text-primary/60" />
+                              <SurfaceTreatmentSectionIcon className="w-4 h-4 text-primary/70" />
                               <span className="text-xs font-heading font-semibold text-foreground/70 uppercase tracking-wide">
                                 Surface Treatment
                               </span>
