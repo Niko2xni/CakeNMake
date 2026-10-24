@@ -28,6 +28,7 @@ import {
 } from '@/lib/cakeConfig';
 import DecorationPreview from './DecorationPreview';
 import SugarColorSection from './SugarColorSection';
+import CenterVariationIcon from './CenterVariationIcons';
 
 // A letter's toolId is 'center-letter{CHAR}-default' -- same format as any
 // other Center design, just distinguished by the 'letter' designId prefix
@@ -1063,8 +1064,14 @@ export default function CenterSection({
                         canDeselect
                         onClick={() => handleSelectVariation(decoration, variant.id)}
                         title={isActive ? `Remove ${variant.label}` : variant.label}
+                        ariaLabel={String(i + 1)}
                       >
-                        {i + 1}
+                        <CenterVariationIcon
+                          variationId={decoration.id}
+                          variantId={variant.id}
+                          index={i}
+                        />
+                        <span className="sr-only">{i + 1}</span>
                       </Circle>
                     );
                   })}
@@ -1088,18 +1095,19 @@ function OptionRow({ label, children }) {
   );
 }
 
-function Circle({ active, canDeselect = false, onClick, title, children }) {
+function Circle({ active, canDeselect = false, onClick, title, ariaLabel, children }) {
   return (
     <button
       type="button"
       onClick={onClick}
       title={title}
-      className={`relative w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${active
+      aria-label={ariaLabel || title}
+      className={`relative w-9 h-9 rounded-full p-0 flex items-center justify-center text-xs font-semibold border-2 transition-all duration-150 ${active
         ? 'bg-primary text-primary-foreground border-primary shadow-md'
         : 'bg-muted border-transparent text-muted-foreground hover:border-primary/30'
         }`}
     >
-      <OptionButtonContent selected={active} canDeselect={canDeselect} label={title}>
+      <OptionButtonContent selected={active} canDeselect={canDeselect} label={ariaLabel || title}>
         {children}
       </OptionButtonContent>
     </button>
