@@ -26,6 +26,7 @@ import {
   X,
   Wand2,
   Palette,
+  Clock,
 } from 'lucide-react';
 import { templateApi } from '@/services/api';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -259,6 +260,12 @@ export default function BakeryTemplates() {
           <p className="text-sm text-gray-600 mt-1 max-w-2xl">
             Design custom cake templates in the 3D designer with 8 automated camera screenshot angles, manage client catalog sections, and organize display order.
           </p>
+          <div className="mt-2.5 flex items-center gap-1.5 text-xs text-amber-800 bg-amber-50/90 border border-amber-200/80 rounded-xl px-3 py-1.5 w-fit">
+            <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+            <span>
+              All template additions and edits are staged as drafts and auto-activate at <strong>10:00 PM Manila</strong>. You can freely edit or delete them before 10:00 PM.
+            </span>
+          </div>
         </div>
         <div className="flex items-center gap-2.5 shrink-0">
           <button

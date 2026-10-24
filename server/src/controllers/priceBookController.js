@@ -103,8 +103,12 @@ async function getWorkspace(req, res) {
     const [active, draft, scheduled, history] = await Promise.all([
       getActivePriceBook(req.platformId),
       PriceBook.findOne({ platform: req.platformId, status: 'draft' }),
-      PriceBook.findOne({ platform: req.platformId, status: 'scheduled', effectiveAt: { $gt: new Date() } }).sort({ effectiveAt: 1 }),
-      PriceBook.find({ platform: req.platformId, status: { $in: ['active', 'archived', 'scheduled'] } }).sort({ version: -1 }).limit(20),
+      PriceBook.findOne({ platform: req.platformId, status: 'scheduled', effectiveAt: { $gt: new Date() } }).sort({ effectiveAt: 1 }).populate('scheduledBy', 'displayName email role'),
+      PriceBook.find({ platform: req.platformId, status: { $in: ['active', 'archived', 'scheduled'] } })
+        .sort({ version: -1 })
+        .limit(20)
+        .populate('scheduledBy', 'displayName email role')
+        .populate('createdBy', 'displayName email role'),
     ]);
     res.json({ active, draft, scheduled, history });
   } catch (error) {
@@ -262,4 +266,30 @@ async function updateDraftRates(req, res) {
   }
 }
 
-module.exports = { cancelScheduled, createDraft, discardDraft, getActiveCatalog, getWorkspace, nextManilaTenPm, publishDraftNow, quoteCake, scheduleDraft, updateDraftItem, updateDraftRates };
+async function getDraftsSummary(req, res) {
+  try {
+    const Template = require('../models/Template');
+    const [pricingDraft, scheduledPricing, pendingTemplates] = await Promise.all([
+      PriceBook.findOne({ platform: req.platformId, status: 'draft' }),
+      PriceBook.findOne({ platform: req.platformId, status: 'scheduled', effectiveAt: { $gt: new Date() } }),
+      Template.countDocuments({ isPublished: true, effectiveAt: { $gt: new Date() } }),
+    ]);
+
+    const hasPricingDraft = Boolean(pricingDraft);
+    const hasScheduledPricing = Boolean(scheduledPricing);
+    const pendingTemplatesCount = Number(pendingTemplates) || 0;
+    const hasPendingChanges = hasPricingDraft || hasScheduledPricing || pendingTemplatesCount > 0;
+
+    res.json({
+      hasPendingChanges,
+      hasPricingDraft,
+      hasScheduledPricing,
+      scheduledPricingEffectiveAt: scheduledPricing?.effectiveAt || null,
+      pendingTemplatesCount,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to check drafts summary', error: error.message });
+  }
+}
+
+module.exports = { cancelScheduled, createDraft, discardDraft, getActiveCatalog, getDraftsSummary, getWorkspace, nextManilaTenPm, publishDraftNow, quoteCake, scheduleDraft, updateDraftItem, updateDraftRates };

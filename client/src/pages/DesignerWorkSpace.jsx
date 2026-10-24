@@ -1358,7 +1358,7 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
   return (
     <div className="h-[100dvh] w-full max-w-full flex flex-col overflow-hidden bg-background">
       <AnimatePresence>
-        {versionChanged && (
+        {!isGuestPage && Boolean(account) && versionChanged && (
           <motion.div
             initial={{ opacity: 0, y: -12, x: '-50%' }}
             animate={{ opacity: 1, y: 0, x: '-50%' }}

@@ -65,6 +65,10 @@ const templateSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  effectiveAt: {
+    type: Date,
+    default: null,
+  },
 }, {
   timestamps: true,
 });

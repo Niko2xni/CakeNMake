@@ -24,6 +24,7 @@ import {
   Search,
   Filter,
   Lock,
+  History,
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -755,21 +756,10 @@ export default function BakeryPricing() {
                 disabled={!hasChanges || saving || publishing}
                 onClick={() => setScheduleModal(true)}
                 title={!hasChanges ? 'No changes made to the pricing draft' : 'Schedule pricing update for 10 PM'}
-                className="flex items-center gap-1.5 rounded-xl border border-pink-200 bg-pink-50 px-3.5 py-2 text-xs font-semibold text-pink-700 hover:bg-pink-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-pink-50"
+                className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-white shadow-md shadow-primary/20 hover:bg-primary/90 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:bg-primary"
               >
                 <CalendarClock className="h-3.5 w-3.5" />
                 Schedule (10 PM)
-              </button>
-
-              <button
-                type="button"
-                disabled={!hasChanges || saving || publishing}
-                onClick={() => setPublishModal(true)}
-                title={!hasChanges ? 'No changes made to the pricing draft' : 'Publish pricing update immediately'}
-                className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-white shadow-md shadow-primary/20 hover:bg-primary/90 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:bg-primary"
-              >
-                <Zap className="h-3.5 w-3.5" />
-                Publish Now
               </button>
             </div>
           )}
@@ -794,6 +784,7 @@ export default function BakeryPricing() {
               { id: 'fundamentals', label: 'Fundamentals', icon: Cake, desc: 'Flavors & sizes (finishes included)' },
               { id: 'center', label: 'Center', icon: Tag, desc: 'Decorations & 3D text rates' },
               { id: 'simulator', label: 'Live Quote Tester', icon: SlidersHorizontal, desc: 'Simulate custom cake estimates' },
+              { id: 'history', label: 'Price Changes Log', icon: History, desc: 'Track version history & rate audit log' },
             ].map((tab) => {
               const Icon = tab.icon;
               const isSelected = activeTab === tab.id || (tab.id === 'center' && (activeTab === 'centerDecorations' || activeTab === 'textPricing'));
@@ -1727,6 +1718,101 @@ export default function BakeryPricing() {
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* 4. Price Changes Log Tab */}
+            {activeTab === 'history' && (
+              <div className="space-y-6">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <History className="h-5 w-5 text-primary" />
+                    <h2 className="text-base font-bold text-gray-900">Price Changes Log</h2>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Complete audit trail of price changes, scheduled 10:00 PM activations, and historical version snapshots.
+                  </p>
+                </div>
+
+                {/* History table / timeline */}
+                {(!workspace?.history || workspace.history.length === 0) ? (
+                  <div className="rounded-xl border border-dashed border-gray-200 p-8 text-center text-xs text-gray-500">
+                    No price change history recorded yet.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {workspace.history.map((record) => {
+                      const isActive = record.status === 'active';
+                      const isScheduled = record.status === 'scheduled';
+                      const isArchived = record.status === 'archived';
+
+                      return (
+                        <div
+                          key={record._id || record.version}
+                          className="rounded-xl border border-pink-100 bg-white p-4 shadow-xs space-y-2.5 transition-all hover:border-pink-200"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-gray-900">
+                                Pricing Version {record.version}
+                              </span>
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                  isActive
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                    : isScheduled
+                                    ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                    : 'bg-gray-100 text-gray-600 border border-gray-200'
+                                }`}
+                              >
+                                {isActive ? 'Live Active' : isScheduled ? 'Scheduled (10 PM)' : 'Archived'}
+                              </span>
+                            </div>
+
+                            <span className="text-[11px] text-gray-400">
+                              {dateTime(record.effectiveAt || record.createdAt)}
+                            </span>
+                          </div>
+
+                          {record.publicationReason && (
+                            <p className="text-xs text-gray-700 bg-pink-50/30 border border-pink-100/60 rounded-lg p-2.5 leading-relaxed font-medium">
+                              "{record.publicationReason}"
+                            </p>
+                          )}
+
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500 pt-1 border-t border-gray-50">
+                            <span>
+                              Effective date:{' '}
+                              <strong className="text-gray-700">
+                                {record.effectiveAt ? dateTime(record.effectiveAt) : 'Immediate'}
+                              </strong>
+                            </span>
+                            {record.scheduledBy && (
+                              <span>
+                                Changed by:{' '}
+                                <strong className="text-gray-700">
+                                  {typeof record.scheduledBy === 'object'
+                                    ? (record.scheduledBy.displayName || record.scheduledBy.email)
+                                    : 'Bakery Admin'}
+                                </strong>
+                              </span>
+                            )}
+                            {record.createdBy && !record.scheduledBy && (
+                              <span>
+                                Created by:{' '}
+                                <strong className="text-gray-700">
+                                  {typeof record.createdBy === 'object'
+                                    ? (record.createdBy.displayName || record.createdBy.email)
+                                    : 'System'}
+                                </strong>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </CustomScrollbar>

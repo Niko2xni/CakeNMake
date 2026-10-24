@@ -400,6 +400,7 @@ export const templateApi = {
 
 export const pricingApi = {
   getWorkspace: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/pricing`),
+  getDraftsSummary: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/pricing/drafts-summary`),
   createDraft: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/pricing/draft`, { method: 'POST' }),
   updateDraftItem: async (componentKey, costBasisMinor, markupMinor) => {
     return requestAuthenticatedJson(`${API_BASE_URL}/bakery/pricing/draft/items/${encodeURIComponent(componentKey)}`, {

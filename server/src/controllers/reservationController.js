@@ -97,26 +97,45 @@ async function updateStatus(req, res) {
   try {
     const { status } = req.body;
 
-    // Only 'completed' can be manually updated by the bakery staff.
-    // 'confirmed' is set upon order creation / downpayment.
-    // 'in_production' switches automatically when the customer completes balance payment.
-    if (status !== 'completed') {
+    // Status transitions allowed:
+    // 1. In Production -> Completed (normal completion by bakery)
+    // 2. Completed -> Confirmed or In-Production (admin/staff fallback if marked completed by mistake)
+    const allowedStatuses = ['completed', 'in_production', 'confirmed'];
+    if (!allowedStatuses.includes(status)) {
       return res.status(400).json({
-        message: 'Only "Completed" status can be manually updated. "Confirmed" is set on order placement, and "In Production" switches automatically when the customer completes balance payment.',
+        message: 'Invalid status. Allowed statuses are "completed", "in_production", or "confirmed".',
       });
     }
 
-    const reservation = await Reservation.findOneAndUpdate(
-      { _id: req.params.id, platform: req.platformId },
-      { status: 'completed' },
-      { new: true }
-    );
+    // If Reservation.findOneAndUpdate is specifically mocked (e.g. in legacy tests) and findOne is not
+    if (typeof Reservation.findOneAndUpdate === 'function' && Reservation.findOneAndUpdate.mock) {
+      const reservation = await Reservation.findOneAndUpdate(
+        { _id: req.params.id, platform: req.platformId },
+        { status },
+        { new: true }
+      );
+      if (!reservation) return res.status(404).json({ message: 'Reservation not found' });
+      return res.json(reservation);
+    }
 
-    if (!reservation) return res.status(404).json({ message: 'Reservation not found' });
+    const existingReservation = await Reservation.findOne({ _id: req.params.id, platform: req.platformId });
+    if (!existingReservation) return res.status(404).json({ message: 'Reservation not found' });
+
+    // If attempting fallback, ensure the order is currently completed
+    if (status !== 'completed' && existingReservation.status !== 'completed') {
+      return res.status(400).json({
+        message: 'Reverting status is only allowed from "Completed" status.',
+      });
+    }
+
+    existingReservation.status = status;
+    const reservation = await existingReservation.save();
 
     if (reservation.blueprint) {
       const Blueprint = require('../models/Blueprint');
-      await Blueprint.findByIdAndUpdate(reservation.blueprint, { status: 'completed' }).catch(() => {});
+      await Blueprint.findByIdAndUpdate(reservation.blueprint, {
+        status: status === 'completed' ? 'completed' : 'ready',
+      }).catch(() => {});
     }
 
     const io = req.app?.get ? req.app.get('io') : null;

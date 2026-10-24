@@ -85,7 +85,8 @@ test('GET /public seeds default sections if empty and returns published template
   }));
 
   mock.method(Template, 'find', (query) => {
-    assert.deepEqual(query, { isPublished: true });
+    assert.equal(query.isPublished, true);
+    assert.ok(Array.isArray(query.$or));
     return {
       sort: () => ({
         lean: async () => [{ _id: 'tpl1', name: 'Berry Bliss', sectionId: 'sec1', order: 0 }],

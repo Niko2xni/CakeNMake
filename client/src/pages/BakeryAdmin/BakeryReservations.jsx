@@ -67,12 +67,17 @@ export default function BakeryReservations({ reservations, loading, selected, se
   const [previewUrl, setPreviewUrl] = useState(null);
   const [completeConfirmOpen, setCompleteConfirmOpen] = useState(false);
   const [completeInputText, setCompleteInputText] = useState('');
+  const [revertConfirmOpen, setRevertConfirmOpen] = useState(false);
+  const [revertTargetStatus, setRevertTargetStatus] = useState('in_production');
+  const [revertInputText, setRevertInputText] = useState('');
   useEffect(() => {
     setChatError('');
     setBlueprintError('');
     setPreviewUrl(null);
     setCompleteConfirmOpen(false);
     setCompleteInputText('');
+    setRevertConfirmOpen(false);
+    setRevertInputText('');
   }, [selected?._id]);
   useEffect(() => {
     if (!selected || previewUrl) return undefined;
@@ -520,9 +525,40 @@ export default function BakeryReservations({ reservations, loading, selected, se
                         </p>
                       )}
                       {isCompleted && (
-                        <p className="mt-1.5 text-[10px] text-gray-500 leading-tight">
-                          ✓ This cake reservation is completed.
-                        </p>
+                        <div className="mt-2 pt-2 border-t border-gray-100 space-y-1.5">
+                          <p className="text-[10px] text-gray-500 leading-tight">
+                            ✓ This cake reservation is completed.
+                          </p>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] font-semibold text-gray-500">Admin fallback:</span>
+                            <button
+                              type="button"
+                              disabled={updatingStatus}
+                              onClick={() => {
+                                setRevertTargetStatus('in_production');
+                                setRevertInputText('');
+                                setRevertConfirmOpen(true);
+                              }}
+                              className="px-2 py-0.5 rounded border border-purple-200 bg-purple-50 text-[10px] font-semibold text-purple-700 hover:bg-purple-100 transition-colors cursor-pointer"
+                              title="Revert back to In-Production"
+                            >
+                              Revert to In-Production
+                            </button>
+                            <button
+                              type="button"
+                              disabled={updatingStatus}
+                              onClick={() => {
+                                setRevertTargetStatus('confirmed');
+                                setRevertInputText('');
+                                setRevertConfirmOpen(true);
+                              }}
+                              className="px-2 py-0.5 rounded border border-blue-200 bg-blue-50 text-[10px] font-semibold text-blue-700 hover:bg-blue-100 transition-colors cursor-pointer"
+                              title="Revert back to Confirmed"
+                            >
+                              Revert to Confirmed
+                            </button>
+                          </div>
+                        </div>
                       )}
                     </>
                   );
@@ -555,9 +591,9 @@ export default function BakeryReservations({ reservations, loading, selected, se
             <div className="p-3 bg-amber-50/90 border border-amber-200/90 rounded-xl text-xs text-amber-900 leading-relaxed">
               <p className="font-bold flex items-center gap-1.5 text-amber-800 mb-1">
                 <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                This action cannot be undone
+                Completion notice
               </p>
-              Once confirmed, this order will be permanently completed. The status cannot be reverted or changed back.
+              This order will be marked completed. If this was done by mistake, bakery administrators can use the admin fallback to revert the status.
             </div>
 
             <div>
@@ -598,6 +634,78 @@ export default function BakeryReservations({ reservations, loading, selected, se
                 className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-white transition-colors shadow-xs cursor-pointer"
               >
                 {updatingStatus ? 'Completing...' : 'Confirm Completed'}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Admin Fallback Revert Confirmation Modal */}
+      <Dialog
+        open={revertConfirmOpen}
+        onOpenChange={(open) => {
+          setRevertConfirmOpen(open);
+          if (!open) setRevertInputText('');
+        }}
+      >
+        <DialogContent className="max-w-md bg-white rounded-2xl p-6 shadow-2xl border border-gray-100">
+          <DialogHeader>
+            <div className="w-12 h-12 rounded-full bg-amber-50 border border-amber-100 text-amber-600 flex items-center justify-center mb-2 mx-auto shadow-xs">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <DialogTitle className="text-center text-lg font-bold text-gray-900">
+              Revert Order Status?
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 pt-1">
+            <div className="p-3 bg-amber-50/90 border border-amber-200/90 rounded-xl text-xs text-amber-900 leading-relaxed">
+              <p className="font-bold flex items-center gap-1.5 text-amber-800 mb-1">
+                Admin status fallback
+              </p>
+              Reverting this completed order back to{' '}
+              <strong className="capitalize">{revertTargetStatus === 'in_production' ? 'In-Production' : 'Confirmed'}</strong>.
+              This fallback allows corrections in case the completion was made by mistake.
+            </div>
+
+            <div>
+              <label htmlFor="confirm-revert-input" className="block text-xs font-semibold text-gray-700 mb-1">
+                Please type <span className="font-bold text-amber-700">"Confirm"</span> to process:
+              </label>
+              <input
+                id="confirm-revert-input"
+                type="text"
+                autoFocus
+                placeholder="Confirm"
+                value={revertInputText}
+                onChange={(e) => setRevertInputText(e.target.value)}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 font-medium"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setRevertConfirmOpen(false);
+                  setRevertInputText('');
+                }}
+                className="flex-1 py-2 px-3 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={updatingStatus || revertInputText.trim().toLowerCase() !== 'confirm'}
+                onClick={async () => {
+                  if (revertInputText.trim().toLowerCase() !== 'confirm') return;
+                  await onStatusChange(selected._id, revertTargetStatus);
+                  setRevertConfirmOpen(false);
+                  setRevertInputText('');
+                }}
+                className="flex-1 py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-white transition-colors shadow-xs cursor-pointer"
+              >
+                {updatingStatus ? 'Updating...' : 'Process Fallback'}
               </button>
             </div>
           </div>

@@ -40,6 +40,8 @@ const sanitizeViews = (views) => {
   }));
 };
 
+const { nextManilaTenPm } = require('../controllers/priceBookController');
+
 // ----------------------------------------------------
 // Public Client Endpoints
 // ----------------------------------------------------
@@ -48,8 +50,16 @@ const sanitizeViews = (views) => {
 router.get('/public', async (req, res) => {
   try {
     await ensureDefaultSections();
+    const now = new Date();
     const sections = await TemplateSection.find().sort({ order: 1, createdAt: 1 }).lean();
-    const templates = await Template.find({ isPublished: true }).sort({ order: 1, createdAt: 1 }).lean();
+    // Only return templates that are published and whose scheduled 10 PM effective time has arrived (or was already live)
+    const templates = await Template.find({
+      isPublished: true,
+      $or: [
+        { effectiveAt: null },
+        { effectiveAt: { $lte: now } },
+      ],
+    }).sort({ order: 1, createdAt: 1 }).lean();
 
     const sectionsWithTemplates = sections.map((section) => ({
       ...section,
@@ -200,9 +210,13 @@ router.get('/', authenticate, loadAppUser, requireRole('bakery_staff', 'bakery_a
       templates: templates.filter((t) => String(t.sectionId) === String(section._id)),
     }));
 
+    const now = new Date();
+    const pendingActivationCount = templates.filter((t) => t.effectiveAt && new Date(t.effectiveAt) > now).length;
+
     return res.json({
       sections: sectionsWithTemplates,
       allTemplates: templates,
+      pendingActivationCount,
     });
   } catch (error) {
     console.error('Failed to fetch bakery templates:', error);
@@ -254,6 +268,7 @@ router.post('/', authenticate, loadAppUser, requireRole('bakery_staff', 'bakery_
       config: config || {},
       order: nextOrder,
       isPublished: true,
+      effectiveAt: nextManilaTenPm(),
     });
 
     return res.status(201).json(template);
@@ -292,6 +307,8 @@ router.put('/:id', authenticate, loadAppUser, requireRole('bakery_staff', 'baker
     if (config !== undefined) update.config = config;
     if (order !== undefined) update.order = Number(order);
     if (isPublished !== undefined) update.isPublished = Boolean(isPublished);
+    // Scheduled for 10:00 PM Manila activation
+    update.effectiveAt = nextManilaTenPm();
 
     const template = await Template.findByIdAndUpdate(req.params.id, update, { new: true });
     if (!template) {

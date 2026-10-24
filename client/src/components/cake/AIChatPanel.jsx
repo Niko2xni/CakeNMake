@@ -201,27 +201,7 @@ export default function AIChatPanel({ config, onChange, quote, session, active =
         <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center shrink-0"><Sparkles className="w-4 h-4 text-primary" /></div>
         <div className="flex-1 min-w-0">
           <p className="text-xs font-heading font-semibold text-foreground">AI Cake Designer</p>
-          <p className="text-[10px] text-muted-foreground">Turn your ideas into a cake</p>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-muted-foreground shrink-0"
-          aria-label="Reset chat"
-          title="Reset chat"
-          disabled={thinking || unavailable || dictation.listening || preparing}
-          onClick={() => {
-            setHistory([]);
-            setDisplay([GREETING]);
-            setInput('');
-            setAttachment(null);
-            setMediaError('');
-            mediaVersion.current++;
-            dictation.stop();
-          }}
-        >
-          <RotateCcw className="h-3.5 w-3.5" />
-        </Button>
       </div>
       {session?.error && <p role="status" className="text-xs text-destructive pb-2">{session.error}</p>}
       {!locked && unavailable && !session?.error && <p role="status" className="text-xs text-muted-foreground pb-2">Loading saved chat...</p>}
