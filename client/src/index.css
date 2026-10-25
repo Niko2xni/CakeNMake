@@ -170,16 +170,30 @@ textarea {
   }
 
   .cn-bakery-content {
-    height: auto !important;
+    height: 100dvh !important;
     min-height: 0;
     margin-left: 0 !important;
     padding: 8px 8px calc(78px + env(safe-area-inset-bottom)) !important;
-    overflow: auto !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch;
   }
 
-  .cn-bakery-content > * {
-    min-height: calc(100dvh - 94px - env(safe-area-inset-bottom));
+  .cn-bakery-control-panel-wrap {
+    min-height: 0 !important;
     height: auto !important;
+    flex-shrink: 0 !important;
+  }
+
+  .cn-bakery-outlet-wrap,
+  .cn-bakery-content > :not(.cn-bakery-control-panel-wrap) {
+    min-height: 0;
+    height: auto !important;
+    flex: 1 1 auto;
+  }
+
+  .cn-bakery-content:not(:has(.cn-bakery-control-panel-wrap)) > .cn-bakery-outlet-wrap {
+    min-height: calc(100dvh - 94px - env(safe-area-inset-bottom));
   }
 
   .cn-bakery-content > .cn-bakery-orders {

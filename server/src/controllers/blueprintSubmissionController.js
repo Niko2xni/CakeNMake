@@ -5,10 +5,18 @@ const Reservation = require('../models/Reservation');
 const storage = require('../services/blueprintStorageService');
 const checkout = require('../services/checkoutReservationService');
 const pricing = require('../services/pricingService');
+const { isWithinThirtyMinutePaymentCutoff } = require('../services/maintenanceService');
 
 // Authenticated demo submission. Payment completion is a simulated client assertion,
 // not proof of a real charge. Do not return storage identifiers or PDF URLs.
 async function submitBlueprint(req, res) {
+  const now = req.__testNow || new Date();
+  if (isWithinThirtyMinutePaymentCutoff(now)) {
+    return res.status(403).json({
+      message: 'No payments are available 30 minutes before the scheduled update (from 9:30 PM to 10:05 PM). Please try again after the update completes.',
+    });
+  }
+
   const body = req.body || {};
   const { submissionId, designName, deliveryDate, designSnapshot, quoteSnapshot, pdfBase64 } = body;
   if (!/^[a-zA-Z0-9_-]{16,100}$/.test(submissionId || '')
@@ -38,6 +46,11 @@ async function submitBlueprint(req, res) {
   try {
     const platform = await Platform.findOne({ slug: body.platformSlug || 'mamshie-bakery', isActive: true });
     if (!platform) return res.status(404).json({ message: 'Bakery not found.' });
+    if (platform.maintenanceMode?.isWebsiteOff) {
+      return res.status(403).json({
+        message: 'Checkout is temporarily unavailable because the website is in maintenance mode. Please try again later.',
+      });
+    }
     const key = { platform: platform._id, submissionId };
     const existing = await Blueprint.findOne(key);
     if (existing) {

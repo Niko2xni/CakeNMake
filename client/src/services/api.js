@@ -166,6 +166,9 @@ export const accountApi = {
     method: 'POST',
     body: JSON.stringify({ email, code }),
   }),
+  disconnectEmailOtp: () => requestAuthenticatedJson(`${API_BASE_URL}/account/email/disconnect`, {
+    method: 'DELETE',
+  }),
 };
 
 // Design API calls

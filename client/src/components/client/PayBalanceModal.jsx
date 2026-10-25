@@ -6,9 +6,11 @@ import {
   ShieldCheck,
   Loader2,
   Sparkles,
+  AlertTriangle,
 } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { accountApi } from '@/services/api';
+import { isWithinThirtyMinutePaymentCutoff } from '@/utils/maintenance';
 
 const formatCurrency = (amount) =>
   new Intl.NumberFormat('en-PH', {
@@ -42,6 +44,8 @@ export default function PayBalanceModal({
       ? transaction.remainingBalance
       : Math.max(0, total - downAmount)
   );
+
+  const isPaymentCutoff = isWithinThirtyMinutePaymentCutoff();
 
   const prevOpenRef = React.useRef(false);
   const prevTxIdRef = React.useRef(null);
@@ -223,6 +227,18 @@ export default function PayBalanceModal({
                   </span>
                 </div>
 
+                {isPaymentCutoff && (
+                  <div role="alert" className="p-3 rounded-2xl bg-amber-50 border border-amber-300 text-xs text-amber-950 space-y-1">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>Payment Cutoff Active (9:30 PM - 10:05 PM)</span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-amber-800">
+                      No payments are available 30 minutes before the scheduled 10:00 PM update. Please wait until the update completes.
+                    </p>
+                  </div>
+                )}
+
                 {paymentError && (
                   <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-600 font-medium">
                     {paymentError}
@@ -234,10 +250,12 @@ export default function PayBalanceModal({
                   <button
                     type="button"
                     onClick={handlePay}
-                    disabled={isProcessing}
-                    className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-[#007DFF] hover:bg-[#0068D9] text-white font-bold text-xs shadow-md transition-colors disabled:opacity-50 cursor-pointer"
+                    disabled={isProcessing || isPaymentCutoff}
+                    className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-[#007DFF] hover:bg-[#0068D9] text-white font-bold text-xs shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   >
-                    {isProcessing ? (
+                    {isPaymentCutoff ? (
+                      <span>Payments unavailable during 9:30 PM cutoff</span>
+                    ) : isProcessing ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
                         <span>Processing simulated GCash payment...</span>

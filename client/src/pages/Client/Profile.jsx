@@ -27,7 +27,7 @@ const SOCIAL_CONFIG = {
 };
 
 export default function Profile() {
-  const { user, account, refreshAccount } = useAuth();
+  const { user, account, refreshAccount, logout } = useAuth();
   const fileInputRef = useRef(null);
 
   useDragToScroll();
@@ -40,9 +40,6 @@ export default function Profile() {
   // can continue to hydrate after Firebase restores the session.
   const [photoOverride, setPhotoOverride] = useState(undefined);
   const [providerData, setProviderData] = useState(user?.providerData || []);
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [nameValue, setNameValue] = useState(user?.displayName || '');
-  const [isSavingName, setIsSavingName] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [disconnectTarget, setDisconnectTarget] = useState(null);
   const [emailLinkOpen, setEmailLinkOpen] = useState(false);
@@ -54,14 +51,22 @@ export default function Profile() {
     || null;
   const synchronizedPhotoURL = user?.photoURL || providerProfile?.photoURL || account?.photoURL || null;
   const displayPhotoURL = safeMediaUrl(photoOverride === undefined ? synchronizedPhotoURL : photoOverride);
-  const fallbackDisplayName = user?.displayName || user?.email?.split('@')[0]?.replace(/[._-]/g, ' ') || 'Cake Lover';
-  const displayName = nameValue.trim() || fallbackDisplayName;
+  const displayName = user?.displayName || user?.email?.split('@')[0]?.replace(/[._-]/g, ' ') || 'Cake Lover';
   const email = user?.email || providerProfile?.email || account?.email || '';
-  const hasVerifiedEmail = Boolean(email && (user?.emailVerified || account?.emailVerified));
-  const signInMethodCount = providerData.length + (hasVerifiedEmail ? 1 : 0);
   const authProviderSignature = (user?.providerData || [])
     .map((profile) => `${profile.providerId}:${profile.uid || profile.email || ''}`)
     .join('|');
+
+  const isGoogleConnected = Boolean(
+    providerData.some((profile) => profile.providerId === 'google.com') ||
+    account?.providers?.includes('google.com')
+  );
+  const isEmailConnected = Boolean(
+    account?.providers?.includes('email-otp') ||
+    (!isGoogleConnected && email)
+  );
+
+  const googleAccount = providerData.find((p) => p.providerId === 'google.com');
 
   useEffect(() => {
     setProviderData(user?.providerData || []);
@@ -69,10 +74,6 @@ export default function Profile() {
   // because an auth context consumer receives a new object reference.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authProviderSignature]);
-
-  useEffect(() => {
-    setNameValue(user?.displayName || '');
-  }, [user?.displayName]);
 
   useEffect(() => {
     // Reset only when the signed-in identity changes. This lets asynchronously
@@ -85,14 +86,26 @@ export default function Profile() {
     setPhotoLoadFailed(false);
   }, [displayPhotoURL]);
 
-useEffect(() => {
-    if (!disconnectTarget) return undefined;
-    const handleEscape = (event) => event.key === 'Escape' && setDisconnectTarget(null);
+  useEffect(() => {
+    if (!disconnectTarget && !emailLinkOpen) return undefined;
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setDisconnectTarget(null);
+        setEmailLinkOpen(false);
+      }
+    };
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [disconnectTarget]);
+  }, [disconnectTarget, emailLinkOpen]);
 
-  const showFeedback = (type, message) => setFeedback({ type, message });
+  const showFeedback = (type, message) => {
+    setFeedback({ type, message });
+    if (type === 'success') {
+      setTimeout(() => {
+        setFeedback((curr) => (curr?.message === message ? null : curr));
+      }, 5000);
+    }
+  };
 
   const handlePhotoUpload = async (event) => {
     const selectedFile = event.target.files?.[0];
@@ -153,50 +166,25 @@ useEffect(() => {
   };
 
   const socialAccounts = useMemo(() => {
-    const providerMap = new Map(providerData.map((profile) => [profile.providerId, profile]));
-
-    return Object.entries(SOCIAL_CONFIG).map(([providerId, config]) => {
-      if (providerId === 'email-otp') {
-        return {
-          ...config,
-          providerId,
-          connected: hasVerifiedEmail,
-          accountName: email || null,
-          accountEmail: null,
-          disconnectable: false,
-        };
-      }
-
-      const account = providerMap.get(providerId);
-      return {
-        ...config,
-        providerId,
-        connected: Boolean(account),
-        accountName: account?.displayName || account?.email || null,
-        accountEmail: account?.email || null,
-        disconnectable: true,
-      };
-    });
-  }, [email, hasVerifiedEmail, providerData]);
-
-  const handleSaveName = async () => {
-    const nextName = nameValue.trim();
-    if (!nextName || !user || !auth) return;
-
-    setIsSavingName(true);
-    setFeedback(null);
-    try {
-      await updateProfile(user, { displayName: nextName });
-      await refreshAccount();
-      setIsEditingName(false);
-      showFeedback('success', 'Your display name was updated.');
-    } catch (error) {
-      console.error('Could not update display name:', error);
-      showFeedback('error', error?.message || 'Unable to update your display name right now.');
-    } finally {
-      setIsSavingName(false);
-    }
-  };
+    return [
+      {
+        ...SOCIAL_CONFIG['email-otp'],
+        providerId: 'email-otp',
+        connected: isEmailConnected,
+        accountName: isEmailConnected ? (email || null) : null,
+        accountEmail: null,
+        disconnectable: isEmailConnected,
+      },
+      {
+        ...SOCIAL_CONFIG['google.com'],
+        providerId: 'google.com',
+        connected: isGoogleConnected,
+        accountName: isGoogleConnected ? (googleAccount?.displayName || googleAccount?.email || displayName) : null,
+        accountEmail: isGoogleConnected ? (googleAccount?.email || email || null) : null,
+        disconnectable: isGoogleConnected,
+      },
+    ];
+  }, [displayName, email, googleAccount, isEmailConnected, isGoogleConnected]);
 
   const handleConnectProvider = async (providerId) => {
     if (!user || !auth) return;
@@ -268,24 +256,45 @@ useEffect(() => {
   const handleDisconnectProvider = async (providerId) => {
     if (!user || !auth) return;
 
-    if (signInMethodCount <= 1) {
-      showFeedback('error', 'Connect another sign-in method before disconnecting your only provider.');
-      return;
-    }
-
     setDisconnectingProvider(providerId);
 
     try {
-      const updatedUser = await unlink(user, providerId);
-      await reload(updatedUser);
-      await updatedUser.getIdToken(true);
-      await refreshAccount();
-      setProviderData(updatedUser.providerData || []);
-      setDisconnectTarget(null);
-      showFeedback('success', `${SOCIAL_CONFIG[providerId].provider} was disconnected.`);
+      if (providerId === 'google.com') {
+        const updatedUser = await unlink(user, providerId);
+        await reload(updatedUser);
+        await updatedUser.getIdToken(true);
+        const syncedAccount = await refreshAccount();
+
+        const remainingGoogle = (updatedUser.providerData || []).some((p) => p.providerId === 'google.com');
+        const hasEmail = Boolean(syncedAccount?.providers?.includes('email-otp'));
+
+        if (!remainingGoogle && !hasEmail) {
+          // No accounts connected to this website anymore - kick user out
+          await logout(true);
+          return;
+        }
+
+        setProviderData(updatedUser.providerData || []);
+        setDisconnectTarget(null);
+        showFeedback('success', 'Google was disconnected.');
+      } else if (providerId === 'email-otp') {
+        await accountApi.disconnectEmailOtp();
+        const syncedAccount = await refreshAccount();
+
+        const hasGoogle = providerData.some((p) => p.providerId === 'google.com') || Boolean(syncedAccount?.providers?.includes('google.com'));
+
+        if (!hasGoogle) {
+          // No accounts connected to this website anymore - kick user out
+          await logout(true);
+          return;
+        }
+
+        setDisconnectTarget(null);
+        showFeedback('success', 'Email verification was disconnected.');
+      }
     } catch (error) {
       console.error(`Could not disconnect ${providerId}:`, error);
-      showFeedback('error', error?.message || `Unable to disconnect ${SOCIAL_CONFIG[providerId].provider}.`);
+      showFeedback('error', error?.message || `Unable to disconnect ${SOCIAL_CONFIG[providerId]?.provider || 'provider'}.`);
     } finally {
       setDisconnectingProvider(null);
     }
@@ -379,29 +388,12 @@ useEffect(() => {
 
               <div className="cn-profile-fields divide-y divide-gray-200">
                 <div className="cn-profile-field-row flex flex-col gap-3 px-6 py-4 text-left md:flex-row md:items-center md:justify-between">
-                  <div className="cn-profile-field-label">Name</div>
-                  <div className="cn-profile-field-value flex items-center gap-3">
-                    {isEditingName ? (
-                      <>
-                        <input
-                          value={nameValue}
-                          onChange={(event) => setNameValue(event.target.value)}
-                          onKeyDown={(event) => event.key === 'Enter' && handleSaveName()}
-                          aria-label="Display name"
-                          autoFocus
-                          maxLength={60}
-                        />
-                        <button type="button" onClick={handleSaveName} disabled={isSavingName || !nameValue.trim()} className="cn-profile-button is-primary">
-                          {isSavingName ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
-                        </button>
-                        <button type="button" onClick={() => { setNameValue(user?.displayName || ''); setIsEditingName(false); }} disabled={isSavingName} className="cn-profile-button">Cancel</button>
-                      </>
-                    ) : (
-                      <>
-                        <span>{displayName}</span>
-                        <button type="button" onClick={() => setIsEditingName(true)} className="cn-profile-button">Edit</button>
-                      </>
-                    )}
+                  <div>
+                    <div className="cn-profile-field-label">Name</div>
+                    <p className="cn-profile-helper">Your account display name.</p>
+                  </div>
+                  <div className="cn-profile-field-value">
+                    <span className="cn-profile-name font-medium text-gray-800">{displayName}</span>
                   </div>
                 </div>
 
@@ -411,11 +403,10 @@ useEffect(() => {
                     <p className="cn-profile-helper">Managed by your sign-in method.</p>
                   </div>
                   <div className="cn-profile-field-value">
-                    <span className="cn-profile-email" title={email || 'Email unavailable'}>{email || 'Email unavailable'}</span>
+                    <span className="cn-profile-email font-medium text-gray-800" title={email || 'Email unavailable'}>{email || 'Email unavailable'}</span>
                   </div>
                 </div>
-
-</div>
+              </div>
             </div>
           </section>
 
@@ -451,9 +442,13 @@ useEffect(() => {
                     {connected && disconnectable ? (
                       <button
                         type="button"
-                        onClick={() => setDisconnectTarget({ providerId, provider })}
-                        disabled={isBusy || signInMethodCount <= 1}
-                        title={signInMethodCount <= 1 ? 'Connect another sign-in method before disconnecting this provider.' : `Disconnect ${provider}`}
+                        onClick={() => {
+                          const hasOther = providerId === 'google.com' ? isEmailConnected : isGoogleConnected;
+                          setDisconnectTarget({ providerId, provider, isLast: !hasOther });
+                        }}
+                        disabled={isBusy}
+                        aria-label={`Disconnect ${provider}`}
+                        title={`Disconnect ${provider}`}
                         className="cn-profile-button px-5 py-2 rounded-xl border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-60"
                       >
                         {isBusy ? <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Disconnecting</span> : 'Disconnect'}
@@ -467,6 +462,7 @@ useEffect(() => {
                         type="button"
                         onClick={() => handleConnectProvider(providerId)}
                         disabled={isBusy}
+                        aria-label={`Connect ${provider}`}
                         className="cn-profile-button is-connect px-5 py-2 rounded-xl border border-pink-200 bg-pink-50 text-sm font-medium text-pink-700 hover:bg-pink-100 transition-colors disabled:opacity-60"
                       >
                         {isBusy ? <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Connecting</span> : 'Connect'}
@@ -483,7 +479,11 @@ useEffect(() => {
         <div className="cn-profile-dialog-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setDisconnectTarget(null)}>
           <div className="cn-profile-dialog" role="dialog" aria-modal="true" aria-labelledby="disconnect-provider-title">
             <h2 id="disconnect-provider-title">Disconnect {disconnectTarget.provider}?</h2>
-            <p>You will no longer be able to use this provider to sign in unless you connect it again.</p>
+            <p>
+              {disconnectTarget.isLast
+                ? 'You have no other sign-in method connected. Disconnecting will sign you out of CakeNMake.'
+                : 'You will no longer be able to use this provider to sign in unless you connect it again.'}
+            </p>
             <div>
               <button type="button" onClick={() => setDisconnectTarget(null)} disabled={Boolean(disconnectingProvider)} className="cn-profile-button">Cancel</button>
               <button type="button" onClick={() => handleDisconnectProvider(disconnectTarget.providerId)} disabled={Boolean(disconnectingProvider)} className="cn-profile-button is-danger">

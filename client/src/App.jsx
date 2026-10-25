@@ -14,7 +14,6 @@ import Designer from '@/pages/Designer';
 import Landing from '@/pages/Landing';
 import ClientHome from '@/pages/Client/Home';
 import Profile from '@/pages/Client/Profile';
-import Settings from '@/pages/Settings';
 import Login from '@/pages/Login';
 import ForgotPassword from '@/pages/ForgotPassword';
 import ResetPassword from '@/pages/ResetPassword';
@@ -108,7 +107,7 @@ const AuthenticatedApp = () => {
           <Route element={<RoleRoute allowedRoles={['customer']} fallbackPath="/bakery/orders" />}>
             <Route path="/client" element={<ClientHome />} />
             <Route path="/profile" element={<Profile />} />
-            <Route path="/settings" element={<Settings />} />
+            <Route path="/settings" element={<Navigate to="/profile" replace />} />
             <Route path="/templates" element={<Templates />} />
             <Route path="/transactions" element={<Transactions />} />
             <Route path="/cake-ai" element={<CakeAI />} />

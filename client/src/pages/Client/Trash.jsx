@@ -51,17 +51,26 @@ export default function Trash() {
       setDeleteTarget(null);
       setShowDeleteAllConfirm(false);
       setDeleteAllInput('');
+      setOperationError('');
     };
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
   }, [detailsModal.open, deleteTarget, showDeleteAllConfirm]);
+
+  const showFeedback = (msg) => {
+    setOperationFeedback(msg);
+    setTimeout(() => {
+      setOperationFeedback((curr) => (curr === msg ? '' : curr));
+    }, 5000);
+  };
 
   const fetchTrashedDesigns = async () => {
     setLoading(true);
     setLoadError('');
     try {
       const designs = await designApi.getDesigns({ trashOnly: true });
-      const trashed = designs.filter(d => d.isTrashed);
+      const list = Array.isArray(designs) ? designs : (Array.isArray(designs?.designs) ? designs.designs : []);
+      const trashed = list.filter(d => Boolean(d?.isTrashed));
       setTrashedDesigns(trashed);
     } catch (error) {
       console.error('Failed to fetch trashed designs:', error);
@@ -72,7 +81,9 @@ export default function Trash() {
   };
 
   const formatDate = (dateString) => {
+    if (!dateString) return 'recently';
     const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return 'recently';
     const now = new Date();
     const diffTime = Math.abs(now - date);
     const diffSeconds = Math.floor(diffTime / 1000);
@@ -98,6 +109,22 @@ export default function Trash() {
     return `${diffYears} years ago`;
   };
 
+  const formatToppings = (config) => {
+    if (!config) return 'None';
+    const toppings = config.toppings;
+    if (Array.isArray(toppings) && toppings.length > 0) {
+      return toppings
+        .map(t => (typeof t === 'string' ? t : (t?.name || t?.type || t?.id || 'Topping')))
+        .join(', ');
+    }
+    if (Array.isArray(config.placedItems) && config.placedItems.length > 0) {
+      return config.placedItems
+        .map(t => (typeof t === 'string' ? t : (t?.name || t?.type || t?.id || 'Item')))
+        .join(', ');
+    }
+    return 'None';
+  };
+
   const handleRestore = async (id) => {
     setPendingAction(`restore-${id}`);
     setOperationError('');
@@ -107,7 +134,7 @@ export default function Trash() {
       await designApi.restoreFromTrash(id);
       setTrashedDesigns(designs => designs.filter(d => d._id !== id));
       setActiveMenu(null);
-      setOperationFeedback(`“${restoredDesign?.name || 'Design'}” was restored to your designs.`);
+      showFeedback(`“${restoredDesign?.name || 'Design'}” was restored to your designs.`);
     } catch (error) {
       console.error('Failed to restore design:', error);
       setOperationError('That design could not be restored. Please try again.');
@@ -123,12 +150,12 @@ export default function Trash() {
     setOperationError('');
     setOperationFeedback('');
     try {
-      const deletedName = deleteTarget.name;
+      const deletedName = deleteTarget.name || 'Design';
       await designApi.permanentlyDelete(id);
       setTrashedDesigns(designs => designs.filter(d => d._id !== id));
       setActiveMenu(null);
       setDeleteTarget(null);
-      setOperationFeedback(`“${deletedName}” was permanently deleted.`);
+      showFeedback(`“${deletedName}” was permanently deleted.`);
     } catch (error) {
       console.error('Failed to permanently delete design:', error);
       setOperationError('That design could not be permanently deleted. Please try again.');
@@ -149,7 +176,7 @@ export default function Trash() {
       setShowDeleteAllConfirm(false);
       setDeleteAllInput('');
       setActiveMenu(null);
-      setOperationFeedback(`All ${count} designs were permanently deleted.`);
+      showFeedback(`All ${count} designs were permanently deleted.`);
     } catch (error) {
       console.error('Failed to delete all trashed designs:', error);
       setOperationError('Could not permanently delete all designs. Please try again.');
@@ -256,7 +283,9 @@ export default function Trash() {
             <CheckCircle2 aria-hidden="true" /> {operationFeedback}
           </p>
         )}
-        {operationError && <p className="cn-trash-operation-error" role="alert">{operationError}</p>}
+        {operationError && !deleteTarget && !showDeleteAllConfirm && (
+          <p className="cn-trash-operation-error" role="alert">{operationError}</p>
+        )}
 
         {/* Trash Content */}
         <div className="cn-trash-content">
@@ -326,7 +355,7 @@ export default function Trash() {
                           className="cn-trash-restore-btn"
                           onClick={() => handleRestore(design._id)}
                           disabled={Boolean(pendingAction)}
-                          aria-label={`Restore design ${design.name || ''}`}
+                          aria-label={`Restore design ${design.name || 'Untitled design'}`}
                         >
                           {pendingAction === `restore-${design._id}` ? (
                             <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
@@ -343,7 +372,7 @@ export default function Trash() {
                         type="button"
                         className="cn-design-menu-trigger"
                         onClick={(e) => handleMenuToggle(e, design._id)}
-                        aria-label={`Open actions for ${design.name}`}
+                        aria-label={`Open actions for ${design.name || 'Untitled design'}`}
                         aria-haspopup="menu"
                         aria-expanded={(typeof activeMenu === 'string' ? activeMenu === design._id : activeMenu?.id === design._id)}
                       >
@@ -405,6 +434,7 @@ export default function Trash() {
             if (event.target === event.currentTarget) {
               setShowDeleteAllConfirm(false);
               setDeleteAllInput('');
+              setOperationError('');
             }
           }}
         >
@@ -445,6 +475,7 @@ export default function Trash() {
                 onClick={() => {
                   setShowDeleteAllConfirm(false);
                   setDeleteAllInput('');
+                  setOperationError('');
                 }}
                 disabled={Boolean(pendingAction)}
               >
@@ -467,15 +498,29 @@ export default function Trash() {
       {deleteTarget && (
         <div
           className="cn-trash-dialog-backdrop fixed inset-0 flex items-center justify-center z-[120]"
-          onMouseDown={(event) => event.target === event.currentTarget && setDeleteTarget(null)}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setDeleteTarget(null);
+              setOperationError('');
+            }
+          }}
         >
           <div role="dialog" aria-modal="true" aria-labelledby="permanent-delete-title" className="cn-trash-dialog w-full max-w-md mx-4">
             <span className="cn-trash-dialog-icon"><Trash2 className="w-6 h-6" /></span>
-            <h2 id="permanent-delete-title">Delete “{deleteTarget.name}” permanently?</h2>
+            <h2 id="permanent-delete-title">Delete “{deleteTarget.name || 'Design'}” permanently?</h2>
             <p>This action cannot be undone. The design and its saved configuration will be permanently removed.</p>
             {operationError && <p className="cn-trash-dialog-error" role="alert">{operationError}</p>}
             <div className="cn-trash-dialog-actions">
-              <button type="button" onClick={() => setDeleteTarget(null)} disabled={Boolean(pendingAction)}>Cancel</button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteTarget(null);
+                  setOperationError('');
+                }}
+                disabled={Boolean(pendingAction)}
+              >
+                Cancel
+              </button>
               <button type="button" onClick={handlePermanentDelete} disabled={Boolean(pendingAction)} className="is-danger">
                 {pendingAction === `delete-${deleteTarget._id}` ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 Delete permanently
@@ -500,11 +545,11 @@ export default function Trash() {
               </div>
             </div>
             <div className="cn-trash-details-list space-y-2.5 text-xs">
-              <div className="flex justify-between py-1 border-b border-[rgba(44,23,19,0.06)]"><span className="text-[var(--cn-muted)]">Name</span> <strong className="text-[var(--cn-ink)]">{detailsModal.design.name}</strong></div>
+              <div className="flex justify-between py-1 border-b border-[rgba(44,23,19,0.06)]"><span className="text-[var(--cn-muted)]">Name</span> <strong className="text-[var(--cn-ink)]">{detailsModal.design.name || 'Untitled design'}</strong></div>
               <div className="flex justify-between py-1 border-b border-[rgba(44,23,19,0.06)]"><span className="text-[var(--cn-muted)]">Layers</span> <strong className="text-[var(--cn-ink)]">{detailsModal.design.config?.layers || 2}</strong></div>
-              <div className="flex justify-between py-1 border-b border-[rgba(44,23,19,0.06)]"><span className="text-[var(--cn-muted)]">Cake Flavor</span> <strong className="text-[var(--cn-ink)] capitalize">{detailsModal.design.config?.cakeColor || 'vanilla'}</strong></div>
-              <div className="flex justify-between py-1 border-b border-[rgba(44,23,19,0.06)]"><span className="text-[var(--cn-muted)]">Frosting</span> <strong className="text-[var(--cn-ink)] capitalize">{detailsModal.design.config?.frostingColor || 'vanilla'}</strong></div>
-              <div className="flex justify-between py-1 border-b border-[rgba(44,23,19,0.06)]"><span className="text-[var(--cn-muted)]">Toppings</span> <strong className="text-[var(--cn-ink)]">{(detailsModal.design.config?.toppings || []).join(', ') || 'None'}</strong></div>
+              <div className="flex justify-between py-1 border-b border-[rgba(44,23,19,0.06)]"><span className="text-[var(--cn-muted)]">Cake Flavor</span> <strong className="text-[var(--cn-ink)] capitalize">{detailsModal.design.config?.cakeColor || detailsModal.design.config?.flavor || detailsModal.design.config?.tiers?.[0]?.flavor || 'vanilla'}</strong></div>
+              <div className="flex justify-between py-1 border-b border-[rgba(44,23,19,0.06)]"><span className="text-[var(--cn-muted)]">Frosting</span> <strong className="text-[var(--cn-ink)] capitalize">{detailsModal.design.config?.frostingColor || detailsModal.design.config?.frosting || detailsModal.design.config?.tiers?.[0]?.frosting || 'vanilla'}</strong></div>
+              <div className="flex justify-between py-1 border-b border-[rgba(44,23,19,0.06)]"><span className="text-[var(--cn-muted)]">Toppings</span> <strong className="text-[var(--cn-ink)]">{formatToppings(detailsModal.design.config)}</strong></div>
               <div className="flex justify-between py-1 border-b border-[rgba(44,23,19,0.06)]"><span className="text-[var(--cn-muted)]">Saved estimate</span> <strong className="text-[var(--cn-ink)]">{formatEstimate(detailsModal.design)}</strong></div>
               <div className="flex justify-between py-1 border-b border-[rgba(44,23,19,0.06)]"><span className="text-[var(--cn-muted)]">Sent to Bakery</span> <strong className="text-[var(--cn-ink)]">{detailsModal.design.sentToBakery ? 'Yes' : 'No'}</strong></div>
               <div className="flex justify-between py-1 border-b border-[rgba(44,23,19,0.06)]"><span className="text-[var(--cn-muted)]">Date Modified</span> <strong className="text-[var(--cn-ink)]">{formatDate(detailsModal.design.lastEdited)}</strong></div>

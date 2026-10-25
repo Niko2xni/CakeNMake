@@ -563,7 +563,27 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
 
   const getTierSpecs = (tierIndex = 0, sizeClass = '8x6', tierLabel = '1 Tier', finishCls = 'naked') => {
     const dims = sizeClass === 'classicCube' ? '1x1' : sizeClass === 'largeCube' ? '2x2' : sizeClass === 'miniBento' ? '3.5x2' : sizeClass === 'standardBento' ? '4x2' : sizeClass === 'largeBento' ? '5x3' : sizeClass === 'squareBento2x2' ? '2x2' : sizeClass === 'squareBento3x3' ? '3x3' : sizeClass === '12x10' || sizeClass === '12x12' ? '12x10' : sizeClass === '10x8' || sizeClass === '10x10' ? '10x8' : sizeClass === '6x4' || sizeClass === '6x6' || sizeClass === 'small' ? '6x4' : sizeClass === '4x4' ? '4x3' : sizeClass === '4x3' ? '4x3' : '8x6';
-    let finish = `${finishLabel(finishCls)} Finish`;
+
+    const extFlavor = isIndividual
+      ? config.exteriorFinish?.layerFlavors?.[tierIndex] || config.exteriorFinish?.flavor
+      : config.exteriorFinish?.flavor;
+    const extSugar = (isIndividual ? config.sugarColorOverrides?.[`exterior-${tierIndex}`] : null)
+      || config.sugarColorOverrides?.exterior;
+
+    let rawExtColor = null;
+    if (extSugar?.mode === 'colorOverride' && extSugar?.colorId) {
+      rawExtColor = extSugar.colorId;
+    } else if (config.sugarColor?.mode === 'colorOverride' && config.sugarColor?.colorId) {
+      rawExtColor = config.sugarColor.colorId;
+    } else if (extSugar?.mode === 'default') {
+      rawExtColor = extFlavor || 'Vanilla';
+    } else {
+      rawExtColor = extFlavor || extSugar?.colorId || 'Vanilla';
+    }
+    const frostingFlavor = title(rawExtColor || 'Vanilla');
+
+    let finishLines = [];
+    let legacyFinishLines = [];
     if (finishCls === 'textured') {
       const textureId = isIndividual
         ? exterior.layerButtercreamTextures?.[tierIndex] || exterior.buttercreamTexture
@@ -573,8 +593,34 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
         : (textureId === 'ridged' || !textureId)
         ? 'Ridge Comb'
         : title(textureId);
-      finish = `Textured: ${textureName}`;
+      finishLines = [
+        'Textured Finish (Included)',
+        `Texture Pattern: ${textureName}`,
+        `Frosting Flavor: ${frostingFlavor}`,
+      ];
+      legacyFinishLines = [
+        'Textured Finish',
+        `Texture Pattern: ${textureName}`,
+        `Frosting Flavor: ${frostingFlavor}`,
+      ];
+    } else if (finishCls === 'frosted') {
+      finishLines = [
+        'Frosted Finish (Included)',
+        `Frosting Flavor: ${frostingFlavor}`,
+      ];
+      legacyFinishLines = [
+        'Frosted Finish',
+        `Frosting Flavor: ${frostingFlavor}`,
+      ];
+    } else {
+      finishLines = [
+        'Naked Finish (Included)',
+      ];
+      legacyFinishLines = [
+        'Naked Finish',
+      ];
     }
+
     const sponge = isIndividual
       ? config.sponge?.layerFlavors?.[tierIndex] || config.sponge?.flavor
       : config.sponge?.flavor;
@@ -621,12 +667,36 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
     const tierSurface = isIndividual
       ? (surface.layerTreatments?.[tierIndex] || surface || {})
       : (surface || {});
-    let dripDetail = null;
+    let dripDetails = [];
     if (tierSurface.mode === 'glaze') {
       const patternId = tierSurface.pattern || 'naturalTear2';
       const dripItem = DRIP_SECTIONS[0]?.items?.find((it) => it.id === patternId);
       const dripLabel = dripItem?.label || title(patternId);
-      dripDetail = `Drip: ${dripLabel} (Included)`;
+
+      const surfaceSugar = (isIndividual ? config.sugarColorOverrides?.[`surface-${tierIndex}`] : null)
+        || config.sugarColorOverrides?.surface
+        || config.sugarColorOverrides?.surfaceTreatment;
+
+      let rawDripColor = null;
+      if (surfaceSugar?.mode === 'colorOverride' && surfaceSugar?.colorId) {
+        rawDripColor = surfaceSugar.colorId;
+      } else if (config.sugarColor?.mode === 'colorOverride' && config.sugarColor?.colorId) {
+        rawDripColor = config.sugarColor.colorId;
+      } else if (surfaceSugar?.colorId) {
+        rawDripColor = surfaceSugar.colorId;
+      } else if (tierSurface.colorId) {
+        rawDripColor = tierSurface.colorId;
+      } else if (surface.colorId) {
+        rawDripColor = surface.colorId;
+      } else {
+        rawDripColor = 'Vanilla';
+      }
+      const dripColorName = title(rawDripColor || 'Vanilla');
+
+      dripDetails = [
+        `Drip: ${dripLabel} (Included)`,
+        `Drip Flavor: ${dripColorName}`,
+      ];
     }
 
     // Side details for this tier (Included in Size at ₱0)
@@ -692,24 +762,25 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
       const res = [
         tierLabel,
         dims,
-        finish,
+        ...legacyFinishLines,
         spongeName,
         fillingName,
         `Piping Design: ${pipingTip}`,
         `Piping Sugar Color: ${pipingColor}`,
       ];
+      if (dripDetails.length) res.push(...dripDetails);
       Object.defineProperty(res, 'tierEdgePrice', { value: tierEdgePrice, enumerable: false, writable: true });
       return res;
     }
 
     const specs = [
       `Size: ${dims} (${tierLabel})`,
-      `${finish} (Included)`,
+      ...finishLines,
       `${fillingName} (Included)`,
       `Piping Design: ${pipingTip}`,
       `Piping Sugar Color: ${pipingColor}`,
     ];
-    if (dripDetail) specs.push(dripDetail);
+    if (dripDetails.length) specs.push(...dripDetails);
     if (sideDetail) specs.push(sideDetail);
     if (edgeTopDetail) specs.push(edgeTopDetail);
     if (edgeBottomDetail) specs.push(edgeBottomDetail);

@@ -12,7 +12,6 @@ const routedPages = [
   '/login-success',
   '/client',
   '/profile',
-  '/settings',
   '/templates',
   '/cake-ai',
   '/trash',

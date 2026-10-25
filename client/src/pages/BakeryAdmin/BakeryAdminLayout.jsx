@@ -15,11 +15,11 @@ function BakeryAdminLayoutContent() {
 
       <main className="cn-bakery-content flex-1 min-w-0 h-[100dvh] overflow-y-auto p-4 flex flex-col">
         {isControlPanelVisible && (
-          <div className="max-w-7xl w-full mx-auto animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="cn-bakery-control-panel-wrap max-w-7xl w-full mx-auto animate-in fade-in slide-in-from-top-2 duration-200 shrink-0">
             <BakeryControlPanelHeader onMinimize={closeControlPanel} />
           </div>
         )}
-        <div className="flex-1 min-w-0">
+        <div className="cn-bakery-outlet-wrap flex-1 min-w-0 flex flex-col">
           <Outlet />
         </div>
       </main>

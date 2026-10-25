@@ -329,144 +329,146 @@ function TemplateModal({ template, allTemplates, onSwitch, onClose, onSelectTemp
 
   return (
     <div
-      className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs overflow-y-auto flex items-center justify-center p-4 animate-in fade-in"
+      className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs overflow-y-auto flex items-start sm:items-center justify-center p-2 sm:p-4 animate-in fade-in"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-pink-100 overflow-hidden my-6 animate-in zoom-in-95"
+        className="relative w-full max-w-4xl bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-pink-100 overflow-hidden my-2 sm:my-6 max-h-[96dvh] flex flex-col animate-in zoom-in-95"
         onClick={(e) => e.stopPropagation()}
       >
         <button
           onClick={onClose}
           aria-label="Close"
-          className="absolute top-3.5 right-3.5 z-20 w-8 h-8 rounded-full bg-white/90 border border-pink-100 flex items-center justify-center text-gray-500 hover:bg-rose-50 hover:text-rose-500 transition-colors shadow-xs"
+          className="absolute top-2.5 right-2.5 sm:top-3.5 sm:right-3.5 z-20 w-8 h-8 rounded-full bg-white/90 border border-pink-100 flex items-center justify-center text-gray-500 hover:bg-rose-50 hover:text-rose-500 transition-colors shadow-xs"
         >
           <X className="w-4 h-4" />
         </button>
 
-        <div className="flex flex-col md:flex-row">
-          {/* Left: 8 angles viewer */}
-          <div className="md:w-3/5 p-6 bg-pink-50/40 flex flex-col justify-between border-b md:border-b-0 md:border-r border-pink-100">
-            <div className="w-full aspect-square rounded-2xl overflow-hidden bg-white border border-pink-100 shadow-sm relative">
-              <img src={activeView?.url} alt={normalized.name} className="w-full h-full object-cover" />
-              {activeView?.label && (
-                <span className="absolute bottom-3 left-3 px-3 py-1 rounded-full bg-black/70 text-white text-xs font-bold backdrop-blur-xs">
-                  {activeView.label} {activeView.angle ? `(${activeView.angle})` : ''}
-                </span>
-              )}
-            </div>
-
-            {total > 1 && (
-              <div className="flex items-center gap-2 mt-3.5">
-                <button
-                  onClick={goPrev}
-                  aria-label="Previous image"
-                  className="w-8 h-8 rounded-full bg-white border border-pink-100 flex items-center justify-center text-gray-600 hover:bg-pink-50 hover:text-pink-500 transition-colors shadow-xs flex-shrink-0"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-
-                <div className="flex gap-2 flex-1 overflow-x-auto py-1 [scrollbar-width:none]">
-                  {normalized.views.map((view, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setActiveIndex(idx)}
-                      aria-label={`Show ${view.label}`}
-                      className={`w-12 h-12 rounded-xl overflow-hidden border-2 transition-all flex-shrink-0 ${
-                        idx === activeIndex
-                          ? 'border-pink-500 ring-2 ring-pink-200 scale-105'
-                          : 'border-pink-100 hover:border-pink-300 opacity-70 hover:opacity-100'
-                      }`}
-                    >
-                      <img src={view.url} alt={view.label} className="w-full h-full object-cover" />
-                    </button>
-                  ))}
-                </div>
-
-                <button
-                  onClick={goNext}
-                  aria-label="Next image"
-                  className="w-8 h-8 rounded-full bg-white border border-pink-100 flex items-center justify-center text-gray-600 hover:bg-pink-50 hover:text-pink-500 transition-colors shadow-xs flex-shrink-0"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
+        <div className="overflow-y-auto flex-1">
+          <div className="flex flex-col md:flex-row">
+            {/* Left: 8 angles viewer */}
+            <div className="md:w-3/5 p-4 sm:p-6 bg-pink-50/40 flex flex-col justify-center border-b md:border-b-0 md:border-r border-pink-100 shrink-0">
+              <div className="w-full max-w-[280px] sm:max-w-[340px] md:max-w-none mx-auto aspect-square rounded-2xl overflow-hidden bg-white border border-pink-100 shadow-sm relative">
+                <img src={activeView?.url} alt={normalized.name} className="w-full h-full object-cover" />
+                {activeView?.label && (
+                  <span className="absolute bottom-2.5 left-2.5 px-2.5 py-0.5 rounded-full bg-black/70 text-white text-[10px] sm:text-xs font-bold backdrop-blur-xs">
+                    {activeView.label} {activeView.angle ? `(${activeView.angle})` : ''}
+                  </span>
+                )}
               </div>
-            )}
-          </div>
 
-          {/* Right: Details, Specs, Customize Button */}
-          <div className="md:w-2/5 p-6 flex flex-col justify-between">
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-pink-600">
-                Preset Cake Template
-              </span>
-              <h2 className="text-2xl font-bold font-heading text-gray-900 mt-0.5">{normalized.name}</h2>
-              <p className="text-xl text-pink-600 font-bold mt-1 font-heading">{normalized.price}</p>
+              {total > 1 && (
+                <div className="flex items-center gap-1.5 sm:gap-2 mt-3 max-w-[280px] sm:max-w-[340px] md:max-w-none mx-auto w-full">
+                  <button
+                    onClick={goPrev}
+                    aria-label="Previous image"
+                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white border border-pink-100 flex items-center justify-center text-gray-600 hover:bg-pink-50 hover:text-pink-500 transition-colors shadow-xs shrink-0"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  </button>
 
-              <p className="text-xs text-gray-600 leading-relaxed my-3">
-                {normalized.longDescription || normalized.description}
-              </p>
-
-              {normalized.specs?.length > 0 && (
-                <div className="space-y-1.5 pt-3 border-t border-pink-100">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Specifications</p>
-                  <div className="space-y-1">
-                    {normalized.specs.map((spec, i) => (
-                      <p key={i} className="text-xs text-gray-700 flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-pink-400 shrink-0" />
-                        {spec}
-                      </p>
+                  <div className="flex gap-1.5 sm:gap-2 flex-1 overflow-x-auto py-1 [scrollbar-width:none]">
+                    {normalized.views.map((view, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setActiveIndex(idx)}
+                        aria-label={`Show ${view.label}`}
+                        className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl overflow-hidden border-2 transition-all shrink-0 ${
+                          idx === activeIndex
+                            ? 'border-pink-500 ring-2 ring-pink-200 scale-105'
+                            : 'border-pink-100 hover:border-pink-300 opacity-70 hover:opacity-100'
+                        }`}
+                      >
+                        <img src={view.url} alt={view.label} className="w-full h-full object-cover" />
+                      </button>
                     ))}
                   </div>
+
+                  <button
+                    onClick={goNext}
+                    aria-label="Next image"
+                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white border border-pink-100 flex items-center justify-center text-gray-600 hover:bg-pink-50 hover:text-pink-500 transition-colors shadow-xs shrink-0"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  </button>
                 </div>
               )}
             </div>
 
-            <div className="mt-6 pt-4 border-t border-pink-100 flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={() => onSelectTemplate(normalized)}
-                className="w-full py-3 px-5 rounded-2xl bg-pink-500 hover:bg-pink-600 text-white font-bold text-xs transition-all shadow-md shadow-pink-500/25 flex items-center justify-center gap-2"
-              >
-                <Sparkles className="w-4 h-4" /> Customize in 3D Designer
-              </button>
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-full py-2 px-4 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-xs font-semibold"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
+            {/* Right: Details, Specs, Customize Button */}
+            <div className="md:w-2/5 p-4 sm:p-6 flex flex-col justify-between flex-1">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-pink-600">
+                  Preset Cake Template
+                </span>
+                <h2 className="text-xl sm:text-2xl font-bold font-heading text-gray-900 mt-0.5">{normalized.name}</h2>
+                <p className="text-lg sm:text-xl text-pink-600 font-bold mt-0.5 font-heading">{normalized.price}</p>
 
-        {/* More templates carousel in modal */}
-        {otherTemplates.length > 0 && (
-          <div className="border-t border-pink-100 p-5 bg-gray-50/50">
-            <p className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-3">More Cake Templates</p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
-              {otherTemplates.slice(0, 6).map((t) => {
-                const norm = normalizeTemplate(t);
-                const thumb = norm.views[0]?.url || norm.thumbnail || norm.image;
-                return (
-                  <button
-                    key={norm.id}
-                    type="button"
-                    onClick={() => onSwitch(norm.id)}
-                    className="group bg-white rounded-xl overflow-hidden border border-pink-100 p-1 text-left hover:border-pink-300 transition-all shadow-2xs"
-                  >
-                    <div className="aspect-square rounded-lg overflow-hidden bg-pink-50">
-                      <img src={thumb} alt={norm.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                <p className="text-xs text-gray-600 leading-relaxed my-2.5">
+                  {normalized.longDescription || normalized.description}
+                </p>
+
+                {normalized.specs?.length > 0 && (
+                  <div className="space-y-1 pt-2.5 border-t border-pink-100">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Specifications</p>
+                    <div className="space-y-1">
+                      {normalized.specs.map((spec, i) => (
+                        <p key={i} className="text-xs text-gray-700 flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-pink-400 shrink-0" />
+                          {spec}
+                        </p>
+                      ))}
                     </div>
-                    <p className="text-[11px] font-bold text-gray-800 truncate mt-1 px-1">{norm.name}</p>
-                    <p className="text-[10px] text-pink-600 font-semibold px-1">{norm.price}</p>
-                  </button>
-                );
-              })}
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-pink-100 flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => onSelectTemplate(normalized)}
+                  className="w-full py-2.5 sm:py-3 px-5 rounded-2xl bg-pink-500 hover:bg-pink-600 text-white font-bold text-xs transition-all shadow-md shadow-pink-500/25 flex items-center justify-center gap-2"
+                >
+                  <Sparkles className="w-4 h-4" /> Customize in 3D Designer
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="w-full py-2 px-4 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-xs font-semibold"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
-        )}
+
+          {/* More templates carousel in modal */}
+          {otherTemplates.length > 0 && (
+            <div className="border-t border-pink-100 p-3 sm:p-5 bg-gray-50/50">
+              <p className="text-[10px] sm:text-xs font-bold text-gray-700 uppercase tracking-wider mb-2.5">More Cake Templates</p>
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 sm:gap-3">
+                {otherTemplates.slice(0, 6).map((t) => {
+                  const norm = normalizeTemplate(t);
+                  const thumb = norm.views[0]?.url || norm.thumbnail || norm.image;
+                  return (
+                    <button
+                      key={norm.id}
+                      type="button"
+                      onClick={() => onSwitch(norm.id)}
+                      className="group bg-white rounded-xl overflow-hidden border border-pink-100 p-1 text-left hover:border-pink-300 transition-all shadow-2xs"
+                    >
+                      <div className="aspect-square rounded-lg overflow-hidden bg-pink-50">
+                        <img src={thumb} alt={norm.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                      </div>
+                      <p className="text-[10px] sm:text-[11px] font-bold text-gray-800 truncate mt-1 px-0.5">{norm.name}</p>
+                      <p className="text-[9px] sm:text-[10px] text-pink-600 font-semibold px-0.5">{norm.price}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -506,12 +508,20 @@ export default function Templates({ onSelectTemplate }) {
   }, [selectedId, allTemplatesList]);
 
   function matchesSearch(t) {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return true;
+    if (!searchQuery.trim()) return true;
+    const raw = searchQuery.trim().toLowerCase();
+    const clean = raw.replace(/^#/, '').trim();
+    const id = String(t._id || t.id || '').toLowerCase();
+    const shortId6 = id.slice(-6);
+    const shortId8 = id.slice(-8);
+
+    const matchesId = id.includes(raw) || (clean && (id.includes(clean) || shortId6.includes(clean) || shortId8.includes(clean)));
+
     return (
-      (t.name || '').toLowerCase().includes(query) ||
-      (t.description || '').toLowerCase().includes(query) ||
-      (t.longDescription || '').toLowerCase().includes(query)
+      matchesId ||
+      (t.name || '').toLowerCase().includes(raw) ||
+      (t.description || '').toLowerCase().includes(raw) ||
+      (t.longDescription || '').toLowerCase().includes(raw)
     );
   }
 
@@ -524,6 +534,11 @@ export default function Templates({ onSelectTemplate }) {
     }
     setSelectedId(null);
   }
+
+  const hasAnyMatchingTemplates = useMemo(() => {
+    if (!searchQuery.trim()) return sectionsData.some((s) => (s.templates || []).length > 0);
+    return sectionsData.some((s) => (s.templates || []).some(matchesSearch));
+  }, [sectionsData, searchQuery]);
 
   return (
     <div className="cn-app-page cn-templates-page min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-orange-50">
@@ -571,6 +586,19 @@ export default function Templates({ onSelectTemplate }) {
               >
                 Start designing <ArrowRight className="w-4 h-4" />
               </Link>
+            </div>
+          ) : !hasAnyMatchingTemplates && searchQuery ? (
+            <div className="cn-home-state is-empty max-w-lg mx-auto text-center py-16">
+              <Search className="w-10 h-10 text-pink-300 mx-auto mb-3" aria-hidden="true" />
+              <h3 className="text-xl font-bold font-heading text-gray-800 mb-1">No matching templates</h3>
+              <p className="text-sm text-gray-500 mb-6">We couldn't find any cake templates matching "{searchQuery}". Try a different keyword or clear your search.</p>
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-pink-200 text-pink-600 hover:bg-pink-50 font-medium text-sm transition-colors"
+              >
+                Clear Search
+              </button>
             </div>
           ) : (
             sectionsData.map((section) => {

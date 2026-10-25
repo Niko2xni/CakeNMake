@@ -96,7 +96,11 @@ async function synchronizeAccount(claims) {
   // provider. Token-only fallback data must never erase stored profile data.
   if (identity.canonical) {
     synchronizedFields.photoURL = identity.photoURL;
-    synchronizedFields.providers = identity.providers;
+    const hasEmailOtp = (existingUser?.providers || []).includes('email-otp') || identity.providers.includes('email-otp');
+    synchronizedFields.providers = [...new Set([
+      ...identity.providers,
+      ...(hasEmailOtp ? ['email-otp'] : []),
+    ])];
   } else {
     if (identity.photoURL) synchronizedFields.photoURL = identity.photoURL;
     if (identity.providers.length) {

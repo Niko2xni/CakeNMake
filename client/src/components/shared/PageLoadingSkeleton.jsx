@@ -244,9 +244,6 @@ function PageSkeletonContent({ path = '', sentToBakery = false } = {}) {
   if (path === '/profile') {
     return <ClientPage><Skeleton className="h-9 w-48" /><div className="grid gap-5 md:grid-cols-2"><section className="space-y-4 rounded-2xl border border-pink-100 bg-white p-6"><Skeleton className="mx-auto h-24 w-24 rounded-full" />{[0, 1, 2, 3].map((item) => <Skeleton key={item} className="h-11 w-full rounded-xl" />)}</section><section className="space-y-4 rounded-2xl border border-pink-100 bg-white p-6"><Skeleton className="h-6 w-1/2" />{[0, 1, 2, 3].map((item) => <Skeleton key={item} className="h-14 w-full rounded-xl" />)}</section></div></ClientPage>;
   }
-  if (path === '/settings') {
-    return <ClientPage><Skeleton className="h-9 w-48" />{[0, 1, 2].map((item) => <section key={item} className="space-y-4 rounded-2xl border border-pink-100 bg-white p-6"><Skeleton className="h-6 w-1/3" /><Skeleton className="h-4 w-2/3" /><Skeleton className="h-12 w-full rounded-xl" /></section>)}</ClientPage>;
-  }
   if (path === '/chats') {
     return <ClientPage wide><div className="flex h-[70dvh] min-h-[500px] overflow-hidden rounded-2xl border border-pink-100 bg-white"><section className="hidden w-80 shrink-0 space-y-3 border-r border-pink-100 p-4 sm:block"><Skeleton className="h-7 w-40" /><Skeleton className="h-10 w-full rounded-full" /><AdminRowsSkeleton count={5} avatar /></section><section className="flex min-w-0 flex-1 flex-col p-5"><Skeleton className="h-10 w-full" /><div className="flex-1 space-y-5 py-8"><Skeleton className="h-16 w-2/5 rounded-2xl" /><Skeleton className="ml-auto h-12 w-1/2 rounded-2xl" /><Skeleton className="h-20 w-1/3 rounded-2xl" /></div><Skeleton className="h-12 w-full rounded-xl" /></section></div></ClientPage>;
   }
@@ -275,7 +272,7 @@ export default function PageLoadingSkeleton({ path: explicitPath, sentToBakery: 
   const path = explicitPath || location.pathname;
   const routePath = path === '/' ? '/' : path.replace(/\/+$/, '') || '/';
   const isAuthRoute = ['/login', '/forgot-password', '/reset-password', '/login-success'].includes(routePath);
-  const isClientRoute = ['/client', '/templates', '/trash', '/profile', '/settings', '/chats', '/cake-ai'].includes(routePath);
+  const isClientRoute = ['/client', '/templates', '/trash', '/profile', '/chats', '/cake-ai'].includes(routePath);
 
   const searchParams = typeof window !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams();
   const sentToBakery = explicitSentToBakery ?? Boolean(

@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Trash from './Trash';
@@ -143,4 +143,115 @@ describe('Trash page states and actions', () => {
     expect(await screen.findByRole('heading', { name: 'Trash is empty' })).toBeVisible();
     expect(screen.getByRole('status')).toHaveTextContent(/all 2 designs were permanently deleted/i);
   });
+
+  it('displays design details modal with formatted config specs', async () => {
+    const detailedDesign = {
+      _id: 'design-detail',
+      name: 'Custom Velvet Elegance',
+      isTrashed: true,
+      createdAt: '2026-10-01T10:00:00.000Z',
+      lastEdited: '2026-10-15T12:00:00.000Z',
+      trashedAt: '2026-10-20T12:00:00.000Z',
+      config: {
+        layers: 3,
+        cakeColor: 'Red Velvet',
+        frostingColor: 'Cream Cheese',
+        toppings: [{ name: 'Gold Leaf' }, { name: 'Fresh Berries' }],
+      },
+      lastEstimate: {
+        totalMinor: 450000,
+        currency: 'PHP',
+      },
+      sentToBakery: true,
+    };
+
+    apiMocks.getDesigns.mockResolvedValue([detailedDesign]);
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: /open actions for custom velvet elegance/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /details/i }));
+
+    const modal = await screen.findByRole('dialog', { name: 'Design Details' });
+    expect(modal).toBeVisible();
+    expect(within(modal).getByText('Custom Velvet Elegance')).toBeInTheDocument();
+    expect(within(modal).getByText('3')).toBeInTheDocument();
+    expect(within(modal).getByText('Red Velvet')).toBeInTheDocument();
+    expect(within(modal).getByText('Cream Cheese')).toBeInTheDocument();
+    expect(within(modal).getByText('Gold Leaf, Fresh Berries')).toBeInTheDocument();
+    expect(within(modal).getByText('Yes')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /close/i }));
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: 'Design Details' })).not.toBeInTheDocument();
+    });
+  });
+
+  it('displays error notification when single restore fails', async () => {
+    apiMocks.getDesigns.mockResolvedValue([trashedDesign]);
+    apiMocks.restoreFromTrash.mockRejectedValue(new Error('Network error'));
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: /restore design/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/that design could not be restored/i);
+    expect(screen.getByText('Garden Celebration')).toBeInTheDocument();
+  });
+
+  it('displays error when single permanent delete fails and allows modal cancellation', async () => {
+    apiMocks.getDesigns.mockResolvedValue([trashedDesign]);
+    apiMocks.permanentlyDelete.mockRejectedValue(new Error('Deletion failed'));
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: /open actions for garden celebration/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /delete permanently/i }));
+
+    const confirmDeleteBtn = screen.getByRole('button', { name: 'Delete permanently' });
+    fireEvent.click(confirmDeleteBtn);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/that design could not be permanently deleted/i);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /delete “garden celebration” permanently/i })).not.toBeInTheDocument();
+    });
+  });
+
+  it('submits bulk deletion with Enter key and handles bulk deletion failure', async () => {
+    apiMocks.getDesigns.mockResolvedValue([trashedDesign]);
+    apiMocks.deleteAllTrash.mockRejectedValue(new Error('Bulk delete failed'));
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: /delete all designs in trash permanently/i }));
+
+    const input = screen.getByPlaceholderText('Type "Delete all designs"');
+    fireEvent.change(input, { target: { value: 'Delete all designs' } });
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/could not permanently delete all designs/i);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /delete all 1 designs permanently/i })).not.toBeInTheDocument();
+    });
+  });
+
+  it('safely handles designs with null or invalid dates and fallback placeholders', async () => {
+    const edgeCaseDesign = {
+      _id: 'edge-1',
+      name: '',
+      isTrashed: true,
+      lastEdited: null,
+      trashedAt: 'invalid-date',
+      thumbnail: null,
+      config: null,
+    };
+
+    apiMocks.getDesigns.mockResolvedValue([edgeCaseDesign]);
+    renderPage();
+
+    expect(await screen.findByText('Untitled design')).toBeInTheDocument();
+    expect(screen.getByText('Deleted recently')).toBeInTheDocument();
+    expect(screen.getByText('30 days left to restore')).toBeInTheDocument();
+  });
 });
+

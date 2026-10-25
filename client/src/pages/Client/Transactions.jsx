@@ -30,6 +30,22 @@ import {
   DialogContent,
 } from '@/components/ui/dialog';
 import PayBalanceModal from '@/components/client/PayBalanceModal';
+import { isWithinThirtyMinutePaymentCutoff } from '@/utils/maintenance';
+
+export const COMPLETED_STATUSES = ['completed', 'fulfilled'];
+export const ONGOING_STATUSES = [
+  'confirmed',
+  'in_production',
+  'in production',
+  'in_progress',
+  'in progress',
+  'baking',
+  'ready',
+  'ready for pickup',
+  'pending',
+  'pending_payment',
+  'awaiting_payment',
+];
 
 function formatCurrency(amount) {
   const num = Number(amount || 0);
@@ -94,7 +110,7 @@ function getStatusBadge(status) {
       </span>
     );
   }
-  if (['pending', 'awaiting_payment'].includes(norm)) {
+  if (['pending', 'pending_payment', 'awaiting_payment'].includes(norm)) {
     return (
       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
         <Clock className="w-3.5 h-3.5 text-amber-600" />
@@ -111,14 +127,14 @@ function getStatusBadge(status) {
 }
 
 function formatReceiptItems(rawItems = []) {
-  if (!rawItems || rawItems.length === 0) return [];
+  if (!Array.isArray(rawItems) || rawItems.length === 0) return [];
 
   // If any item already has details, preserve it cleanly
-  const hasExistingDetails = rawItems.some((it) => Array.isArray(it.details) && it.details.length > 0);
+  const hasExistingDetails = rawItems.some((it) => Array.isArray(it?.details) && it.details.length > 0);
   if (hasExistingDetails) {
     return rawItems.map((item) => {
-      let label = item.label;
-      if (label?.toLowerCase().startsWith('center decorations') && !label.endsWith(':')) {
+      let label = item?.label || '';
+      if (label.toLowerCase().startsWith('center decorations') && !label.endsWith(':')) {
         label = 'Center Decorations:';
       }
       return { ...item, label };
@@ -297,16 +313,26 @@ export default function Transactions() {
 
   const handlePaymentSuccess = (res, tx) => {
     const updatedStatus = res.status || 'in_production';
-    const finalPayment = res.finalPayment || {
+    const finalPayment = res.reservation?.finalPayment || res.finalPayment || {
       amount: tx.remainingBalance,
       isPaid: true,
       method: 'gcash',
       paidAt: new Date().toISOString(),
     };
 
+    const matchesTx = (t) => {
+      if (!t || !tx) return false;
+      if (t.id && tx.id && t.id === tx.id) return true;
+      if (t.reservationId && tx.id && t.reservationId === tx.id) return true;
+      if (t.id && tx.reservationId && t.id === tx.reservationId) return true;
+      if (t.reservationId && tx.reservationId && t.reservationId === tx.reservationId) return true;
+      if (t.blueprintId && tx.blueprintId && t.blueprintId === tx.blueprintId) return true;
+      return false;
+    };
+
     setTransactions((prev) =>
       prev.map((t) => {
-        if (t.id === tx.id || t.reservationId === tx.id) {
+        if (matchesTx(t)) {
           return {
             ...t,
             status: updatedStatus,
@@ -319,7 +345,7 @@ export default function Transactions() {
     );
 
     setSelectedTx((prev) => {
-      if (prev && (prev.id === tx.id || prev.reservationId === tx.id)) {
+      if (prev && matchesTx(prev)) {
         return {
           ...prev,
           status: updatedStatus,
@@ -351,12 +377,10 @@ export default function Transactions() {
 
   const counts = useMemo(() => {
     const total = transactions.length;
-    const ongoing = transactions.filter((tx) =>
-      ['confirmed', 'in_production', 'in production', 'baking', 'ready'].includes(String(tx.status || 'confirmed').toLowerCase())
-    ).length;
     const completed = transactions.filter((tx) =>
-      ['completed', 'fulfilled'].includes(String(tx.status).toLowerCase())
+      COMPLETED_STATUSES.includes(String(tx.status || '').toLowerCase())
     ).length;
+    const ongoing = total - completed;
     return { total, ongoing, completed };
   }, [transactions]);
 
@@ -365,14 +389,10 @@ export default function Transactions() {
     const clean = raw.replace(/^#/, '').trim();
     return transactions.filter((tx) => {
       const normStatus = String(tx.status || 'confirmed').toLowerCase();
-      if (statusFilter === 'ongoing') {
-        const isOngoing = ['confirmed', 'in_production', 'in production', 'baking', 'ready', 'pending'].includes(normStatus);
-        if (!isOngoing) return false;
-      }
-      if (statusFilter === 'completed') {
-        const isCompleted = ['completed', 'fulfilled'].includes(normStatus);
-        if (!isCompleted) return false;
-      }
+      const isCompleted = COMPLETED_STATUSES.includes(normStatus);
+
+      if (statusFilter === 'ongoing' && isCompleted) return false;
+      if (statusFilter === 'completed' && !isCompleted) return false;
 
       if (!raw) return true;
 
@@ -380,7 +400,7 @@ export default function Transactions() {
         tx.id,
         tx.reservationId,
         tx.blueprintId,
-        tx.designId,
+        typeof tx.designId === 'object' ? tx.designId?._id : tx.designId,
       ].filter(Boolean).map((val) => String(val).toLowerCase());
 
       const idMatch = ids.some((idVal) => {
@@ -393,11 +413,20 @@ export default function Transactions() {
         return false;
       });
 
-      const nameMatch = (tx.designName || '').toLowerCase().includes(raw) ||
-        (clean && (tx.designName || '').toLowerCase().includes(clean));
-      const bakeryMatch = (tx.bakeryName || '').toLowerCase().includes(raw);
-      const statusMatch = normStatus.includes(raw);
-      return idMatch || nameMatch || bakeryMatch || statusMatch;
+      const nameMatch = String(tx.designName || '').toLowerCase().includes(raw) ||
+        (clean && String(tx.designName || '').toLowerCase().includes(clean));
+      const bakeryMatch = String(tx.bakeryName || '').toLowerCase().includes(raw);
+      const readableStatus = normStatus.replace(/_/g, ' ');
+      const statusMatch = normStatus.includes(raw) || readableStatus.includes(raw) ||
+        (normStatus === 'in_production' && (raw.includes('production') || raw.includes('progress') || raw.includes('baking'))) ||
+        (normStatus === 'pending_payment' && (raw.includes('pending') || raw.includes('payment')));
+      const dateStr = formatDate(tx.pickupDate).toLowerCase();
+      const createdDateStr = formatDate(tx.createdAt).toLowerCase();
+      const dateMatch = (tx.pickupDate && String(tx.pickupDate).toLowerCase().includes(raw)) ||
+        dateStr.includes(raw) ||
+        createdDateStr.includes(raw);
+
+      return idMatch || nameMatch || bakeryMatch || statusMatch || dateMatch;
     });
   }, [transactions, search, statusFilter]);
 
@@ -582,7 +611,7 @@ export default function Transactions() {
 
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-gray-400 text-[11px] bg-white px-2 py-0.5 rounded-md border border-gray-100">
-                        Order #{tx.id.slice(-8).toUpperCase()}
+                        Order #{String(tx.id || tx._id || '').slice(-8).toUpperCase()}
                       </span>
                       {getStatusBadge(tx.status)}
                     </div>
@@ -622,7 +651,11 @@ export default function Transactions() {
                         {remainingBalance > 0 ? (
                           <div className="flex items-center gap-1.5 text-[11px] text-amber-700 font-medium">
                             <Clock className="w-3.5 h-3.5 text-amber-600" />
-                            <span>Down Payment Paid • Balance of {formatCurrency(remainingBalance)} remaining</span>
+                            <span>
+                              {tx.downPayment?.isPaid !== false
+                                ? `Down Payment Paid • Balance of ${formatCurrency(remainingBalance)} remaining`
+                                : `Payment Pending • Balance of ${formatCurrency(remainingBalance)} remaining`}
+                            </span>
                           </div>
                         ) : (
                           <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 font-medium">
@@ -683,7 +716,7 @@ export default function Transactions() {
 
                         {tx.designId && (
                           <Link
-                            to={`/designer?designId=${tx.designId}`}
+                            to={`/designer?designId=${typeof tx.designId === 'object' ? tx.designId?._id : tx.designId}`}
                             className="hidden sm:inline-flex items-center justify-center p-2 rounded-xl bg-white hover:bg-pink-50 text-gray-500 hover:text-pink-600 border border-pink-200 transition-colors"
                             title="Open design in 3D workspace"
                           >
@@ -713,6 +746,7 @@ export default function Transactions() {
                   ? Number(selectedTx.remainingBalance)
                   : Math.max(0, totalAmount - downPaymentAmount));
             const formattedItems = formatReceiptItems(selectedTx.pricingSnapshot?.lineItems || []);
+            const isCutoff = isWithinThirtyMinutePaymentCutoff();
 
             return (
               <div className="space-y-4">
@@ -727,7 +761,7 @@ export default function Transactions() {
                         Price list breakdown
                       </h3>
                       <p className="text-[11px] text-gray-500 font-medium truncate max-w-[260px]">
-                        <span className="font-mono font-bold text-gray-700">#{selectedTx.id.slice(-8).toUpperCase()}</span> • {selectedTx.designName}
+                        <span className="font-mono font-bold text-gray-700">#{String(selectedTx.id || selectedTx._id || '').slice(-8).toUpperCase()}</span> • {selectedTx.designName}
                       </p>
                     </div>
                   </div>
@@ -755,12 +789,21 @@ export default function Transactions() {
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs text-emerald-600 font-semibold pt-1">
-                    <span className="flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Down Payment Paid (GCash Simulated)
-                    </span>
-                    <span className="tabular-nums font-bold">-{formatCurrency(downPaymentAmount)}</span>
-                  </div>
+                  {selectedTx.downPayment?.isPaid !== false ? (
+                    <div className="flex items-center justify-between text-xs text-emerald-600 font-semibold pt-1">
+                      <span className="flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Down Payment Paid (GCash Simulated)
+                      </span>
+                      <span className="tabular-nums font-bold">-{formatCurrency(downPaymentAmount)}</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between text-xs text-amber-600 font-semibold pt-1">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5" /> Down Payment Pending
+                      </span>
+                      <span className="tabular-nums font-bold">₱0.00</span>
+                    </div>
+                  )}
 
                   {remainingBalance > 0 ? (
                     <div className="space-y-2 pt-1 border-t border-gray-100">
@@ -770,6 +813,12 @@ export default function Transactions() {
                           {formatCurrency(remainingBalance)}
                         </span>
                       </div>
+                      {isCutoff && (
+                        <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-900 flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                          <span>Payment cutoff active (9:30 PM - 10:05 PM). Balance payments temporarily unavailable.</span>
+                        </div>
+                      )}
                       <button
                         type="button"
                         onClick={() => openBalancePayment(selectedTx)}
@@ -802,7 +851,7 @@ export default function Transactions() {
 
                 {/* Optional Order Note */}
                 <div className="p-3 rounded-2xl bg-gray-50 border border-gray-100 text-[11px] text-gray-500 leading-relaxed">
-                  <strong>Order Notice (Optional):</strong> Showing this receipt is completely optional. You can show this screen, show your confirmation email, or just mention your name and order ID (<span className="font-mono font-bold text-gray-800">#{selectedTx.id.slice(-8).toUpperCase()}</span>) at {selectedTx.bakeryName}. Any remaining balance can be settled directly with the bakery.
+                  <strong>Order Notice (Optional):</strong> Showing this receipt is completely optional. You can show this screen, show your confirmation email, or just mention your name and order ID (<span className="font-mono font-bold text-gray-800">#{String(selectedTx.id || selectedTx._id || '').slice(-8).toUpperCase()}</span>) at {selectedTx.bakeryName}. Any remaining balance can be settled directly with the bakery.
                 </div>
 
                 {/* Actions */}

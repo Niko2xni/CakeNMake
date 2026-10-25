@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { format } from 'date-fns';
-import { ChevronLeft, ShieldCheck, Smartphone, Lock, RotateCw } from 'lucide-react';
+import { ChevronLeft, ShieldCheck, Smartphone, Lock, RotateCw, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { isWithinThirtyMinutePaymentCutoff } from '@/utils/maintenance';
 
 // Static demo GCash reference code — locked to downpayment amount
 function generateRef(amount) {
@@ -22,6 +23,7 @@ export default function GCashPayment({ total, selectedDate, fulfillment, onPaid,
   const [openingChat, setOpeningChat] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submissionError, setSubmissionError] = useState('');
+  const isCutoff = isWithinThirtyMinutePaymentCutoff();
 
   const submitOrder = async () => {
     setSubmitting(true);
@@ -177,9 +179,30 @@ export default function GCashPayment({ total, selectedDate, fulfillment, onPaid,
           </Button>
         </div>
       ) : (
-        <Button className="w-full bg-[#007DFF] hover:bg-[#0068D9]" onClick={() => setShowConfirmModal(true)} disabled={paying}>
-          {paying ? 'Processing...' : 'Continue simulated checkout'}
-        </Button>
+        <div className="space-y-3">
+          {isCutoff && (
+            <div role="alert" className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-xs text-amber-950 dark:text-amber-200 space-y-1">
+              <div className="flex items-center gap-1.5 font-bold text-amber-900 dark:text-amber-100">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Payment Cutoff Active (9:30 PM - 10:05 PM)</span>
+              </div>
+              <p className="text-[11px] leading-relaxed text-amber-800 dark:text-amber-300">
+                No payments are available 30 minutes before the scheduled 10:00 PM update. Please complete your order after the update finishes.
+              </p>
+            </div>
+          )}
+          <Button
+            className="w-full bg-[#007DFF] hover:bg-[#0068D9] disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => setShowConfirmModal(true)}
+            disabled={paying || isCutoff}
+          >
+            {isCutoff
+              ? 'Payments unavailable during 9:30 PM cutoff'
+              : paying
+              ? 'Processing...'
+              : 'Continue simulated checkout'}
+          </Button>
+        </div>
       )}
 
       {/* Elaborate Final Confirmation & Rules Modal */}

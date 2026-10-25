@@ -1,7 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Login from './Login';
 import { authApi } from '@/services/api';
 
@@ -23,11 +23,14 @@ beforeEach(() => {
   Object.assign(session, { account: null, isAuthenticated: false, isLoadingAuth: false, authError: null });
   firebase.custom.mockReset();
   googleAuthMock.redirectToGoogleOAuth.mockReset();
+  authApi.requestEmailOtp.mockReset();
+  authApi.requestEmailOtp.mockResolvedValue({ expiresAt: Date.now() + 180000 });
+  authApi.verifyEmailOtp.mockReset();
 });
 
 vi.mock('@/services/api', () => ({
   authApi: {
-    requestEmailOtp: vi.fn().mockResolvedValue({ expiresAt: Date.now() + 180000 }),
+    requestEmailOtp: vi.fn(),
     verifyEmailOtp: vi.fn(),
   },
 }));
@@ -71,10 +74,11 @@ describe('Login auth experience', () => {
 
     expect(await screen.findByText('A 6-digit verification code was sent to google-user@example.com.')).toBeInTheDocument();
     expect(screen.getByLabelText(/verification code/i)).toBeInTheDocument();
+    expect(screen.getByText('google-user@example.com')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^verify$/i })).toBeInTheDocument();
   });
 
-  it('exchanges the verified email OTP for a Firebase session', async () => {
+  it('exchanges the verified email OTP for a Firebase session and navigates to login-success', async () => {
     authApi.verifyEmailOtp.mockResolvedValueOnce({ token: 'custom-token' });
     firebase.custom.mockResolvedValueOnce({ user: { uid: 'email-user' } });
     render(
@@ -110,6 +114,22 @@ describe('Login auth experience', () => {
     expect(screen.getByText('Customer dashboard')).toBeInTheDocument();
   });
 
+  it('redirects bakery admin accounts to /bakery/orders', () => {
+    const view = () => (
+      <MemoryRouter initialEntries={['/login']}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/client" element={<div>Customer dashboard</div>} />
+          <Route path="/bakery/orders" element={<div>Bakery dashboard</div>} />
+        </Routes>
+      </MemoryRouter>
+    );
+    const { rerender } = render(view());
+    Object.assign(session, { account: { role: 'bakery_admin' }, isAuthenticated: true });
+    rerender(view());
+    expect(screen.getByText('Bakery dashboard')).toBeInTheDocument();
+  });
+
   it('shows account synchronization failures instead of silently remaining at login', () => {
     session.authError = { message: 'Could not connect to the account server.' };
     render(<MemoryRouter><Login /></MemoryRouter>);
@@ -128,7 +148,7 @@ describe('Login auth experience', () => {
     expect(screen.getByRole('button', { name: /^login$/i })).toBeInTheDocument();
   });
 
-  it('shows a resend OTP action and a 3 minute countdown after sending a code', async () => {
+  it('shows a resend OTP action and countdown after sending a code', async () => {
     render(
       <MemoryRouter>
         <Login />
@@ -167,6 +187,95 @@ describe('Login auth experience', () => {
 
     await vi.waitFor(() => {
       expect(screen.getByRole('button', { name: /^verify$/i })).toBeDisabled();
+      expect(screen.getByText(/your verification code has expired/i)).toBeInTheDocument();
+    });
+
+    vi.useRealTimers();
+  });
+
+  it('allows user to navigate Back from OTP step to re-check email without losing email address', async () => {
+    render(
+      <MemoryRouter>
+        <Login />
+      </MemoryRouter>
+    );
+
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'test@example.com' } });
+    fireEvent.click(screen.getByRole('button', { name: /^login$/i }));
+
+    expect(await screen.findByText(/^Verification code$/i)).toBeInTheDocument();
+
+    const backBtn = screen.getByRole('button', { name: /back/i });
+    fireEvent.click(backBtn);
+
+    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/email/i)).toHaveValue('test@example.com');
+  });
+
+  it('handles API error when requesting email OTP', async () => {
+    authApi.requestEmailOtp.mockRejectedValueOnce(new Error('Rate limit exceeded. Try again in 5 minutes.'));
+
+    render(
+      <MemoryRouter>
+        <Login />
+      </MemoryRouter>
+    );
+
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'rate-limited@example.com' } });
+    fireEvent.click(screen.getByRole('button', { name: /^login$/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Rate limit exceeded. Try again in 5 minutes.');
+  });
+
+  it('handles API error when verifying email OTP', async () => {
+    authApi.verifyEmailOtp.mockRejectedValueOnce(new Error('Invalid or expired verification code.'));
+
+    render(
+      <MemoryRouter>
+        <Login />
+      </MemoryRouter>
+    );
+
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'user@example.com' } });
+    fireEvent.click(screen.getByRole('button', { name: /^login$/i }));
+
+    const input = await screen.findByLabelText('Verification code');
+    fireEvent.change(input, { target: { value: '000000' } });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Invalid or expired verification code.');
+  });
+
+  it('allows resending a new OTP code after expiry', async () => {
+    vi.useFakeTimers();
+    authApi.requestEmailOtp.mockResolvedValueOnce({ expiresAt: Date.now() + 2000 });
+
+    render(
+      <MemoryRouter>
+        <Login />
+      </MemoryRouter>
+    );
+
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'resend@example.com' } });
+    fireEvent.click(screen.getByRole('button', { name: /^login$/i }));
+
+    await vi.waitFor(() => {
+      expect(screen.getByRole('button', { name: /^verify$/i })).toBeInTheDocument();
+    });
+
+    vi.advanceTimersByTime(3000);
+
+    const resendBtn = await vi.waitFor(() => {
+      const btn = screen.getByRole('button', { name: /resend otp/i });
+      expect(btn).not.toBeDisabled();
+      return btn;
+    });
+
+    authApi.requestEmailOtp.mockResolvedValueOnce({ expiresAt: Date.now() + 180000 });
+    fireEvent.click(resendBtn);
+
+    await vi.waitFor(() => {
+      expect(authApi.requestEmailOtp).toHaveBeenCalledTimes(2);
+      expect(screen.getByText(/a new 6-digit verification code was sent to resend@example\.com/i)).toBeInTheDocument();
     });
 
     vi.useRealTimers();

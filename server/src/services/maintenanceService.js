@@ -31,6 +31,21 @@ function isWithinUpdateExecutionWindow(now = new Date()) {
 }
 
 /**
+ * Checks if the given date is within 30 minutes prior to 10:00 PM Manila time
+ * or during the 10:00 PM update window.
+ * 10:00 PM is 22:00 Manila time (UTC+8).
+ * 30 minutes before 10:00 PM is 9:30 PM (21:30 Manila time).
+ * Payment cutoff window is [21:30, 22:05) Manila time.
+ */
+function isWithinThirtyMinutePaymentCutoff(now = new Date()) {
+  const manilaMs = now.getTime() + 8 * 60 * 60 * 1000;
+  const manilaDate = new Date(manilaMs);
+  const hours = manilaDate.getUTCHours();
+  const minutes = manilaDate.getUTCMinutes();
+  return (hours === 21 && minutes >= 30) || (hours === 22 && minutes < 5);
+}
+
+/**
  * Returns beginning of current Manila day (midnight 00:00:00 Manila time in UTC Date)
  */
 function getStartOfManilaDay(now = new Date()) {
@@ -506,6 +521,7 @@ async function getSystemStatus(platformId = null) {
   const showWarning = hasScheduledChanges && inWarningWindow;
 
   const isWebsiteOff = Boolean(plat?.maintenanceMode?.isWebsiteOff);
+  const isPaymentCutoff = isWithinThirtyMinutePaymentCutoff(now) || isWebsiteOff;
 
   return {
     isWebsiteOff,
@@ -517,7 +533,9 @@ async function getSystemStatus(platformId = null) {
     nextScheduledUpdate: nextManilaTenPm(now).toISOString(),
     isWarningWindow: inWarningWindow,
     showClientWarning: showWarning,
-    warningMessage: 'Notice: The server will update and will be temporarily off starting from 10:00 PM.',
+    warningMessage: 'Notice: The server will update and will be temporarily off starting from 10:00 PM. No payments are available 30 minutes before the scheduled update (from 9:30 PM).',
+    isPaymentCutoff,
+    paymentCutoffMessage: 'No payments are available 30 minutes before the scheduled update (from 9:30 PM to 10:05 PM). Please try again after the update completes.',
     maintenanceReason: plat?.maintenanceMode?.reason || '',
     lastCompletedAt: plat?.maintenanceMode?.lastCompletedAt || null,
   };
@@ -526,6 +544,7 @@ async function getSystemStatus(platformId = null) {
 module.exports = {
   isWithinThreeHourWarningWindow,
   isWithinUpdateExecutionWindow,
+  isWithinThirtyMinutePaymentCutoff,
   processScheduledMaintenance,
   getSystemStatus,
   getUnifiedDrafts,

@@ -94,7 +94,9 @@ test('cake quote prices textured buttercream finish for single and two-tier cake
   assert.deepEqual(quote1Tier.lineItems[0].details, [
     '1 Tier',
     '6x4',
-    'Textured: Ribbon Wrap',
+    'Textured Finish',
+    'Texture Pattern: Ribbon Wrap',
+    'Frosting Flavor: Vanilla',
     'Chocolate Sponge',
     'Filling: Strawberry (2 Layers)',
     'Piping Design: Shell',
@@ -114,7 +116,9 @@ test('cake quote prices textured buttercream finish for single and two-tier cake
   assert.deepEqual(quote2Tier.lineItems[0].details, [
     'Bottom Tier',
     '8x6',
-    'Textured: Ridge Comb',
+    'Textured Finish',
+    'Texture Pattern: Ridge Comb',
+    'Frosting Flavor: Vanilla',
     'Vanilla Sponge',
     'Filling: None',
     'Piping Design: None',
@@ -125,7 +129,9 @@ test('cake quote prices textured buttercream finish for single and two-tier cake
   assert.deepEqual(quote2Tier.lineItems[1].details, [
     'Top Tier',
     '6x4',
-    'Textured: Ridge Comb',
+    'Textured Finish',
+    'Texture Pattern: Ridge Comb',
+    'Frosting Flavor: Vanilla',
     'Vanilla Sponge',
     'Filling: None',
     'Piping Design: None',
@@ -177,6 +183,7 @@ test('drip breakdown is included in Size details at ₱0 and does not emit separ
   assert.equal(dripLine1, undefined);
   const sizeLine = quote1.lineItems.find((l) => l.componentKey === 'sponge-size');
   assert.ok(sizeLine.details.includes('Drip: Long Drips (Included)'));
+  assert.ok(sizeLine.details.includes('Drip Flavor: Vanilla'));
 
   // 2-Tier Drip
   const quote2 = buildQuote({
@@ -189,6 +196,7 @@ test('drip breakdown is included in Size details at ₱0 and does not emit separ
   assert.equal(dripBottom, undefined);
   const bSize = quote2.lineItems.find((l) => l.componentKey === 'sponge-size-bottom');
   assert.ok(bSize.details.includes('Drip: Long Drips (Included)'));
+  assert.ok(bSize.details.includes('Drip Flavor: Vanilla'));
 });
 
 test('next publication time is the next 10 PM in Manila', () => {
@@ -373,6 +381,7 @@ test('two-tier quote prices and generates accurate specs for Uniform vs Individu
   assert.deepEqual(uniformBottom.details, [
     'Size: 8x6 (Bottom Tier)',
     'Frosted Finish (Included)',
+    'Frosting Flavor: Vanilla',
     'Filling: Strawberry (2 Layers) (Included)',
     'Piping Design: None',
     'Piping Sugar Color: Rose Pink',
@@ -380,6 +389,7 @@ test('two-tier quote prices and generates accurate specs for Uniform vs Individu
   assert.deepEqual(uniformTop.details, [
     'Size: 6x4 (Top Tier)',
     'Frosted Finish (Included)',
+    'Frosting Flavor: Vanilla',
     'Filling: Strawberry (2 Layers) (Included)',
     'Piping Design: None',
     'Piping Sugar Color: Rose Pink',
@@ -412,7 +422,9 @@ test('two-tier quote prices and generates accurate specs for Uniform vs Individu
   ]);
   assert.deepEqual(indTop.details, [
     'Size: 6x4 (Top Tier)',
-    'Textured: Ribbon Wrap (Included)',
+    'Textured Finish (Included)',
+    'Texture Pattern: Ribbon Wrap',
+    'Frosting Flavor: Vanilla',
     'Filling: Lemon (1 Layer) (Included)',
     'Piping Design: None',
     'Piping Sugar Color: Lemon',
@@ -448,6 +460,7 @@ test('petits fours quote prices a 4-piece set and each individually configured v
     'Petits Four (4 pcs)',
     '1x1',
     'Frosted Finish',
+    'Frosting Flavor: Vanilla',
     'Chocolate Sponge',
     'Filling: None',
     'Piping Design: None',
@@ -471,6 +484,7 @@ test('petits fours quote prices a 4-piece set and each individually configured v
     'Variant 1',
     '2x2',
     'Frosted Finish',
+    'Frosting Flavor: Vanilla',
     'Vanilla Sponge',
     'Filling: None',
     'Piping Design: None',

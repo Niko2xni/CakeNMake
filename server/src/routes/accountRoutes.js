@@ -6,6 +6,7 @@ const {
     updateCurrentAccount,
     requestEmailLinkOtp,
     verifyEmailLinkOtp,
+    disconnectEmailOtp,
     getCustomerTransactions,
     payTransactionBalance,
 } = require('../controllers/accountController');
@@ -21,5 +22,6 @@ router.get('/transactions', getCustomerTransactions);
 router.post('/transactions/:id/pay-balance', payTransactionBalance);
 router.post('/email/request-otp', requestEmailLinkOtp);
 router.post('/email/verify-otp', verifyEmailLinkOtp);
+router.delete('/email/disconnect', disconnectEmailOtp);
 
 module.exports = router;

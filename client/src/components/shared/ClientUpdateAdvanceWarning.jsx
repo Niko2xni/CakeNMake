@@ -58,7 +58,7 @@ export default function ClientUpdateAdvanceWarning() {
               </span>
             </div>
             <p className="mt-1 text-xs text-amber-900 leading-relaxed">
-              The server will update and will be temporarily off starting from <strong>10:00 PM</strong>. Please save your custom cake designs and complete your orders prior to the update window.
+              The server will update and will be temporarily off starting from <strong>10:00 PM</strong>. No payments are available 30 minutes before the scheduled update (from <strong>9:30 PM</strong>). Please save your custom cake designs and complete your orders prior to 9:30 PM.
             </p>
           </div>
         </div>

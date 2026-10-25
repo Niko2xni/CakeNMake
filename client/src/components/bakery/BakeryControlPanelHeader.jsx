@@ -189,14 +189,14 @@ export default function BakeryControlPanelHeader({ onDraftsChange, onMinimize, c
         isWebsiteOff
           ? 'bg-rose-50/98 border-rose-300 text-rose-950'
           : 'bg-white/95 border-pink-200/90 text-gray-800'
-      } p-3 sm:p-4 mb-4 ${className}`}
+      } p-2.5 sm:p-4 mb-2.5 sm:mb-4 ${className}`}
     >
       {/* Top Header Row */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2.5 sm:gap-3">
         {/* Left: Control Panel Badge & Room Details */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <div
-            className={`p-2.5 rounded-xl flex items-center justify-center shrink-0 ${
+            className={`p-2 sm:p-2.5 rounded-xl flex items-center justify-center shrink-0 ${
               isWebsiteOff
                 ? 'bg-rose-600 text-white animate-pulse'
                 : 'bg-gradient-to-br from-pink-500 to-rose-500 text-white shadow-sm'
@@ -205,16 +205,16 @@ export default function BakeryControlPanelHeader({ onDraftsChange, onMinimize, c
             <Radio className="w-4 h-4" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Control Panel & Monitoring Room
               </span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-pink-100 text-pink-700">
+              <span className="text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full font-semibold bg-pink-100 text-pink-700">
                 {currentPageLabel}
               </span>
             </div>
             <div className="flex items-center gap-2 mt-0.5">
-              <h2 className="text-sm sm:text-base font-bold text-gray-900 leading-tight">
+              <h2 className="text-xs sm:text-base font-bold text-gray-900 leading-tight">
                 Templates & Pricing Control Panel
               </h2>
             </div>
@@ -222,10 +222,10 @@ export default function BakeryControlPanelHeader({ onDraftsChange, onMinimize, c
         </div>
 
         {/* Right: Client Access Status Pill + Action Buttons */}
-        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap sm:flex-nowrap">
           {/* Status Governing Client Access */}
           <div
-            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-xs ${
+            className={`inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border text-[11px] sm:text-xs font-bold transition-all shadow-xs ${
               isWebsiteOff
                 ? 'bg-rose-600 text-white border-rose-700 animate-pulse'
                 : 'bg-emerald-50 text-emerald-800 border-emerald-200'
@@ -237,7 +237,7 @@ export default function BakeryControlPanelHeader({ onDraftsChange, onMinimize, c
             }
           >
             <span
-              className={`h-2.5 w-2.5 rounded-full ${
+              className={`h-2 sm:h-2.5 w-2 sm:w-2.5 rounded-full ${
                 isWebsiteOff ? 'bg-white animate-ping' : 'bg-emerald-500'
               }`}
             />
@@ -249,7 +249,7 @@ export default function BakeryControlPanelHeader({ onDraftsChange, onMinimize, c
             type="button"
             onClick={handleToggleWebsite}
             disabled={actionInProgress === 'toggle'}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+            className={`inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold border transition-all ${
               isWebsiteOff
                 ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700'
                 : 'bg-white hover:bg-rose-50 text-rose-700 border-rose-200 hover:border-rose-300'
@@ -269,7 +269,7 @@ export default function BakeryControlPanelHeader({ onDraftsChange, onMinimize, c
               setActiveTab('drafts');
               setIsExpanded(isExpanded && activeTab === 'drafts' ? false : true);
             }}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+            className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold border transition-all ${
               isExpanded && activeTab === 'drafts'
                 ? 'bg-pink-100 text-pink-900 border-pink-400 ring-2 ring-pink-400/30 font-bold'
                 : totalCount > 0
@@ -295,7 +295,7 @@ export default function BakeryControlPanelHeader({ onDraftsChange, onMinimize, c
               setActiveTab('log');
               setIsExpanded(isExpanded && activeTab === 'log' ? false : true);
             }}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+            className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold border transition-all ${
               isExpanded && activeTab === 'log'
                 ? 'bg-pink-100 text-pink-900 border-pink-400 ring-2 ring-pink-400/30 font-bold'
                 : 'bg-white hover:bg-pink-50 text-gray-700 border-gray-200 shadow-2xs'
@@ -319,7 +319,7 @@ export default function BakeryControlPanelHeader({ onDraftsChange, onMinimize, c
             <button
               type="button"
               onClick={onMinimize}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-100 border border-gray-200 transition-colors shadow-2xs"
+              className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-100 border border-gray-200 transition-colors shadow-2xs"
               title="Minimize Control Panel (Click Control in nav bar to summon it back)"
             >
               <Minus className="w-3.5 h-3.5" />
@@ -331,22 +331,22 @@ export default function BakeryControlPanelHeader({ onDraftsChange, onMinimize, c
 
       {/* Pending Changes on Hold Embedded Message inside Control Panel Box */}
       {totalCount > 0 && (
-        <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50/95 p-3 text-xs text-amber-950 shadow-xs animate-in fade-in duration-200">
+        <div className="mt-2.5 sm:mt-3 rounded-xl border border-amber-300 bg-amber-50/95 p-2.5 sm:p-3 text-xs text-amber-950 shadow-xs animate-in fade-in duration-200">
           <div className="flex flex-wrap items-start justify-between gap-2">
-            <div className="flex items-start gap-2.5 min-w-0 flex-1">
-              <div className="p-1.5 rounded-lg bg-amber-200 text-amber-900 shrink-0 mt-0.5">
-                <Clock className="w-4 h-4" />
+            <div className="flex items-start gap-2 sm:gap-2.5 min-w-0 flex-1">
+              <div className="p-1 sm:p-1.5 rounded-lg bg-amber-200 text-amber-900 shrink-0 mt-0.5">
+                <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                   <span className="font-bold text-amber-950 text-xs sm:text-sm">
                     Pending Changes on Hold
                   </span>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-900 border border-amber-300">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-200 px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-bold text-amber-900 border border-amber-300">
                     Auto-commits at 10:00 PM
                   </span>
                 </div>
-                <p className="mt-1 text-[11px] text-amber-900 leading-relaxed">
+                <p className="mt-1 text-[10.5px] sm:text-[11px] text-amber-900 leading-relaxed">
                   These are currently drafts waiting to be committed at 10:00 PM. None of these changes have reflected to client-facing screens yet. You can edit, modify, or delete your drafts anytime before 10:00 PM.
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -623,16 +623,16 @@ export default function BakeryControlPanelHeader({ onDraftsChange, onMinimize, c
       )}
 
       {/* Advance 10 PM Schedule Notification Bar - Always clean at bottom of panel */}
-      <div className="mt-2.5 pt-2.5 border-t border-pink-100/80 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+      <div className="mt-2 pt-2 sm:mt-2.5 sm:pt-2.5 border-t border-pink-100/80 flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-muted-foreground">
         <div className="flex items-center gap-1.5 text-gray-700 flex-wrap">
-          <Clock className="w-3.5 h-3.5 text-pink-600 shrink-0" />
+          <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-pink-600 shrink-0" />
           <span>
-            Scheduled update window: <strong className="text-gray-900">10:00 PM</strong> daily. Both Template and Pricing edits commit together. Warning banner active 3 hours ahead (from 7:00 PM).
+            Scheduled update window: <strong className="text-gray-900">10:00 PM</strong> daily. Both Template and Pricing edits commit together. Warning banner active 3 hours ahead (from 7:00 PM). No payments available 30 minutes before the update (from 9:30 PM).
           </span>
         </div>
         <div className="flex items-center gap-3">
           {systemStatus?.showClientWarning && (
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md border border-amber-300">
+            <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md border border-amber-300">
               <AlertTriangle className="w-3 h-3 text-amber-600" /> 3-Hour Advance Warning Active on Client Side
             </span>
           )}

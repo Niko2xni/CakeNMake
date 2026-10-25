@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const Reservation = require('../models/Reservation');
 const Blueprint = require('../models/Blueprint');
+const Platform = require('../models/Platform');
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const { synchronizeAccount } = require('../services/accountSyncService');
@@ -9,6 +10,7 @@ const { firebaseAdminAuth, firebaseAdminConfigured } = require('../config/fireba
 const { requestOtp, verifyOtp } = require('../services/emailOtpService');
 const { publishMessage } = require('../services/moderationService');
 const { sendBalancePaymentEmail } = require('../services/reservationEmailService');
+const { isWithinThirtyMinutePaymentCutoff } = require('../services/maintenanceService');
 
 async function syncAccount(req, res) {
     try {
@@ -187,6 +189,11 @@ async function verifyEmailLinkOtp(req, res) {
             emailVerified: true,
         });
 
+        await User.findOneAndUpdate(
+            { firebaseUid: req.auth.uid },
+            { $addToSet: { providers: 'email-otp' } }
+        );
+
         const user = await synchronizeAccount(req.auth);
         return res.json({
             message: 'Your verified email was connected successfully.',
@@ -306,10 +313,24 @@ async function getCustomerTransactions(req, res) {
 }
 
 async function payTransactionBalance(req, res) {
+    const now = req.__testNow || new Date();
+    if (isWithinThirtyMinutePaymentCutoff(now)) {
+        return res.status(403).json({
+            message: 'No payments are available 30 minutes before the scheduled update (from 9:30 PM to 10:05 PM). Please try again after the update completes.',
+        });
+    }
+
     const { id } = req.params;
     const { paymentReference, method = 'gcash' } = req.body || {};
 
     try {
+        const platform = await Platform.findOne();
+        if (platform?.maintenanceMode?.isWebsiteOff) {
+            return res.status(403).json({
+                message: 'Payments are temporarily unavailable because the website is in maintenance mode. Please try again later.',
+            });
+        }
+
         const firebaseUid = req.auth?.uid || req.user?.uid;
         if (!firebaseUid) {
             return res.status(401).json({ message: 'Authentication is required.' });
@@ -523,12 +544,39 @@ async function payTransactionBalance(req, res) {
     }
 }
 
+async function disconnectEmailOtp(req, res) {
+    try {
+        const user = await User.findOneAndUpdate(
+            { firebaseUid: req.auth.uid, status: 'active' },
+            { $pull: { providers: 'email-otp' } },
+            { new: true }
+        );
+        if (!user) {
+            return res.status(404).json({
+                code: 'ACCOUNT_NOT_FOUND',
+                message: 'Account not found.',
+            });
+        }
+        return res.json({
+            message: 'Email verification was disconnected.',
+            user,
+        });
+    } catch (error) {
+        console.error('Email disconnect failed:', error);
+        return res.status(500).json({
+            code: 'DISCONNECT_FAILED',
+            message: 'We could not disconnect email verification.',
+        });
+    }
+}
+
 module.exports = {
     syncAccount,
     getCurrentAccount,
     updateCurrentAccount,
     requestEmailLinkOtp,
     verifyEmailLinkOtp,
+    disconnectEmailOtp,
     getCustomerTransactions,
     payTransactionBalance,
 };

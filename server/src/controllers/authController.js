@@ -59,7 +59,13 @@ exports.verifyEmailOtp = async (req, res) => {
       user = await firebaseAdminAuth.createUser({ email, emailVerified: true });
     }
 
-    const token = await firebaseAdminAuth.createCustomToken(user.uid);
+    const User = require('../models/User');
+    await User.findOneAndUpdate(
+      { firebaseUid: user.uid },
+      { $addToSet: { providers: 'email-otp' } }
+    );
+
+    const token = await firebaseAdminAuth.createCustomToken(user.uid, { provider: 'email-otp' });
     return res.json({ token });
   } catch (error) {
     return sendServiceError(res, error, 'We could not complete sign-in.');

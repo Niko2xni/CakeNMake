@@ -7,7 +7,6 @@ import {
   MessageSquare,
   Plus,
   Receipt,
-  Settings,
   Trash2,
   User,
 } from 'lucide-react';
@@ -99,7 +98,7 @@ export default function ClientNavbar() {
           <button
             type="button"
             onClick={() => setUserDropdownOpen((open) => !open)}
-            className={`cn-nav-item cn-account-item ${['/profile', '/settings'].includes(location.pathname) ? 'is-active' : ''}`}
+            className={`cn-nav-item cn-account-item ${location.pathname === '/profile' ? 'is-active' : ''}`}
             aria-expanded={userDropdownOpen}
             aria-haspopup="menu"
           >
@@ -140,15 +139,6 @@ export default function ClientNavbar() {
                   onClick={() => setUserDropdownOpen(false)}
                 >
                   <User className="w-4 h-4" /> Profile
-                </Link>
-                <Link
-                  to="/settings"
-                  role="menuitem"
-                  aria-current={location.pathname === '/settings' ? 'page' : undefined}
-                  className={location.pathname === '/settings' ? 'is-current' : undefined}
-                  onClick={() => setUserDropdownOpen(false)}
-                >
-                  <Settings className="w-4 h-4" /> Settings
                 </Link>
               </div>
               <div className="cn-user-popover-footer">

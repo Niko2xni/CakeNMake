@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,12 +21,14 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const { account, isAuthenticated, isLoadingAuth, authError } = useAuth();
+  const isVerifyingRef = useRef(false);
+
   useEffect(() => {
     if (isLoadingAuth || !isAuthenticated || !account) return;
     navigate(['bakery_staff', 'bakery_admin', 'platform_admin'].includes(account.role) ? '/bakery/orders' : '/client', { replace: true });
   }, [account, isAuthenticated, isLoadingAuth, navigate]);
 
-  const initialEmail = location.state?.email || "";
+  const initialEmail = (location.state?.email || "").trim().toLowerCase();
   const initialOtpSent = Boolean(location.state?.otpSent && initialEmail);
   const initialExpiresAt = location.state?.expiresAt || null;
 
@@ -64,8 +66,8 @@ export default function Login() {
         setOtp("");
         setOtpExpiresAt(null);
         setOtpTimeLeft(0);
-        setOtpExpiredMessage("OTP expired");
-        setStatusMessage("Please request a new code to continue.");
+        setOtpExpiredMessage("Your verification code has expired. Please request a new code to continue.");
+        setStatusMessage("");
         setError("");
       }
     };
@@ -90,7 +92,8 @@ export default function Login() {
 
   const verifyCode = async (codeToVerify) => {
     const targetCode = String(codeToVerify || otp || "").trim();
-    if (loading) return;
+    if (loading || isVerifyingRef.current) return;
+    isVerifyingRef.current = true;
     setError("");
     setStatusMessage("");
     setOtpExpiredMessage("");
@@ -101,9 +104,9 @@ export default function Login() {
         setOtp("");
         setOtpExpiresAt(null);
         setOtpTimeLeft(0);
-        setOtpExpiredMessage("OTP expired");
-        setStatusMessage("Please request a new code to continue.");
-        setError("Your verification code expired. Please request a new code.");
+        setOtpExpiredMessage("Your verification code has expired. Please request a new code to continue.");
+        setStatusMessage("");
+        setError("");
         return;
       }
 
@@ -115,6 +118,7 @@ export default function Login() {
     } catch (authError) {
       setError(authError.message || "Authentication failed.");
     } finally {
+      isVerifyingRef.current = false;
       setLoading(false);
     }
   };
@@ -122,7 +126,7 @@ export default function Login() {
   const handleOtpChange = (value) => {
     const cleaned = value.replace(/\D/g, "").slice(0, 6);
     setOtp(cleaned);
-    if (cleaned.length === 6 && !loading && otpSent && otpTimeLeft > 0) {
+    if (cleaned.length === 6 && !loading && !isVerifyingRef.current && otpSent && otpTimeLeft > 0) {
       verifyCode(cleaned);
     }
   };
@@ -244,13 +248,14 @@ export default function Login() {
                 variant="ghost"
                 size="sm"
                 className="cn-auth-back-btn h-8 px-2.5 gap-1.5 text-xs font-semibold rounded-lg text-muted-foreground hover:text-foreground hover:bg-black/5"
+                disabled={loading}
                 onClick={() => {
                   setOtpSent(false);
                   setOtp("");
-                  setEmail("");
                   setOtpExpiresAt(null);
                   setOtpTimeLeft(0);
                   setStatusMessage("");
+                  setOtpExpiredMessage("");
                   setError("");
                 }}
               >
@@ -259,7 +264,14 @@ export default function Login() {
               </Button>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <Label>Verification code</Label>
+              <div>
+                <Label>Verification code</Label>
+                {email && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Sent to <span className="font-medium text-foreground">{email}</span>
+                  </p>
+                )}
+              </div>
               {otpExpiresAt && (
                 <div className="flex items-center gap-1.5 text-xs font-medium text-black whitespace-nowrap">
                   <TimerReset className="w-3.5 h-3.5 text-black" />
@@ -276,7 +288,7 @@ export default function Login() {
                 onChange={handleOtpChange}
                 onComplete={(val) => {
                   const cleaned = String(val || "").replace(/\D/g, "").slice(0, 6);
-                  if (cleaned.length === 6 && !loading && otpSent && otpTimeLeft > 0) {
+                  if (cleaned.length === 6 && !loading && !isVerifyingRef.current && otpSent && otpTimeLeft > 0) {
                     verifyCode(cleaned);
                   }
                 }}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,7 @@ export default function GuestAuthModal({
 }) {
   const { isAuthenticated, isLoadingAuth, authError } = useAuth();
   const [pendingUser, setPendingUser] = useState(null);
+  const isVerifyingRef = useRef(false);
 
   useEffect(() => {
     if (!isOpen || !pendingUser || isLoadingAuth) return;
@@ -113,8 +114,8 @@ export default function GuestAuthModal({
         setOtp("");
         setOtpExpiresAt(null);
         setOtpTimeLeft(0);
-        setOtpExpiredMessage("OTP expired");
-        setStatusMessage("Please request a new code to continue.");
+        setOtpExpiredMessage("Your verification code has expired. Please request a new code to continue.");
+        setStatusMessage("");
         setError("");
       }
     };
@@ -140,7 +141,8 @@ export default function GuestAuthModal({
 
   const verifyCode = async (codeToVerify) => {
     const targetCode = String(codeToVerify || otp || "").trim();
-    if (loading || Boolean(pendingUser)) return;
+    if (loading || Boolean(pendingUser) || isVerifyingRef.current) return;
+    isVerifyingRef.current = true;
     setError("");
     setStatusMessage("");
     setOtpExpiredMessage("");
@@ -151,9 +153,9 @@ export default function GuestAuthModal({
         setOtp("");
         setOtpExpiresAt(null);
         setOtpTimeLeft(0);
-        setOtpExpiredMessage("OTP expired");
-        setStatusMessage("Please request a new code to continue.");
-        setError("Your verification code expired. Please request a new code.");
+        setOtpExpiredMessage("Your verification code has expired. Please request a new code to continue.");
+        setStatusMessage("");
+        setError("");
         return;
       }
 
@@ -166,6 +168,7 @@ export default function GuestAuthModal({
     } catch (authError) {
       setError(authError.message || "Authentication failed.");
     } finally {
+      isVerifyingRef.current = false;
       setLoading(false);
     }
   };
@@ -173,7 +176,7 @@ export default function GuestAuthModal({
   const handleOtpChange = (value) => {
     const cleaned = value.replace(/\D/g, "").slice(0, 6);
     setOtp(cleaned);
-    if (cleaned.length === 6 && !loading && !pendingUser && otpSent && otpTimeLeft > 0) {
+    if (cleaned.length === 6 && !loading && !pendingUser && !isVerifyingRef.current && otpSent && otpTimeLeft > 0) {
       verifyCode(cleaned);
     }
   };
@@ -347,13 +350,14 @@ export default function GuestAuthModal({
                   variant="ghost"
                   size="sm"
                   className="cn-auth-back-btn h-8 px-2.5 gap-1.5 text-xs font-semibold rounded-lg text-muted-foreground hover:text-foreground hover:bg-black/5"
+                  disabled={loading}
                   onClick={() => {
                     setOtpSent(false);
                     setOtp("");
-                    setEmail("");
                     setOtpExpiresAt(null);
                     setOtpTimeLeft(0);
                     setStatusMessage("");
+                    setOtpExpiredMessage("");
                     setError("");
                   }}
                 >
@@ -379,7 +383,7 @@ export default function GuestAuthModal({
                   onChange={handleOtpChange}
                   onComplete={(val) => {
                     const cleaned = String(val || "").replace(/\D/g, "").slice(0, 6);
-                    if (cleaned.length === 6 && !loading && !pendingUser && otpSent && otpTimeLeft > 0) {
+                    if (cleaned.length === 6 && !loading && !pendingUser && !isVerifyingRef.current && otpSent && otpTimeLeft > 0) {
                       verifyCode(cleaned);
                     }
                   }}

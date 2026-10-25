@@ -39,17 +39,16 @@ describe('ClientNavbar', () => {
     expect(chatsLink).toHaveClass('is-active');
   });
 
-  it('opens an accessible account menu with profile and settings links', () => {
-    renderNavbar('/settings');
+  it('opens an accessible account menu with profile link', () => {
+    renderNavbar('/profile');
 
     fireEvent.click(screen.getByRole('button', { name: /account/i }));
 
     expect(screen.getByText('Jane Doe')).toBeInTheDocument();
     expect(screen.getByText('jane@example.com')).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /profile/i })).toHaveAttribute('href', '/profile');
-    expect(screen.getByRole('menuitem', { name: /settings/i })).toHaveAttribute('href', '/settings');
-    expect(screen.getByRole('menuitem', { name: /settings/i })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('menuitem', { name: /profile/i })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('menuitem', { name: /profile/i })).toHaveAttribute('aria-current', 'page');
+    expect(screen.queryByRole('menuitem', { name: /settings/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: /orders & support/i })).not.toBeInTheDocument();
   });
 
