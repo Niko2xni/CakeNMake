@@ -165,6 +165,121 @@ The CakeNMake Team`;
   return { subject, text, html };
 }
 
+function buildBalancePaidEmailContent({
+  orderRef = 'CONFIRMED',
+  customerName,
+  designName,
+  bakeryName = 'AH TINAPS BAKESHOP',
+  deliveryDate,
+  totalPrice,
+  amountPaid,
+  paymentReference,
+  status = 'In Production',
+}) {
+  const displayBakeryName = (!bakeryName || bakeryName === 'Mamshie Bakery')
+    ? 'AH TINAPS BAKESHOP'
+    : bakeryName;
+  const subject = `Balance Payment Received: ${safeHeader(designName)} (In Production) - CakeNMake`;
+
+  const text = `Hello ${customerName},
+
+Great news! We have received your remaining balance payment of ₱${amountPaid} for your cake design "${designName}".
+
+Payment & Order Details:
+• Order Reference: #${orderRef}
+• Design: "${designName}"
+• Bakery: ${displayBakeryName}
+• Delivery/Pickup Date: ${deliveryDate}
+• Payment Reference: ${paymentReference || 'N/A'}
+• Balance Paid: ₱${amountPaid}
+• Total Price: ₱${totalPrice} (Fully Paid)
+• Order Status: ${status}
+
+Production Update:
+Your cake is now officially IN PRODUCTION! Our bakers at ${displayBakeryName} have commenced preparation for your order. We will keep you posted as your cake is baked, decorated, and prepared for pickup.
+
+----------------------------------------------------
+🧾 ORDER PICKUP SLIP (Optional for collection)
+Order Reference: #${orderRef}
+Cake: "${designName}"
+Bakery Store: ${displayBakeryName}
+Scheduled Date: ${deliveryDate}
+Total Paid: ₱${totalPrice} (Fully Paid)
+Status: ${status}
+(Showing this slip is optional. You can simply show this email, mention your order reference, or state your name at the counter.)
+----------------------------------------------------
+
+Thank you for choosing CakeNMake!
+
+Warm regards,
+The CakeNMake Team & ${displayBakeryName}`;
+
+  const values = Object.fromEntries(Object.entries({
+    subject, orderRef, customerName, designName, bakeryName: displayBakeryName, deliveryDate, totalPrice, amountPaid, paymentReference: paymentReference || 'N/A', status,
+  }).map(([key, value]) => [key, escapeHtml(value)]));
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>${values.subject}</title></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #fdf8f9; color: #1f2937; margin: 0; padding: 24px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #fee2e2;">
+    <tr><td style="background: linear-gradient(135deg, #10b981, #059669, #0d9488); padding: 28px 32px; text-align: center;"><h1 style="color: #ffffff; margin: 0; font-size: 24px;">🎂 CakeNMake</h1><p style="color: #ffffff; margin: 6px 0 0; font-size: 14px;">Balance Paid &bull; Order In Production!</p></td></tr>
+    <tr><td style="padding: 32px;">
+      <p style="font-size: 16px; margin: 0 0 16px; color: #374151;">Hello <strong>${values.customerName}</strong>,</p>
+      <p style="font-size: 14px; line-height: 1.6; margin: 0 0 24px; color: #4b5563;">Great news! We have received your remaining balance payment of <strong style="color: #059669;">₱${values.amountPaid}</strong> for <strong>"${values.designName}"</strong>. Your order is now fully settled and officially in production!</p>
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px; margin-bottom: 24px;"><tr><td style="padding: 20px;">
+        <h2 style="font-size: 15px; margin: 0 0 14px; color: #065f46;">Payment Receipt & Status</h2>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size: 14px; line-height: 1.8;">
+          <tr><td style="color: #6b7280; width: 45%;">Order Reference:</td><td style="color: #111827; font-weight: 600; font-family: monospace;">#${values.orderRef}</td></tr>
+          <tr><td style="color: #6b7280;">Cake Design:</td><td style="color: #111827; font-weight: 600;">${values.designName}</td></tr>
+          <tr><td style="color: #6b7280;">Bakery:</td><td style="color: #111827; font-weight: 600;">${values.bakeryName}</td></tr>
+          <tr><td style="color: #6b7280;">Pickup / Delivery:</td><td style="color: #111827; font-weight: 600;">${values.deliveryDate}</td></tr>
+          <tr><td style="color: #6b7280;">Balance Paid Now:</td><td style="color: #059669; font-weight: 700;">₱${values.amountPaid}</td></tr>
+          <tr><td style="color: #6b7280;">Payment Reference:</td><td style="color: #4b5563; font-family: monospace; font-size: 12px;">${values.paymentReference}</td></tr>
+          <tr><td style="color: #6b7280;">Total Price:</td><td style="color: #111827; font-weight: 600;">₱${values.totalPrice} <span style="color: #059669; font-size: 12px; font-weight: bold;">(100% Paid)</span></td></tr>
+          <tr><td style="color: #6b7280;">Current Status:</td><td style="color: #059669; font-weight: 700;">${values.status}</td></tr>
+        </table>
+      </td></tr></table>
+
+      <!-- Optional Digital Pickup Slip -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border: 2px dashed #059669; border-radius: 12px; margin-bottom: 24px;">
+        <tr><td style="padding: 18px 20px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="font-size: 14px; font-weight: 700; color: #059669;">🧾 Order Pickup Slip</td>
+              <td style="text-align: right; font-size: 11px; color: #6b7280; font-family: monospace;">Ref: #${values.orderRef}</td>
+            </tr>
+          </table>
+          <p style="font-size: 12px; color: #6b7280; margin: 8px 0 12px; line-height: 1.5;">
+            Showing this slip is <strong>completely optional</strong> when claiming your cake. You can simply show this email, mention your order reference, or state your name at the counter.
+          </p>
+          <div style="background-color: #f0fdf4; border-radius: 8px; padding: 12px 14px; font-size: 13px; line-height: 1.6;">
+            <div><strong>Cake:</strong> ${values.designName}</div>
+            <div><strong>Bakery:</strong> ${values.bakeryName}</div>
+            <div><strong>Pickup Date:</strong> ${values.deliveryDate}</div>
+            <div><strong>Total Paid:</strong> ₱${values.totalPrice} (Fully Paid)</div>
+            <div style="color: #065f46; font-weight: 700;"><strong>Status:</strong> In Production</div>
+          </div>
+        </td></tr>
+      </table>
+
+      <div style="background-color: #f9fafb; border-radius: 12px; padding: 18px 20px; margin-bottom: 24px; border: 1px solid #f3f4f6;">
+        <h3 style="font-size: 13px; color: #374151; margin: 0 0 8px;">What's next?</h3>
+        <p style="font-size: 13px; color: #6b7280; line-height: 1.5; margin: 0;">
+          Our baking team is now preparing and decorating your cake according to your 3D specifications. You can message the bakery staff directly anytime through your <strong>CakeNMake Chats</strong>.
+        </p>
+      </div>
+      <p style="font-size: 13px; color: #9ca3af; line-height: 1.5; margin: 0;">If you have any questions, feel free to chat with us directly via the app.</p>
+    </td></tr>
+    <tr><td style="background-color: #f9fafb; padding: 20px 32px; text-align: center; border-top: 1px solid #f3f4f6; font-size: 12px; color: #9ca3af;"><p style="margin: 0;">CakeNMake &bull; Your 3D Custom Cake Design Platform</p></td></tr>
+  </table>
+</body>
+</html>`.trim();
+  return { subject, text, html };
+}
+
 function retryDelay(attempts) {
   return Math.min(RETRY_BASE_MS * (2 ** Math.max(0, attempts - 1)), RETRY_MAX_MS);
 }
@@ -213,6 +328,49 @@ function createReservationEmailService({
       remainingBalance: formatPesos(Math.max(0, totalNum - downNum)),
       isDownPaymentPaid: isPaid,
       status: isPaid ? 'Confirmed' : (reservation.status === 'confirmed' ? 'Confirmed' : 'Pending Down Payment'),
+    });
+    if (!mailDelivery.configured) return { sent: false, reason: 'NOT_CONFIGURED', error: 'Email delivery is not configured.' };
+    try {
+      return { sent: true, result: await mailDelivery.send({ to: user.email, ...message }) };
+    } catch (error) {
+      return { sent: false, error: error.message || 'Email provider rejected delivery.' };
+    }
+  }
+
+  async function sendBalancePaymentEmail(reservation) {
+    if (!reservation) return { sent: false, reason: 'NO_RESERVATION' };
+    let user = reservation.user;
+    try {
+      if (!user || typeof user !== 'object' || !user.email) user = user ? await userModel.findById(user._id || user).lean() : null;
+    } catch {
+      return { sent: false, error: 'Customer account lookup failed.' };
+    }
+    if (!user?.email) return { sent: false, reason: 'NO_EMAIL', error: 'Customer account has no email address.' };
+
+    let platform = reservation.platform;
+    try {
+      if (!platform || typeof platform !== 'object' || !platform.name) platform = platform ? await platformModel.findById(platform._id || platform).lean() : null;
+    } catch {
+      return { sent: false, error: 'Bakery lookup failed.' };
+    }
+    const resolvedBakeryName = (platform?.name && platform.name !== 'Mamshie Bakery')
+      ? platform.name
+      : 'AH TINAPS BAKESHOP';
+
+    const totalNum = Number(reservation.totalPrice || 0);
+    const balancePaidNum = Number(reservation.finalPayment?.amount || (totalNum - Number(reservation.downPayment?.amount || 0)));
+    const resId = reservation._id ? String(reservation._id) : '';
+    const orderRef = resId ? resId.slice(-8).toUpperCase() : 'CONFIRMED';
+    const message = buildBalancePaidEmailContent({
+      orderRef,
+      customerName: user.displayName || user.email.split('@')[0] || 'Valued Customer',
+      designName: reservation.designName || 'Custom Cake',
+      bakeryName: resolvedBakeryName,
+      deliveryDate: formatDate(reservation.pickupDate),
+      totalPrice: formatPesos(totalNum),
+      amountPaid: formatPesos(balancePaidNum),
+      paymentReference: reservation.finalPayment?.paymentReference || 'N/A',
+      status: 'In Production',
     });
     if (!mailDelivery.configured) return { sent: false, reason: 'NOT_CONFIGURED', error: 'Email delivery is not configured.' };
     try {
@@ -282,7 +440,12 @@ function createReservationEmailService({
     return Promise.allSettled(pending.map((entry) => processReservationConfirmationEmail(entry)));
   }
 
-  return { sendReservationConfirmationEmail, processReservationConfirmationEmail, processPendingReservationConfirmations };
+  return {
+    sendReservationConfirmationEmail,
+    sendBalancePaymentEmail,
+    processReservationConfirmationEmail,
+    processPendingReservationConfirmations,
+  };
 }
 
 const defaultReservationEmailService = createReservationEmailService();
@@ -290,9 +453,11 @@ const defaultReservationEmailService = createReservationEmailService();
 module.exports = {
   createReservationEmailService,
   sendReservationConfirmationEmail: (reservation) => defaultReservationEmailService.sendReservationConfirmationEmail(reservation),
+  sendBalancePaymentEmail: (reservation) => defaultReservationEmailService.sendBalancePaymentEmail(reservation),
   processReservationConfirmationEmail: (reservation) => defaultReservationEmailService.processReservationConfirmationEmail(reservation),
   processPendingReservationConfirmations: (options) => defaultReservationEmailService.processPendingReservationConfirmations(options),
   buildEmailContent,
+  buildBalancePaidEmailContent,
   formatPesos,
   formatDate,
   escapeHtml,

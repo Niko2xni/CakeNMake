@@ -3,6 +3,7 @@ const { test, afterEach, mock } = require('node:test');
 const {
   createReservationEmailService,
   buildEmailContent,
+  buildBalancePaidEmailContent,
   formatPesos,
   formatDate,
 } = require('../src/services/reservationEmailService');
@@ -236,6 +237,60 @@ test('sendReservationConfirmationEmail catches mail delivery errors safely', asy
   const result = await service.sendReservationConfirmationEmail(reservation);
   assert.equal(result.sent, false);
   assert.equal(result.error, 'SMTP connection timed out');
+});
+
+test('buildBalancePaidEmailContent creates balance paid notification and in-production slip', () => {
+  const content = buildBalancePaidEmailContent({
+    customerName: 'Juan Dela Cruz',
+    designName: 'Strawberry Shortcake',
+    bakeryName: 'AH TINAPS BAKESHOP',
+    deliveryDate: 'Nov 1, 2026',
+    totalPrice: '3,000.00',
+    amountPaid: '1,500.00',
+    paymentReference: 'DEMO-BAL-1500-ABCDEF',
+  });
+
+  assert.equal(content.subject, 'Balance Payment Received: Strawberry Shortcake (In Production) - CakeNMake');
+  assert.ok(content.text.includes('Hello Juan Dela Cruz,'));
+  assert.ok(content.text.includes('₱1,500.00'));
+  assert.ok(content.text.includes('IN PRODUCTION'));
+  assert.ok(content.text.includes('DEMO-BAL-1500-ABCDEF'));
+  assert.ok(content.html.includes('Juan Dela Cruz'));
+  assert.ok(content.html.includes('₱1,500.00'));
+  assert.ok(content.html.includes('In Production'));
+});
+
+test('sendBalancePaymentEmail delivers balance email to customer', async () => {
+  let sentPayload = null;
+  const mockMailDelivery = {
+    configured: true,
+    send: async (payload) => {
+      sentPayload = payload;
+      return { messageId: 'msg_bal_123' };
+    },
+  };
+
+  const service = createReservationEmailService({
+    mailDelivery: mockMailDelivery,
+  });
+
+  const reservation = {
+    _id: '671b5678901234567890abcd',
+    user: { email: 'client@example.com', displayName: 'Client Name' },
+    platform: { name: 'AH TINAPS BAKESHOP' },
+    designName: 'Velvet Rose',
+    pickupDate: new Date('2026-11-05T00:00:00Z'),
+    totalPrice: 2000,
+    downPayment: { amount: 1000, isPaid: true },
+    finalPayment: { amount: 1000, isPaid: true, paymentReference: 'REF-1000' },
+  };
+
+  const result = await service.sendBalancePaymentEmail(reservation);
+  assert.equal(result.sent, true);
+  assert.ok(sentPayload);
+  assert.equal(sentPayload.to, 'client@example.com');
+  assert.ok(sentPayload.subject.includes('Balance Payment Received'));
+  assert.ok(sentPayload.text.includes('REF-1000'));
 });
 
 test('only one concurrent worker can claim and send a confirmation', async () => {

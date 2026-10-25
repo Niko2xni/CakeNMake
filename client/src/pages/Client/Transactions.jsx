@@ -361,7 +361,8 @@ export default function Transactions() {
   }, [transactions]);
 
   const filteredTransactions = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const raw = search.trim().toLowerCase();
+    const clean = raw.replace(/^#/, '').trim();
     return transactions.filter((tx) => {
       const normStatus = String(tx.status || 'confirmed').toLowerCase();
       if (statusFilter === 'ongoing') {
@@ -373,13 +374,29 @@ export default function Transactions() {
         if (!isCompleted) return false;
       }
 
-      if (!q) return true;
-      const idMatch = (tx.id || '').toLowerCase().includes(q) ||
-        (tx.reservationId || '').toLowerCase().includes(q) ||
-        (tx.blueprintId || '').toLowerCase().includes(q);
-      const nameMatch = (tx.designName || '').toLowerCase().includes(q);
-      const bakeryMatch = (tx.bakeryName || '').toLowerCase().includes(q);
-      const statusMatch = normStatus.includes(q);
+      if (!raw) return true;
+
+      const ids = [
+        tx.id,
+        tx.reservationId,
+        tx.blueprintId,
+        tx.designId,
+      ].filter(Boolean).map((val) => String(val).toLowerCase());
+
+      const idMatch = ids.some((idVal) => {
+        if (idVal.includes(raw)) return true;
+        if (clean) {
+          if (idVal.includes(clean)) return true;
+          if (idVal.slice(-6).includes(clean)) return true;
+          if (idVal.slice(-8).includes(clean)) return true;
+        }
+        return false;
+      });
+
+      const nameMatch = (tx.designName || '').toLowerCase().includes(raw) ||
+        (clean && (tx.designName || '').toLowerCase().includes(clean));
+      const bakeryMatch = (tx.bakeryName || '').toLowerCase().includes(raw);
+      const statusMatch = normStatus.includes(raw);
       return idMatch || nameMatch || bakeryMatch || statusMatch;
     });
   }, [transactions, search, statusFilter]);

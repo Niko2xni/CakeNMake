@@ -2,9 +2,13 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const Reservation = require('../models/Reservation');
 const Blueprint = require('../models/Blueprint');
+const Conversation = require('../models/Conversation');
+const Message = require('../models/Message');
 const { synchronizeAccount } = require('../services/accountSyncService');
 const { firebaseAdminAuth, firebaseAdminConfigured } = require('../config/firebaseAdmin');
 const { requestOtp, verifyOtp } = require('../services/emailOtpService');
+const { publishMessage } = require('../services/moderationService');
+const { sendBalancePaymentEmail } = require('../services/reservationEmailService');
 
 async function syncAccount(req, res) {
     try {
@@ -402,23 +406,108 @@ async function payTransactionBalance(req, res) {
 
         // Emit live socket update to bakery platform room
         const io = req.app?.get ? req.app.get('io') : null;
-        if (io && reservation.platform) {
-            const populated = await Reservation.findById(reservation._id)
+        let populated = null;
+        if (reservation.platform) {
+            populated = await Reservation.findById(reservation._id)
                 .populate('user', 'displayName email name')
                 .populate('design', 'name thumbnail')
                 .populate('blueprint', 'designName')
+                .populate('platform', 'name')
                 .lean()
                 .catch(() => null);
 
-            io.to(`platform:${reservation.platform}`).emit('reservation:updated', populated || reservation);
-            io.to(`platform:${reservation.platform}`).emit('bakery:notification', {
-                type: 'in_production',
-                title: 'Balance Paid! (Order In Production)',
-                message: `${populated?.user?.displayName || populated?.user?.name || user?.displayName || 'Customer'} paid the remaining balance (₱${Number(reservation.finalPayment?.amount || balanceAmount).toLocaleString()}) for "${populated?.design?.name || populated?.blueprint?.designName || populated?.designName || 'Custom Cake'}". Status changed to In Production!`,
-                reservationId: String(reservation._id),
-                status: 'in_production',
-                timestamp: new Date(),
+            if (io) {
+                io.to(`platform:${reservation.platform}`).emit('reservation:updated', populated || reservation);
+                io.to(`platform:${reservation.platform}`).emit('bakery:notification', {
+                    type: 'in_production',
+                    title: 'Balance Paid! (Order In Production)',
+                    message: `${populated?.user?.displayName || populated?.user?.name || user?.displayName || 'Customer'} paid the remaining balance (₱${Number(reservation.finalPayment?.amount || balanceAmount).toLocaleString()}) for "${populated?.design?.name || populated?.blueprint?.designName || populated?.designName || 'Custom Cake'}". Status changed to In Production!`,
+                    reservationId: String(reservation._id),
+                    status: 'in_production',
+                    timestamp: new Date(),
+                });
+            }
+        }
+
+        // Automatic bakery chat: post an acknowledgement message from the bakery
+        try {
+            if (reservation.platform && user?._id) {
+                let conversation = await Conversation.findOne({
+                    customer: user._id,
+                    platform: reservation.platform,
+                });
+
+                if (!conversation) {
+                    conversation = await Conversation.create({
+                        customer: user._id,
+                        platform: reservation.platform,
+                        reservation: reservation._id,
+                        status: 'open',
+                    }).catch((e) => {
+                        if (e.code === 11000) {
+                            return Conversation.findOne({ customer: user._id, platform: reservation.platform });
+                        }
+                        throw e;
+                    });
+                }
+
+                if (conversation && conversation.status === 'open') {
+                    const bakerySender = await User.findOne({
+                        platform: reservation.platform,
+                        role: { $in: ['bakery_admin', 'bakery_staff'] },
+                        status: 'active',
+                    }) || await User.findOne({
+                        platform: reservation.platform,
+                        role: { $in: ['bakery_admin', 'bakery_staff'] },
+                    });
+
+                    if (bakerySender) {
+                        const cakeName = populated?.design?.name || populated?.blueprint?.designName || reservation.designName || 'Custom Cake';
+                        const balFormatted = Number(reservation.finalPayment?.amount || balanceAmount).toLocaleString();
+                        const chatText = `We have received your remaining balance payment of ₱${balFormatted} (Ref: ${ref}) for "${cakeName}". Your cake is now in production! Our baking team has started preparation and we will notify you once it's ready.`;
+                        const clientMsgId = `balance_paid_${reservation._id}_${Date.now()}`;
+
+                        const chatMsg = await Message.create({
+                            conversation: conversation._id,
+                            sender: bakerySender._id,
+                            senderRole: bakerySender.role,
+                            type: 'text',
+                            text: chatText,
+                            clientMessageId: clientMsgId,
+                            readBy: [],
+                            moderation: 'approved',
+                        }).catch(() => null);
+
+                        if (chatMsg) {
+                            await Conversation.updateOne(
+                                { _id: conversation._id },
+                                {
+                                    $set: {
+                                        lastMessageAt: chatMsg.createdAt,
+                                        lastMessagePreview: chatText.slice(0, 160),
+                                    },
+                                    $inc: { customerUnreadCount: 1 },
+                                },
+                            ).catch(() => {});
+
+                            if (io) {
+                                publishMessage(io, conversation, chatMsg);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (chatErr) {
+            console.error('Failed to post automatic bakery balance chat message:', chatErr);
+        }
+
+        // Send balance payment email confirmation to user
+        try {
+            sendBalancePaymentEmail(populated || reservation).catch((emailErr) => {
+                console.warn('Could not send balance payment email:', emailErr.message || emailErr);
             });
+        } catch (emailErr) {
+            console.warn('Balance payment email trigger error:', emailErr);
         }
 
         return res.json({

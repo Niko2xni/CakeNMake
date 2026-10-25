@@ -110,16 +110,36 @@ export default function BakeryReservations({ reservations, loading, selected, se
   const filtered = reservations.filter((r) => {
     if (activeTab !== 'all' && r.status !== activeTab) return false;
     if (!search.trim()) return true;
-    return [
+    const raw = search.trim().toLowerCase();
+    const clean = raw.replace(/^#/, '').trim();
+
+    const ids = [
+      r._id,
+      r.design?._id || r.design,
+      r.blueprint?._id || r.blueprint,
+    ].filter(Boolean).map((v) => String(v).toLowerCase());
+
+    const idMatch = ids.some((idVal) => {
+      if (idVal.includes(raw)) return true;
+      if (clean) {
+        if (idVal.includes(clean)) return true;
+        if (idVal.slice(-6).includes(clean)) return true;
+        if (idVal.slice(-8).includes(clean)) return true;
+      }
+      return false;
+    });
+
+    const infoMatch = [
       r.user?.displayName,
       r.user?.name,
       r.user?.email,
       r.designName,
-      r._id,
       r.fulfillment?.type,
       r.fulfillment?.deliveryAddress,
       r.fulfillment?.timeSlot,
-    ].filter(Boolean).join(' ').toLowerCase().includes(search.trim().toLowerCase());
+    ].filter(Boolean).join(' ').toLowerCase();
+
+    return idMatch || infoMatch.includes(raw) || (clean && infoMatch.includes(clean));
   });
 
   return (

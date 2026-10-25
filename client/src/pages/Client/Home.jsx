@@ -514,12 +514,20 @@ export default function ClientHome() {
 
   const displayedDesigns = recentDesigns.filter((design) => {
     if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase().trim();
+    const raw = searchQuery.trim().toLowerCase();
+    const clean = raw.replace(/^#/, '').trim();
+    const id = String(design._id || design.id || '').toLowerCase();
+    const shortId6 = id.slice(-6);
+    const shortId8 = id.slice(-8);
+
+    const matchesId = id.includes(raw) || (clean && (id.includes(clean) || shortId6.includes(clean) || shortId8.includes(clean)));
+
     return (
-      (design.name && design.name.toLowerCase().includes(q)) ||
-      (design.config?.sponge?.flavor && design.config.sponge.flavor.toLowerCase().includes(q)) ||
-      (design.config?.frosting?.style && design.config.frosting.style.toLowerCase().includes(q)) ||
-      (design.config?.cakeStructure?.size && design.config.cakeStructure.size.toLowerCase().includes(q))
+      matchesId ||
+      (design.name && design.name.toLowerCase().includes(raw)) ||
+      (design.config?.sponge?.flavor && design.config.sponge.flavor.toLowerCase().includes(raw)) ||
+      (design.config?.frosting?.style && design.config.frosting.style.toLowerCase().includes(raw)) ||
+      (design.config?.cakeStructure?.size && design.config.cakeStructure.size.toLowerCase().includes(raw))
     );
   });
 
