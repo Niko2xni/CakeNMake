@@ -25,7 +25,7 @@ const PIPING_FLAVORS = [
   { key: 'mango', label: 'Mango', color: '#FFAB00' },
   { key: 'ube', label: 'Ube', color: '#8E5EA2' },
   { key: 'chocolate', label: 'Chocolate', color: '#5C3317' },
-  { key: 'mocha', label: 'Mocha', color: '#A4775A' },
+  { key: 'mocha', label: 'Mocha', color: '#B8977E' },
   { key: 'cheese', label: 'Cheese', color: '#FFD54F' },
 ];
 

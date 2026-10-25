@@ -129,14 +129,14 @@ export const FROSTING_COLORS = {
   strawberry: '#FF8BA7',
   cheese: '#FFE082',
   ube: '#8E5EA2',
-  mocha: '#9C7A5E',
+  mocha: '#B8977E',
 };
 
 export const PIPING_FLAVOR_COLORS = {
   mango: '#FFAB00',
   ube: '#8E5EA2',
   chocolate: '#5C3317',
-  mocha: '#A4775A',
+  mocha: '#C29F85',
   cheese: '#FFD54F',
 };
 
@@ -146,7 +146,7 @@ export const FILLING_COLORS = {
   strawberry: '#FFB6C1',
   cheese: '#FFF59D',
   ube: '#9C27B0',
-  mocha: '#8D6E63',
+  mocha: '#AB8E83',
 };
 
 // ---------------------------------------------------------------------------

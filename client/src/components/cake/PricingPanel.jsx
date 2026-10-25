@@ -8,9 +8,36 @@ const formatMoney = (minor = 0) => new Intl.NumberFormat('en-PH', {
   style: 'currency', currency: 'PHP', minimumFractionDigits: minor % 100 === 0 ? 0 : 2,
 }).format(minor / 100);
 
-function LineItem({ label, details, lineTotalMinor = 0, quantity = 1, unitPriceMinor = 0, showDetails = false, componentKey = '' }) {
+function LineItem({ label, details, items, lineTotalMinor = 0, quantity = 1, unitPriceMinor = 0, showDetails = false, componentKey = '' }) {
   const isCenterText = label?.startsWith('Center Text') || (Array.isArray(details) && details.some(d => typeof d === 'string' && d.startsWith('Letters x')));
+  const isCenterDeco = componentKey === 'center-decorations' || label?.startsWith('Center Decorations');
   const isFlavor = label?.toLowerCase().startsWith('flavor') || componentKey?.includes('flavor');
+
+  if (isCenterDeco) {
+    // If structured items are provided, render each with its own inline price
+    const hasItems = Array.isArray(items) && items.length > 0;
+    const decoList = hasItems
+      ? items
+      : Array.isArray(details) && details.length > 1
+        ? details.slice(1).map(name => ({ name, priceMinor: lineTotalMinor }))
+        : [];
+
+    return (
+      <div className="text-xs space-y-1">
+        <div className="font-bold text-foreground text-xs">Center Decorations:</div>
+        <div className="space-y-0.5">
+          {decoList.map((deco, idx) => (
+            <div key={idx} className="flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>{deco.name || deco.label}</span>
+              {deco.priceMinor != null && (
+                <span className="shrink-0 font-bold tabular-nums text-foreground">{formatMoney(deco.priceMinor)}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   if (isCenterText) {
     let displayDetails = Array.isArray(details) && details.length > 0 ? details : [];

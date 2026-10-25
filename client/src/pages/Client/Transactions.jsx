@@ -191,11 +191,37 @@ function formatReceiptItems(rawItems = []) {
   });
 }
 
-function BreakdownLineItem({ label, details, lineTotalMinor, unitPriceMinor = 0, quantity = 1, showDetails = true, componentKey = '' }) {
+function BreakdownLineItem({ label, details, items, lineTotalMinor, unitPriceMinor = 0, quantity = 1, showDetails = true, componentKey = '' }) {
   const isCenterText = label?.startsWith('Center Text') || (Array.isArray(details) && details.some((d) => typeof d === 'string' && d.startsWith('Letters x')));
+  const isCenterDeco = componentKey === 'center-decorations' || label?.startsWith('Center Decorations');
   const isFlavor = label?.toLowerCase().startsWith('flavor') || componentKey?.includes('flavor');
   const isHeading = isFlavor || label?.toLowerCase().startsWith('size') || label?.toLowerCase().startsWith('center') || componentKey?.includes('size') || componentKey?.includes('center');
   const computedTotal = lineTotalMinor != null ? lineTotalMinor / 100 : ((unitPriceMinor || 0) * (quantity || 1)) / 100;
+
+  if (isCenterDeco) {
+    const hasItems = Array.isArray(items) && items.length > 0;
+    const decoList = hasItems
+      ? items
+      : Array.isArray(details) && details.length > 1
+        ? details.slice(1).map((name) => ({ name, priceMinor: lineTotalMinor }))
+        : [];
+
+    return (
+      <div className="text-xs space-y-1 py-1">
+        <div className="font-bold text-gray-900 text-xs">Center Decorations:</div>
+        <div className="space-y-0.5">
+          {decoList.map((deco, idx) => (
+            <div key={idx} className="flex items-center justify-between text-[11px] text-gray-500">
+              <span>{deco.name || deco.label}</span>
+              {deco.priceMinor != null && (
+                <span className="shrink-0 font-bold tabular-nums text-gray-900">{formatCurrency(deco.priceMinor / 100)}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   if (isCenterText) {
     let displayDetails = Array.isArray(details) && details.length > 0 ? details : [];

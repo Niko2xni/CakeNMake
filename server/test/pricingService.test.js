@@ -694,3 +694,55 @@ test('filling, drip, side, and edge are included (₱0)', () => {
   assert.equal(quoteWithAll.totalMinor, 30000);
 });
 
+test('edge designs with included decorations apply half of the original 1-4 bracket price', () => {
+  // Plain 6x4 naked = 300
+  // Cherry 1-4 bracket is 200, so edge decoration with cherry should add 200 / 2 = 100
+  const quoteWithCherryEdge = buildQuote({
+    structure: { size: '6x4', layers: 1 },
+    sponge: { flavor: 'plain' },
+    exteriorFinish: { style: 'naked' },
+    edge: { mode: 'independent', top: { piping: { tip: 'cherryRim' } } },
+  });
+
+  const sizeLine = quoteWithCherryEdge.lineItems.find((l) => l.componentKey === 'sponge-size');
+  assert.ok(sizeLine);
+  assert.equal(sizeLine.lineTotalMinor, 10000); // ₱0 base size + ₱100 halved cherry edge
+  assert.ok(sizeLine.details.some((d) => d.includes('Edge Top: Cherry Rim (+₱100)')));
+  // 300 (sponge) + 100 (halved cherry edge) = 400
+  assert.equal(quoteWithCherryEdge.totalMinor, 40000);
+});
+
+test('center decorations line item contains itemized items with individual prices', () => {
+  const quote = buildQuote({
+    structure: { size: '8x6', layers: 1 },
+    sponge: { flavor: 'vanilla' },
+    exteriorFinish: { style: 'naked' },
+    place: {
+      items: [
+        // 10 Strawberries -> 5-10 bracket = ₱300
+        ...Array.from({ length: 10 }, (_, i) => ({ type: 'center-strawberry-default', x: 0.1 * i, z: 0 })),
+        // 4 Cherries -> 1-4 bracket = ₱200
+        ...Array.from({ length: 4 }, (_, i) => ({ type: 'center-cherry-default', x: 0, z: 0.1 * i })),
+      ],
+    },
+  });
+
+  const centerLine = quote.lineItems.find((l) => l.componentKey === 'center-decorations');
+  assert.ok(centerLine);
+  assert.equal(centerLine.lineTotalMinor, 50000); // ₱500 total
+  assert.ok(Array.isArray(centerLine.items));
+  assert.equal(centerLine.items.length, 2);
+
+  const strawb = centerLine.items.find((i) => i.designId === 'strawberry');
+  assert.ok(strawb);
+  assert.equal(strawb.name, 'Strawberry x 10');
+  assert.equal(strawb.pricePesos, 300);
+  assert.equal(strawb.priceMinor, 30000);
+
+  const cherry = centerLine.items.find((i) => i.designId === 'cherry');
+  assert.ok(cherry);
+  assert.equal(cherry.name, 'Cherry x 4');
+  assert.equal(cherry.pricePesos, 200);
+  assert.equal(cherry.priceMinor, 20000);
+});
+

@@ -141,21 +141,19 @@ export const FLAVORS = {
   mocha: {
     name: 'Mocha',
     colors: {
-      // Pushed more red/orange through relative to green — the original
-      // leaned khaki/sandy under render lighting. Now reads closer to
-      // warm milky coffee / light milk chocolate rather than wet sand.
-      crumbBase: '#C08A5C',
-      crumbDark: '#9C6A48',
-      crumbLight: '#DCAE84',
-      filling: '#B47850',
-      frosting: '#B47850',
+      // Lightened warm milk-coffee / mocha chiffon sponge
+      crumbBase: '#D4A47A',
+      crumbDark: '#B2825E',
+      crumbLight: '#E8C4A0',
+      filling: '#B8977E',
+      frosting: '#B8977E',
       // Sponge texture colors
-      sideCenter: '#C08A5C',
-      crumbHighlight: '#DCAE84',
-      bakedRim: '#9C6A48',
-      bakedTop: '#8A5A3C',
-      crumbMid: '#B08050',
-      bottomBake: '#704228',
+      sideCenter: '#D4A47A',
+      crumbHighlight: '#E8C4A0',
+      bakedRim: '#B2825E',
+      bakedTop: '#A07050',
+      crumbMid: '#C5996E',
+      bottomBake: '#8B5A3E',
     }
   },
 };

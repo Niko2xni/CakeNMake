@@ -525,6 +525,42 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
       .replace(/\b\w/g, (c) => c.toUpperCase());
   };
 
+  /**
+   * Helper to calculate the price for edge decorations that include original decorations (e.g. Cherry, Hershey's, Ferrero).
+   * Applies half of the 1-4 bracket price of each included decoration.
+   */
+  const getEdgeDecorationPrice = (tip) => {
+    if (!tip || typeof tip !== 'string') return 0;
+    let totalPrice = 0;
+
+    const getBaseDecoPrice = (key) => {
+      const defaultBrackets = DEFAULT_RATES.center?.brackets?.[key] || [];
+      const customBrackets = rates?.center?.brackets?.[key];
+      const bracket1to4 = (customBrackets && customBrackets[0]?.price != null)
+        ? customBrackets[0].price
+        : (defaultBrackets[0]?.price ?? 200);
+      return Math.round(bracket1to4 / 2);
+    };
+
+    if (tip === 'hersheysKissRim') {
+      totalPrice += getBaseDecoPrice('hersheysKisses');
+    } else if (tip === 'hersheysKissRimSparse') {
+      totalPrice += getBaseDecoPrice('hersheysKisses') + getBaseDecoPrice('ferreroRocher');
+    } else if (tip === 'ferreroRocherRim') {
+      totalPrice += getBaseDecoPrice('ferreroRocher');
+    } else if (tip === 'ferreroRocherRimSparse') {
+      totalPrice += getBaseDecoPrice('ferreroRocher') + getBaseDecoPrice('cherry');
+    } else if (tip === 'cherryRim') {
+      totalPrice += getBaseDecoPrice('cherry');
+    } else if (tip === 'cherryRimSparse') {
+      totalPrice += getBaseDecoPrice('cherry') + getBaseDecoPrice('hersheysKisses');
+    } else if (/Cherry/i.test(tip)) {
+      totalPrice += getBaseDecoPrice('cherry');
+    }
+
+    return totalPrice;
+  };
+
   const getTierSpecs = (tierIndex = 0, sizeClass = '8x6', tierLabel = '1 Tier', finishCls = 'naked') => {
     const dims = sizeClass === 'classicCube' ? '1x1' : sizeClass === 'largeCube' ? '2x2' : sizeClass === 'miniBento' ? '3.5x2' : sizeClass === 'standardBento' ? '4x2' : sizeClass === 'largeBento' ? '5x3' : sizeClass === 'squareBento2x2' ? '2x2' : sizeClass === 'squareBento3x3' ? '3x3' : sizeClass === '12x10' || sizeClass === '12x12' ? '12x10' : sizeClass === '10x8' || sizeClass === '10x10' ? '10x8' : sizeClass === '6x4' || sizeClass === '6x6' || sizeClass === 'small' ? '6x4' : sizeClass === '4x4' ? '4x3' : sizeClass === '4x3' ? '4x3' : '8x6';
     let finish = `${finishLabel(finishCls)} Finish`;
@@ -604,35 +640,56 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
       sideDetail = `Side: ${sideDesignLabel} (Included)`;
     }
 
-    // Edge details for this tier (Included in Size at ₱0)
+    // Edge details for this tier (halved original decoration price if included decorations are present, otherwise Included at ₱0)
     const edge = config.edge || {};
     let edgeTopDetail = null;
     let edgeBottomDetail = null;
+    let tierEdgePrice = 0;
+
     if (edge.mode === 'both') {
-      if (edge.both && (edge.both.piping?.tip || edge.both.decorations?.setId)) {
-        const tip = edge.both.piping?.tip || edge.both.decorations?.setId;
+      const tip = edge.both?.piping?.tip || edge.both?.pipingTip || edge.both?.decorations?.setId;
+      if (tip) {
         const edgeItem = EDGE_SECTIONS.flatMap((s) => s.items).find((it) => it.id === tip);
         const edgeLabel = edgeItem?.label || title(tip);
-        edgeTopDetail = `Edge Top: ${edgeLabel} (Included)`;
-        edgeBottomDetail = `Edge Bottom: ${edgeLabel} (Included)`;
+        const decoPrice = getEdgeDecorationPrice(tip);
+        if (decoPrice > 0) {
+          edgeTopDetail = `Edge Top: ${edgeLabel} (+₱${decoPrice})`;
+          edgeBottomDetail = `Edge Bottom: ${edgeLabel} (+₱${decoPrice})`;
+          tierEdgePrice += decoPrice * 2;
+        } else {
+          edgeTopDetail = `Edge Top: ${edgeLabel} (Included)`;
+          edgeBottomDetail = `Edge Bottom: ${edgeLabel} (Included)`;
+        }
       }
     } else {
-      if (edge.top && (edge.top.piping?.tip || edge.top.decorations?.setId)) {
-        const tip = edge.top.piping?.tip || edge.top.decorations?.setId;
-        const edgeItem = EDGE_SECTIONS.flatMap((s) => s.items).find((it) => it.id === tip);
-        const edgeLabel = edgeItem?.label || title(tip);
-        edgeTopDetail = `Edge Top: ${edgeLabel} (Included)`;
+      const topTip = edge.top?.piping?.tip || edge.top?.pipingTip || edge.top?.decorations?.setId;
+      if (topTip) {
+        const edgeItem = EDGE_SECTIONS.flatMap((s) => s.items).find((it) => it.id === topTip);
+        const edgeLabel = edgeItem?.label || title(topTip);
+        const decoPrice = getEdgeDecorationPrice(topTip);
+        if (decoPrice > 0) {
+          edgeTopDetail = `Edge Top: ${edgeLabel} (+₱${decoPrice})`;
+          tierEdgePrice += decoPrice;
+        } else {
+          edgeTopDetail = `Edge Top: ${edgeLabel} (Included)`;
+        }
       }
-      if (edge.bottom && (edge.bottom.piping?.tip || edge.bottom.decorations?.setId)) {
-        const tip = edge.bottom.piping?.tip || edge.bottom.decorations?.setId;
-        const edgeItem = EDGE_SECTIONS.flatMap((s) => s.items).find((it) => it.id === tip);
-        const edgeLabel = edgeItem?.label || title(tip);
-        edgeBottomDetail = `Edge Bottom: ${edgeLabel} (Included)`;
+      const bottomTip = edge.bottom?.piping?.tip || edge.bottom?.pipingTip || edge.bottom?.decorations?.setId;
+      if (bottomTip) {
+        const edgeItem = EDGE_SECTIONS.flatMap((s) => s.items).find((it) => it.id === bottomTip);
+        const edgeLabel = edgeItem?.label || title(bottomTip);
+        const decoPrice = getEdgeDecorationPrice(bottomTip);
+        if (decoPrice > 0) {
+          edgeBottomDetail = `Edge Bottom: ${edgeLabel} (+₱${decoPrice})`;
+          tierEdgePrice += decoPrice;
+        } else {
+          edgeBottomDetail = `Edge Bottom: ${edgeLabel} (Included)`;
+        }
       }
     }
 
     if (isPetitsFour || (rates && rates !== DEFAULT_RATES && rates.sponge && !rates.flavors)) {
-      return [
+      const res = [
         tierLabel,
         dims,
         finish,
@@ -641,6 +698,8 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
         `Piping Design: ${pipingTip}`,
         `Piping Sugar Color: ${pipingColor}`,
       ];
+      Object.defineProperty(res, 'tierEdgePrice', { value: tierEdgePrice, enumerable: false, writable: true });
+      return res;
     }
 
     const specs = [
@@ -655,6 +714,7 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
     if (edgeTopDetail) specs.push(edgeTopDetail);
     if (edgeBottomDetail) specs.push(edgeBottomDetail);
 
+    Object.defineProperty(specs, 'tierEdgePrice', { value: tierEdgePrice, enumerable: false, writable: true });
     return specs;
   };
 
@@ -727,9 +787,10 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
     const sizePrice = rates?.sizes?.[size] ?? SIZE_ADDONS[size] ?? 0;
     const dims = size === '12x10' || size === '12x12' ? '12x10' : size === '10x8' || size === '10x10' ? '10x8' : size === '6x4' || size === '6x6' || size === 'small' ? '6x4' : '8x6';
     const specs = getTierSpecs(0, size, '1 Tier', cls);
+    const totalSizePrice = sizePrice + (specs.tierEdgePrice || 0);
 
     // Highlighted Kind 1: Size (with all treatments included inside specs)
-    add('sponge-size', `Size: ${dims} (1 Tier)`, sizePrice, 1, specs);
+    add('sponge-size', `Size: ${dims} (1 Tier)`, totalSizePrice, 1, specs);
 
     // Highlighted Kind 2: Flavor
     const spongeDisplay = isPickColor ? 'Custom Pick Color' : `${title(flavor)} Sponge`;
@@ -768,12 +829,15 @@ function calculateCakePrice(config, rates = DEFAULT_RATES) {
     const d0 = getTierSpecs(0, baseSize, 'Bottom Tier', bottom);
     const d1 = getTierSpecs(1, topSize, 'Top Tier', top);
 
+    const totalBottomSizePrice = bottomSizePrice + (d0.tierEdgePrice || 0);
+    const totalTopSizePrice = topSizePrice + (d1.tierEdgePrice || 0);
+
     // Bottom Tier: Size & Flavor
-    add('sponge-size-bottom', `Size (Bottom Tier): ${baseDims}`, bottomSizePrice, 1, d0);
+    add('sponge-size-bottom', `Size (Bottom Tier): ${baseDims}`, totalBottomSizePrice, 1, d0);
     add('sponge-flavor-bottom', `Flavor (Bottom Tier): ${isBPickColor ? 'Custom Pick Color' : `${title(bottomFlavor)} Sponge`}`, bottomFlavorPrice, 1);
 
     // Top Tier: Size & Flavor
-    add('sponge-size-top', `Size (Top Tier): ${topDims}`, topSizePrice, 1, d1);
+    add('sponge-size-top', `Size (Top Tier): ${topDims}`, totalTopSizePrice, 1, d1);
     add('sponge-flavor-top', `Flavor (Top Tier): ${isTPickColor ? 'Custom Pick Color' : `${title(topFlavor)} Sponge`}`, topFlavorPrice, 1);
   }
 
@@ -982,6 +1046,7 @@ function filterPrunedPlacedItems(config) {
   }
   // ── Center: Decorations & Text ─────────────────────────────────────────
   const decoEntries = [];
+  const decoItems = [];
   let decoTotalPrice = 0;
 
   for (const [designId, quantity] of Object.entries(counts)) {
@@ -989,8 +1054,17 @@ function filterPrunedPlacedItems(config) {
     const label = DESIGN_LABELS[designId] || designId;
     const each = rates.center?.perPiece?.[designId] ?? DEFAULT_RATES.center?.perPiece?.[designId];
     if (each != null) {
-      decoTotalPrice += each * quantity;
+      const itemPrice = each * quantity;
+      decoTotalPrice += itemPrice;
       decoEntries.push(`${label} x ${quantity}`);
+      decoItems.push({
+        designId,
+        label,
+        name: `${label} x ${quantity}`,
+        quantity,
+        pricePesos: itemPrice,
+        priceMinor: centavos(itemPrice),
+      });
       continue;
     }
 
@@ -1020,6 +1094,14 @@ function filterPrunedPlacedItems(config) {
     } else {
       decoTotalPrice += price;
       decoEntries.push(`${label} x ${quantity}`);
+      decoItems.push({
+        designId,
+        label,
+        name: `${label} x ${quantity}`,
+        quantity,
+        pricePesos: price,
+        priceMinor: centavos(price),
+      });
     }
   }
 
@@ -1028,7 +1110,11 @@ function filterPrunedPlacedItems(config) {
       'Center Decorations:',
       ...decoEntries,
     ];
-    add('center-decorations', 'Center Decorations', decoTotalPrice, 1, decoDetails);
+    add('center-decorations', 'Center Decorations:', decoTotalPrice, 1, decoDetails);
+    const addedDecoLine = lineItems[lineItems.length - 1];
+    if (addedDecoLine) {
+      addedDecoLine.items = decoItems;
+    }
   }
 
   // 3D Fondant Text

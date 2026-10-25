@@ -138,6 +138,17 @@ async function updateDraftItem(req, res) {
     entry.markupMinor = markupMinor;
     await draft.save();
 
+    // Also sync to active pricebook so it bypasses timer and is inserted live now
+    const active = await getActivePriceBook(req.platformId);
+    if (active) {
+      const activeEntry = active.items.find((c) => c.componentKey === req.params.componentKey);
+      if (activeEntry) {
+        activeEntry.costBasisMinor = costBasisMinor;
+        activeEntry.markupMinor = markupMinor;
+        await active.save();
+      }
+    }
+
     const { recordAuditLog } = require('../services/maintenanceService');
     await recordAuditLog({
       platformId: req.platformId,
@@ -317,6 +328,13 @@ async function updateDraftRates(req, res) {
     const { rates } = req.body;
     if (!rates || typeof rates !== 'object') {
       return res.status(400).json({ message: 'Rates object is required.' });
+    }
+    // Update active book directly so pricing edits bypass timer and are live now
+    const active = await getActivePriceBook(req.platformId);
+    if (active) {
+      active.rates = rates;
+      active.markModified('rates');
+      await active.save();
     }
     const draft = await getOrCreateDraft(req.platformId, req.user._id);
     draft.rates = rates;

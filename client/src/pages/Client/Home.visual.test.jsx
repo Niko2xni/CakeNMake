@@ -261,4 +261,127 @@ describe('ClientHome presentation', () => {
     expect(await screen.findByText('Draft Unsent Cake')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /pay balance/i })).not.toBeInTheDocument();
   });
+
+  it('filters designs by search query and restores full list when cleared', async () => {
+    apiMocks.getDesigns.mockResolvedValue(designs);
+    renderHome();
+
+    expect(await screen.findByText('Cherry cake')).toBeInTheDocument();
+    expect(screen.getByText('Garden cake')).toBeInTheDocument();
+
+    const searchInput = screen.getByPlaceholderText(/search your designs/i);
+    fireEvent.change(searchInput, { target: { value: 'Garden' } });
+
+    expect(screen.getByText('Garden cake')).toBeInTheDocument();
+    expect(screen.queryByText('Cherry cake')).not.toBeInTheDocument();
+
+    const clearBtn = screen.getByRole('button', { name: /clear search/i });
+    fireEvent.click(clearBtn);
+
+    expect(screen.getByText('Cherry cake')).toBeInTheDocument();
+    expect(screen.getByText('Garden cake')).toBeInTheDocument();
+  });
+
+  it('renames an unsent design through the rename modal with optimistic update', async () => {
+    apiMocks.getDesigns.mockResolvedValue(designs);
+    apiMocks.updateDesign.mockResolvedValue({ ...designs[0], name: 'Botanical Garden Cake' });
+    renderHome();
+
+    fireEvent.click(await screen.findByRole('button', { name: /actions for garden cake/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /rename/i }));
+
+    expect(screen.getByRole('dialog', { name: /rename design/i })).toBeInTheDocument();
+    const input = screen.getByLabelText('Design name');
+    fireEvent.change(input, { target: { value: 'Botanical Garden Cake' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(apiMocks.updateDesign).toHaveBeenCalledWith('older', { name: 'Botanical Garden Cake' }));
+    expect(await screen.findByText('Botanical Garden Cake')).toBeInTheDocument();
+  });
+
+  it('does not display Rename option in menu for designs already sent to bakery', async () => {
+    apiMocks.getDesigns.mockResolvedValue(designs);
+    renderHome();
+
+    fireEvent.click(await screen.findByRole('button', { name: /actions for cherry cake/i }));
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /rename/i })).not.toBeInTheDocument();
+  });
+
+  it('moves a single design to trash and restores it when clicking Undo on notification', async () => {
+    apiMocks.getDesigns.mockResolvedValue(designs);
+    apiMocks.moveToTrash.mockResolvedValue({ ...designs[0], isTrashed: true });
+    apiMocks.restoreFromTrash.mockResolvedValue({ message: 'Restored' });
+    apiMocks.getDesignById.mockResolvedValue(designs[0]);
+    renderHome();
+
+    fireEvent.click(await screen.findByRole('button', { name: /actions for garden cake/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /move to trash/i }));
+
+    expect(screen.getByRole('dialog', { name: /move “garden cake” to trash\?/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Move to trash' }));
+
+    await waitFor(() => expect(apiMocks.moveToTrash).toHaveBeenCalledWith('older'));
+    expect(screen.queryByRole('heading', { name: 'Garden cake' })).not.toBeInTheDocument();
+
+    const undoBtn = await screen.findByRole('button', { name: 'Undo' });
+    expect(undoBtn).toBeInTheDocument();
+    fireEvent.click(undoBtn);
+
+    await waitFor(() => expect(apiMocks.restoreFromTrash).toHaveBeenCalledWith('older'));
+    expect(await screen.findAllByRole('heading', { name: 'Garden cake' })).toHaveLength(2);
+  });
+
+  it('opens details drawer with specifications and allows inline rename', async () => {
+    apiMocks.getDesigns.mockResolvedValue(designs);
+    apiMocks.updateDesign.mockResolvedValue({ ...designs[0], name: 'Lush Garden Cake' });
+    renderHome();
+
+    fireEvent.click(await screen.findByRole('button', { name: /actions for garden cake/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /details/i }));
+
+    expect(screen.getByRole('complementary', { name: /design details and price breakdown/i })).toBeInTheDocument();
+    expect(screen.getByText(/design specifications/i)).toBeInTheDocument();
+
+    const renameTrigger = screen.getByTitle('Click to rename design');
+    fireEvent.click(renameTrigger);
+
+    const inlineInput = screen.getByPlaceholderText('Enter design name...');
+    fireEvent.change(inlineInput, { target: { value: 'Lush Garden Cake' } });
+    fireEvent.click(screen.getByRole('button', { name: /confirm rename/i }));
+
+    await waitFor(() => expect(apiMocks.updateDesign).toHaveBeenCalledWith('older', { name: 'Lush Garden Cake' }));
+    expect(screen.getAllByText('Lush Garden Cake').length).toBeGreaterThanOrEqual(1);
+
+    fireEvent.click(screen.getByRole('button', { name: /close details/i }));
+    expect(screen.queryByRole('complementary', { name: /design details and price breakdown/i })).not.toBeInTheDocument();
+  });
+
+  it('opens design in a new tab when clicking Open in new tab', async () => {
+    const windowOpenSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    apiMocks.getDesigns.mockResolvedValue(designs);
+    renderHome();
+
+    fireEvent.click(await screen.findByRole('button', { name: /actions for garden cake/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /open in new tab/i }));
+
+    expect(windowOpenSpy).toHaveBeenCalledWith('/designer?designId=older', '_blank');
+    windowOpenSpy.mockRestore();
+  });
+
+  it('closes active action menus, details drawer, and modals with Escape key', async () => {
+    apiMocks.getDesigns.mockResolvedValue(designs);
+    renderHome();
+
+    fireEvent.click(await screen.findByRole('button', { name: /actions for garden cake/i }));
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+
+    fireEvent.click(await screen.findByRole('button', { name: /actions for garden cake/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /details/i }));
+    expect(screen.getByRole('complementary', { name: /design details and price breakdown/i })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('complementary', { name: /design details and price breakdown/i })).not.toBeInTheDocument();
+  });
 });

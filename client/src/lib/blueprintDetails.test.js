@@ -644,7 +644,7 @@ describe('internal blueprint', () => {
       { mode: 'default', colorId: 'ube', expectedName: 'Ube', expectedHex: '#6B4F82' },
       { mode: 'default', colorId: 'cheese', expectedName: 'Cheese', expectedHex: '#FFF4C2' },
       { mode: 'default', colorId: 'vanilla', expectedName: 'Vanilla', expectedHex: '#F5E6C8' },
-      { mode: 'default', colorId: 'mocha', expectedName: 'Mocha', expectedHex: '#C08A5C' },
+      { mode: 'default', colorId: 'mocha', expectedName: 'Mocha', expectedHex: '#D4A47A' },
       { mode: 'colorOverride', colorId: 'pink', expectedName: 'Pink', expectedHex: '#F5A9C0' },
       { mode: 'colorOverride', colorId: 'red', expectedName: 'Red', expectedHex: '#D6293E' },
       { mode: 'colorOverride', colorId: 'black', expectedName: 'Black', expectedHex: '#2B2B2B' },

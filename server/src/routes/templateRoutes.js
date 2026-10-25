@@ -440,20 +440,20 @@ router.post('/', authenticate, loadAppUser, requireRole('bakery_staff', 'bakery_
       config: config || {},
       order: nextOrder,
       isPublished: true,
-      pendingAction: 'create',
+      pendingAction: 'none',
       draftOriginalState: null,
-      effectiveAt: nextManilaTenPm(),
+      effectiveAt: null, // Bypasses timer - inserted now
     });
 
     const { recordAuditLog } = require('../services/maintenanceService');
     await recordAuditLog({
       type: 'template',
       action: 'create',
-      title: `Draft Template Created: "${template.name}"`,
-      description: `Staged for 10:00 PM auto-activation in section "${targetSectionId}"`,
+      title: `Template Created: "${template.name}"`,
+      description: `Created and published live in section "${targetSectionId}"`,
       changedBy: req.user?._id,
       changedByName: req.user?.displayName || req.user?.email || 'Bakery Staff',
-      scheduledEffectiveAt: template.effectiveAt,
+      scheduledEffectiveAt: null,
     });
 
     return res.status(201).json(template);
@@ -515,11 +515,9 @@ router.put('/:id', authenticate, loadAppUser, requireRole('bakery_staff', 'baker
     if (order !== undefined) existing.order = Number(order);
     if (isPublished !== undefined) existing.isPublished = Boolean(isPublished);
 
-    if (existing.pendingAction !== 'create') {
-      existing.pendingAction = 'update';
-      existing.draftOriginalState = draftOriginalState;
-    }
-    existing.effectiveAt = nextManilaTenPm();
+    existing.pendingAction = 'none';
+    existing.draftOriginalState = null;
+    existing.effectiveAt = null; // Bypasses timer - inserted now
 
     await existing.save();
 
@@ -527,11 +525,11 @@ router.put('/:id', authenticate, loadAppUser, requireRole('bakery_staff', 'baker
     await recordAuditLog({
       type: 'template',
       action: 'update',
-      title: `Draft Template Updated: "${existing.name}"`,
-      description: 'Changes staged for 10:00 PM auto-activation.',
+      title: `Template Updated: "${existing.name}"`,
+      description: 'Changes applied immediately live.',
       changedBy: req.user?._id,
       changedByName: req.user?.displayName || req.user?.email || 'Bakery Staff',
-      scheduledEffectiveAt: existing.effectiveAt,
+      scheduledEffectiveAt: null,
     });
 
     return res.json(existing);
@@ -541,7 +539,7 @@ router.put('/:id', authenticate, loadAppUser, requireRole('bakery_staff', 'baker
   }
 });
 
-// DELETE /api/bakery/templates/:id - Delete template (stages pending delete if already live, or removes immediately if draft)
+// DELETE /api/bakery/templates/:id - Delete template immediately
 router.delete('/:id', authenticate, loadAppUser, requireRole('bakery_staff', 'bakery_admin', 'platform_admin'), async (req, res) => {
   try {
     const existing = await Template.findById(req.params.id);
@@ -549,52 +547,18 @@ router.delete('/:id', authenticate, loadAppUser, requireRole('bakery_staff', 'ba
       return res.status(404).json({ message: 'Template not found' });
     }
 
-    // If it was just created in draft (never live), delete immediately
-    if (existing.pendingAction === 'create') {
-      const tName = existing.name;
-      await Template.findByIdAndDelete(existing._id);
-      const { recordAuditLog } = require('../services/maintenanceService');
-      await recordAuditLog({
-        type: 'template',
-        action: 'discard',
-        title: `Draft Template Discarded: "${tName}"`,
-        description: 'New draft template removed before publishing.',
-        changedBy: req.user?._id,
-        changedByName: req.user?.displayName || req.user?.email || 'Bakery Staff',
-      });
-      return res.json({ message: 'Draft template removed', deletedId: req.params.id, staged: false });
-    }
-
-    // If it's a live template, stage the deletion for 10 PM so it can be viewed and discarded/canceled in control panel
-    existing.draftOriginalState = existing.draftOriginalState || {
-      name: existing.name,
-      description: existing.description,
-      longDescription: existing.longDescription,
-      sectionId: existing.sectionId,
-      priceMinor: existing.priceMinor,
-      specs: existing.specs,
-      views: existing.views,
-      thumbnail: existing.thumbnail,
-      config: existing.config,
-      order: existing.order,
-      isPublished: existing.isPublished,
-    };
-    existing.pendingAction = 'delete';
-    existing.effectiveAt = nextManilaTenPm();
-    await existing.save();
-
+    const tName = existing.name;
+    await Template.findByIdAndDelete(existing._id);
     const { recordAuditLog } = require('../services/maintenanceService');
     await recordAuditLog({
       type: 'template',
       action: 'delete',
-      title: `Template Deletion Staged: "${existing.name}"`,
-      description: 'Scheduled for removal at 10:00 PM.',
+      title: `Template Deleted: "${tName}"`,
+      description: 'Template removed immediately.',
       changedBy: req.user?._id,
       changedByName: req.user?.displayName || req.user?.email || 'Bakery Staff',
-      scheduledEffectiveAt: existing.effectiveAt,
     });
-
-    return res.json({ message: 'Template scheduled for removal at 10:00 PM', deletedId: req.params.id, staged: true });
+    return res.json({ message: 'Template removed', deletedId: req.params.id, staged: false });
   } catch (error) {
     console.error('Failed to delete template:', error);
     return res.status(500).json({ message: 'Failed to delete template' });

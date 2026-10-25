@@ -1134,6 +1134,35 @@ export default function ClientHome() {
                 <div className="space-y-2 bg-[var(--cn-paper)] p-3 rounded-xl border border-[var(--cn-line)]">
                   {lineItems.map((item, idx) => {
                     const isCenterText = item.label?.startsWith('Center Text') || (Array.isArray(item.details) && item.details.some(d => typeof d === 'string' && d.startsWith('Letters x')));
+                    const isCenterDeco = item.componentKey === 'center-decorations' || item.label?.startsWith('Center Decorations');
+
+                    if (isCenterDeco) {
+                      const hasItems = Array.isArray(item.items) && item.items.length > 0;
+                      const decoList = hasItems
+                        ? item.items
+                        : Array.isArray(item.details) && item.details.length > 1
+                          ? item.details.slice(1).map((name) => ({ name, priceMinor: item.lineTotalMinor }))
+                          : [];
+
+                      return (
+                        <div key={idx} className="space-y-1 text-xs border-b border-[rgba(44,23,19,0.06)] pb-1.5 last:border-b-0 last:pb-0">
+                          <p className="font-semibold text-[var(--cn-ink)] leading-tight">Center Decorations:</p>
+                          <div className="space-y-0.5">
+                            {decoList.map((deco, dIdx) => (
+                              <div key={dIdx} className="flex items-center justify-between gap-2 text-[10px] text-[var(--cn-muted)]">
+                                <span>{deco.name || deco.label}</span>
+                                {deco.priceMinor != null && (
+                                  <span className="font-bold text-[var(--cn-ink)] tabular-nums shrink-0">
+                                    {formatMoney(deco.priceMinor)}
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    }
+
                     let displayLabel = item.label;
                     let displayDetails = item.details || [];
                     if (isCenterText) {
