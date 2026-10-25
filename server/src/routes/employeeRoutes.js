@@ -22,7 +22,7 @@ router.get('/', ...adminOnly, async (req, res) => {
 
     const employees = await User.find({
       platform: platformId,
-      role: { $in: ['bakery_staff', 'bakery_admin'] },
+      role: { $in: ['bakery_staff', 'bakery_admin', 'platform_admin'] },
     })
       .select('_id email displayName photoURL role status createdAt')
       .sort({ createdAt: -1 });

@@ -20,10 +20,14 @@ const BakeryEmployees = () => {
   const [newEmail, setNewEmail] = useState('');
   const [newRole, setNewRole] = useState('bakery_staff');
   const [submitting, setSubmitting] = useState(false);
+  const [modalError, setModalError] = useState('');
 
   // Revoke confirmation modal state
   const [employeeToRevoke, setEmployeeToRevoke] = useState(null);
   const [revoking, setRevoking] = useState(false);
+  const [revokeError, setRevokeError] = useState('');
+
+  const [brokenImages, setBrokenImages] = useState({});
 
   const fetchEmployees = async () => {
     try {
@@ -44,6 +48,18 @@ const BakeryEmployees = () => {
     }
   }, [isAdmin]);
 
+  useEffect(() => {
+    if (!isAddModalOpen && !employeeToRevoke) return undefined;
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+        if (isAddModalOpen && !submitting) setIsAddModalOpen(false);
+        if (employeeToRevoke && !revoking) setEmployeeToRevoke(null);
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isAddModalOpen, employeeToRevoke, submitting, revoking]);
+
   const handleAddEmployee = async (e) => {
     e.preventDefault();
     if (!newEmail.trim()) return;
@@ -51,6 +67,7 @@ const BakeryEmployees = () => {
     try {
       setSubmitting(true);
       setError('');
+      setModalError('');
       const res = await employeeApi.addEmployee(newEmail.trim(), newRole);
       setSuccessMessage(res.message || 'Employee added successfully!');
       setIsAddModalOpen(false);
@@ -59,7 +76,7 @@ const BakeryEmployees = () => {
       fetchEmployees();
       setTimeout(() => setSuccessMessage(''), 5000);
     } catch (err) {
-      setError(err?.message || 'Failed to add employee.');
+      setModalError(err?.message || 'Failed to add employee.');
     } finally {
       setSubmitting(false);
     }
@@ -71,13 +88,14 @@ const BakeryEmployees = () => {
     try {
       setRevoking(true);
       setError('');
+      setRevokeError('');
       const res = await employeeApi.removeEmployee(employeeToRevoke._id);
       setSuccessMessage(res.message || 'Employee access removed.');
       setEmployeeToRevoke(null);
       fetchEmployees();
       setTimeout(() => setSuccessMessage(''), 5000);
     } catch (err) {
-      setError(err?.message || 'Failed to revoke employee access.');
+      setRevokeError(err?.message || 'Failed to revoke employee access.');
     } finally {
       setRevoking(false);
     }
@@ -140,16 +158,36 @@ const BakeryEmployees = () => {
 
       {/* Notifications */}
       {successMessage && (
-        <div className="flex items-center gap-3 p-4 bg-green-50 text-green-800 rounded-xl border border-green-200">
-          <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
-          <span className="text-sm font-medium">{successMessage}</span>
+        <div className="flex items-center justify-between p-4 bg-green-50 text-green-800 rounded-xl border border-green-200">
+          <div className="flex items-center gap-3">
+            <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
+            <span className="text-sm font-medium">{successMessage}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSuccessMessage('')}
+            className="text-green-600 hover:text-green-800 p-1 rounded-lg"
+            aria-label="Dismiss notification"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
       {error && (
-        <div className="flex items-center gap-3 p-4 bg-red-50 text-red-800 rounded-xl border border-red-200">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
-          <span className="text-sm font-medium">{error}</span>
+        <div role="alert" className="flex items-center justify-between p-4 bg-red-50 text-red-800 rounded-xl border border-red-200">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+            <span className="text-sm font-medium">{error}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setError('')}
+            className="text-red-600 hover:text-red-800 p-1 rounded-lg"
+            aria-label="Dismiss error"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
@@ -261,15 +299,20 @@ const BakeryEmployees = () => {
                     <tr key={emp._id} className="hover:bg-pink-50/20 transition">
                       <td className="py-4 px-6 flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-pink-100 text-pink-600 font-bold flex items-center justify-center flex-shrink-0 overflow-hidden">
-                          {emp.photoURL ? (
-                            <img src={emp.photoURL} alt={emp.displayName} className="w-full h-full object-cover" />
+                          {emp.photoURL && !brokenImages[emp._id] ? (
+                            <img
+                              src={emp.photoURL}
+                              alt={emp.displayName || emp.email}
+                              onError={() => setBrokenImages((prev) => ({ ...prev, [emp._id]: true }))}
+                              className="w-full h-full object-cover"
+                            />
                           ) : (
                             (emp.displayName?.[0] || emp.email?.[0] || 'U').toUpperCase()
                           )}
                         </div>
                         <div>
                           <div className="font-semibold text-gray-900 flex items-center gap-2">
-                            <span>{emp.displayName || 'No Name'}</span>
+                            <span>{emp.displayName || emp.email?.split('@')[0] || 'Team Member'}</span>
                             {isCurrentSelf && (
                               <span className="text-[10px] font-bold px-2 py-0.5 bg-gray-100 text-gray-600 rounded">
                                 You
@@ -312,7 +355,10 @@ const BakeryEmployees = () => {
                           <span className="text-xs text-gray-400 italic">Current Session</span>
                         ) : (
                           <button
-                            onClick={() => setEmployeeToRevoke(emp)}
+                            onClick={() => {
+                              setRevokeError('');
+                              setEmployeeToRevoke(emp);
+                            }}
                             className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700 font-semibold hover:bg-red-50 px-2.5 py-1.5 rounded-lg transition"
                             title="Revoke employee access"
                           >
@@ -332,22 +378,42 @@ const BakeryEmployees = () => {
 
       {/* Add Employee Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-gray-100 space-y-5 animate-in fade-in zoom-in-95 duration-150">
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget && !submitting) setIsAddModalOpen(false);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-employee-title"
+            className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-gray-100 space-y-5 animate-in fade-in zoom-in-95 duration-150"
+          >
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
               <div className="flex items-center gap-2">
                 <div className="p-2 bg-pink-100 text-pink-600 rounded-lg">
                   <UserPlus className="w-5 h-5" />
                 </div>
-                <h3 className="font-bold text-gray-900 text-lg">Grant Employee Access</h3>
+                <h3 id="add-employee-title" className="font-bold text-gray-900 text-lg">Grant Employee Access</h3>
               </div>
               <button
+                type="button"
                 onClick={() => setIsAddModalOpen(false)}
+                disabled={submitting}
                 className="text-gray-400 hover:text-gray-600 p-1 rounded-lg"
+                aria-label="Close"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            {modalError && (
+              <div role="alert" className="flex items-center gap-2 p-3 bg-red-50 text-red-700 text-xs rounded-xl border border-red-200">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{modalError}</span>
+              </div>
+            )}
 
             <form onSubmit={handleAddEmployee} className="space-y-4">
               <div>
@@ -429,6 +495,7 @@ const BakeryEmployees = () => {
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
+                  disabled={submitting}
                   className="px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition"
                 >
                   Cancel
@@ -448,14 +515,31 @@ const BakeryEmployees = () => {
 
       {/* Revoke Confirmation Modal */}
       {employeeToRevoke && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-gray-100 space-y-4">
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget && !revoking) setEmployeeToRevoke(null);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="revoke-employee-title"
+            className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-gray-100 space-y-4"
+          >
             <div className="flex items-center gap-3 text-red-600">
               <div className="p-2.5 bg-red-100 rounded-xl">
                 <AlertTriangle className="w-6 h-6" />
               </div>
-              <h3 className="font-bold text-gray-900 text-lg">Revoke Employee Access?</h3>
+              <h3 id="revoke-employee-title" className="font-bold text-gray-900 text-lg">Revoke Employee Access?</h3>
             </div>
+
+            {revokeError && (
+              <div role="alert" className="flex items-center gap-2 p-3 bg-red-50 text-red-700 text-xs rounded-xl border border-red-200">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{revokeError}</span>
+              </div>
+            )}
 
             <p className="text-sm text-gray-600 leading-relaxed">
               Are you sure you want to revoke bakery access for{' '}
@@ -467,6 +551,7 @@ const BakeryEmployees = () => {
               <button
                 type="button"
                 onClick={() => setEmployeeToRevoke(null)}
+                disabled={revoking}
                 className="px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition"
               >
                 Cancel
