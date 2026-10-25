@@ -7,6 +7,17 @@ import CustomScrollbar from '@/components/shared/CustomScrollbar';
 import { AdminRowsSkeleton } from '@/components/shared/PageLoadingSkeleton';
 import SidePatternsGalleryModal from '@/components/bakery/SidePatternsGalleryModal';
 
+const STATUS_CONFIG = {
+  ready: { label: 'Ready', className: 'text-pink-600' },
+  in_production: { label: 'In Production', className: 'text-purple-600 font-medium' },
+  completed: { label: 'Completed', className: 'text-emerald-600 font-medium' },
+  complete: { label: 'Completed', className: 'text-emerald-600 font-medium' },
+  uploading: { label: 'Uploading', className: 'text-amber-600' },
+  failed: { label: 'Failed', className: 'text-red-600' },
+};
+
+const ACCESSIBLE_STATUSES = ['ready', 'in_production', 'completed', 'complete'];
+
 export default function BakeryBlueprints() {
   const [records, setRecords] = useState([]);
   const [search, setSearch] = useState('');
@@ -71,9 +82,10 @@ export default function BakeryBlueprints() {
     const customer = (record.customerName || '').toLowerCase();
     const design = (record.designName || '').toLowerCase();
     const status = (record.status || '').toLowerCase();
+    const statusLabel = (STATUS_CONFIG[record.status]?.label || '').toLowerCase();
     const id = (record.id || '').toLowerCase();
     const dateStr = record.deliveryDate ? new Date(record.deliveryDate).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).toLowerCase() : '';
-    return customer.includes(q) || design.includes(q) || status.includes(q) || id.includes(q) || dateStr.includes(q);
+    return customer.includes(q) || design.includes(q) || status.includes(q) || statusLabel.includes(q) || id.includes(q) || dateStr.includes(q);
   });
 
   return (
@@ -132,20 +144,29 @@ export default function BakeryBlueprints() {
             </button>
           </div>
         )}
-        {filteredRecords.map((record) => (
-          <div key={record.id} className="flex flex-wrap items-center gap-4 rounded-xl border border-pink-100 px-4 py-3">
-            <div className="flex-1 min-w-0">
-              <div className="flex gap-2 items-center"><p className="text-sm font-semibold">{record.customerName}</p><span className="text-xs text-pink-600">{{ ready: 'Ready', uploading: 'Uploading', failed: 'Failed' }[record.status] || record.status}</span></div>
-              <p className="text-sm text-gray-600 truncate">{record.designName}</p>
-              <p className="text-xs text-gray-500 mt-1">Delivery {new Date(record.deliveryDate).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })} · {record.totalMinor == null ? 'Estimate unavailable' : new Intl.NumberFormat('en-PH', { style: 'currency', currency: record.currency }).format(record.totalMinor / 100)}</p>
-              {record.status === 'failed' && <p className="text-xs text-red-600">{record.failureReason || 'PDF upload failed.'}</p>}
+        {filteredRecords.map((record) => {
+          const statusInfo = STATUS_CONFIG[record.status] || { label: record.status, className: 'text-pink-600' };
+          const canAccess = ACCESSIBLE_STATUSES.includes(record.status);
+          return (
+            <div key={record.id} className="flex flex-wrap items-center gap-4 rounded-xl border border-pink-100 px-4 py-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex gap-2 items-center">
+                  <p className="text-sm font-semibold">{record.customerName}</p>
+                  <span className={`text-xs ${statusInfo.className}`}>{statusInfo.label}</span>
+                </div>
+                <p className="text-sm text-gray-600 truncate">{record.designName}</p>
+                <p className="text-xs text-gray-500 mt-1">Delivery {new Date(record.deliveryDate).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })} · {record.totalMinor == null ? 'Estimate unavailable' : new Intl.NumberFormat('en-PH', { style: 'currency', currency: record.currency }).format(record.totalMinor / 100)}</p>
+                {record.status === 'failed' && <p className="text-xs text-red-600">{record.failureReason || 'PDF upload failed.'}</p>}
+              </div>
+              {canAccess && (
+                <div className="flex gap-2">
+                  <button disabled={busy === record.id} onClick={() => access(record, false)} className="text-xs px-3 py-1.5 rounded-full border border-pink-200 text-pink-600 hover:bg-pink-50 transition-colors disabled:opacity-50">View</button>
+                  <button disabled={busy === record.id} onClick={() => access(record, true)} className="text-xs px-3 py-1.5 rounded-full bg-pink-500 hover:bg-pink-600 text-white transition-colors disabled:opacity-50">Download</button>
+                </div>
+              )}
             </div>
-            {record.status === 'ready' && <div className="flex gap-2">
-              <button disabled={busy === record.id} onClick={() => access(record, false)} className="text-xs px-3 py-1.5 rounded-full border border-pink-200 text-pink-600 disabled:opacity-50">View</button>
-              <button disabled={busy === record.id} onClick={() => access(record, true)} className="text-xs px-3 py-1.5 rounded-full bg-pink-500 text-white disabled:opacity-50">Download</button>
-            </div>}
-          </div>
-        ))}
+          );
+        })}
       </CustomScrollbar>
       {preview && <div role="dialog" aria-modal="true" aria-label="Blueprint PDF preview" className="fixed inset-0 z-50 bg-black/50 p-6 flex flex-col">
         <div className="bg-white px-4 py-3 flex justify-between rounded-t-xl"><p>{preview.title}</p><button onClick={() => setPreview(null)}>Close preview</button></div>

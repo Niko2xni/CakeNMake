@@ -23,7 +23,8 @@ async function getBlueprintAccess(req, res) {
   try {
     const record = await Blueprint.findOne({ _id: req.params.id, platform: req.platformId });
     if (!record) return res.status(404).json({ message: 'Blueprint not found.' });
-    if (record.status !== 'ready' || !record.pdf) return res.status(409).json({ message: 'Blueprint PDF is not ready.' });
+    const accessibleStatuses = ['ready', 'in_production', 'completed', 'complete'];
+    if (!accessibleStatuses.includes(record.status) || !record.pdf) return res.status(409).json({ message: 'Blueprint PDF is not ready.' });
     if (record.pdf.publicId !== blueprintPublicId(req.platformId, record._id)
       || record.pdf.resourceType !== 'raw' || record.pdf.deliveryType !== 'private') {
       return res.status(409).json({ message: 'Blueprint storage reference is invalid.' });

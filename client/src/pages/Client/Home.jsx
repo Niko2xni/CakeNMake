@@ -28,6 +28,7 @@ import ClientNavbar from '@/components/client/ClientNavbar';
 import { designApi, pricingApi, accountApi } from '@/services/api';
 import PayBalanceModal from '@/components/client/PayBalanceModal';
 import { useDragToScroll } from '@/hooks/useDragToScroll';
+import { getChatSocket } from '@/lib/chat-socket';
 
 const formatMoney = (minor = 0) => new Intl.NumberFormat('en-PH', {
   style: 'currency',
@@ -127,7 +128,23 @@ export default function ClientHome() {
 
   useEffect(() => {
     fetchRecentDesigns();
+    let active = true;
+    let socket;
+    Promise.resolve()
+      .then(() => getChatSocket?.())
+      .then((s) => {
+        if (active && s) {
+          socket = s;
+          socket.on('reservation:updated', () => {
+            if (active) fetchRecentDesigns();
+          });
+        }
+      })
+      .catch(() => {});
+
     return () => {
+      active = false;
+      socket?.off('reservation:updated');
       if (trashNotificationTimerRef.current) {
         clearTimeout(trashNotificationTimerRef.current);
       }
@@ -675,13 +692,14 @@ export default function ClientHome() {
                     const isMenuOpen = (typeof activeMenu === 'string' ? activeMenu === design._id : activeMenu?.id === design._id);
                     const isSentToBakery = Boolean(design.sentToBakery);
                     const relatedTx = isSentToBakery ? getDesignTransaction(design) : null;
-                    const isPaidInFull = Boolean(isSentToBakery && relatedTx && (Boolean(relatedTx?.finalPayment?.isPaid) || Number(relatedTx?.remainingBalance) === 0));
+                    const isCompleted = Boolean(isSentToBakery && relatedTx && (relatedTx.status === 'completed' || relatedTx.status === 'fulfilled'));
+                    const isPaidInFull = Boolean(isSentToBakery && relatedTx && (Boolean(relatedTx?.finalPayment?.isPaid) || Number(relatedTx?.remainingBalance) === 0 || isCompleted));
                     const remainingBal = isPaidInFull
                       ? 0
                       : (relatedTx?.remainingBalance != null
                           ? Number(relatedTx.remainingBalance)
                           : Math.max(0, Number(relatedTx?.totalPrice || 0) - Number(relatedTx?.downPayment?.amount || 0)));
-                    const hasBalanceDue = Boolean(isSentToBakery && relatedTx && remainingBal > 0 && !isPaidInFull);
+                    const hasBalanceDue = Boolean(isSentToBakery && relatedTx && remainingBal > 0 && !isPaidInFull && !isCompleted);
 
                     return (
                       <article
@@ -819,7 +837,14 @@ export default function ClientHome() {
                         </div>
 
                         {/* Action buttons / badges at bottom of design card - keeps all cards perfectly balanced */}
-                        {hasBalanceDue ? (
+                        {isCompleted ? (
+                          <div className="px-3 pb-3 pt-0 mt-auto">
+                            <div className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              Order Completed • Paid in full
+                            </div>
+                          </div>
+                        ) : hasBalanceDue ? (
                           <div className="px-3 pb-3 pt-0 mt-auto">
                             <button
                               type="button"
@@ -1076,7 +1101,8 @@ export default function ClientHome() {
             {(() => {
               const selectedTx = getDesignTransaction(selectedDesign);
               if (!selectedTx) return null;
-              const isSelectedPaid = Boolean(selectedTx.finalPayment?.isPaid) || Number(selectedTx.remainingBalance) === 0;
+              const isSelCompleted = selectedTx.status === 'completed' || selectedTx.status === 'fulfilled';
+              const isSelectedPaid = Boolean(selectedTx.finalPayment?.isPaid) || Number(selectedTx.remainingBalance) === 0 || isSelCompleted;
               const selBal = isSelectedPaid
                 ? 0
                 : (selectedTx.remainingBalance != null
@@ -1098,13 +1124,22 @@ export default function ClientHome() {
                   <div className="flex items-center justify-between">
                     <span className="text-gray-500">Order Status:</span>
                     <span className={`font-semibold px-2 py-0.5 rounded-full text-[10px] ${
-                      isSelectedPaid ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                      isSelCompleted
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                        : isSelectedPaid
+                        ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                        : 'bg-blue-100 text-blue-800 border border-blue-200'
                     }`}>
-                      {isSelectedPaid ? 'In Progress' : 'Confirmed (Awaiting Balance)'}
+                      {isSelCompleted ? 'Completed' : isSelectedPaid ? 'In Progress' : 'Confirmed (Awaiting Balance)'}
                     </span>
                   </div>
 
-                  {selBal > 0 && !isSelectedPaid ? (
+                  {isSelCompleted ? (
+                    <div className="pt-1.5 border-t border-pink-100 flex items-center gap-1.5 text-[11px] text-emerald-700 font-medium">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Order completed · Paid in full</span>
+                    </div>
+                  ) : selBal > 0 && !isSelectedPaid ? (
                     <div className="pt-1.5 border-t border-pink-100 space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-gray-600 font-medium">Remaining Balance:</span>

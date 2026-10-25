@@ -27,10 +27,10 @@ const blueprintSchema = new mongoose.Schema({
   paymentCompletedAt: { type: Date, required: true, immutable: true },
   status: {
     type: String,
-    enum: ['uploading', 'ready', 'failed'],
+    enum: ['uploading', 'ready', 'failed', 'in_production', 'completed'],
     default: 'uploading',
     validate: {
-      validator(value) { return value !== 'ready' || Boolean(this.pdf?.publicId); },
+      validator(value) { return !['ready', 'in_production', 'completed'].includes(value) || Boolean(this.pdf?.publicId); },
       message: 'A ready blueprint requires a stored private PDF.',
     },
   },

@@ -37,6 +37,30 @@ test('ready private files receive expiring links with requested attachment behav
   assert.ok(response.body.url);
 });
 
+test('in_production and completed blueprints also receive access to private PDF links', async () => {
+  for (const status of ['in_production', 'completed']) {
+    mock.method(Blueprint, 'findOne', async () => ({
+      _id: id, status, pdf: { publicId: blueprintPublicId(platformId, id), resourceType: 'raw', deliveryType: 'private' },
+    }));
+    mock.method(cloudinary.utils, 'private_download_url', () => 'https://api.cloudinary.com/private-download');
+    const response = res();
+    await getBlueprintAccess({ platformId, params: { id }, query: {} }, response);
+    assert.equal(response.code, 200);
+    assert.ok(response.body.url);
+    mock.restoreAll();
+  }
+});
+
+test('uploading or failed blueprints cannot access PDF links', async () => {
+  for (const status of ['uploading', 'failed']) {
+    mock.method(Blueprint, 'findOne', async () => ({ _id: id, status, pdf: null }));
+    const response = res();
+    await getBlueprintAccess({ platformId, params: { id }, query: {} }, response);
+    assert.equal(response.code, 409);
+    mock.restoreAll();
+  }
+});
+
 test('listing omits PDF identifiers and uses only trusted bakery membership', async () => {
   mock.method(Blueprint, 'find', (filter) => {
     assert.deepEqual(filter, { platform: platformId });

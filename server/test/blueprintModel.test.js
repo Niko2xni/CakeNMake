@@ -24,11 +24,15 @@ test('guest submissions do not require a saved design or user', () => {
   assert.equal(record.status, 'uploading');
 });
 
-test('payment completion is required and ready records require private storage', () => {
+test('payment completion is required and ready, in_production, and completed records require private storage', () => {
   assert.ok(submission({ paymentCompletedAt: null }).validateSync().errors.paymentCompletedAt);
   assert.ok(submission({ status: 'ready' }).validateSync().errors.status);
+  assert.ok(submission({ status: 'in_production' }).validateSync().errors.status);
+  assert.ok(submission({ status: 'completed' }).validateSync().errors.status);
   const pdf = { publicId: 'blueprints/order.pdf', resourceType: 'raw', deliveryType: 'private', bytes: 1000, uploadedAt: new Date() };
   assert.equal(submission({ status: 'ready', pdf }).validateSync(), undefined);
+  assert.equal(submission({ status: 'in_production', pdf }).validateSync(), undefined);
+  assert.equal(submission({ status: 'completed', pdf }).validateSync(), undefined);
   assert.ok(submission({ status: 'ready', pdf: { ...pdf, deliveryType: 'upload' } }).validateSync());
 });
 

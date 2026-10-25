@@ -165,7 +165,7 @@ async function updateStatus(req, res) {
     if (reservation.blueprint) {
       const Blueprint = require('../models/Blueprint');
       await Blueprint.findByIdAndUpdate(reservation.blueprint, {
-        status: status === 'completed' ? 'completed' : 'ready',
+        status: status === 'completed' ? 'completed' : (status === 'in_production' ? 'in_production' : 'ready'),
       }).catch(() => {});
     }
 
