@@ -10,6 +10,12 @@ const platformSchema = new mongoose.Schema(
     isActive: { type: Boolean, default: true },
     featureFlags: { type: Object, default: {} },
     billingSettings: { type: Object, default: {} },
+    maintenanceMode: {
+      isWebsiteOff: { type: Boolean, default: false },
+      updatedAt: { type: Date, default: null },
+      lastCompletedAt: { type: Date, default: null },
+      reason: { type: String, default: '' },
+    },
   },
   { timestamps: true }
 );

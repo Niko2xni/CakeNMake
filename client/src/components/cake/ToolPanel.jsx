@@ -39,6 +39,8 @@ export default function ToolPanel({
   config,
   onChange,
   onReset,
+  templateOriginalConfig,
+  onResetToTemplate,
   activeTool,
   onSelectTool,
   onPlaceChange,
@@ -533,12 +535,11 @@ export default function ToolPanel({
           <Bot className="w-4 h-4" />
           AI
         </button>
-        {/* Interior Preview toggle — this control didn't exist before;
-            toggleInteriorPreview was defined in the previous ToolPanel but
-            never actually wired to anything clickable. */}
+        {/* Interior Preview toggle */}
         <Button
           variant="ghost"
           size="icon"
+          data-tutorial="interior-preview"
           disabled={isAiBusy}
           className={`rounded-full shrink-0 h-9 w-9 ${(isAiBusy) ? 'opacity-40 cursor-not-allowed' : ''
             } ${config.interiorPreview ? 'text-amber-600' : 'text-muted-foreground hover:text-foreground'
@@ -555,6 +556,7 @@ export default function ToolPanel({
         <Button
           variant="ghost"
           size="icon"
+          data-tutorial="reset-cake"
           disabled={isAiBusy}
           className={`rounded-full text-muted-foreground hover:text-foreground shrink-0 h-9 w-9 ${(isAiBusy) ? 'opacity-40 cursor-not-allowed' : ''
             }`}
@@ -1060,6 +1062,7 @@ export default function ToolPanel({
           >
             <motion.div
               role="dialog"
+              data-tutorial="reset-dialog"
               aria-modal="true"
               aria-label="Confirm Reset Design"
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
@@ -1069,40 +1072,85 @@ export default function ToolPanel({
               className="w-[340px] max-w-[calc(100vw-2rem)] rounded-2xl border border-border/40 bg-card p-5 sm:p-6 shadow-2xl space-y-4"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
-                  <RotateCcw className="h-5 w-5" />
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
+                    <RotateCcw className="h-5 w-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="font-heading text-base font-bold text-foreground">Reset Cake Design?</h3>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {Boolean(templateOriginalConfig)
+                        ? "This design originated from a template. You can restore it back to the original template or perform a full blank reset."
+                        : "Are you sure you want to reset your cake design? All custom selections, piping, decorations, and colors will be reverted to default."}
+                    </p>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <h3 className="font-heading text-base font-bold text-foreground">Reset Cake Design?</h3>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    Are you sure you want to reset your cake design? All custom selections, piping, decorations, and colors will be reverted to default.
-                  </p>
-                </div>
-              </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="rounded-xl px-4 text-xs font-semibold"
-                  onClick={() => setShowResetConfirm(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  className="rounded-xl px-4 text-xs font-semibold"
-                  onClick={() => {
-                    setShowResetConfirm(false);
-                    onReset?.();
-                  }}
-                >
-                  Reset Design
-                </Button>
+                {Boolean(templateOriginalConfig) ? (
+                  <div className="flex flex-col gap-2 pt-2">
+                    <Button
+                      type="button"
+                      variant="default"
+                      size="sm"
+                      className="w-full rounded-xl py-2.5 text-xs font-semibold bg-pink-500 hover:bg-pink-600 text-white shadow-sm flex items-center justify-center gap-2"
+                      onClick={() => {
+                        setShowResetConfirm(false);
+                        onResetToTemplate?.();
+                      }}
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      Reset to Template
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      className="w-full rounded-xl py-2.5 text-xs font-semibold"
+                      onClick={() => {
+                        setShowResetConfirm(false);
+                        onReset?.();
+                      }}
+                    >
+                      Blank Reset
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      data-tutorial="reset-cancel"
+                      className="w-full rounded-xl py-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
+                      onClick={() => setShowResetConfirm(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-end gap-2 pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      data-tutorial="reset-cancel"
+                      className="rounded-xl px-4 text-xs font-semibold"
+                      onClick={() => setShowResetConfirm(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      className="rounded-xl px-4 text-xs font-semibold"
+                      onClick={() => {
+                        setShowResetConfirm(false);
+                        onReset?.();
+                      }}
+                    >
+                      Reset Design
+                    </Button>
+                  </div>
+                )}
               </div>
             </motion.div>
           </motion.div>

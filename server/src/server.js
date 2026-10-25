@@ -22,6 +22,19 @@ connectDB().then(async () => {
   // The partial unique index enforces one open request even under concurrency.
   await require('./models/SupportRequest').init();
   startReservationEmailWorker();
+
+  // Background check for 10:00 PM scheduled updates
+  const { isWithinUpdateExecutionWindow, processScheduledMaintenance } = require('./services/maintenanceService');
+  setInterval(async () => {
+    try {
+      if (isWithinUpdateExecutionWindow()) {
+        await processScheduledMaintenance();
+      }
+    } catch (workerErr) {
+      console.warn('[MaintenanceWorker] Periodic check error:', workerErr.message);
+    }
+  }, 60000);
+
   httpServer.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });

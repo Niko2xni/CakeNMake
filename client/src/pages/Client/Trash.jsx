@@ -17,6 +17,7 @@ export default function Trash() {
   const [detailsModal, setDetailsModal] = useState({ open: false, design: null });
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
+  const [deleteAllInput, setDeleteAllInput] = useState('');
 
   useDragToScroll();
 
@@ -49,6 +50,7 @@ export default function Trash() {
       setDetailsModal({ open: false, design: null });
       setDeleteTarget(null);
       setShowDeleteAllConfirm(false);
+      setDeleteAllInput('');
     };
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
@@ -136,6 +138,7 @@ export default function Trash() {
   };
 
   const handleDeleteAll = async () => {
+    if (deleteAllInput.trim() !== 'Delete all designs') return;
     setPendingAction('delete-all');
     setOperationError('');
     setOperationFeedback('');
@@ -144,6 +147,7 @@ export default function Trash() {
       await designApi.deleteAllTrash();
       setTrashedDesigns([]);
       setShowDeleteAllConfirm(false);
+      setDeleteAllInput('');
       setActiveMenu(null);
       setOperationFeedback(`All ${count} designs were permanently deleted.`);
     } catch (error) {
@@ -210,7 +214,10 @@ export default function Trash() {
             {!loading && trashedDesigns.length > 0 && (
               <button
                 type="button"
-                onClick={() => setShowDeleteAllConfirm(true)}
+                onClick={() => {
+                  setDeleteAllInput('');
+                  setShowDeleteAllConfirm(true);
+                }}
                 disabled={Boolean(pendingAction)}
                 className="cn-trash-delete-all-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 text-[var(--cn-cherry)] text-xs font-semibold shadow-xs transition-colors cursor-pointer"
                 aria-label="Delete all designs in trash permanently"
@@ -394,19 +401,59 @@ export default function Trash() {
       {showDeleteAllConfirm && (
         <div
           className="cn-trash-dialog-backdrop fixed inset-0 flex items-center justify-center z-[120]"
-          onMouseDown={(event) => event.target === event.currentTarget && setShowDeleteAllConfirm(false)}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setShowDeleteAllConfirm(false);
+              setDeleteAllInput('');
+            }
+          }}
         >
           <div role="dialog" aria-modal="true" aria-labelledby="delete-all-title" className="cn-trash-dialog w-full max-w-md mx-4">
             <span className="cn-trash-dialog-icon"><Trash2 className="w-6 h-6" /></span>
             <h2 id="delete-all-title">Delete all {trashedDesigns.length} designs permanently?</h2>
             <p>This action cannot be undone. All deleted designs in your Trash will be permanently removed.</p>
+
+            <div className="rounded-xl bg-rose-50/70 border border-rose-200/80 p-3 text-xs text-rose-950 my-4 text-left space-y-1.5">
+              <p className="font-medium">
+                To confirm permanent deletion, please type <strong className="font-mono bg-white px-1.5 py-0.5 rounded border border-rose-300 text-rose-700 select-all">Delete all designs</strong> below:
+              </p>
+              <input
+                type="text"
+                value={deleteAllInput}
+                onChange={(e) => setDeleteAllInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && deleteAllInput.trim() === 'Delete all designs' && !pendingAction) {
+                    handleDeleteAll();
+                  }
+                }}
+                placeholder='Type "Delete all designs"'
+                aria-label='Type "Delete all designs" to confirm'
+                className="w-full mt-2 rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-900 outline-none focus:border-[var(--cn-danger)] focus:ring-2 focus:ring-[var(--cn-danger)]/20 transition-all"
+                autoFocus
+              />
+              {deleteAllInput.length > 0 && deleteAllInput.trim() !== 'Delete all designs' && (
+                <p className="text-[11px] text-rose-600 font-medium pt-0.5">
+                  Input must exactly match: "Delete all designs"
+                </p>
+              )}
+            </div>
+
             {operationError && <p className="cn-trash-dialog-error" role="alert">{operationError}</p>}
             <div className="cn-trash-dialog-actions">
-              <button type="button" onClick={() => setShowDeleteAllConfirm(false)} disabled={Boolean(pendingAction)}>Cancel</button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteAllConfirm(false);
+                  setDeleteAllInput('');
+                }}
+                disabled={Boolean(pendingAction)}
+              >
+                Cancel
+              </button>
               <button
                 type="button"
                 onClick={handleDeleteAll}
-                disabled={Boolean(pendingAction)}
+                disabled={Boolean(pendingAction) || deleteAllInput.trim() !== 'Delete all designs'}
                 className="is-danger"
               >
                 {pendingAction === 'delete-all' ? <Loader2 className="w-4 h-4 animate-spin" /> : null}

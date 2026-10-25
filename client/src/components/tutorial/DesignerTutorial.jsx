@@ -77,6 +77,7 @@ function getLayout({ rect, cardH, vw, vh, step, stepIndex, groupIdx }) {
         const isStep8PlaceOrSelect =
             step?.id === 'center-place' ||
             step?.id === 'center-select' ||
+            step?.id === 'interior-preview-explain' ||
             step?.title === 'Place it' ||
             step?.title === 'Select an item';
 

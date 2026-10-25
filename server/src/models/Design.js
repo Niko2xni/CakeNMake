@@ -73,6 +73,11 @@ const designSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  templateId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Template',
+    default: null
+  },
   // Informational estimate shown with saved designs. Reservation checkout
   // recalculates authoritatively and stores its own immutable snapshot.
   lastEstimate: {

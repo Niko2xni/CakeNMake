@@ -137,6 +137,18 @@ async function updateDraftItem(req, res) {
     entry.costBasisMinor = costBasisMinor;
     entry.markupMinor = markupMinor;
     await draft.save();
+
+    const { recordAuditLog } = require('../services/maintenanceService');
+    await recordAuditLog({
+      platformId: req.platformId,
+      type: 'pricing',
+      action: 'update',
+      title: `Pricing Component Updated: "${entry.displayName}"`,
+      description: `Rate set to ₱${((costBasisMinor + markupMinor) / 100).toFixed(2)} in draft v${draft.version}.`,
+      changedBy: req.user?._id,
+      changedByName: req.user?.displayName || req.user?.email || 'Bakery Staff',
+    });
+
     res.json(draft);
   } catch (error) {
     res.status(500).json({ message: 'Failed to update pricing draft', error: error.message });
@@ -157,6 +169,19 @@ async function scheduleDraft(req, res) {
     draft.publicationReason = reason;
     draft.scheduledBy = req.user._id;
     await draft.save();
+
+    const { recordAuditLog } = require('../services/maintenanceService');
+    await recordAuditLog({
+      platformId: req.platformId,
+      type: 'pricing',
+      action: 'schedule',
+      title: `Pricing Book v${draft.version} Scheduled for 10:00 PM`,
+      description: `Reason: "${reason}"`,
+      changedBy: req.user?._id,
+      changedByName: req.user?.displayName || req.user?.email || 'Bakery Staff',
+      scheduledEffectiveAt: draft.effectiveAt,
+    });
+
     res.json(draft);
   } catch (error) {
     res.status(500).json({ message: 'Failed to schedule pricing', error: error.message });
@@ -191,6 +216,17 @@ async function publishDraftNow(req, res) {
       { status: 'archived' },
     );
 
+    const { recordAuditLog } = require('../services/maintenanceService');
+    await recordAuditLog({
+      platformId: req.platformId,
+      type: 'pricing',
+      action: 'publish',
+      title: `Pricing Book v${draft.version} Published Live`,
+      description: `Reason: "${reason}"`,
+      changedBy: req.user?._id,
+      changedByName: req.user?.displayName || req.user?.email || 'Bakery Staff',
+    });
+
     res.json(draft);
   } catch (error) {
     res.status(500).json({ message: 'Failed to publish pricing immediately', error: error.message });
@@ -199,7 +235,21 @@ async function publishDraftNow(req, res) {
 
 async function discardDraft(req, res) {
   try {
+    const draft = await PriceBook.findOne({ platform: req.platformId, status: 'draft' });
+    const version = draft?.version;
     await PriceBook.deleteOne({ platform: req.platformId, status: 'draft' });
+
+    const { recordAuditLog } = require('../services/maintenanceService');
+    await recordAuditLog({
+      platformId: req.platformId,
+      type: 'pricing',
+      action: 'discard',
+      title: `Pricing Draft ${version ? `v${version} ` : ''}Discarded`,
+      description: 'Pricing draft changes were discarded.',
+      changedBy: req.user?._id,
+      changedByName: req.user?.displayName || req.user?.email || 'Bakery Staff',
+    });
+
     res.status(204).end();
   } catch (error) {
     res.status(500).json({ message: 'Failed to discard pricing draft', error: error.message });
@@ -215,6 +265,18 @@ async function cancelScheduled(req, res) {
     scheduled.publicationReason = '';
     scheduled.scheduledBy = null;
     await scheduled.save();
+
+    const { recordAuditLog } = require('../services/maintenanceService');
+    await recordAuditLog({
+      platformId: req.platformId,
+      type: 'pricing',
+      action: 'revert',
+      title: `Scheduled Pricing v${scheduled.version} Reverted to Draft`,
+      description: 'Scheduled 10:00 PM auto-activation cancelled.',
+      changedBy: req.user?._id,
+      changedByName: req.user?.displayName || req.user?.email || 'Bakery Staff',
+    });
+
     res.json(scheduled);
   } catch (error) {
     res.status(500).json({ message: 'Failed to cancel scheduled pricing', error: error.message });
@@ -268,24 +330,22 @@ async function updateDraftRates(req, res) {
 
 async function getDraftsSummary(req, res) {
   try {
-    const Template = require('../models/Template');
-    const [pricingDraft, scheduledPricing, pendingTemplates] = await Promise.all([
-      PriceBook.findOne({ platform: req.platformId, status: 'draft' }),
-      PriceBook.findOne({ platform: req.platformId, status: 'scheduled', effectiveAt: { $gt: new Date() } }),
-      Template.countDocuments({ isPublished: true, effectiveAt: { $gt: new Date() } }),
-    ]);
+    const { getUnifiedDrafts } = require('../services/maintenanceService');
+    const platformId = req.platformId || req.user?.platform?._id || req.user?.platform;
+    const unified = await getUnifiedDrafts(platformId);
 
-    const hasPricingDraft = Boolean(pricingDraft);
-    const hasScheduledPricing = Boolean(scheduledPricing);
-    const pendingTemplatesCount = Number(pendingTemplates) || 0;
-    const hasPendingChanges = hasPricingDraft || hasScheduledPricing || pendingTemplatesCount > 0;
+    const hasPricingDraft = unified.pricingCount > 0;
+    const hasScheduledPricing = unified.pricingDrafts.some((d) => d.pendingAction === 'scheduled');
+    const pendingTemplatesCount = unified.templatesCount;
+    const hasPendingChanges = unified.totalCount > 0;
 
     res.json({
       hasPendingChanges,
       hasPricingDraft,
       hasScheduledPricing,
-      scheduledPricingEffectiveAt: scheduledPricing?.effectiveAt || null,
+      scheduledPricingEffectiveAt: unified.drafts.find((d) => d.category === 'pricing' && d.pendingAction === 'scheduled')?.effectiveAt || null,
       pendingTemplatesCount,
+      totalDraftsCount: unified.totalCount,
     });
   } catch (error) {
     res.status(500).json({ message: 'Failed to check drafts summary', error: error.message });

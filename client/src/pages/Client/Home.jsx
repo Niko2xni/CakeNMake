@@ -88,6 +88,7 @@ export default function ClientHome() {
   const [userTransactions, setUserTransactions] = useState([]);
   const [payingBalanceTx, setPayingBalanceTx] = useState(null);
   const [showMoveAllConfirm, setShowMoveAllConfirm] = useState(false);
+  const [moveAllTrashInput, setMoveAllTrashInput] = useState('');
   const [showCapacityLimitModal, setShowCapacityLimitModal] = useState(false);
   const [showTrashFullWarning, setShowTrashFullWarning] = useState(false);
   const [neverShowTrashWarning, setNeverShowTrashWarning] = useState(() => {
@@ -144,7 +145,10 @@ export default function ClientHome() {
         setActiveMenu(null);
         if (renameModal.open) setRenameModal({ open: false, designId: null, currentName: '' });
         if (trashConfirmTarget) setTrashConfirmTarget(null);
-        if (showMoveAllConfirm) setShowMoveAllConfirm(false);
+        if (showMoveAllConfirm) {
+          setShowMoveAllConfirm(false);
+          setMoveAllTrashInput('');
+        }
         if (showCapacityLimitModal) setShowCapacityLimitModal(false);
         if (selectedDesign) setSelectedDesign(null);
       }
@@ -410,7 +414,9 @@ export default function ClientHome() {
   };
 
   const handleMoveAllToTrash = async () => {
+    if (moveAllTrashInput.trim() !== 'Move all to trash') return;
     setShowMoveAllConfirm(false);
+    setMoveAllTrashInput('');
     try {
       const count = recentDesigns.length;
       await designApi.moveAllToTrash();
@@ -574,7 +580,10 @@ export default function ClientHome() {
                 </span>
                 <button
                   type="button"
-                  onClick={() => setShowMoveAllConfirm(true)}
+                  onClick={() => {
+                    setMoveAllTrashInput('');
+                    setShowMoveAllConfirm(true);
+                  }}
                   className="cn-home-trash-all-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 text-[var(--cn-cherry)] text-xs font-semibold shadow-xs transition-colors cursor-pointer"
                   aria-label="Move all designs to trash"
                 >
@@ -1333,7 +1342,10 @@ export default function ClientHome() {
           className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[120]"
           role="presentation"
           onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setShowMoveAllConfirm(false);
+            if (e.target === e.currentTarget) {
+              setShowMoveAllConfirm(false);
+              setMoveAllTrashInput('');
+            }
           }}
         >
           <div
@@ -1348,13 +1360,42 @@ export default function ClientHome() {
             <h3 id="move-all-confirm-title" className="font-heading text-lg font-bold text-[var(--cn-ink)] mb-2">
               Move all {recentDesigns.length} designs to Trash?
             </h3>
-            <p className="text-xs text-[var(--cn-muted)] leading-relaxed mb-6">
+            <p className="text-xs text-[var(--cn-muted)] leading-relaxed mb-4">
               All designs on your cake table will be moved to your Trash folder. You can retrieve and restore them at any time within <strong>30 days</strong>.
             </p>
+
+            <div className="rounded-xl bg-rose-50/70 border border-rose-200/80 p-3 text-xs text-rose-950 mb-5 space-y-1.5">
+              <p className="font-medium">
+                To confirm, please type <strong className="font-mono bg-white px-1.5 py-0.5 rounded border border-rose-300 text-rose-700 select-all">Move all to trash</strong> below:
+              </p>
+              <input
+                type="text"
+                value={moveAllTrashInput}
+                onChange={(e) => setMoveAllTrashInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && moveAllTrashInput.trim() === 'Move all to trash') {
+                    handleMoveAllToTrash();
+                  }
+                }}
+                placeholder='Type "Move all to trash"'
+                aria-label='Type "Move all to trash" to confirm'
+                className="w-full mt-2 rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-900 outline-none focus:border-[var(--cn-cherry)] focus:ring-2 focus:ring-[var(--cn-cherry)]/20 transition-all"
+                autoFocus
+              />
+              {moveAllTrashInput.length > 0 && moveAllTrashInput.trim() !== 'Move all to trash' && (
+                <p className="text-[11px] text-rose-600 font-medium pt-0.5">
+                  Input must exactly match: "Move all to trash"
+                </p>
+              )}
+            </div>
+
             <div className="flex items-center justify-end gap-2.5">
               <button
                 type="button"
-                onClick={() => setShowMoveAllConfirm(false)}
+                onClick={() => {
+                  setShowMoveAllConfirm(false);
+                  setMoveAllTrashInput('');
+                }}
                 className="px-4 py-2 text-xs font-semibold text-[var(--cn-muted)] hover:bg-[var(--cn-paper)] rounded-xl transition-colors cursor-pointer"
               >
                 Cancel
@@ -1362,7 +1403,8 @@ export default function ClientHome() {
               <button
                 type="button"
                 onClick={handleMoveAllToTrash}
-                className="px-4 py-2 bg-[var(--cn-cherry)] hover:bg-[var(--cn-cherry-dark)] text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer"
+                disabled={moveAllTrashInput.trim() !== 'Move all to trash'}
+                className="px-4 py-2 bg-[var(--cn-cherry)] hover:bg-[var(--cn-cherry-dark)] text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[var(--cn-cherry)]"
               >
                 Move all to trash
               </button>

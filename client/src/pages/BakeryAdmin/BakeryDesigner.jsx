@@ -33,6 +33,7 @@ import { adaptConfigToLegacy } from '@/lib/configAdapter';
 import useCakeQuote from '@/hooks/use-cake-quote';
 import PageLoadingSkeleton from '@/components/shared/PageLoadingSkeleton';
 import TemplateBackgroundStudioModal from '@/components/bakery/TemplateBackgroundStudioModal';
+import BakeryControlPanelHeader from '@/components/bakery/BakeryControlPanelHeader';
 
 const formatMoney = (minor = 0) =>
   new Intl.NumberFormat('en-PH', {
@@ -364,12 +365,14 @@ export default function BakeryDesigner() {
   const placeUndoStackRef = useRef([]);
   const placeRedoStackRef = useRef([]);
   const [placeHistoryVersion, setPlaceHistoryVersion] = useState(0);
+  const [isControlPanelOpen, setIsControlPanelOpen] = useState(true);
 
   const cakeSceneRef = useRef(null);
   const mainAreaRef = useRef(null);
   const titleRef = useRef(null);
 
   const [loadingInitial, setLoadingInitial] = useState(Boolean(templateId));
+  const [templateOriginalConfig, setTemplateOriginalConfig] = useState(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [publishModalOpen, setPublishModalOpen] = useState(false);
   const [capturedViews, setCapturedViews] = useState([]);
@@ -510,6 +513,7 @@ export default function BakeryDesigner() {
         setSelectedSectionId(data.sectionId || '');
         if (data.config && typeof data.config === 'object') {
           setCakeConfig(data.config);
+          setTemplateOriginalConfig(data.config);
         }
       }
     } catch (err) {
@@ -967,6 +971,13 @@ export default function BakeryDesigner() {
         </div>
       </header>
 
+      {/* Control Panel Header for Templates, Pricing & Client Access */}
+      {isControlPanelOpen && (
+        <div className="px-3 sm:px-4 pt-2">
+          <BakeryControlPanelHeader onMinimize={() => setIsControlPanelOpen(false)} />
+        </div>
+      )}
+
       {/* Main Studio Area - Split in 2 on mobile (top: 3D render, bottom: toolpanel), side-by-side on desktop */}
       <div ref={mainAreaRef} className="flex-1 flex flex-col md:flex-row relative overflow-hidden min-h-0">
         {/* 3D View - Top screen on mobile, left workspace on desktop */}
@@ -1077,6 +1088,17 @@ export default function BakeryDesigner() {
           <ToolPanel
             config={cakeConfig}
             onChange={handleConfigChange}
+            templateOriginalConfig={templateOriginalConfig}
+            onResetToTemplate={() => {
+              if (templateOriginalConfig) {
+                setCakeConfig(templateOriginalConfig);
+                lastActiveToolBeforeSelectionRef.current = null;
+                setActiveTool(null);
+                placeUndoStackRef.current = [];
+                placeRedoStackRef.current = [];
+                setPlaceHistoryVersion((v) => v + 1);
+              }
+            }}
             onReset={() => {
               setCakeConfig(DEFAULT_CONFIG);
               lastActiveToolBeforeSelectionRef.current = null;
@@ -1376,7 +1398,7 @@ export default function BakeryDesigner() {
                     className="px-6 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold transition-all shadow-md shadow-primary/20 flex items-center gap-2 disabled:opacity-50"
                   >
                     {savingTemplate && <Loader2 className="w-4 h-4 animate-spin" />}
-                    Publish Template to Catalog
+                    Save Template (Drafted for 10 PM)
                   </button>
                 </div>
               </div>

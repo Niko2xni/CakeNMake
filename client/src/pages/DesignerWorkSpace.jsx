@@ -135,6 +135,13 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
   const [guestAuthInitialExpiresAt, setGuestAuthInitialExpiresAt] = useState(() => location.state?.expiresAt || null);
   const [capacityModalOpen, setCapacityModalOpen] = useState(false);
 
+  const [templateOriginalConfig, setTemplateOriginalConfig] = useState(null);
+  const [templateId, setTemplateId] = useState(null);
+  const latestTemplateIdRef = useRef(null);
+  useEffect(() => {
+    latestTemplateIdRef.current = templateId;
+  }, [templateId]);
+
   useEffect(() => {
     if (location.state?.guestAuthOpen && location.state?.email) {
       setGuestAuthInitialEmail(location.state.email);
@@ -509,6 +516,20 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
       if (design.orderContext) {
         setOrderContext(design.orderContext);
       }
+      if (design.templateId) {
+        setTemplateId(design.templateId);
+        try {
+          const tpl = await templateApi.getPublicTemplateById(design.templateId);
+          if (tpl?.config) {
+            setTemplateOriginalConfig(adaptConfigFromLegacy(tpl.config));
+          }
+        } catch (e) {
+          console.warn('Could not load original template for design:', e);
+        }
+      } else {
+        setTemplateId(null);
+        setTemplateOriginalConfig(null);
+      }
       setHasUnsavedChanges(false);
       setSaveStatus('saved');
     } catch (error) {
@@ -541,6 +562,8 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
           const tplTitle = tpl.name || 'Template Cake';
           setConfig(adapted);
           setTitle(tplTitle);
+          setTemplateId(tpl._id || templateIdParam);
+          setTemplateOriginalConfig(adapted);
 
           if (account) {
             try {
@@ -553,6 +576,7 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
               const savedDesign = await designApi.createDesign({
                 name: tplTitle,
                 config: adapted,
+                templateId: tpl._id || templateIdParam,
                 isPublic: false,
               });
               setDesignId(savedDesign._id);
@@ -574,6 +598,8 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
         .finally(() => setIsDesignLoading(false));
     } else {
       setIsDesignLoading(false);
+      setTemplateId(null);
+      setTemplateOriginalConfig(null);
       // Completely new design or restored guest draft
       isLoadingRef.current = true;
       setDesignId(null);
@@ -701,6 +727,7 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
       const designData = {
         name: title,
         config: config,
+        templateId: templateId || undefined,
         lastEstimate: quote ? {
           pricingVersion: quote.pricingVersion,
           currency: quote.currency,
@@ -806,6 +833,7 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
         const designData = {
           name: latestTitleRef.current,
           config: latestConfigRef.current,
+          templateId: latestTemplateIdRef.current || undefined,
           lastEstimate: latestQuoteRef.current ? {
             pricingVersion: latestQuoteRef.current.pricingVersion,
             currency: latestQuoteRef.current.currency,
@@ -1669,6 +1697,17 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
               config={config}
               quote={quote}
               onChange={setConfig}
+              templateOriginalConfig={templateOriginalConfig}
+              onResetToTemplate={() => {
+                if (templateOriginalConfig) {
+                  setConfig(templateOriginalConfig);
+                  lastActiveToolBeforeSelectionRef.current = null;
+                  setActiveTool(null);
+                  placeUndoStackRef.current = [];
+                  placeRedoStackRef.current = [];
+                  setPlaceHistoryVersion(v => v + 1);
+                }
+              }}
               onReset={() => {
                 setConfig(INITIAL_CONFIG);
                 lastActiveToolBeforeSelectionRef.current = null;

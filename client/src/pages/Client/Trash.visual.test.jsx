@@ -117,7 +117,7 @@ describe('Trash page states and actions', () => {
     expect(screen.getAllByText(/days left to restore/i)).toHaveLength(4);
   });
 
-  it('permanently deletes all trashed designs when confirmed', async () => {
+  it('permanently deletes all trashed designs when confirmed with typed verification', async () => {
     apiMocks.getDesigns.mockResolvedValue([trashedDesign, { ...trashedDesign, _id: 'design-2' }]);
     apiMocks.deleteAllTrash.mockResolvedValue({ message: 'Deleted', count: 2 });
     renderPage();
@@ -127,7 +127,17 @@ describe('Trash page states and actions', () => {
 
     expect(await screen.findByRole('heading', { name: /delete all 2 designs permanently/i })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete all permanently' }));
+    const confirmBtn = screen.getByRole('button', { name: 'Delete all permanently' });
+    expect(confirmBtn).toBeDisabled();
+
+    const input = screen.getByPlaceholderText('Type "Delete all designs"');
+    fireEvent.change(input, { target: { value: 'random phrase' } });
+    expect(confirmBtn).toBeDisabled();
+
+    fireEvent.change(input, { target: { value: 'Delete all designs' } });
+    expect(confirmBtn).toBeEnabled();
+
+    fireEvent.click(confirmBtn);
 
     await waitFor(() => expect(apiMocks.deleteAllTrash).toHaveBeenCalled());
     expect(await screen.findByRole('heading', { name: 'Trash is empty' })).toBeVisible();

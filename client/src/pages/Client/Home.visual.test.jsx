@@ -123,7 +123,7 @@ describe('ClientHome presentation', () => {
     expect(screen.getByRole('heading', { name: `Move “${longName}” to trash?` })).toHaveClass('break-words');
   });
 
-  it('moves all designs to trash through the Move to Trash all button', async () => {
+  it('moves all designs to trash through the Move to Trash all button after typing confirmation', async () => {
     apiMocks.getDesigns.mockResolvedValue(designs);
     apiMocks.moveAllToTrash.mockResolvedValue({ message: 'All designs moved to trash', count: 2 });
     renderHome();
@@ -133,7 +133,17 @@ describe('ClientHome presentation', () => {
 
     expect(await screen.findByRole('heading', { name: /move all 2 designs to trash\?/i })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Move all to trash' }));
+    const confirmBtn = screen.getByRole('button', { name: 'Move all to trash' });
+    expect(confirmBtn).toBeDisabled();
+
+    const input = screen.getByPlaceholderText('Type "Move all to trash"');
+    fireEvent.change(input, { target: { value: 'wrong phrase' } });
+    expect(confirmBtn).toBeDisabled();
+
+    fireEvent.change(input, { target: { value: 'Move all to trash' } });
+    expect(confirmBtn).toBeEnabled();
+
+    fireEvent.click(confirmBtn);
 
     await waitFor(() => expect(apiMocks.moveAllToTrash).toHaveBeenCalled());
     expect(await screen.findByText(/your cake table is ready/i)).toBeInTheDocument();

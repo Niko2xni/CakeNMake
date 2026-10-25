@@ -181,3 +181,80 @@ test('POST /upload-signature returns valid upload credentials and signature', as
   }
 });
 
+test('GET /drafts returns drafted template changes itemized with summary', async () => {
+  const handler = getRouteHandler('/drafts', 'get');
+  const res = mockRes();
+
+  const dummyDraftTemplates = [
+    {
+      _id: 'd1',
+      name: 'Festive Holiday Cake',
+      priceMinor: 150000,
+      thumbnail: 'thumb.jpg',
+      pendingAction: 'create',
+      sectionId: { _id: 'sec1', name: 'Special Celebrations' },
+      effectiveAt: new Date(Date.now() + 3600000),
+      draftOriginalState: null,
+    },
+    {
+      _id: 'd2',
+      name: 'Berry Bliss v2',
+      priceMinor: 180000,
+      thumbnail: 'thumb2.jpg',
+      pendingAction: 'update',
+      sectionId: { _id: 'sec1', name: 'Special Celebrations' },
+      effectiveAt: new Date(Date.now() + 3600000),
+      draftOriginalState: { name: 'Berry Bliss', priceMinor: 160000 },
+    },
+  ];
+
+  mock.method(Template, 'find', () => ({
+    populate: () => ({
+      lean: async () => dummyDraftTemplates,
+    }),
+  }));
+
+  await handler({}, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.count, 2);
+  assert.equal(res.body.drafts[0].pendingAction, 'create');
+  assert.match(res.body.drafts[0].summary, /New Template/);
+  assert.equal(res.body.drafts[1].pendingAction, 'update');
+  assert.match(res.body.drafts[1].summary, /Updated/);
+});
+
+test('DELETE /drafts/:id reverts an updated template back to its live state', async () => {
+  const handler = getRouteHandler('/drafts/:id', 'delete');
+  const res = mockRes();
+
+  let saved = false;
+  const mockTemplateDoc = {
+    _id: 'd2',
+    name: 'Berry Bliss v2',
+    priceMinor: 180000,
+    pendingAction: 'update',
+    draftOriginalState: {
+      name: 'Berry Bliss',
+      priceMinor: 160000,
+      isPublished: true,
+    },
+    async save() {
+      saved = true;
+    },
+  };
+
+  mock.method(Template, 'findById', async () => mockTemplateDoc);
+
+  await handler({ params: { id: 'd2' } }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(mockTemplateDoc.name, 'Berry Bliss');
+  assert.equal(mockTemplateDoc.priceMinor, 160000);
+  assert.equal(mockTemplateDoc.pendingAction, 'none');
+  assert.equal(mockTemplateDoc.draftOriginalState, null);
+  assert.equal(mockTemplateDoc.effectiveAt, null);
+  assert.equal(saved, true);
+});
+
+

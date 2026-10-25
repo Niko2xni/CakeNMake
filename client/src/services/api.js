@@ -330,6 +330,13 @@ export const templateApi = {
     method: 'POST',
     body: JSON.stringify({ sectionId, orderedIds }),
   }),
+  getDrafts: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/templates/drafts`),
+  discardDraft: (id) => requestAuthenticatedJson(`${API_BASE_URL}/bakery/templates/drafts/${id}`, {
+    method: 'DELETE',
+  }),
+  discardAllDrafts: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/templates/drafts/discard-all`, {
+    method: 'POST',
+  }),
 
   // Upload template view images to Cloudinary
   uploadTemplateImage: async (base64Image) => {
@@ -445,6 +452,29 @@ export const employeeApi = {
 
 export const transactionApi = {
   getTransactions: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/transactions`),
+};
+
+export const systemApi = {
+  getStatus: () => requestJson(`${API_BASE_URL}/system/status`),
+  toggleWebsite: (isWebsiteOff, reason = '') =>
+    requestAuthenticatedJson(`${API_BASE_URL}/system/website-toggle`, {
+      method: 'POST',
+      body: JSON.stringify({ isWebsiteOff, reason }),
+    }),
+  triggerMaintenanceNow: () =>
+    requestAuthenticatedJson(`${API_BASE_URL}/system/maintenance/trigger`, {
+      method: 'POST',
+    }),
+  getUnifiedDrafts: () => requestAuthenticatedJson(`${API_BASE_URL}/system/unified-drafts`),
+  discardUnifiedDraft: (id) =>
+    requestAuthenticatedJson(`${API_BASE_URL}/system/unified-drafts/${id}`, {
+      method: 'DELETE',
+    }),
+  discardAllUnifiedDrafts: () =>
+    requestAuthenticatedJson(`${API_BASE_URL}/system/unified-drafts/discard-all`, {
+      method: 'POST',
+    }),
+  getDailyLog: () => requestAuthenticatedJson(`${API_BASE_URL}/system/daily-log`),
 };
 
 

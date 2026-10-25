@@ -109,6 +109,9 @@ export default function BakeryTemplates() {
 
   useEffect(() => {
     fetchTemplatesData();
+    const handleDraftsChanged = () => fetchTemplatesData();
+    window.addEventListener('bakery-drafts-changed', handleDraftsChanged);
+    return () => window.removeEventListener('bakery-drafts-changed', handleDraftsChanged);
   }, []);
 
   const fetchTemplatesData = async () => {
@@ -249,7 +252,7 @@ export default function BakeryTemplates() {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-16 px-4 pt-6">
+    <div className="space-y-6 max-w-7xl mx-auto pb-16 px-4 pt-2">
       {/* Top Banner & Action */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gradient-to-r from-pink-500/10 via-rose-50 to-orange-50/20 p-6 rounded-2xl border border-pink-100 shadow-xs">
         <div>
@@ -260,12 +263,6 @@ export default function BakeryTemplates() {
           <p className="text-sm text-gray-600 mt-1 max-w-2xl">
             Design custom cake templates in the 3D designer with 8 automated camera screenshot angles, manage client catalog sections, and organize display order.
           </p>
-          <div className="mt-2.5 flex items-center gap-1.5 text-xs text-amber-800 bg-amber-50/90 border border-amber-200/80 rounded-xl px-3 py-1.5 w-fit">
-            <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-            <span>
-              All template additions and edits are staged as drafts and auto-activate at <strong>10:00 PM Manila</strong>. You can freely edit or delete them before 10:00 PM.
-            </span>
-          </div>
         </div>
         <div className="flex items-center gap-2.5 shrink-0">
           <button

@@ -37,6 +37,8 @@ import BakeryTemplates from '@/pages/BakeryAdmin/BakeryTemplates';
 import BakeryDesigner from '@/pages/BakeryAdmin/BakeryDesigner';
 import BakeryProfile from '@/pages/BakeryAdmin/BakeryProfile';
 import BakeryEmployees from '@/pages/BakeryAdmin/BakeryEmployees';
+import ClientAccessGuard from '@/components/shared/ClientAccessGuard';
+import ClientUpdateAdvanceWarning from '@/components/shared/ClientUpdateAdvanceWarning';
 
 const AuthenticatedApp = () => {
   const { user, isLoadingAuth, authChecked, isLoadingPublicSettings, authError, navigateToLogin, retryAccountSync } = useAuth();
@@ -82,60 +84,62 @@ const AuthenticatedApp = () => {
 
   // Render the main app
   return (
-    <Routes>
-      <Route path="/" element={<Landing />} />
-      <Route path="/guest-designer" element={<Designer />} />
+    <ClientAccessGuard>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/guest-designer" element={<Designer />} />
 
-      <Route path="/login" element={<Login />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/login-success" element={<LoginSuccess />} />
-      <Route path="/auth/google/callback" element={<GoogleCallback />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/login-success" element={<LoginSuccess />} />
+        <Route path="/auth/google/callback" element={<GoogleCallback />} />
 
-      {/* Original designer workspace: only logged in client accounts can access */}
-      <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/guest-designer" replace />} />}>
-        <Route element={<RoleRoute allowedRoles={['customer']} fallbackPath="/bakery/orders" />}>
-          <Route path="/designer" element={<DesignerWorkSpace />} />
-        </Route>
-      </Route>
-
-      {/* Protected client and bakery routes */}
-      <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
-        {/* Only client accounts can access customer routes */}
-        <Route element={<RoleRoute allowedRoles={['customer']} fallbackPath="/bakery/orders" />}>
-          <Route path="/client" element={<ClientHome />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/templates" element={<Templates />} />
-          <Route path="/transactions" element={<Transactions />} />
-          <Route path="/cake-ai" element={<CakeAI />} />
-          <Route path="/trash" element={<Trash />} />
-          <Route path="/chats" element={<Chats />} />
-          <Route path="/support" element={<CustomerSupport />} />
-        </Route>
-
-        {/* Only bakery admin / staff accounts can access bakery admin routes */}
-        <Route element={<RoleRoute allowedRoles={['bakery_staff', 'bakery_admin', 'platform_admin']} fallbackPath="/client" />}>
-          <Route path="/bakery/designer" element={<BakeryDesigner />} />
-          <Route path="/bakery" element={<BakeryAdminLayout />}>
-            <Route index element={<Navigate to="orders" replace />} />
-            <Route path="orders" element={<BakeryOrders />} />
-            <Route path="reservations" element={<Navigate to="/bakery/orders" replace />} />
-            <Route path="pricing" element={<BakeryPricing />} />
-            <Route path="templates" element={<BakeryTemplates />} />
-            <Route path="transactions" element={<Navigate to="/bakery/orders?tab=payments" replace />} />
-            <Route path="chats" element={<BakeryChatsSection />} />
-            <Route path="assets" element={<Navigate to="/bakery/orders" replace />} />
-            <Route path="billing" element={<BakeryBilling />} />
-            <Route path="employees" element={<BakeryEmployees />} />
-            <Route path="blueprints" element={<BakeryBlueprints />} />
-            <Route path="profile" element={<BakeryProfile />} />
+        {/* Original designer workspace: only logged in client accounts can access */}
+        <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/guest-designer" replace />} />}>
+          <Route element={<RoleRoute allowedRoles={['customer']} fallbackPath="/bakery/orders" />}>
+            <Route path="/designer" element={<DesignerWorkSpace />} />
           </Route>
         </Route>
-      </Route>
 
-      <Route path="*" element={<PageNotFound />} />
-    </Routes>
+        {/* Protected client and bakery routes */}
+        <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
+          {/* Only client accounts can access customer routes */}
+          <Route element={<RoleRoute allowedRoles={['customer']} fallbackPath="/bakery/orders" />}>
+            <Route path="/client" element={<ClientHome />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/templates" element={<Templates />} />
+            <Route path="/transactions" element={<Transactions />} />
+            <Route path="/cake-ai" element={<CakeAI />} />
+            <Route path="/trash" element={<Trash />} />
+            <Route path="/chats" element={<Chats />} />
+            <Route path="/support" element={<CustomerSupport />} />
+          </Route>
+
+          {/* Only bakery admin / staff accounts can access bakery admin routes */}
+          <Route element={<RoleRoute allowedRoles={['bakery_staff', 'bakery_admin', 'platform_admin']} fallbackPath="/client" />}>
+            <Route path="/bakery/designer" element={<BakeryDesigner />} />
+            <Route path="/bakery" element={<BakeryAdminLayout />}>
+              <Route index element={<Navigate to="orders" replace />} />
+              <Route path="orders" element={<BakeryOrders />} />
+              <Route path="reservations" element={<Navigate to="/bakery/orders" replace />} />
+              <Route path="pricing" element={<BakeryPricing />} />
+              <Route path="templates" element={<BakeryTemplates />} />
+              <Route path="transactions" element={<Navigate to="/bakery/orders?tab=payments" replace />} />
+              <Route path="chats" element={<BakeryChatsSection />} />
+              <Route path="assets" element={<Navigate to="/bakery/orders" replace />} />
+              <Route path="billing" element={<BakeryBilling />} />
+              <Route path="employees" element={<BakeryEmployees />} />
+              <Route path="blueprints" element={<BakeryBlueprints />} />
+              <Route path="profile" element={<BakeryProfile />} />
+            </Route>
+          </Route>
+        </Route>
+
+        <Route path="*" element={<PageNotFound />} />
+      </Routes>
+    </ClientAccessGuard>
   );
 };
 
@@ -149,6 +153,7 @@ function App() {
           <ScrollToTop />
           <AuthenticatedApp />
           <CustomerRestrictionNotice />
+          <ClientUpdateAdvanceWarning />
         </Router>
         <Toaster />
       </QueryClientProvider>

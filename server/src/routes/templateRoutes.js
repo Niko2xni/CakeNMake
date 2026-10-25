@@ -198,6 +198,176 @@ router.post('/sections/reorder', authenticate, loadAppUser, requireRole('bakery_
   }
 });
 
+// GET /api/bakery/templates/drafts - Get all drafted edits itemized
+router.get('/drafts', authenticate, loadAppUser, requireRole('bakery_staff', 'bakery_admin', 'platform_admin'), async (req, res) => {
+  try {
+    const now = new Date();
+    const templates = await Template.find({
+      $or: [
+        { pendingAction: { $in: ['create', 'update', 'delete'] } },
+        { effectiveAt: { $gt: now } },
+      ],
+    }).populate('sectionId', 'name').lean();
+
+    const drafts = templates.map((t) => {
+      let action = t.pendingAction;
+      if (!action || action === 'none') {
+        action = t.draftOriginalState ? 'update' : 'create';
+      }
+
+      let summary = '';
+      if (action === 'create') {
+        summary = `New Template: "${t.name}" added to "${t.sectionId?.name || 'Section'}"`;
+      } else if (action === 'delete') {
+        summary = `Delete Template: "${t.name}"`;
+      } else if (action === 'update') {
+        const changes = [];
+        const orig = t.draftOriginalState || {};
+        if (orig.name && orig.name !== t.name) changes.push(`name to "${t.name}"`);
+        if (orig.priceMinor !== undefined && orig.priceMinor !== t.priceMinor) changes.push(`price to ₱${(t.priceMinor / 100).toFixed(2)}`);
+        if (orig.description !== undefined && orig.description !== t.description) changes.push('description');
+        if (orig.sectionId && String(orig.sectionId) !== String(t.sectionId?._id || t.sectionId)) changes.push('section');
+        if (orig.views && JSON.stringify(orig.views) !== JSON.stringify(t.views)) changes.push('showcase views');
+        if (orig.config && JSON.stringify(orig.config) !== JSON.stringify(t.config)) changes.push('cake 3D design specs');
+        summary = changes.length > 0 ? `Updated ${changes.join(', ')} on "${t.name}"` : `Modified details for "${t.name}"`;
+      }
+
+      return {
+        _id: t._id,
+        name: t.name,
+        thumbnail: t.thumbnail,
+        priceMinor: t.priceMinor,
+        sectionName: t.sectionId?.name || '',
+        pendingAction: action,
+        effectiveAt: t.effectiveAt,
+        summary,
+        hasOriginal: Boolean(t.draftOriginalState),
+      };
+    });
+
+    return res.json({
+      drafts,
+      count: drafts.length,
+      nextCommitTime: nextManilaTenPm(now).toISOString(),
+    });
+  } catch (error) {
+    console.error('Failed to get template drafts:', error);
+    return res.status(500).json({ message: 'Failed to retrieve template drafts' });
+  }
+});
+
+// DELETE /api/bakery/templates/drafts/:id - Discard / Revert a single specific drafted edit
+router.delete('/drafts/:id', authenticate, loadAppUser, requireRole('bakery_admin', 'platform_admin'), async (req, res) => {
+  try {
+    const template = await Template.findById(req.params.id);
+    if (!template) {
+      return res.status(404).json({ message: 'Draft template not found' });
+    }
+
+    if (template.pendingAction === 'create' || (!template.draftOriginalState && template.effectiveAt)) {
+      // It was newly created and hasn't gone live yet -> completely remove
+      const tName = template.name;
+      await Template.findByIdAndDelete(template._id);
+      const { recordAuditLog } = require('../services/maintenanceService');
+      await recordAuditLog({
+        type: 'template',
+        action: 'discard',
+        title: `Draft Template Discarded: "${tName}"`,
+        description: 'Draft was removed prior to 10:00 PM auto-activation.',
+        changedBy: req.user?._id,
+        changedByName: req.user?.displayName || req.user?.email || 'Bakery Staff',
+      });
+      return res.json({ message: `Draft "${tName}" removed completely.`, discardedId: template._id, revertedToOriginal: false });
+    }
+
+    if (template.draftOriginalState) {
+      // It was an update or pending delete -> restore original live state
+      const orig = template.draftOriginalState;
+      template.name = orig.name;
+      template.description = orig.description;
+      template.longDescription = orig.longDescription;
+      template.sectionId = orig.sectionId;
+      template.priceMinor = orig.priceMinor;
+      template.specs = orig.specs;
+      template.views = orig.views;
+      template.thumbnail = orig.thumbnail;
+      template.config = orig.config;
+      template.order = orig.order;
+      template.isPublished = orig.isPublished !== undefined ? orig.isPublished : true;
+      template.pendingAction = 'none';
+      template.draftOriginalState = null;
+      template.effectiveAt = null; // restore to active live state
+      await template.save();
+
+      const { recordAuditLog } = require('../services/maintenanceService');
+      await recordAuditLog({
+        type: 'template',
+        action: 'revert',
+        title: `Draft Changes Reverted: "${template.name}"`,
+        description: 'Restored template to previous active catalog state.',
+        changedBy: req.user?._id,
+        changedByName: req.user?.displayName || req.user?.email || 'Bakery Staff',
+      });
+
+      return res.json({ message: `Changes reverted for "${template.name}".`, discardedId: template._id, revertedToOriginal: true });
+    }
+
+    // Default fallback: clear draft flags
+    template.pendingAction = 'none';
+    template.effectiveAt = null;
+    await template.save();
+    return res.json({ message: `Draft status cleared for "${template.name}".`, discardedId: template._id });
+  } catch (error) {
+    console.error('Failed to discard draft edit:', error);
+    return res.status(500).json({ message: 'Failed to discard draft edit' });
+  }
+});
+
+// POST /api/bakery/templates/drafts/discard-all - Discard all template drafts
+router.post('/drafts/discard-all', authenticate, loadAppUser, requireRole('bakery_admin', 'platform_admin'), async (req, res) => {
+  try {
+    const now = new Date();
+    const draftedTemplates = await Template.find({
+      $or: [
+        { pendingAction: { $in: ['create', 'update', 'delete'] } },
+        { effectiveAt: { $gt: now } },
+      ],
+    });
+
+    for (const tpl of draftedTemplates) {
+      if (tpl.pendingAction === 'create' || (!tpl.draftOriginalState && tpl.effectiveAt)) {
+        await Template.findByIdAndDelete(tpl._id);
+      } else if (tpl.draftOriginalState) {
+        const orig = tpl.draftOriginalState;
+        tpl.name = orig.name;
+        tpl.description = orig.description;
+        tpl.longDescription = orig.longDescription;
+        tpl.sectionId = orig.sectionId;
+        tpl.priceMinor = orig.priceMinor;
+        tpl.specs = orig.specs;
+        tpl.views = orig.views;
+        tpl.thumbnail = orig.thumbnail;
+        tpl.config = orig.config;
+        tpl.order = orig.order;
+        tpl.isPublished = orig.isPublished !== undefined ? orig.isPublished : true;
+        tpl.pendingAction = 'none';
+        tpl.draftOriginalState = null;
+        tpl.effectiveAt = null;
+        await tpl.save();
+      } else {
+        tpl.pendingAction = 'none';
+        tpl.effectiveAt = null;
+        await tpl.save();
+      }
+    }
+
+    return res.json({ message: 'All drafted template edits have been discarded.' });
+  } catch (error) {
+    console.error('Failed to discard all template drafts:', error);
+    return res.status(500).json({ message: 'Failed to discard all template drafts' });
+  }
+});
+
 // GET /api/bakery/templates - Get all templates and sections for management
 router.get('/', authenticate, loadAppUser, requireRole('bakery_staff', 'bakery_admin', 'platform_admin'), async (req, res) => {
   try {
@@ -211,7 +381,9 @@ router.get('/', authenticate, loadAppUser, requireRole('bakery_staff', 'bakery_a
     }));
 
     const now = new Date();
-    const pendingActivationCount = templates.filter((t) => t.effectiveAt && new Date(t.effectiveAt) > now).length;
+    const pendingActivationCount = templates.filter(
+      (t) => (t.pendingAction && t.pendingAction !== 'none') || (t.effectiveAt && new Date(t.effectiveAt) > now)
+    ).length;
 
     return res.json({
       sections: sectionsWithTemplates,
@@ -224,7 +396,7 @@ router.get('/', authenticate, loadAppUser, requireRole('bakery_staff', 'bakery_a
   }
 });
 
-// POST /api/bakery/templates - Create template
+// POST /api/bakery/templates - Create template (drafted for 10 PM)
 router.post('/', authenticate, loadAppUser, requireRole('bakery_staff', 'bakery_admin', 'platform_admin'), async (req, res) => {
   try {
     const {
@@ -268,7 +440,20 @@ router.post('/', authenticate, loadAppUser, requireRole('bakery_staff', 'bakery_
       config: config || {},
       order: nextOrder,
       isPublished: true,
+      pendingAction: 'create',
+      draftOriginalState: null,
       effectiveAt: nextManilaTenPm(),
+    });
+
+    const { recordAuditLog } = require('../services/maintenanceService');
+    await recordAuditLog({
+      type: 'template',
+      action: 'create',
+      title: `Draft Template Created: "${template.name}"`,
+      description: `Staged for 10:00 PM auto-activation in section "${targetSectionId}"`,
+      changedBy: req.user?._id,
+      changedByName: req.user?.displayName || req.user?.email || 'Bakery Staff',
+      scheduledEffectiveAt: template.effectiveAt,
     });
 
     return res.status(201).json(template);
@@ -278,7 +463,7 @@ router.post('/', authenticate, loadAppUser, requireRole('bakery_staff', 'bakery_
   }
 });
 
-// PUT /api/bakery/templates/:id - Update template
+// PUT /api/bakery/templates/:id - Update template (drafted for 10 PM, snapshots original state)
 router.put('/:id', authenticate, loadAppUser, requireRole('bakery_staff', 'bakery_admin', 'platform_admin'), async (req, res) => {
   try {
     const {
@@ -295,40 +480,121 @@ router.put('/:id', authenticate, loadAppUser, requireRole('bakery_staff', 'baker
       isPublished,
     } = req.body;
 
-    const update = {};
-    if (name !== undefined) update.name = name.trim();
-    if (description !== undefined) update.description = description.trim();
-    if (longDescription !== undefined) update.longDescription = longDescription.trim();
-    if (sectionId !== undefined) update.sectionId = sectionId;
-    if (priceMinor !== undefined) update.priceMinor = Number(priceMinor);
-    if (specs !== undefined) update.specs = specs;
-    if (views !== undefined) update.views = sanitizeViews(views);
-    if (thumbnail !== undefined) update.thumbnail = thumbnail;
-    if (config !== undefined) update.config = config;
-    if (order !== undefined) update.order = Number(order);
-    if (isPublished !== undefined) update.isPublished = Boolean(isPublished);
-    // Scheduled for 10:00 PM Manila activation
-    update.effectiveAt = nextManilaTenPm();
-
-    const template = await Template.findByIdAndUpdate(req.params.id, update, { new: true });
-    if (!template) {
+    const existing = await Template.findById(req.params.id);
+    if (!existing) {
       return res.status(404).json({ message: 'Template not found' });
     }
-    return res.json(template);
+
+    // Preserve original state if not already in a draft update
+    let draftOriginalState = existing.draftOriginalState;
+    if (!draftOriginalState && existing.pendingAction === 'none') {
+      draftOriginalState = {
+        name: existing.name,
+        description: existing.description,
+        longDescription: existing.longDescription,
+        sectionId: existing.sectionId,
+        priceMinor: existing.priceMinor,
+        specs: existing.specs,
+        views: existing.views,
+        thumbnail: existing.thumbnail,
+        config: existing.config,
+        order: existing.order,
+        isPublished: existing.isPublished,
+      };
+    }
+
+    if (name !== undefined) existing.name = name.trim();
+    if (description !== undefined) existing.description = description.trim();
+    if (longDescription !== undefined) existing.longDescription = longDescription.trim();
+    if (sectionId !== undefined) existing.sectionId = sectionId;
+    if (priceMinor !== undefined) existing.priceMinor = Number(priceMinor);
+    if (specs !== undefined) existing.specs = specs;
+    if (views !== undefined) existing.views = sanitizeViews(views);
+    if (thumbnail !== undefined) existing.thumbnail = thumbnail;
+    if (config !== undefined) existing.config = config;
+    if (order !== undefined) existing.order = Number(order);
+    if (isPublished !== undefined) existing.isPublished = Boolean(isPublished);
+
+    if (existing.pendingAction !== 'create') {
+      existing.pendingAction = 'update';
+      existing.draftOriginalState = draftOriginalState;
+    }
+    existing.effectiveAt = nextManilaTenPm();
+
+    await existing.save();
+
+    const { recordAuditLog } = require('../services/maintenanceService');
+    await recordAuditLog({
+      type: 'template',
+      action: 'update',
+      title: `Draft Template Updated: "${existing.name}"`,
+      description: 'Changes staged for 10:00 PM auto-activation.',
+      changedBy: req.user?._id,
+      changedByName: req.user?.displayName || req.user?.email || 'Bakery Staff',
+      scheduledEffectiveAt: existing.effectiveAt,
+    });
+
+    return res.json(existing);
   } catch (error) {
     console.error('Failed to update template:', error);
     return res.status(500).json({ message: 'Failed to update template' });
   }
 });
 
-// DELETE /api/bakery/templates/:id - Delete template
+// DELETE /api/bakery/templates/:id - Delete template (stages pending delete if already live, or removes immediately if draft)
 router.delete('/:id', authenticate, loadAppUser, requireRole('bakery_staff', 'bakery_admin', 'platform_admin'), async (req, res) => {
   try {
-    const template = await Template.findByIdAndDelete(req.params.id);
-    if (!template) {
+    const existing = await Template.findById(req.params.id);
+    if (!existing) {
       return res.status(404).json({ message: 'Template not found' });
     }
-    return res.json({ message: 'Template deleted', deletedId: req.params.id });
+
+    // If it was just created in draft (never live), delete immediately
+    if (existing.pendingAction === 'create') {
+      const tName = existing.name;
+      await Template.findByIdAndDelete(existing._id);
+      const { recordAuditLog } = require('../services/maintenanceService');
+      await recordAuditLog({
+        type: 'template',
+        action: 'discard',
+        title: `Draft Template Discarded: "${tName}"`,
+        description: 'New draft template removed before publishing.',
+        changedBy: req.user?._id,
+        changedByName: req.user?.displayName || req.user?.email || 'Bakery Staff',
+      });
+      return res.json({ message: 'Draft template removed', deletedId: req.params.id, staged: false });
+    }
+
+    // If it's a live template, stage the deletion for 10 PM so it can be viewed and discarded/canceled in control panel
+    existing.draftOriginalState = existing.draftOriginalState || {
+      name: existing.name,
+      description: existing.description,
+      longDescription: existing.longDescription,
+      sectionId: existing.sectionId,
+      priceMinor: existing.priceMinor,
+      specs: existing.specs,
+      views: existing.views,
+      thumbnail: existing.thumbnail,
+      config: existing.config,
+      order: existing.order,
+      isPublished: existing.isPublished,
+    };
+    existing.pendingAction = 'delete';
+    existing.effectiveAt = nextManilaTenPm();
+    await existing.save();
+
+    const { recordAuditLog } = require('../services/maintenanceService');
+    await recordAuditLog({
+      type: 'template',
+      action: 'delete',
+      title: `Template Deletion Staged: "${existing.name}"`,
+      description: 'Scheduled for removal at 10:00 PM.',
+      changedBy: req.user?._id,
+      changedByName: req.user?.displayName || req.user?.email || 'Bakery Staff',
+      scheduledEffectiveAt: existing.effectiveAt,
+    });
+
+    return res.json({ message: 'Template scheduled for removal at 10:00 PM', deletedId: req.params.id, staged: true });
   } catch (error) {
     console.error('Failed to delete template:', error);
     return res.status(500).json({ message: 'Failed to delete template' });

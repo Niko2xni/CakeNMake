@@ -69,6 +69,15 @@ const templateSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  pendingAction: {
+    type: String,
+    enum: ['none', 'create', 'update', 'delete'],
+    default: 'none',
+  },
+  draftOriginalState: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null,
+  },
 }, {
   timestamps: true,
 });

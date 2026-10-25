@@ -274,14 +274,60 @@ export const TUTORIAL_STEPS = [
         setup: { tab: 'center', tool: null, keepSelection: true, patch: (c) => ({ ...c, center: { ...(c.center || {}), mode: 'text' } }) },
     },
 
-    // ── 9 · Send ──────────────────────────────────────────────────
+    // ── 9 · Interior Preview ──────────────────────────────────────
     {
-        id: 'send-bakery', group: 9, kind: 'info', title: 'Send Bakery',
+        id: 'interior-preview-toggle', group: 9, kind: 'try', title: 'Interior Preview',
+        text: "Now that your cake is customized, let's see what's inside. Click the Eye icon in the panel header to turn on Interior Preview.",
+        target: '[data-tutorial="interior-preview"]', allow: ['[data-tutorial="interior-preview"]'],
+        done: { when: ({ config }) => Boolean(config.interiorPreview) },
+        doneText: '3D cutaway active! Look inside the cake.',
+        setup: { tab: 'fundamentals', expand: 'none', tool: null },
+    },
+    {
+        id: 'interior-preview-explain', group: 9, kind: 'info', title: 'How & Why It Works',
+        text: "Interior Preview cuts a real-time 3D geometric cross-section into your cake. It works this way because a custom cake is more than just frosting — both you and the baker need to inspect internal sponge crumb, filling flavor, and layer thickness to verify structure and taste pairings before baking. Rotate the cake to view the cross-section.",
+        target: CANVAS,
+        setup: { tab: 'fundamentals', expand: 'none', tool: null, patch: (c) => ({ ...c, interiorPreview: true }) },
+    },
+    {
+        id: 'interior-preview-close', group: 9, kind: 'try', title: 'Close Preview',
+        text: 'Click the Eye icon again to close the cutaway and return to the complete cake exterior.',
+        target: '[data-tutorial="interior-preview"]', allow: ['[data-tutorial="interior-preview"]'],
+        done: { when: ({ config }) => !config.interiorPreview },
+        doneText: 'Closed! Your complete custom cake is back in view.',
+        setup: { tab: 'fundamentals', expand: 'none', tool: null, patch: (c) => ({ ...c, interiorPreview: true }) },
+    },
+
+    // ── 10 · Reset Cake ───────────────────────────────────────────
+    {
+        id: 'reset-cake-open', group: 10, kind: 'try', title: 'Reset Cake',
+        text: 'Made a mistake or want to start fresh? Click the Reset icon (circular arrow next to the Eye) to open the reset options.',
+        target: '[data-tutorial="reset-cake"]', allow: ['[data-tutorial="reset-cake"]'],
+        done: { click: '[data-tutorial="reset-cake"]' },
+        doneText: 'Reset options opened.',
+        setup: { tab: 'fundamentals', expand: 'none', tool: null },
+    },
+    {
+        id: 'reset-cake-explain', group: 10, kind: 'info', title: 'How & Why Reset Works',
+        text: 'Reset gives you a safe escape hatch. When starting from a bakery template, you can choose "Reset to Template" (reverts only your edits while preserving the template base) or "Blank Reset" (cleans the canvas to a default cake). It works this way to protect your intricate 3D design work from accidental loss while letting you experiment freely.',
+        target: '[data-tutorial="reset-dialog"]', fallback: TOOL,
+    },
+    {
+        id: 'reset-cake-dismiss', group: 10, kind: 'try', title: 'Dismissing Reset',
+        text: 'Click Cancel to close the reset dialog and preserve your design.',
+        target: '[data-tutorial="reset-cancel"]', allow: ['[data-tutorial="reset-cancel"]', 'button'],
+        done: { click: '[data-tutorial="reset-cancel"]' },
+        doneText: 'Cancelled. Your design is preserved.',
+    },
+
+    // ── 11 · Send ─────────────────────────────────────────────────
+    {
+        id: 'send-bakery', group: 11, kind: 'info', title: 'Send Bakery',
         text: 'When your cake is ready, Send Bakery opens a simulated payment and emails you a confirmation. Nothing is actually sent in this tutorial.',
         target: '[data-tutorial="send-bakery"]', setup: { tool: null },
     },
     {
-        id: 'chat-bakery', group: 9, kind: 'info', title: 'Bakery Chat',
+        id: 'chat-bakery', group: 11, kind: 'info', title: 'Bakery Chat',
         text: 'After sending, you land in Bakery Chat to talk with your baker. Finishing now resets the designer: your tutorial cake disappears and your own design returns.',
         target: null,
     },
