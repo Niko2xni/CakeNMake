@@ -14,9 +14,23 @@ async function recordDownPayment(req, res) {
   try {
     const reservation = await Reservation.findOne({ _id: req.params.id, platform: req.platformId });
     if (!reservation) return res.status(404).json({ message: 'Reservation not found.' });
-    if (reservation.downPayment?.isPaid) return res.status(409).json({ message: 'This down payment has already been recorded.' });
+    const isAlreadyVerified = Boolean(
+      reservation.downPayment?.isPaid &&
+      reservation.downPayment?.paymentReference !== 'simulated_checkout'
+    );
+    if (isAlreadyVerified) return res.status(409).json({ message: 'This down payment has already been recorded.' });
     if (Math.round(amount * 100) !== Math.round(reservation.downPayment.amount * 100)) return res.status(400).json({ message: 'Amount must match the required down payment.' });
-    const updated = await Reservation.findOneAndUpdate({ _id: reservation._id, platform: req.platformId, 'downPayment.isPaid': false, status: reservation.status }, {
+    const filter = {
+      _id: reservation._id,
+      platform: req.platformId,
+      status: reservation.status,
+    };
+    if (!reservation.downPayment?.isPaid) {
+      filter['downPayment.isPaid'] = false;
+    } else {
+      filter['downPayment.paymentReference'] = 'simulated_checkout';
+    }
+    const updated = await Reservation.findOneAndUpdate(filter, {
       $set: { 'downPayment.isPaid': true, 'downPayment.paidAt': new Date(), 'downPayment.paymentReference': reference.trim(),
         'downPayment.method': method, 'downPayment.recordedBy': req.user._id,
         ...(reservation.status === 'pending_payment' ? { status: 'confirmed' } : {}) },
@@ -129,6 +143,23 @@ async function updateStatus(req, res) {
     }
 
     existingReservation.status = status;
+
+    if (status === 'completed') {
+      const totalPrice = Number(existingReservation.totalPrice || 0);
+      const downAmount = Number(existingReservation.downPayment?.amount || Math.ceil(totalPrice / 2));
+      const balAmount = Math.max(0, totalPrice - downAmount);
+      if (!existingReservation.finalPayment) {
+        existingReservation.finalPayment = {};
+      }
+      if (!existingReservation.finalPayment.isPaid) {
+        existingReservation.finalPayment.isPaid = true;
+        existingReservation.finalPayment.amount = balAmount;
+        existingReservation.finalPayment.paidAt = existingReservation.finalPayment.paidAt || new Date();
+        existingReservation.finalPayment.method = existingReservation.finalPayment.method || 'cash';
+        existingReservation.finalPayment.paymentReference = existingReservation.finalPayment.paymentReference || 'COMPLETED_ON_ORDER';
+      }
+    }
+
     const reservation = await existingReservation.save();
 
     if (reservation.blueprint) {

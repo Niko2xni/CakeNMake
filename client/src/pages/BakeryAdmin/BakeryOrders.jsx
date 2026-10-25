@@ -148,7 +148,7 @@ export default function BakeryOrders() {
     { label: 'Remaining Balance Due', value: `₱${Number(remainingBalance).toLocaleString()}`, icon: Clock },
   ] : [];
 
-  return <div className="cn-bakery-orders h-full min-h-0 rounded-2xl border border-pink-100 bg-white shadow-sm flex flex-col overflow-hidden">
+  return <div className="cn-bakery-orders h-full min-h-[820px] rounded-2xl border border-pink-100 bg-white shadow-sm flex flex-col overflow-hidden">
     <header className="shrink-0 border-b border-pink-100 px-4 py-4 sm:px-6 flex justify-between items-center">
       <div>
         <h1 className="text-xl font-bold tracking-tight text-gray-900">Orders</h1>
@@ -185,14 +185,29 @@ export default function BakeryOrders() {
         className={`px-3 py-3 text-sm font-medium border-b-2 ${activeTab === key ? 'border-pink-500 text-pink-600' : 'border-transparent text-gray-500'}`}
       >{label}</button>)}
     </div>
-    <section id="orders-reservations-panel" role="tabpanel" aria-labelledby="orders-reservations-tab" hidden={activeTab !== 'reservations'} className="flex-1 min-h-0">
+    <section
+      id="orders-reservations-panel"
+      role="tabpanel"
+      aria-labelledby="orders-reservations-tab"
+      hidden={activeTab !== 'reservations'}
+      className={activeTab === 'reservations' ? 'flex-1 min-h-[550px] flex flex-col' : 'hidden'}
+    >
       {reservationsError && <LoadError message={reservationsError} onRetry={loadReservations} />}
-      <div hidden={Boolean(reservationsError)} className="h-full">
+      <div
+        hidden={Boolean(reservationsError)}
+        className={reservationsError ? 'hidden' : 'flex-1 min-h-[550px] flex flex-col'}
+      >
         <BakeryReservations reservations={reservations} loading={reservationsLoading} selected={selected}
           setSelected={(row) => { setSelected(row); setStatusError(''); }} onStatusChange={updateStatus} updatingStatus={updatingStatus} statusError={statusError} onRecordPayment={recordPayment} />
       </div>
     </section>
-    <section id="orders-payments-panel" role="tabpanel" aria-labelledby="orders-payments-tab" hidden={activeTab !== 'payments'} className="flex-1 min-h-0">
+    <section
+      id="orders-payments-panel"
+      role="tabpanel"
+      aria-labelledby="orders-payments-tab"
+      hidden={activeTab !== 'payments'}
+      className={activeTab === 'payments' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}
+    >
       {!paymentsError && <BakeryPaymentHistory payments={payments} loading={paymentsLoading} onOpenReservation={(payment) => {
         setSelected(reservations.find((row) => row._id === payment._id) || payment);
         setStatusError('');

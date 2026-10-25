@@ -19,7 +19,7 @@ function BakeryAdminLayoutContent() {
             <BakeryControlPanelHeader onMinimize={closeControlPanel} />
           </div>
         )}
-        <div className="cn-bakery-outlet-wrap flex-1 min-w-0 flex flex-col">
+        <div className="cn-bakery-outlet-wrap flex-1 min-w-0 min-h-0 flex flex-col">
           <Outlet />
         </div>
       </main>

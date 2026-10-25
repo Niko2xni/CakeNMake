@@ -93,15 +93,12 @@ describe('Orders', () => {
     await waitFor(() => expect(screen.getByLabelText('Current route')).toHaveTextContent('/bakery/chats?tab=messages&conversation=conversation-1'));
     expect(chatApi.openReservationChat).toHaveBeenCalledWith('order-1');
   });
-  it('records a verified down payment and refreshes orders and totals', async () => {
-    bakeryApi.recordDownPayment.mockResolvedValue({});
+  it('does not render a down payment form as all reservations have automated simulated payments', async () => {
     setup('/bakery/orders?tab=payments');
     fireEvent.click(await screen.findByRole('button', { name: 'Open reservation for Ben Reyes' }));
-    expect(screen.getByRole('button', { name: 'Record verified payment' })).toBeDisabled();
-    fireEvent.change(screen.getByLabelText('Receipt / payment reference'), { target: { value: 'GC-12345' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Record verified payment' }));
-    await waitFor(() => expect(bakeryApi.recordDownPayment).toHaveBeenCalledWith('order-2', { amount: 500, method: 'gcash', reference: 'GC-12345' }));
-    await waitFor(() => expect(transactionApi.getTransactions).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole('button', { name: 'Record verified payment' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Receipt / payment reference')).not.toBeInTheDocument();
+    expect(screen.getByText('Reservation Details')).toBeVisible();
   });
   it('preserves reservation search and status filters when switching tabs', async () => {
     setup();

@@ -8,24 +8,7 @@ import { chatApi } from '@/services/chat-api';
 import { bakeryApi } from '@/services/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
-function DownPaymentForm({ order, onRecordPayment }) {
-  const [method, setMethod] = useState('gcash');
-  const [reference, setReference] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  async function submit(event) {
-    event.preventDefault(); setBusy(true); setError('');
-    try { await onRecordPayment(order._id, { amount: order.downPayment.amount, method, reference }); }
-    catch (failure) { setError(failure.message || 'Could not record payment.'); }
-    finally { setBusy(false); }
-  }
-  return <form onSubmit={submit} className="space-y-3 rounded-xl border border-pink-100 bg-pink-50/40 p-3">
-    <h3 className="text-sm font-semibold">Record down payment</h3><p className="text-xs text-gray-600">Record only after verifying receipt of ₱{Number(order.downPayment.amount).toLocaleString()}. Simulated checkout does not collect money.</p>
-    <label className="block text-xs">Payment method<select value={method} onChange={(e) => setMethod(e.target.value)} className="mt-1 block w-full rounded-lg border p-2 text-sm"><option value="gcash">GCash</option><option value="cash">Cash</option><option value="bank_transfer">Bank transfer</option><option value="other">Other</option></select></label>
-    <label className="block text-xs">Receipt / payment reference<input required maxLength={200} value={reference} onChange={(e) => setReference(e.target.value)} className="mt-1 block w-full rounded-lg border p-2 text-sm" /></label>
-    {error && <p role="alert" className="text-xs text-red-700">{error}</p>}<button disabled={busy || !reference.trim()} className="w-full rounded-lg bg-pink-600 p-2 text-sm text-white disabled:opacity-50">{busy ? 'Recording…' : 'Record verified payment'}</button>
-  </form>;
-}
+
 
 
 const STATUS_TABS = [
@@ -57,7 +40,7 @@ function formatPeso(amount) {
   return `₱${Number(amount || 0).toLocaleString()}`;
 }
 
-export default function BakeryReservations({ reservations, loading, selected, setSelected, onStatusChange, updatingStatus, statusError, onRecordPayment }) {
+export default function BakeryReservations({ reservations, loading, selected, setSelected, onStatusChange, updatingStatus, statusError }) {
   const [activeTab, setActiveTab] = useState('all');
   const [search, setSearch] = useState('');
   const navigate = useNavigate();
@@ -102,11 +85,6 @@ export default function BakeryReservations({ reservations, loading, selected, se
     finally { setOpeningChat(false); }
   }
 
-  const hasUnpaid = reservations.some((r) => r.status === 'pending_payment');
-  const availableTabs = hasUnpaid
-    ? [...STATUS_TABS, { key: 'pending_payment', label: 'Unpaid Deposit' }]
-    : STATUS_TABS;
-
   const filtered = reservations.filter((r) => {
     if (activeTab !== 'all' && r.status !== activeTab) return false;
     if (!search.trim()) return true;
@@ -146,7 +124,7 @@ export default function BakeryReservations({ reservations, loading, selected, se
     <div className="cn-bakery-reservations flex h-full min-h-0">
       <Dialog open={Boolean(previewUrl)} onOpenChange={(open) => { if (!open) setPreviewUrl(null); }}><DialogContent className="flex h-[85dvh] max-w-5xl flex-col"><DialogHeader><DialogTitle>Blueprint PDF preview</DialogTitle></DialogHeader>{previewUrl && <iframe title="Order blueprint PDF" src={previewUrl} className="min-h-0 w-full flex-1 rounded-lg border" />}</DialogContent></Dialog>
       {/* Main list */}
-      <div className="flex-1 min-w-0 bg-white flex flex-col overflow-hidden">
+      <div className="flex-1 min-w-0 bg-white flex flex-col overflow-hidden h-full min-h-0">
 
         <div className="flex-shrink-0 px-4 pt-3">
           <div className="relative mb-3">
@@ -163,7 +141,7 @@ export default function BakeryReservations({ reservations, loading, selected, se
           </div>
 
           <div className="flex gap-1 overflow-x-auto pb-px">
-            {availableTabs.map((tab) => (
+            {STATUS_TABS.map((tab) => (
               <button
                 key={tab.key}
                 aria-pressed={activeTab === tab.key}
@@ -230,17 +208,27 @@ export default function BakeryReservations({ reservations, loading, selected, se
                         <span className="text-gray-300">·</span>
                         <span className="font-semibold text-gray-800">{formatPeso(r.totalPrice)} total</span>
                         <span className="text-gray-300">·</span>
-                        {r.downPayment?.isPaid ? (
-                          <span className="text-gray-600">
-                            <span className="text-green-600 font-medium">Deposit paid</span>
-                            {' · '}
-                            <span>Balance: <strong>{formatPeso(Math.max(0, (r.totalPrice || 0) - (r.downPayment?.amount || 0)))}</strong></span>
-                          </span>
-                        ) : (
-                          <span className="text-yellow-700 font-medium bg-yellow-50 px-1.5 py-0.5 rounded border border-yellow-200 text-[11px]">
-                            Deposit unpaid ({formatPeso(r.downPayment?.amount)})
-                          </span>
-                        )}
+                        {(() => {
+                          const downAmount = Number(r.downPayment?.amount || Math.round(Number(r.totalPrice || 0) * 0.5));
+                          const rawBal = Math.max(0, Number(r.totalPrice || 0) - downAmount);
+                          const isBalPaid = Boolean(r.finalPayment?.isPaid) || r.status === 'completed' || rawBal === 0;
+
+                          if (isBalPaid) {
+                            return (
+                              <span className="text-green-600 font-medium">
+                                Paid in full
+                              </span>
+                            );
+                          }
+
+                          return (
+                            <span className="text-gray-600">
+                              <span className="text-green-600 font-medium">Downpayment paid</span>
+                              {' · '}
+                              <span>Balance: <strong>{formatPeso(rawBal)}</strong></span>
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
 
@@ -258,7 +246,7 @@ export default function BakeryReservations({ reservations, loading, selected, se
       </div>
 
       {/* Detail panel - streamlined modern layout */}
-      <div className={`cn-reservation-detail flex-shrink-0 overflow-hidden ${selected ? 'is-open w-[22rem] lg:w-[26rem] ml-4' : 'w-0 ml-0'}`}>
+      <div className={`cn-reservation-detail flex-shrink-0 h-full sticky top-0 self-start overflow-hidden ${selected ? 'is-open w-[22rem] lg:w-[26rem] ml-4' : 'w-0 ml-0'}`}>
         {selected && (
           <div className="w-full h-full flex flex-col bg-white rounded-2xl border border-pink-100 shadow-xl overflow-hidden">
             <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-pink-100 bg-pink-50/20">
@@ -407,6 +395,7 @@ export default function BakeryReservations({ reservations, loading, selected, se
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-xs">
+                  {/* 1. Downpayment */}
                   <div className="p-2 rounded-lg bg-white border border-gray-200/80 flex flex-col justify-between">
                     <div>
                       <span className="text-[10px] text-gray-500 block uppercase font-medium">1. Downpayment (50%)</span>
@@ -414,45 +403,51 @@ export default function BakeryReservations({ reservations, loading, selected, se
                         <span className="font-bold text-gray-900">
                           {formatPeso(selected.downPayment?.amount || Math.round(selected.totalPrice * 0.5))}
                         </span>
-                        <span className={`text-[10px] font-semibold px-1.5 py-0.2 rounded ${
-                          selected.downPayment?.isPaid ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                        }`}>
-                          {selected.downPayment?.isPaid ? 'Paid' : 'Unpaid'}
+                        <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-green-100 text-green-700">
+                          Paid
                         </span>
                       </div>
                     </div>
-                    {selected.downPayment?.isPaid && (
-                      <p className="text-[10px] text-gray-500 mt-1 truncate" title={`${selected.downPayment.method || 'paid'}${selected.downPayment.paymentReference ? ` · Ref: ${selected.downPayment.paymentReference}` : ''}`}>
-                        {selected.downPayment.method || 'paid'}{selected.downPayment.paymentReference ? ` · Ref: ${selected.downPayment.paymentReference}` : ''}
-                      </p>
-                    )}
+                    <p className="text-[10px] text-gray-500 mt-1 truncate" title={`${selected.downPayment?.method || 'gcash'}${selected.downPayment?.paymentReference ? ` · Ref: ${selected.downPayment.paymentReference}` : ''}`}>
+                      {selected.downPayment?.method || 'gcash'}{selected.downPayment?.paymentReference ? ` · Ref: ${selected.downPayment.paymentReference}` : ''}
+                    </p>
                   </div>
 
-                  <div className="p-2 rounded-lg bg-white border border-gray-200/80 flex flex-col justify-between">
-                    <div>
-                      <span className="text-[10px] text-gray-500 block uppercase font-medium">2. Remaining Balance</span>
-                      <p className="font-bold text-gray-900 mt-0.5">
-                        {formatPeso(Math.max(0, (selected.totalPrice || 0) - (selected.downPayment?.amount || Math.round(selected.totalPrice * 0.5))))}
-                      </p>
-                    </div>
-                    <span className="text-[10px] text-gray-500 mt-1 block">
-                      Due 48h before baking
-                    </span>
-                  </div>
+                  {/* 2. Remaining Balance */}
+                  {(() => {
+                    const downAmount = Number(selected.downPayment?.amount || Math.round(selected.totalPrice * 0.5));
+                    const rawBal = Math.max(0, Number(selected.totalPrice || 0) - downAmount);
+                    const isBalPaid = Boolean(selected.finalPayment?.isPaid) || selected.status === 'completed' || rawBal === 0;
+
+                    return (
+                      <div className="p-2 rounded-lg bg-white border border-gray-200/80 flex flex-col justify-between">
+                        <div>
+                          <span className="text-[10px] text-gray-500 block uppercase font-medium">2. Remaining Balance</span>
+                          <div className="flex items-baseline gap-1.5 mt-0.5">
+                            <span className="font-bold text-gray-900">
+                              {formatPeso(rawBal)}
+                            </span>
+                            <span className={`text-[10px] font-semibold px-1.5 py-0.2 rounded ${
+                              isBalPaid ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {isBalPaid ? 'Paid' : 'Unpaid'}
+                            </span>
+                          </div>
+                        </div>
+                        {isBalPaid ? (
+                          <p className="text-[10px] text-gray-500 mt-1 truncate" title={selected.finalPayment?.paymentReference ? `${selected.finalPayment?.method || 'paid'} · Ref: ${selected.finalPayment.paymentReference}` : 'Paid in full'}>
+                            {selected.finalPayment?.method || 'paid'}{selected.finalPayment?.paymentReference ? ` · Ref: ${selected.finalPayment.paymentReference}` : ' · Paid in full'}
+                          </p>
+                        ) : (
+                          <span className="text-[10px] text-gray-500 mt-1 block">
+                            Due 48h before baking
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
-
-                {/* Simulated checkout alert - only show if still unpaid */}
-                {!selected.downPayment?.isPaid && selected.checkoutMode === 'simulated' && (
-                  <p className="text-[11px] text-amber-700 bg-amber-50 p-1.5 rounded border border-amber-200">
-                    Simulated checkout · Payment requires staff verification below
-                  </p>
-                )}
               </div>
-
-              {/* Record Downpayment Form if unpaid */}
-              {!selected.downPayment?.isPaid && onRecordPayment && (
-                <DownPaymentForm key={selected._id} order={selected} onRecordPayment={onRecordPayment} />
-              )}
 
               {/* Order Stage */}
               <div className="pt-2 border-t border-gray-100">
@@ -464,7 +459,7 @@ export default function BakeryReservations({ reservations, loading, selected, se
                 {(() => {
                   const downAmount = Number(selected.downPayment?.amount || 0);
                   const remBal = Math.max(0, Number(selected.totalPrice || 0) - downAmount);
-                  const isBalPaid = remBal === 0 || Boolean(selected.finalPayment?.isPaid);
+                  const isBalPaid = remBal === 0 || Boolean(selected.finalPayment?.isPaid) || selected.status === 'completed';
                   const isConfirmed = selected.status === 'confirmed' || selected.status === 'pending_payment';
                   const isInProduction = selected.status === 'in_production';
                   const isCompleted = selected.status === 'completed';
@@ -474,26 +469,22 @@ export default function BakeryReservations({ reservations, loading, selected, se
                       <div className="grid grid-cols-3 gap-1.5">
                         {/* 1. Confirmed - Automated stage */}
                         <div
-                          className={`text-xs py-1.5 px-2 rounded-lg border font-medium text-center truncate select-none ${
+                          className={`text-xs py-1.5 px-2 rounded-full border text-center truncate select-none transition-colors ${
                             isConfirmed
-                              ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-xs'
-                              : isCompleted || isInProduction
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : 'border-gray-200 text-gray-400 bg-gray-50'
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-xs font-semibold'
+                              : 'bg-white border-gray-200 text-gray-700 font-medium'
                           }`}
-                          title="Stage 1: Confirmed automatically upon order placement and deposit"
+                          title="Stage 1: Confirmed automatically upon order placement and downpayment"
                         >
-                          {isInProduction || isCompleted ? 'Confirmed ✓' : 'Confirmed'}
+                          Confirmed
                         </div>
 
                         {/* 2. In Production - Automated upon client balance payment */}
                         <div
-                          className={`text-xs py-1.5 px-2 rounded-lg border font-medium text-center truncate select-none ${
+                          className={`text-xs py-1.5 px-2 rounded-full border text-center truncate select-none transition-colors ${
                             isInProduction
-                              ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
-                              : isCompleted
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : 'border-gray-200 text-gray-400 bg-gray-50 opacity-60'
+                              ? 'bg-purple-600 text-white border-purple-600 shadow-xs font-semibold'
+                              : 'bg-white border-gray-200 text-gray-700 font-medium'
                           }`}
                           title={
                             isInProduction
@@ -503,7 +494,7 @@ export default function BakeryReservations({ reservations, loading, selected, se
                               : 'Stage 2: Switches to In Production automatically when client pays balance'
                           }
                         >
-                          {isCompleted ? 'In Prod ✓' : 'In Production'}
+                          In Production
                         </div>
 
                         {/* 3. Completed - ONLY manual bakery action */}
@@ -521,15 +512,15 @@ export default function BakeryReservations({ reservations, loading, selected, se
                             setCompleteConfirmOpen(true);
                             setCompleteInputText('');
                           }}
-                          className={`text-xs py-1.5 px-2 rounded-lg border font-medium transition-colors text-center truncate ${
+                          className={`text-xs py-1.5 px-2 rounded-full border transition-colors text-center truncate ${
                             isCompleted
-                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs cursor-default'
+                              ? 'bg-green-600 text-white border-green-600 shadow-xs font-semibold cursor-default'
                               : isInProduction
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-600 hover:text-white cursor-pointer shadow-xs font-semibold'
-                              : 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed opacity-60'
+                              ? 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 cursor-pointer shadow-xs font-medium'
+                              : 'bg-white border-gray-200 text-gray-700 cursor-not-allowed opacity-60 font-medium'
                           }`}
                         >
-                          {isCompleted ? 'Completed ✓' : 'Completed'}
+                          Completed
                         </button>
                       </div>
 
@@ -559,7 +550,7 @@ export default function BakeryReservations({ reservations, loading, selected, se
                                 setRevertInputText('');
                                 setRevertConfirmOpen(true);
                               }}
-                              className="px-2 py-0.5 rounded border border-purple-200 bg-purple-50 text-[10px] font-semibold text-purple-700 hover:bg-purple-100 transition-colors cursor-pointer"
+                              className="px-2 py-0.5 rounded border border-purple-200 bg-white text-[10px] font-semibold text-purple-700 hover:bg-purple-50 transition-colors cursor-pointer"
                               title="Revert back to In-Production"
                             >
                               Revert to In-Production
@@ -572,7 +563,7 @@ export default function BakeryReservations({ reservations, loading, selected, se
                                 setRevertInputText('');
                                 setRevertConfirmOpen(true);
                               }}
-                              className="px-2 py-0.5 rounded border border-blue-200 bg-blue-50 text-[10px] font-semibold text-blue-700 hover:bg-blue-100 transition-colors cursor-pointer"
+                              className="px-2 py-0.5 rounded border border-blue-200 bg-white text-[10px] font-semibold text-blue-700 hover:bg-blue-50 transition-colors cursor-pointer"
                               title="Revert back to Confirmed"
                             >
                               Revert to Confirmed

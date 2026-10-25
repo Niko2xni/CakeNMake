@@ -9,11 +9,16 @@ const STATUS_LABELS = {
 const peso = (value) => `₱${Number(value || 0).toLocaleString()}`;
 const date = (value) => value ? new Date(value).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not recorded';
 
+export function isOrderDepositPaid(payment) {
+  return Boolean(payment?.downPayment?.isPaid);
+}
+
 export default function BakeryPaymentHistory({ payments, loading, onOpenReservation }) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const filtered = payments.filter(payment => {
-    const matchesStatus = filter === 'all' || Boolean(payment.downPayment?.isPaid) === (filter === 'paid');
+    const isDepositPaid = isOrderDepositPaid(payment);
+    const matchesStatus = filter === 'all' || isDepositPaid === (filter === 'paid');
     const haystack = [payment.user?.displayName, payment.user?.name, payment.user?.email, payment.designName, payment.downPayment?.paymentReference, payment._id].filter(Boolean).join(' ').toLowerCase();
     return matchesStatus && haystack.includes(search.trim().toLowerCase());
   });
@@ -61,12 +66,27 @@ export default function BakeryPaymentHistory({ payments, loading, onOpenReservat
         <div className="flex items-center gap-3.5 flex-shrink-0">
           <div className="text-right text-xs text-gray-500 space-y-0.5 border-l border-pink-100 pl-4">
             <p className="text-sm font-bold text-gray-900">Total: {peso(payment.totalPrice)}</p>
-            <p className="flex items-center justify-end gap-1">
-              <span>{peso(payment.downPayment?.amount)} · <strong className={payment.downPayment?.isPaid ? 'text-green-600' : 'text-yellow-700'}>{payment.downPayment?.isPaid ? 'Paid' : 'Unpaid'}</strong></span>
-              {payment.totalPrice != null && (
-                <span className="text-gray-400">· Balance: {peso(Math.max(0, (payment.totalPrice || 0) - (payment.downPayment?.amount || 0)))}</span>
-              )}
-            </p>
+            {(() => {
+              const downAmount = Number(payment.downPayment?.amount || 0);
+              const rawBal = Math.max(0, Number(payment.totalPrice || 0) - downAmount);
+              const isDepositPaid = isOrderDepositPaid(payment);
+              const isBalPaid = Boolean(payment.finalPayment?.isPaid) || payment.status === 'completed' || rawBal === 0;
+
+              return (
+                <p className="flex items-center justify-end gap-1">
+                  <span>{peso(payment.downPayment?.amount)} · <strong className={isDepositPaid ? 'text-green-600' : 'text-yellow-700'}>{isDepositPaid ? 'Paid' : 'Unpaid'}</strong></span>
+                  {payment.totalPrice != null && (
+                    <span className="text-gray-400">
+                      {isDepositPaid && isBalPaid ? (
+                        <strong className="text-green-600 font-semibold ml-1">· Paid in full</strong>
+                      ) : (
+                        <span>· Balance: {peso(rawBal)}</span>
+                      )}
+                    </span>
+                  )}
+                </p>
+              );
+            })()}
           </div>
           <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border flex-shrink-0 ${
             payment.status === 'completed'
