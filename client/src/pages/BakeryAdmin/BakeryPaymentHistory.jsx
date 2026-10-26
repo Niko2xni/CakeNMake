@@ -56,9 +56,17 @@ export default function BakeryPaymentHistory({ payments, loading, onOpenReservat
             {payment.downPayment?.paymentReference && (
               <>
                 <span className="text-gray-300">·</span>
-                <span className="font-mono text-[11px] text-gray-500 truncate max-w-[200px]" title={payment.downPayment.paymentReference}>
-                  Ref: {payment.downPayment.paymentReference}
-                </span>
+                {(() => {
+                  const downAmount = Number(payment.downPayment?.amount || Math.round(Number(payment.totalPrice || 0) * 0.5));
+                  const displayRef = payment.downPayment.paymentReference === 'simulated_checkout'
+                    ? `DEMO-DP-${downAmount}-${String(payment._id).slice(-6).toUpperCase()}`
+                    : payment.downPayment.paymentReference;
+                  return (
+                    <span className="font-mono text-[11px] text-gray-500 truncate max-w-[200px]" title={displayRef}>
+                      Ref: {displayRef}
+                    </span>
+                  );
+                })()}
               </>
             )}
           </div>

@@ -190,7 +190,7 @@ export default function BakeryReservations({ reservations, loading, selected, se
                       <p className="text-sm font-semibold text-gray-900 truncate">
                         {r.user?.displayName || r.user?.name || 'Unknown customer'}
                       </p>
-                      <p className="mt-1 truncate text-xs text-gray-600">{r.designName || 'Custom cake'} · #{r._id.slice(-6)}</p>
+                      <p className="mt-1 truncate text-xs text-gray-600">{r.designName || 'Custom cake'} · #{String(r._id).slice(-8).toUpperCase()}</p>
                       <div className="mt-1 flex items-center gap-1.5 flex-wrap text-xs text-gray-500">
                         {r.fulfillment?.type && (
                           <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${
@@ -277,7 +277,7 @@ export default function BakeryReservations({ reservations, loading, selected, se
                   </p>
                   <p className="text-[11px] text-gray-500 truncate">{selected.user?.email}</p>
                   <p className="text-[11px] font-medium text-pink-600 truncate mt-0.5">
-                    {selected.designName || 'Custom cake'} <span className="text-gray-400 font-normal">· #{selected._id.slice(-6)}</span>
+                    {selected.designName || 'Custom cake'} <span className="text-gray-400 font-normal">· #{String(selected._id).slice(-8).toUpperCase()}</span>
                   </p>
                 </div>
               </div>
@@ -408,9 +408,17 @@ export default function BakeryReservations({ reservations, loading, selected, se
                         </span>
                       </div>
                     </div>
-                    <p className="text-[10px] text-gray-500 mt-1 truncate" title={`${selected.downPayment?.method || 'gcash'}${selected.downPayment?.paymentReference ? ` · Ref: ${selected.downPayment.paymentReference}` : ''}`}>
-                      {selected.downPayment?.method || 'gcash'}{selected.downPayment?.paymentReference ? ` · Ref: ${selected.downPayment.paymentReference}` : ''}
-                    </p>
+                    {(() => {
+                      const downAmount = Number(selected.downPayment?.amount || Math.round(selected.totalPrice * 0.5));
+                      const downRef = selected.downPayment?.paymentReference === 'simulated_checkout'
+                        ? `DEMO-DP-${downAmount}-${String(selected._id).slice(-6).toUpperCase()}`
+                        : selected.downPayment?.paymentReference;
+                      return (
+                        <p className="text-[10px] text-gray-500 mt-1 truncate" title={`${selected.downPayment?.method || 'gcash'}${downRef ? ` · Ref: ${downRef}` : ''}`}>
+                          {selected.downPayment?.method || 'gcash'}{downRef ? ` · Ref: ${downRef}` : ''}
+                        </p>
+                      );
+                    })()}
                   </div>
 
                   {/* 2. Remaining Balance */}

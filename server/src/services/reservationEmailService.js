@@ -41,6 +41,7 @@ function buildEmailContent({
   totalPrice,
   downPayment,
   remainingBalance,
+  paymentReference,
   isDownPaymentPaid = true,
   status = 'Confirmed',
 }) {
@@ -57,12 +58,13 @@ function buildEmailContent({
 Thank you for sending your cake design to ${displayBakeryName}! We have received your reservation request and recorded your order specifications.
 
 Reservation Details:
+• Order Reference: #${orderRef}
 • Design: "${designName}"
 • Bakery: ${displayBakeryName}
 • Delivery/Pickup Date: ${deliveryDate}
 • Total Estimated Price: ₱${totalPrice}
 • ${isDownPaymentPaid ? 'Down Payment (50%):' : 'Required Down Payment:'} ₱${downPayment} ${downPaymentNote}
-• Remaining Balance: ₱${remainingBalance} ${balanceNote}
+${paymentReference ? `• Payment Reference: ${paymentReference}\n` : ''}• Remaining Balance: ₱${remainingBalance} ${balanceNote}
 • Status: ${statusDisplay}
 
 ----------------------------------------------------
@@ -87,7 +89,7 @@ Thank you,
 The CakeNMake Team`;
 
   const values = Object.fromEntries(Object.entries({
-    subject, orderRef, customerName, designName, bakeryName: displayBakeryName, deliveryDate, totalPrice, downPayment, remainingBalance, statusDisplay, downPaymentNote, balanceNote,
+    subject, orderRef, customerName, designName, bakeryName: displayBakeryName, deliveryDate, totalPrice, downPayment, remainingBalance, paymentReference: paymentReference || '', statusDisplay, downPaymentNote, balanceNote,
   }).map(([key, value]) => [key, escapeHtml(value)]));
 
   const statusColor = isDownPaymentPaid ? '#16a34a' : '#ea580c';
@@ -106,11 +108,13 @@ The CakeNMake Team`;
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #fff1f2; border: 1px solid #ffe4e6; border-radius: 12px; margin-bottom: 24px;"><tr><td style="padding: 20px;">
         <h2 style="font-size: 15px; margin: 0 0 14px; color: #9f1239;">Reservation Summary</h2>
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size: 14px; line-height: 1.8;">
-          <tr><td style="color: #6b7280; width: 45%;">Cake Design:</td><td style="color: #111827; font-weight: 600;">${values.designName}</td></tr>
+          <tr><td style="color: #6b7280; width: 45%;">Order Reference:</td><td style="color: #111827; font-weight: 600; font-family: monospace;">#${values.orderRef}</td></tr>
+          <tr><td style="color: #6b7280;">Cake Design:</td><td style="color: #111827; font-weight: 600;">${values.designName}</td></tr>
           <tr><td style="color: #6b7280;">Bakery:</td><td style="color: #111827; font-weight: 600;">${values.bakeryName}</td></tr>
           <tr><td style="color: #6b7280;">Delivery / Pickup:</td><td style="color: #111827; font-weight: 600;">${values.deliveryDate}</td></tr>
           <tr><td style="color: #6b7280;">Total Estimated Price:</td><td style="color: #111827; font-weight: 600;">₱${values.totalPrice}</td></tr>
           <tr><td style="color: #6b7280;">${isDownPaymentPaid ? 'Down Payment (50%):' : 'Required Down Payment:'}</td><td style="color: ${downPaymentColor}; font-weight: 700;">₱${values.downPayment} <span style="font-size: 11px; font-weight: normal; color: ${isDownPaymentPaid ? '#16a34a' : '#6b7280'};">${values.downPaymentNote}</span></td></tr>
+          ${values.paymentReference ? `<tr><td style="color: #6b7280;">Payment Reference:</td><td style="color: #4b5563; font-family: monospace; font-size: 12px;">${values.paymentReference}</td></tr>` : ''}
           <tr><td style="color: #6b7280;">Remaining Balance:</td><td style="color: #111827; font-weight: 600;">₱${values.remainingBalance} <span style="font-size: 11px; font-weight: normal; color: #6b7280;">${values.balanceNote}</span></td></tr>
           <tr><td style="color: #6b7280;">Status:</td><td style="color: ${statusColor}; font-weight: 600;">${values.statusDisplay}</td></tr>
         </table>
@@ -317,6 +321,10 @@ function createReservationEmailService({
     const isPaid = reservation.downPayment?.isPaid !== false;
     const resId = reservation._id ? String(reservation._id) : '';
     const orderRef = resId ? resId.slice(-8).toUpperCase() : 'CONFIRMED';
+    const rawDownRef = reservation.downPayment?.paymentReference;
+    const paymentReference = (rawDownRef && rawDownRef !== 'simulated_checkout')
+      ? rawDownRef
+      : (isPaid && resId ? `DEMO-DP-${downNum}-${resId.slice(-6).toUpperCase()}` : null);
     const message = buildEmailContent({
       orderRef,
       customerName: user.displayName || user.email.split('@')[0] || 'Valued Customer',
@@ -326,6 +334,7 @@ function createReservationEmailService({
       totalPrice: formatPesos(totalNum),
       downPayment: formatPesos(downNum),
       remainingBalance: formatPesos(Math.max(0, totalNum - downNum)),
+      paymentReference,
       isDownPaymentPaid: isPaid,
       status: isPaid ? 'Confirmed' : (reservation.status === 'confirmed' ? 'Confirmed' : 'Pending Down Payment'),
     });
