@@ -1,6 +1,7 @@
 const Reservation = require('../models/Reservation');
 const Conversation = require('../models/Conversation');
 const { serializeConversation } = require('./conversationController');
+const { sendOrderCompletedEmail } = require('../services/reservationEmailService');
 const mongoose = require('mongoose');
 
 async function recordDownPayment(req, res) {
@@ -135,6 +136,11 @@ async function updateStatus(req, res) {
         { new: true }
       );
       if (!reservation) return res.status(404).json({ message: 'Reservation not found' });
+      if (status === 'completed') {
+        sendOrderCompletedEmail(reservation).catch((err) => {
+          console.error('[ReservationEmail] Failed to send order completed email:', err?.message || err);
+        });
+      }
       return res.json(reservation);
     }
 
@@ -183,6 +189,13 @@ async function updateStatus(req, res) {
         io.to(`user:${customerUserId}`).emit('reservation:updated', reservation);
       }
     }
+
+    if (status === 'completed') {
+      sendOrderCompletedEmail(reservation).catch((err) => {
+        console.error('[ReservationEmail] Failed to send order completed email:', err?.message || err);
+      });
+    }
+
     res.json(reservation);
   } catch (err) {
     res.status(500).json({ message: 'Failed to update status', error: err.message });

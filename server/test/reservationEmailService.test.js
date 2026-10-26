@@ -4,6 +4,7 @@ const {
   createReservationEmailService,
   buildEmailContent,
   buildBalancePaidEmailContent,
+  buildOrderCompletedEmailContent,
   formatPesos,
   formatDate,
 } = require('../src/services/reservationEmailService');
@@ -395,3 +396,77 @@ test('ensureCheckoutReservation invokes confirmation processing for a retry so f
   assert.ok(res2);
   assert.equal(emailSentCount, 2);
 });
+
+test('buildOrderCompletedEmailContent formats completion email and contains no blueprint mention', () => {
+  const content = buildOrderCompletedEmailContent({
+    orderRef: 'ABC12345',
+    customerName: 'Maria Santos',
+    designName: 'Wedding Elegance',
+    bakeryName: 'AH TINAPS BAKESHOP',
+    deliveryDate: 'Oct 28, 2026',
+    totalPrice: '3,800.00',
+    fulfillmentType: 'pickup',
+  });
+
+  assert.equal(content.subject, 'Order Completed: Wedding Elegance - CakeNMake');
+  assert.ok(content.text.includes('Hello Maria Santos,'));
+  assert.ok(content.text.includes('Wedding Elegance'));
+  assert.ok(content.text.includes('AH TINAPS BAKESHOP'));
+  assert.ok(content.text.includes('₱3,800.00 (Fully Paid)'));
+  assert.ok(content.text.includes('Completed (Claimed / Picked Up)'));
+  assert.ok(content.text.includes('My Orders'));
+
+  // Strict requirement: customer must never see or hear about blueprint
+  assert.equal(content.text.toLowerCase().includes('blueprint'), false, 'text should not mention blueprint');
+  assert.equal(content.html.toLowerCase().includes('blueprint'), false, 'html should not mention blueprint');
+  assert.equal(content.subject.toLowerCase().includes('blueprint'), false, 'subject should not mention blueprint');
+
+  assert.ok(content.html.includes('Your Cake Order is Completed!'));
+  assert.ok(content.html.includes('My Orders'));
+});
+
+test('sendOrderCompletedEmail resolves user and platform and delivers completion email', async () => {
+  let sentMessage = null;
+  const mockMailDelivery = {
+    configured: true,
+    send: async (msg) => {
+      sentMessage = msg;
+      return { messageId: 'msg_completed_1' };
+    },
+  };
+
+  const mockUser = {
+    _id: 'user_456',
+    email: 'maria@example.com',
+    displayName: 'Maria Santos',
+  };
+
+  const mockPlatform = {
+    _id: 'plat_456',
+    name: 'AH TINAPS BAKESHOP',
+  };
+
+  const service = createReservationEmailService({
+    mailDelivery: mockMailDelivery,
+    userModel: { findById: () => ({ lean: async () => mockUser }) },
+    platformModel: { findById: () => ({ lean: async () => mockPlatform }) },
+  });
+
+  const reservation = {
+    _id: '670000000000000000000099',
+    user: 'user_456',
+    platform: 'plat_456',
+    designName: 'Floral Tier Cake',
+    totalPrice: 4200,
+    pickupDate: new Date('2026-10-30T10:00:00Z'),
+    fulfillment: { type: 'pickup' },
+  };
+
+  const result = await service.sendOrderCompletedEmail(reservation);
+  assert.equal(result.sent, true);
+  assert.equal(sentMessage.to, 'maria@example.com');
+  assert.equal(sentMessage.subject, 'Order Completed: Floral Tier Cake - CakeNMake');
+  assert.equal(sentMessage.text.toLowerCase().includes('blueprint'), false);
+  assert.equal(sentMessage.html.toLowerCase().includes('blueprint'), false);
+});
+

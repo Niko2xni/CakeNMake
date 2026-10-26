@@ -1373,7 +1373,7 @@ export default function ClientHome() {
               <p className="text-xs text-[var(--cn-muted)] leading-relaxed mb-6">
                 {isTargetCompleted ? (
                   <>
-                    This cake order has been completed! Moving this card to trash will clear it from your Cake Table, but your <strong>receipt, blueprint, and order history will permanently remain safe</strong> in <Link to="/transactions" className="text-pink-600 underline font-medium">My Orders</Link>.
+                    This cake order has been completed! Moving this card to trash will clear it from your Cake Table, but your <strong>receipt and order history will permanently remain safe</strong> in <Link to="/transactions" className="text-pink-600 underline font-medium">My Orders</Link>.
                   </>
                 ) : (
                   <>
