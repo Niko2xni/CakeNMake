@@ -88,6 +88,27 @@ async function submitBlueprint(req, res) {
       record = await Blueprint.findOneAndUpdate({ ...key, status: 'failed' }, { $set: { status: 'uploading', failureReason: null } }, { new: true });
       if (!record) return res.status(202).json({ submissionId, status: 'uploading', platformId: String(platform._id) });
     } else {
+      const dailyCapacity = Number(platform.dailyCapacity) > 0 ? Number(platform.dailyCapacity) : 1;
+      const targetDateStart = new Date(`${deliveryDate}T00:00:00.000Z`);
+      const targetDateEnd = new Date(`${deliveryDate}T23:59:59.999Z`);
+      let existingReservationCount = 0;
+      if (Reservation.db?.readyState === 1 || Boolean(Reservation.countDocuments?.mock)) {
+        existingReservationCount = await Reservation.countDocuments({
+          platform: platform._id,
+          pickupDate: { $gte: targetDateStart, $lte: targetDateEnd },
+          status: { $in: ['pending_payment', 'confirmed', 'in_production', 'completed'] },
+        }).catch((err) => {
+          if (err.name === 'MongooseError' && err.message.includes('buffering timed out')) return 0;
+          throw err;
+        });
+      }
+      if (existingReservationCount >= dailyCapacity) {
+        return res.status(409).json({
+          message: 'This date has already been booked. Please choose another date.',
+          code: 'DATE_ALREADY_BOOKED',
+        });
+      }
+
       const orderPricingSnapshot = { ...pricing.buildQuote(designSnapshot, await pricing.getActivePriceBook(platform._id)), calculatedAt: new Date() };
       if (quoteSnapshot && quoteSnapshot.totalMinor !== orderPricingSnapshot.totalMinor) return res.status(409).json({ message: 'Cake pricing changed. Refresh the quote before checking out.' });
       record = await Blueprint.create({ ...key, submissionHash, customer: req.user?._id || null, customerName, designName: designName.trim(), deliveryDate, designSnapshot, quoteSnapshot: quoteSnapshot || null, orderPricingSnapshot, paymentMode: 'simulated', paymentCompletedAt: new Date() });

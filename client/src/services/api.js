@@ -436,6 +436,11 @@ export const pricingApi = {
   }),
 };
 
+export const reservationApi = {
+  getBookedDates: (platform = 'mamshie-bakery') =>
+    requestJson(`${API_BASE_URL}/reservations/booked-dates?platform=${encodeURIComponent(platform)}`),
+};
+
 export const billingApi = {
   getAIUsageSummary: () => requestAuthenticatedJson(`${API_BASE_URL}/bakery/billing/usage`),
 

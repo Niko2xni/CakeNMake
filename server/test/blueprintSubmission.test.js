@@ -59,6 +59,19 @@ test('a manipulated or stale customer quote cannot set the reservation price', a
   assert.equal(create.mock.callCount(), 0);
 });
 
+test('submitBlueprint rejects order when date already has an active reservation for the bakery', async () => {
+  const Reservation = require('../src/models/Reservation');
+  mock.method(Platform, 'findOne', async () => ({ _id: 'a'.repeat(24), dailyCapacity: 1 }));
+  mock.method(Blueprint, 'findOne', async () => null);
+  mock.method(Reservation, 'countDocuments', async () => 1);
+  const create = mock.method(Blueprint, 'create', async () => assert.fail('booked date must not create blueprint'));
+  const res = response();
+  await submitBlueprint({ body: body(), user: { _id: 'c'.repeat(24) } }, res);
+  assert.equal(res.code, 409);
+  assert.equal(res.body.code, 'DATE_ALREADY_BOOKED');
+  assert.equal(create.mock.callCount(), 0);
+});
+
 test('reservation failure after PDF save keeps a ready blueprint retryable without reupload', async () => {
   mock.method(Platform, 'findOne', async () => ({ _id: 'a'.repeat(24) }));
   mock.method(Blueprint, 'findOne', async () => null);

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { addDays, addMonths, subMonths, format, isSameDay, startOfToday, startOfMonth, endOfMonth, eachDayOfInterval, isBefore, isAfter, isSameMonth } from 'date-fns';
 import { CalendarDays, Info, ChevronLeft, ChevronRight } from 'lucide-react';
+import { reservationApi } from '@/services/api';
 
 export function countUsedTabs(config = {}) {
   let tabsCount = 1; // Fundamentals is always used (+1 day)
@@ -52,7 +53,23 @@ export function calcComplexityDays(config) {
   return countUsedTabs(config);
 }
 
-export default function DeliveryCalendar({ config, selectedDate, onSelect }) {
+export default function DeliveryCalendar({ config, selectedDate, onSelect, bookedDates: externalBookedDates }) {
+  const [bookedDates, setBookedDates] = useState(externalBookedDates || []);
+
+  useEffect(() => {
+    if (externalBookedDates) {
+      setBookedDates(externalBookedDates);
+      return;
+    }
+    let active = true;
+    reservationApi?.getBookedDates?.().then((res) => {
+      if (active && Array.isArray(res?.bookedDates)) {
+        setBookedDates(res.bookedDates);
+      }
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [externalBookedDates]);
+
   const complexityDays = calcComplexityDays(config);
   const prepDays = 3;
   const totalBuffer = complexityDays + prepDays;
@@ -104,11 +121,16 @@ export default function DeliveryCalendar({ config, selectedDate, onSelect }) {
         Choose when you need your cake ready. Fulfillment details will be coordinated in chat after checkout.
       </p>
 
-      <div className="flex items-start gap-2 bg-primary/5 border border-primary/20 rounded-xl px-3 py-2.5 mb-4">
+      <div className="flex items-start gap-2 bg-primary/5 border border-primary/20 rounded-xl px-3 py-2.5 mb-2">
         <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
         <p className="text-xs text-foreground/70">
           Your custom cake requires <span className="font-semibold text-foreground">{totalBuffer} days</span> lead time. Earliest date ready: <span className="font-semibold text-foreground">{format(earliestDeliverable, 'MMM d, yyyy')}</span>.
         </p>
+      </div>
+
+      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mb-3 px-1">
+        <span className="inline-block w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+        <span>Dates marked <strong className="text-rose-600 dark:text-rose-400">Booked</strong> have reached daily capacity (1 custom cake/day for quality craft).</span>
       </div>
 
       {/* Month Header with Navigation */}
@@ -148,22 +170,33 @@ export default function DeliveryCalendar({ config, selectedDate, onSelect }) {
             const isBeforeEarliest = isBefore(day, earliest);
             const isAfterMax = isAfter(day, maxDate);
             const isCurrentMonth = isSameMonth(day, currentMonth);
-            const isDisabled = isSunday || isSaturday || isBeforeEarliest || isAfterMax;
+
+            const dayKey = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+            const isBooked = bookedDates.includes(dayKey);
+            const isDisabled = isSunday || isSaturday || isBeforeEarliest || isAfterMax || isBooked;
 
             return (
               <button
                 key={day.toISOString()}
+                type="button"
                 onClick={() => !isDisabled && onSelect(day)}
                 disabled={isDisabled}
+                title={isBooked ? 'Fully booked (1 cake per day limit)' : undefined}
                 className={`
-                  rounded-lg py-2 text-xs font-medium transition-all
+                  relative rounded-lg py-2 text-xs font-medium transition-all flex flex-col items-center justify-center min-h-[38px]
                   ${isSelected ? 'bg-primary text-primary-foreground shadow-md' : ''}
                   ${!isSelected && !isDisabled ? 'hover:bg-primary/10 text-foreground' : ''}
-                  ${isDisabled ? 'text-muted-foreground/40 cursor-not-allowed' : ''}
+                  ${isBooked ? 'bg-rose-50 text-rose-300 dark:bg-rose-950/20 dark:text-rose-400/50 cursor-not-allowed line-through' : ''}
+                  ${isDisabled && !isBooked ? 'text-muted-foreground/40 cursor-not-allowed' : ''}
                   ${!isCurrentMonth ? 'text-muted-foreground/60' : ''}
                 `}
               >
-                {format(day, 'd')}
+                <span>{format(day, 'd')}</span>
+                {isBooked && (
+                  <span className="text-[8px] font-semibold tracking-tighter text-rose-500 block leading-none no-underline">
+                    Booked
+                  </span>
+                )}
               </button>
             );
           })}

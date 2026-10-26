@@ -35,6 +35,7 @@ app.use('/api/cake-ai', cakeAiRoutes);
 
 const reservationRoutes = require('./routes/reservationRoutes');
 app.use('/api/bakery/reservations', reservationRoutes);
+app.use('/api/reservations', require('./routes/publicReservationRoutes'));
 
 const pricingRoutes = require('./routes/pricingRoutes');
 app.use('/api/bakery/pricing', pricingRoutes);

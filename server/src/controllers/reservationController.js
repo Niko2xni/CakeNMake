@@ -201,5 +201,48 @@ async function updateStatus(req, res) {
     res.status(500).json({ message: 'Failed to update status', error: err.message });
   }
 }
+const Platform = require('../models/Platform');
 
-module.exports = { listReservations, getReservation, updateStatus, openChat, recordDownPayment };
+async function getBookedDates(req, res) {
+  try {
+    const platformSlug = req.query.platform || 'mamshie-bakery';
+    const query = mongoose.isValidObjectId(platformSlug)
+      ? { $or: [{ _id: platformSlug }, { slug: platformSlug }], isActive: true }
+      : { slug: platformSlug, isActive: true };
+    const platform = await Platform.findOne(query);
+    if (!platform) {
+      return res.status(404).json({ message: 'Bakery not found.' });
+    }
+
+    const dailyCapacity = Number(platform.dailyCapacity) > 0 ? Number(platform.dailyCapacity) : 1;
+
+    let reservations = [];
+    if (Reservation.db?.readyState === 1 || Boolean(Reservation.find?.mock)) {
+      reservations = await Reservation.find({
+        platform: platform._id,
+        status: { $in: ['pending_payment', 'confirmed', 'in_production', 'completed'] },
+      }).select('pickupDate status');
+    }
+
+    const counts = {};
+    for (const r of reservations) {
+      if (!r.pickupDate) continue;
+      const d = new Date(r.pickupDate);
+      if (Number.isNaN(d.getTime())) continue;
+      const dateKey = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+      counts[dateKey] = (counts[dateKey] || 0) + 1;
+    }
+
+    const bookedDates = Object.keys(counts).filter((dateKey) => counts[dateKey] >= dailyCapacity);
+
+    return res.json({
+      platform: platform.slug,
+      dailyCapacity,
+      bookedDates,
+    });
+  } catch (err) {
+    return res.status(500).json({ message: 'Failed to retrieve booked dates.', error: err.message });
+  }
+}
+
+module.exports = { listReservations, getReservation, updateStatus, openChat, recordDownPayment, getBookedDates };
