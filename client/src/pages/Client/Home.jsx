@@ -23,6 +23,7 @@ import {
   CheckCircle2,
   Store,
   Palette,
+  Lock,
 } from 'lucide-react';
 import ClientNavbar from '@/components/client/ClientNavbar';
 import { designApi, pricingApi, accountApi } from '@/services/api';
@@ -435,9 +436,17 @@ export default function ClientHome() {
     setShowMoveAllConfirm(false);
     setMoveAllTrashInput('');
     try {
-      const count = recentDesigns.length;
-      await designApi.moveAllToTrash();
-      setRecentDesigns([]);
+      const result = await designApi.moveAllToTrash();
+      setRecentDesigns((prev) =>
+        prev.filter((d) => {
+          const isSentToBakery = Boolean(d.sentToBakery);
+          const relatedTx = isSentToBakery ? getDesignTransaction(d) : null;
+          const isActiveOrder = Boolean(
+            isSentToBakery && relatedTx && ['pending_payment', 'confirmed', 'in_production'].includes(relatedTx.status)
+          );
+          return isActiveOrder;
+        })
+      );
       setSelectedDesign(null);
       setActiveMenu(null);
 
@@ -446,7 +455,7 @@ export default function ClientHome() {
       }
 
       setTrashNotification({
-        designName: `All ${count} designs`,
+        designName: `${result?.count || 'Eligible'} designs`,
         show: true,
         isBulk: true,
       });
@@ -456,7 +465,7 @@ export default function ClientHome() {
       }, 5000);
     } catch (error) {
       console.error('Failed to move all designs to trash:', error);
-      setLoadError('Could not move all designs to trash. Please try again.');
+      setLoadError(error?.message || 'Could not move all designs to trash. Please try again.');
     }
   };
 
@@ -700,6 +709,7 @@ export default function ClientHome() {
                           ? Number(relatedTx.remainingBalance)
                           : Math.max(0, Number(relatedTx?.totalPrice || 0) - Number(relatedTx?.downPayment?.amount || 0)));
                     const hasBalanceDue = Boolean(isSentToBakery && relatedTx && remainingBal > 0 && !isPaidInFull && !isCompleted);
+                    const isActiveOrder = Boolean(isSentToBakery && relatedTx && !isCompleted && ['pending_payment', 'confirmed', 'in_production'].includes(relatedTx.status));
 
                     return (
                       <article
@@ -820,17 +830,29 @@ export default function ClientHome() {
                                 >
                                   <Info aria-hidden="true" /> Details
                                 </button>
-                                <button
-                                  type="button"
-                                  role="menuitem"
-                                  className="is-danger"
-                                  onClick={() => {
-                                    setActiveMenu(null);
-                                    setTrashConfirmTarget(design);
-                                  }}
-                                >
-                                  <Trash2 aria-hidden="true" /> Move to trash
-                                </button>
+                                {isActiveOrder ? (
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    disabled
+                                    className="opacity-50 cursor-not-allowed text-xs text-gray-400 flex items-center gap-1.5"
+                                    title="Active reservations cannot be moved to trash while in progress"
+                                  >
+                                    <Lock className="w-3.5 h-3.5 text-amber-500 shrink-0" /> Order in progress
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    className="is-danger"
+                                    onClick={() => {
+                                      setActiveMenu(null);
+                                      setTrashConfirmTarget(design);
+                                    }}
+                                  >
+                                    <Trash2 aria-hidden="true" /> Move to trash
+                                  </button>
+                                )}
                               </div>
                             )}
                           </div>
@@ -1270,66 +1292,100 @@ export default function ClientHome() {
               >
                 <Copy className="w-3.5 h-3.5 text-[var(--cn-muted)]" /> Duplicate
               </button>
-              <button
-                type="button"
-                onClick={() => setTrashConfirmTarget(selectedDesign)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-[var(--cn-line)] bg-white hover:bg-rose-50 text-[var(--cn-cherry)] text-xs font-semibold transition-colors shadow-xs"
-                title="Move to trash"
-              >
-                <Trash2 className="w-3.5 h-3.5 text-[var(--cn-cherry)]" /> Move to trash
-              </button>
+              {(() => {
+                const selectedTx = getDesignTransaction(selectedDesign);
+                const isSelCompleted = selectedTx?.status === 'completed' || selectedTx?.status === 'fulfilled';
+                const isSelectedActiveOrder = Boolean(selectedDesign?.sentToBakery && selectedTx && !isSelCompleted);
+
+                if (isSelectedActiveOrder) {
+                  return (
+                    <button
+                      type="button"
+                      disabled
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-amber-200 bg-amber-50/70 text-amber-700 text-xs font-semibold cursor-not-allowed opacity-80 shadow-xs"
+                      title="Active reservations cannot be moved to trash while in progress"
+                    >
+                      <Lock className="w-3.5 h-3.5 text-amber-600" /> Order in progress
+                    </button>
+                  );
+                }
+
+                return (
+                  <button
+                    type="button"
+                    onClick={() => setTrashConfirmTarget(selectedDesign)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-[var(--cn-line)] bg-white hover:bg-rose-50 text-[var(--cn-cherry)] text-xs font-semibold transition-colors shadow-xs"
+                    title="Move to trash"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-[var(--cn-cherry)]" /> Move to trash
+                  </button>
+                );
+              })()}
             </div>
           </aside>
         </div>
       )}
 
       {/* Move to Trash Confirmation Dialog */}
-      {trashConfirmTarget && (
-        <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[120]"
-          role="presentation"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setTrashConfirmTarget(null);
-          }}
-        >
+      {trashConfirmTarget && (() => {
+        const targetTx = trashConfirmTarget?.sentToBakery ? getDesignTransaction(trashConfirmTarget) : null;
+        const isTargetCompleted = Boolean(trashConfirmTarget?.sentToBakery && targetTx && (targetTx.status === 'completed' || targetTx.status === 'fulfilled'));
+
+        return (
           <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="trash-confirm-title"
-            className="bg-white rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl border border-[var(--cn-line)] animate-in fade-in zoom-in-95 duration-150"
+            className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[120]"
+            role="presentation"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) setTrashConfirmTarget(null);
+            }}
           >
-            <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center text-[var(--cn-cherry)] mb-4">
-              <Trash2 className="w-6 h-6" />
-            </div>
-            <h3 id="trash-confirm-title" className="font-heading text-lg font-bold text-[var(--cn-ink)] mb-2 break-words">
-              Move “{trashConfirmTarget.name || 'Untitled design'}” to trash?
-            </h3>
-            <p className="text-xs text-[var(--cn-muted)] leading-relaxed mb-6">
-              This design will be moved to your Trash folder. You can retrieve and restore it at any time within <strong>30 days</strong>. After 30 days, it may be permanently deleted.
-            </p>
-            <div className="flex items-center justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => setTrashConfirmTarget(null)}
-                className="px-4 py-2 text-xs font-semibold text-[var(--cn-muted)] hover:bg-[var(--cn-paper)] rounded-xl transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const targetId = trashConfirmTarget._id;
-                  setTrashConfirmTarget(null);
-                  handleMoveToTrash(targetId);
-                }}
-                className="px-4 py-2 bg-[var(--cn-cherry)] hover:bg-[var(--cn-cherry-dark)] text-white text-xs font-bold rounded-xl shadow-sm transition-colors"
-              >
-                Move to trash
-              </button>
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="trash-confirm-title"
+              className="bg-white rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl border border-[var(--cn-line)] animate-in fade-in zoom-in-95 duration-150"
+            >
+              <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center text-[var(--cn-cherry)] mb-4">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <h3 id="trash-confirm-title" className="font-heading text-lg font-bold text-[var(--cn-ink)] mb-2 break-words">
+                Move “{trashConfirmTarget.name || 'Untitled design'}” to trash?
+              </h3>
+              <p className="text-xs text-[var(--cn-muted)] leading-relaxed mb-6">
+                {isTargetCompleted ? (
+                  <>
+                    This cake order has been completed! Moving this card to trash will clear it from your Cake Table, but your <strong>receipt, blueprint, and order history will permanently remain safe</strong> in <Link to="/transactions" className="text-pink-600 underline font-medium">My Orders</Link>.
+                  </>
+                ) : (
+                  <>
+                    This design will be moved to your Trash folder. You can retrieve and restore it at any time within <strong>30 days</strong>. After 30 days, it may be permanently deleted.
+                  </>
+                )}
+              </p>
+              <div className="flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setTrashConfirmTarget(null)}
+                  className="px-4 py-2 text-xs font-semibold text-[var(--cn-muted)] hover:bg-[var(--cn-paper)] rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const targetId = trashConfirmTarget._id;
+                    setTrashConfirmTarget(null);
+                    handleMoveToTrash(targetId);
+                  }}
+                  className="px-4 py-2 bg-[var(--cn-cherry)] hover:bg-[var(--cn-cherry-dark)] text-white text-xs font-bold rounded-xl shadow-sm transition-colors"
+                >
+                  Move to trash
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Rename Modal */}
       {renameModal.open && (

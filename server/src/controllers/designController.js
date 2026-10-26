@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Design = require('../models/Design');
+const Reservation = require('../models/Reservation');
 const {
   createThumbnailUploadSignature: buildThumbnailUploadSignature,
   deleteTrustedThumbnail,
@@ -185,11 +186,38 @@ exports.updateDesign = async (req, res) => {
   }
 };
 
+async function hasActiveReservation(req, design) {
+  if (!design || !design.sentToBakery) return false;
+  const userId = req.user?._id;
+  if (!userId) return false;
+  try {
+    const reservation = await Reservation.findOne({
+      user: userId,
+      $or: [
+        { design: design._id },
+        { designName: design.name },
+      ],
+      status: { $in: ['pending_payment', 'confirmed', 'in_production'] },
+    });
+    return Boolean(reservation);
+  } catch (error) {
+    console.error('Error checking active reservation:', error);
+    return false;
+  }
+}
+
 async function removeOwnedDesign(req, res, message) {
   if (invalidDesignId(req, res)) return;
   try {
-    const design = await Design.findOneAndDelete(ownedDesignFilter(req));
+    const design = await Design.findOne(ownedDesignFilter(req));
     if (!design) return notFound(res);
+    if (await hasActiveReservation(req, design)) {
+      return res.status(400).json({
+        code: 'ORDER_IN_PROGRESS',
+        message: 'This design has an active reservation and cannot be deleted while in progress.',
+      });
+    }
+    await Design.deleteOne({ _id: design._id });
     await deleteTrustedThumbnail({
       asset: design.thumbnailAsset,
       firebaseUid: req.auth.uid,
@@ -210,6 +238,12 @@ exports.moveToTrash = async (req, res) => {
   try {
     const design = await Design.findOne(ownedDesignFilter(req));
     if (!design) return notFound(res);
+    if (await hasActiveReservation(req, design)) {
+      return res.status(400).json({
+        code: 'ORDER_IN_PROGRESS',
+        message: 'This design has an active reservation and cannot be moved to trash while in progress.',
+      });
+    }
     const filter = ownerFilter(req);
     if (!design.isTrashed) {
       const trashedCount = await Design.countDocuments({ ...filter, isTrashed: true });
@@ -262,9 +296,43 @@ exports.moveAllToTrash = async (req, res) => {
       return res.json({ message: 'No designs to move to trash', count: 0 });
     }
 
+    const userId = req.user?._id;
+    const hasSentToBakery = activeDesigns.some((d) => d.sentToBakery);
+    let activeReservationDesignIds = new Set();
+    if (hasSentToBakery && userId) {
+      try {
+        const activeReservations = await Reservation.find({
+          user: userId,
+          status: { $in: ['pending_payment', 'confirmed', 'in_production'] },
+        }).select('design designName');
+        for (const r of activeReservations) {
+          if (r.design) activeReservationDesignIds.add(String(r.design));
+        }
+        for (const d of activeDesigns) {
+          if (d.sentToBakery && activeReservations.some((r) => r.designName === d.name)) {
+            activeReservationDesignIds.add(String(d._id));
+          }
+        }
+      } catch (error) {
+        console.error('Error checking active reservations for moveAllToTrash:', error);
+      }
+    }
+
+    const trashableDesigns = activeDesigns.filter((d) => !activeReservationDesignIds.has(String(d._id)));
+    if (trashableDesigns.length === 0) {
+      return res.status(400).json({
+        code: 'ALL_ORDERS_IN_PROGRESS',
+        message: 'All your designs have active reservations and cannot be moved to trash while in progress.',
+      });
+    }
+
     const now = new Date();
+    const updateFilter = activeReservationDesignIds.size > 0
+      ? { ...filter, isTrashed: false, _id: { $nin: Array.from(activeReservationDesignIds) } }
+      : { ...filter, isTrashed: false };
+
     await Design.updateMany(
-      { ...filter, isTrashed: false },
+      updateFilter,
       { $set: { isTrashed: true, trashedAt: now } }
     );
 
@@ -286,7 +354,7 @@ exports.moveAllToTrash = async (req, res) => {
       }
     }
 
-    return res.json({ message: 'All designs moved to trash', count: activeDesigns.length });
+    return res.json({ message: 'All eligible designs moved to trash', count: trashableDesigns.length });
   } catch (error) {
     console.error('Error moving all designs to trash:', error);
     return res.status(500).json({ message: 'Failed to move all designs to trash' });

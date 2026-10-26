@@ -3,6 +3,7 @@ const { afterEach, beforeEach, mock, test } = require('node:test');
 const mongoose = require('mongoose');
 
 const Design = require('../src/models/Design');
+const Reservation = require('../src/models/Reservation');
 const {
   createDesign,
   getDesigns,
@@ -13,6 +14,8 @@ const {
   moveAllToTrash,
   restoreFromTrash,
   deleteAllTrash,
+  deleteDesign,
+  permanentlyDelete,
   MAX_TRASH_CAPACITY,
   MAX_ACTIVE_DESIGNS,
 } = require('../src/controllers/designController');
@@ -285,4 +288,65 @@ test('deleteAllTrash permanently removes all trashed designs', async () => {
   assert.equal(res.body.count, 1);
   assert.equal(deleteFilter.isTrashed, true);
 });
+
+test('moveToTrash blocks trashing when design has an active reservation', async () => {
+  mock.method(Design, 'findOne', async () => ({
+    _id: designId,
+    name: 'Active Birthday Cake',
+    sentToBakery: true,
+    isTrashed: false,
+  }));
+  mock.method(Reservation, 'findOne', async () => ({
+    _id: 'res-1',
+    status: 'in_production',
+  }));
+
+  const res = response();
+  await moveToTrash(request(), res);
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.code, 'ORDER_IN_PROGRESS');
+  assert.match(res.body.message, /active reservation/i);
+});
+
+test('moveToTrash allows trashing when order is completed', async () => {
+  let saved = false;
+  mock.method(Design, 'findOne', async () => ({
+    _id: designId,
+    name: 'Completed Birthday Cake',
+    sentToBakery: true,
+    isTrashed: false,
+    save: async function () {
+      saved = true;
+      return this;
+    },
+  }));
+  // findOne returns null for active status filter because order status is 'completed'
+  mock.method(Reservation, 'findOne', async () => null);
+  mock.method(Design, 'countDocuments', async () => 0);
+
+  const res = response();
+  await moveToTrash(request(), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(saved, true);
+});
+
+test('deleteDesign blocks deleting when design has an active reservation', async () => {
+  mock.method(Design, 'findOne', async () => ({
+    _id: designId,
+    name: 'Active Wedding Cake',
+    sentToBakery: true,
+    isTrashed: true,
+  }));
+  mock.method(Reservation, 'findOne', async () => ({
+    _id: 'res-2',
+    status: 'confirmed',
+  }));
+
+  const res = response();
+  await deleteDesign(request(), res);
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.code, 'ORDER_IN_PROGRESS');
+  assert.match(res.body.message, /active reservation/i);
+});
+
 
