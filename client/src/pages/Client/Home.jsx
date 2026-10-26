@@ -136,8 +136,25 @@ export default function ClientHome() {
       .then((s) => {
         if (active && s) {
           socket = s;
-          socket.on('reservation:updated', () => {
-            if (active) fetchRecentDesigns();
+          socket.on('reservation:updated', (updatedRes) => {
+            if (!active) return;
+            if (updatedRes?._id) {
+              const updatedId = String(updatedRes._id);
+              setUserTransactions((prev) =>
+                prev.map((tx) => {
+                  if (tx.id === updatedId || tx.reservationId === updatedId) {
+                    return {
+                      ...tx,
+                      status: updatedRes.status || tx.status,
+                      finalPayment: updatedRes.finalPayment || tx.finalPayment,
+                      remainingBalance: updatedRes.status === 'completed' ? 0 : tx.remainingBalance,
+                    };
+                  }
+                  return tx;
+                })
+              );
+            }
+            fetchRecentDesigns({ silent: true });
           });
         }
       })
@@ -211,9 +228,11 @@ export default function ClientHome() {
     }
   }, [selectedDesign]);
 
-  const fetchRecentDesigns = async () => {
-    setLoading(true);
-    setLoadError('');
+  const fetchRecentDesigns = async ({ silent = false } = {}) => {
+    if (!silent) {
+      setLoading(true);
+      setLoadError('');
+    }
     try {
       const txPromise = accountApi?.getTransactions
         ? accountApi.getTransactions().catch(() => ({ transactions: [] }))
@@ -233,9 +252,9 @@ export default function ClientHome() {
       }
     } catch (error) {
       console.error('Failed to fetch designs:', error);
-      setLoadError('We could not load your designs.');
+      if (!silent) setLoadError('We could not load your designs.');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 

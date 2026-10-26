@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/dialog';
 import PayBalanceModal from '@/components/client/PayBalanceModal';
 import { isWithinThirtyMinutePaymentCutoff } from '@/utils/maintenance';
+import { getChatSocket } from '@/lib/chat-socket';
 
 export const COMPLETED_STATUSES = ['completed', 'fulfilled'];
 export const ONGOING_STATUSES = [
@@ -357,22 +358,70 @@ export default function Transactions() {
     });
   };
 
-  const fetchTransactions = async () => {
+  const fetchTransactions = async ({ silent = false } = {}) => {
     try {
-      setLoading(true);
-      setError(null);
+      if (!silent) {
+        setLoading(true);
+        setError(null);
+      }
       const res = await accountApi.getTransactions();
       setTransactions(res?.transactions || []);
     } catch (err) {
       console.error('Failed to load transaction history:', err);
-      setError(err?.message || 'Could not load your orders. Please try again.');
+      if (!silent) setError(err?.message || 'Could not load your orders. Please try again.');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchTransactions();
+    let active = true;
+    let socket;
+    Promise.resolve()
+      .then(() => getChatSocket?.())
+      .then((s) => {
+        if (active && s) {
+          socket = s;
+          socket.on('reservation:updated', (updatedRes) => {
+            if (!active) return;
+            if (updatedRes?._id) {
+              const updatedId = String(updatedRes._id);
+              setTransactions((prev) =>
+                prev.map((t) => {
+                  if (t.id === updatedId || t.reservationId === updatedId) {
+                    return {
+                      ...t,
+                      status: updatedRes.status || t.status,
+                      finalPayment: updatedRes.finalPayment || t.finalPayment,
+                      remainingBalance: updatedRes.status === 'completed' ? 0 : t.remainingBalance,
+                    };
+                  }
+                  return t;
+                })
+              );
+              setSelectedTx((prev) => {
+                if (prev && (prev.id === updatedId || prev.reservationId === updatedId)) {
+                  return {
+                    ...prev,
+                    status: updatedRes.status || prev.status,
+                    finalPayment: updatedRes.finalPayment || prev.finalPayment,
+                    remainingBalance: updatedRes.status === 'completed' ? 0 : prev.remainingBalance,
+                  };
+                }
+                return prev;
+              });
+            }
+            fetchTransactions({ silent: true });
+          });
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+      socket?.off('reservation:updated');
+    };
   }, []);
 
   const counts = useMemo(() => {

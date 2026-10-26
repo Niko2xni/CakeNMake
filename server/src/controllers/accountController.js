@@ -439,6 +439,10 @@ async function payTransactionBalance(req, res) {
 
             if (io) {
                 io.to(`platform:${reservation.platform}`).emit('reservation:updated', populated || reservation);
+                const customerUserId = reservation.user?._id || reservation.user;
+                if (customerUserId) {
+                    io.to(`user:${customerUserId}`).emit('reservation:updated', populated || reservation);
+                }
                 io.to(`platform:${reservation.platform}`).emit('bakery:notification', {
                     type: 'in_production',
                     title: 'Balance Paid! (Order In Production)',

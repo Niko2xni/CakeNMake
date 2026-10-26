@@ -37,7 +37,13 @@ async function recordDownPayment(req, res) {
     }, { new: true, runValidators: true });
     if (!updated) return res.status(409).json({ message: 'Order changed. Refresh before recording payment.' });
     const io = req.app?.get ? req.app.get('io') : null;
-    io?.to(`platform:${req.platformId}`).emit('reservation:updated', updated);
+    if (io) {
+      io.to(`platform:${req.platformId}`).emit('reservation:updated', updated);
+      const customerUserId = updated.user?._id || updated.user;
+      if (customerUserId) {
+        io.to(`user:${customerUserId}`).emit('reservation:updated', updated);
+      }
+    }
     if (updated.status === 'confirmed') {
       io?.to(`platform:${req.platformId}`).emit('bakery:notification', {
         type: 'confirmed',
@@ -170,7 +176,13 @@ async function updateStatus(req, res) {
     }
 
     const io = req.app?.get ? req.app.get('io') : null;
-    io?.to(`platform:${req.platformId}`).emit('reservation:updated', reservation);
+    if (io) {
+      io.to(`platform:${req.platformId}`).emit('reservation:updated', reservation);
+      const customerUserId = reservation.user?._id || reservation.user;
+      if (customerUserId) {
+        io.to(`user:${customerUserId}`).emit('reservation:updated', reservation);
+      }
+    }
     res.json(reservation);
   } catch (err) {
     res.status(500).json({ message: 'Failed to update status', error: err.message });
