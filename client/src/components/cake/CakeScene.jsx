@@ -2722,10 +2722,15 @@ const CakeScene = React.forwardRef(function CakeScene({
 
           if (pieceFillingEnabled && s < pieceFillingLayers) {
             const fillingH = pieceHeight * 0.12;
-            const fillMat = getFrostingMaterial(
+            const baseFillMat = getFrostingMaterial(
               pieceFillingSugarColor || fillColor || '#FFF4DC',
               pieceFillingSugarColorId || null
             );
+            const fillMat = baseFillMat.clone();
+            fillMat.clippingPlanes = [];
+            fillMat.polygonOffset = true;
+            fillMat.polygonOffsetFactor = -1;
+            fillMat.polygonOffsetUnits = -1;
             let fillGeom;
             const fillRadius = pfSpongeRadius * 0.98;
             if (pieceFillingPipingTip === 'mashedCircles' || pieceFillingPipingTip === 'mashedSwirls') {
@@ -2737,6 +2742,7 @@ const CakeScene = React.forwardRef(function CakeScene({
             }
             const fillMesh = new THREE.Mesh(fillGeom, fillMat);
             fillMesh.position.y = spongeCurrentY + fillingH / 2;
+            fillMesh.frustumCulled = false;
             fillMesh.userData.blueprintRole = 'filling';
             pieceGroup.add(fillMesh);
             spongeCurrentY += fillingH;
@@ -3808,10 +3814,15 @@ const CakeScene = React.forwardRef(function CakeScene({
             // Mix/Red-White Gradient and silently falls back to a flat
             // swatch, which is why Pick Color for those six previously
             // only ever displayed correctly on Exterior Finish.
-            const pipingMat = getFrostingMaterial(
+            const basePipingMat = getFrostingMaterial(
               layerFillingSugarColors[i] || fillingPipingColor,
               layerFillingSugarColorIds[i] || fillingPipingColorId
             );
+            const pipingMat = basePipingMat.clone();
+            pipingMat.clippingPlanes = [];
+            pipingMat.polygonOffset = true;
+            pipingMat.polygonOffsetFactor = -1;
+            pipingMat.polygonOffsetUnits = -1;
             const isSwirl = tierFillingPipingTip === 'mashedSwirls';
             const buildMashedGeometry = isSwirl
               ? buildMashedSwirlFillingGeometry
@@ -3879,6 +3890,7 @@ const CakeScene = React.forwardRef(function CakeScene({
             mashedFilling.position.y = fillingY;
             mashedFilling.castShadow = true;
             mashedFilling.receiveShadow = true;
+            mashedFilling.frustumCulled = false;
             mashedFilling.userData.blueprintRole = 'filling';
             mashedFilling.userData.tier = i;
             group.add(mashedFilling);
@@ -3904,10 +3916,15 @@ const CakeScene = React.forwardRef(function CakeScene({
             // to Mashed Circles/Mashed Swirls but never to None. Same
             // colorId second argument as that branch too, for the same
             // pattern/gradient/metallic reason.
-            const fillingMat = getFrostingMaterial(
+            const baseFillingMat = getFrostingMaterial(
               layerFillingSugarColors[i] || fillingPipingColor,
               layerFillingSugarColorIds[i] || fillingPipingColorId
             );
+            const fillingMat = baseFillingMat.clone();
+            fillingMat.clippingPlanes = [];
+            fillingMat.polygonOffset = true;
+            fillingMat.polygonOffsetFactor = -1;
+            fillingMat.polygonOffsetUnits = -1;
             const fillingSection = new THREE.Mesh(
               buildFillingProfileGeometry(radius - 0.02, FILLING_H, 0),
               fillingMat
@@ -3915,6 +3932,7 @@ const CakeScene = React.forwardRef(function CakeScene({
             fillingSection.position.y = fillingY;
             fillingSection.castShadow = true;
             fillingSection.receiveShadow = true;
+            fillingSection.frustumCulled = false;
             fillingSection.userData.blueprintRole = 'filling';
             fillingSection.userData.tier = i;
             group.add(fillingSection);

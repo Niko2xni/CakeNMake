@@ -235,6 +235,7 @@ export function buildMashedCircleFillingGeometry(radius, height, {
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geo.setIndex(indices);
   geo.computeVertexNormals();
+  geo.computeBoundingSphere();
   return geo;
 }
 
