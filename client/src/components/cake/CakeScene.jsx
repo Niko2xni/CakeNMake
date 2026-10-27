@@ -3868,7 +3868,8 @@ const CakeScene = React.forwardRef(function CakeScene({
             const coverageFn = fillingSideCoverageFn
               ? (angle, localY) => fillingSideCoverageFn(angle, fillingY + localY)
               : null;
-            const mashedGeometry = buildMashedGeometry(radius * 0.95, FILLING_H, { rand, precomputedJitter: bumpJitter, coverageFn });
+            const mashedRadius = (isFrostedTier ? spongeRadius : radius) * 0.95;
+            const mashedGeometry = buildMashedGeometry(mashedRadius, FILLING_H, { rand, precomputedJitter: bumpJitter, coverageFn });
             // Recompute UV.v as a clean top-to-bottom 0→1 ramp over this
             // geometry's own bounding box — see applyVerticalGradientUV's
             // doc comment in frostingMaterial.js. Fixes gradient Color
@@ -3926,7 +3927,7 @@ const CakeScene = React.forwardRef(function CakeScene({
               }
             );
             const fillingSection = new THREE.Mesh(
-              buildFillingProfileGeometry(radius - 0.02, FILLING_H, 0),
+              buildFillingProfileGeometry(spongeRadius, FILLING_H, 0),
               fillingMat
             );
             fillingSection.position.y = fillingY;
