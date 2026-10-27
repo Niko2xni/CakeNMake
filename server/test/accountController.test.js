@@ -178,3 +178,30 @@ test('updateCurrentAccount only writes the supported display name field', async 
     $set: { displayName: 'Updated Name' },
   });
 });
+
+test('updateCurrentAccount allows updating hasSeenTutorial', async () => {
+  let capturedUpdate;
+  mock.method(User, 'findOneAndUpdate', async (filter, update, options) => {
+    assert.deepEqual(filter, {
+      firebaseUid: 'firebase-user-1',
+      status: 'active',
+    });
+    capturedUpdate = update;
+    return { firebaseUid: 'firebase-user-1', hasSeenTutorial: true };
+  });
+
+  const req = createRequest();
+  req.body = {
+    hasSeenTutorial: true,
+    role: 'platform_admin',
+  };
+  const res = createResponse();
+
+  await updateCurrentAccount(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(capturedUpdate, {
+    $set: { hasSeenTutorial: true },
+  });
+});
+

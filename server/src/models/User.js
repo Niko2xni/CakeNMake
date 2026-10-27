@@ -79,6 +79,11 @@ const userSchema = new mongoose.Schema(
             type: Date,
             default: null,
         },
+
+        hasSeenTutorial: {
+            type: Boolean,
+            default: false,
+        },
     },
     { timestamps: true }
 );

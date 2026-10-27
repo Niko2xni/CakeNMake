@@ -262,6 +262,7 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
   const [tutorialStepIndex, setTutorialStepIndex] = useState(0);
   const [tutorialStepDone, setTutorialStepDone] = useState(false);
   const [tutorialEvents, setTutorialEvents] = useState({});
+  const [isFirstDesignCreated, setIsFirstDesignCreated] = useState(() => Boolean(location.state?.isFirstDesignCreated));
   const preTutorialStateRef = useRef(null);
   const tutorialStartRef = useRef(null);
   const hasAutoStartedTutorialRef = useRef(false);
@@ -370,33 +371,59 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
     applyTutorialSetup(TUTORIAL_STEPS[next]);
   }, [applyTutorialSetup]);
 
+  const markTutorialCompleted = useCallback(() => {
+    try {
+      localStorage.setItem(TUTORIAL_DONE_KEY, 'true');
+      if (account?._id) {
+        localStorage.setItem(`${TUTORIAL_DONE_KEY}_${account._id}`, 'true');
+      }
+    } catch (e) { }
+    if (account?._id) {
+      accountApi.updateMe({ hasSeenTutorial: true }).catch(() => { });
+    }
+  }, [account]);
+
   const finishTutorial = useCallback(() => {
     setTutorialOpen(false);
     setTutorialStepDone(false);
     setTutorialEvents({});
     restorePreTutorialState();
-    try {
-      localStorage.setItem(TUTORIAL_DONE_KEY, 'true');
-    } catch (e) { }
-  }, [restorePreTutorialState]);
+    markTutorialCompleted();
+  }, [restorePreTutorialState, markTutorialCompleted]);
 
-  // First-time users start the tutorial automatically (or via ?tutorial=true).
-  // Returning users, and anyone opening a saved design, can replay it from the header button.
+  // First-time users who have an account and created their first design start the tutorial automatically (or via ?tutorial=true).
+  // Guests, returning users, and subsequent designs do not auto-start, but can replay it from the header button.
   useEffect(() => {
     if (tutorialOpen || hasAutoStartedTutorialRef.current) return undefined;
     const forced = searchParams.get('tutorial') === 'true';
+
+    // 1. Guests NEVER auto-start the tutorial
+    if (!forced && (isGuestPage || !account)) return undefined;
+
+    // 2. Check if this account has already seen/completed the tutorial
+    const userKey = account?._id ? `${TUTORIAL_DONE_KEY}_${account._id}` : TUTORIAL_DONE_KEY;
     let seen = false;
     try {
-      seen = localStorage.getItem(TUTORIAL_DONE_KEY) === 'true';
+      seen = Boolean(account?.hasSeenTutorial) ||
+        localStorage.getItem(userKey) === 'true' ||
+        localStorage.getItem(TUTORIAL_DONE_KEY) === 'true';
     } catch (e) { }
-    if (!forced && (seen || searchParams.get('designId'))) return undefined;
+
+    if (!forced && seen) return undefined;
+
+    // 3. Only logged in users who made a 1st time account and created their 1st design get to see it auto-activate
+    const isFirstDesign = isFirstDesignCreated || Boolean(location.state?.isFirstDesignCreated);
+    if (!forced && !isFirstDesign) return undefined;
+
     const timer = setTimeout(() => {
       if (hasAutoStartedTutorialRef.current) return;
       hasAutoStartedTutorialRef.current = true;
+      setIsFirstDesignCreated(false);
+      markTutorialCompleted();
       tutorialStartRef.current?.();
     }, forced ? 0 : 900);
     return () => clearTimeout(timer);
-  }, [searchParams, tutorialOpen]);
+  }, [searchParams, tutorialOpen, isGuestPage, account, isFirstDesignCreated, location.state, markTutorialCompleted]);
 
   // Completion by state or workspace event
   useEffect(() => {
@@ -573,6 +600,7 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
                 setCapacityModalOpen(true);
                 return;
               }
+              const isFirstDesign = activeUserDesigns.length === 0;
               const savedDesign = await designApi.createDesign({
                 name: tplTitle,
                 config: adapted,
@@ -583,7 +611,13 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
               setTitle(savedDesign.name || tplTitle);
               setSaveStatus('saved');
               setHasUnsavedChanges(false);
-              navigate(`/designer?designId=${savedDesign._id}`, { replace: true });
+              if (isFirstDesign) {
+                setIsFirstDesignCreated(true);
+              }
+              navigate(`/designer?designId=${savedDesign._id}`, {
+                replace: true,
+                state: { ...(location.state || {}), isFirstDesignCreated: isFirstDesign },
+              });
               setTimeout(() => saveThumbnail(savedDesign._id), 600);
             } catch (e) {
               if (e?.message?.includes('capacity') || e?.message?.includes('maximum') || e?.status === 400) {
@@ -639,6 +673,7 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
               return;
             }
 
+            const isFirstDesign = activeUserDesigns.length === 0;
             const existingNames = new Set(
               activeUserDesigns
                 .map((d) => (d?.name || '').trim().toLowerCase())
@@ -672,7 +707,13 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
             setTitle(savedDesign.name || defaultTitle);
             setSaveStatus('saved');
             setHasUnsavedChanges(false);
-            navigate(`/designer?designId=${savedDesign._id}`, { replace: true });
+            if (isFirstDesign) {
+              setIsFirstDesignCreated(true);
+            }
+            navigate(`/designer?designId=${savedDesign._id}`, {
+              replace: true,
+              state: { ...(location.state || {}), isFirstDesignCreated: isFirstDesign },
+            });
             setTimeout(() => saveThumbnail(savedDesign._id), 600);
             if (draft?.action === 'order') {
               setBakeryOpen(true);

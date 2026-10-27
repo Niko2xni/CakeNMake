@@ -88,6 +88,10 @@ async function updateCurrentAccount(req, res) {
             allowedUpdates.displayName = displayName;
         }
 
+        if (typeof req.body.hasSeenTutorial === 'boolean') {
+            allowedUpdates.hasSeenTutorial = req.body.hasSeenTutorial;
+        }
+
         const user = await User.findOneAndUpdate(
             { firebaseUid: req.auth.uid, status: 'active' },
             { $set: allowedUpdates },
