@@ -56,6 +56,77 @@ export function cleanDecorName(rawType, designId) {
     .trim();
 }
 
+export function resolveEdgeColors(config = {}, slot = 'top', edgeSlot = null) {
+  const edge = edgeSlot || config.edge?.[slot] || (config.edge?.mode === 'both' ? config.edge?.both : null) || {};
+  const overrides = config.sugarColorOverrides || {};
+  const context = slot === 'both' ? 'edgeBoth' : `edge${slot.charAt(0).toUpperCase()}${slot.slice(1)}`;
+
+  const extractColorId = (val) => {
+    if (!val) return null;
+    if (typeof val === 'string') return val;
+    if (val.mode === 'colorOverride' && val.colorId) return val.colorId;
+    if (val.mode === 'default' && val.colorId) return val.colorId;
+    if (val.colorId) return val.colorId;
+    return null;
+  };
+
+  // Primary color override: e.g. edgeTop, then edgeBoth, then edge
+  const primaryOverride = overrides[context]
+    || (slot === 'top' || slot === 'bottom' || slot === 'middle' ? overrides.edgeBoth : null)
+    || overrides.edge
+    || null;
+
+  const primaryOverrideId = extractColorId(primaryOverride);
+  const primaryColorId = primaryOverrideId
+    || edge.piping?.colorId
+    || edge.decorations?.colorId
+    || (config.sugarColor?.mode === 'colorOverride' && config.sugarColor?.colorId ? config.sugarColor.colorId : null)
+    || config.sugarColor?.colorId
+    || 'vanilla';
+
+  const primaryHex = flavorColorOf(primaryColorId) || '#F6DEAB';
+  const primaryName = name(primaryColorId);
+
+  // Secondary color (only for alternating tips)
+  const tip = edge.piping?.tip || edge.decorations?.setId || '';
+  const isAlt = String(tip).endsWith('Alt') || String(tip).toLowerCase().includes('alternat');
+
+  const secondaryOverride = overrides[`${context}Secondary`]
+    || (slot === 'top' || slot === 'bottom' || slot === 'middle' ? overrides.edgeBothSecondary : null)
+    || overrides.edgeSecondary
+    || null;
+  const secondaryOverrideId = extractColorId(secondaryOverride);
+
+  const rawSecondaryId = secondaryOverrideId || edge.piping?.secondaryColorId || null;
+  const secondaryColorId = isAlt ? (rawSecondaryId || 'red') : null;
+  const hasSecondary = isAlt && Boolean(secondaryColorId);
+
+  const secondaryHex = hasSecondary ? (flavorColorOf(secondaryColorId) || '#D6293E') : null;
+  const secondaryName = hasSecondary ? name(secondaryColorId) : null;
+
+  const fullColorName = hasSecondary ? `${primaryName} / ${secondaryName}` : primaryName;
+
+  // Decoration specific color
+  const decorColorId = primaryOverrideId || edge.decorations?.colorId || primaryColorId;
+  const decorHex = flavorColorOf(decorColorId) || primaryHex;
+  const decorName = name(decorColorId);
+
+  return {
+    primaryColorId,
+    primaryHex,
+    primaryName,
+    secondaryColorId,
+    secondaryHex,
+    secondaryName,
+    hasSecondary,
+    fullColorName,
+    decorColorId,
+    decorHex,
+    decorName,
+    isAlt,
+  };
+}
+
 // Match selection rows to quote keys, keeping every quoted cent exactly once.
 export function buildBlueprintDetails(config, quote, designName = '') {
   const sections = [];
@@ -173,11 +244,13 @@ export function buildBlueprintDetails(config, quote, designName = '') {
   slots.forEach((slot) => {
     const edge = config.edge?.[slot];
     if (edge?.piping?.tip) {
-      const isAlt = String(edge.piping.tip).endsWith('Alt') || String(edge.piping.tip).toLowerCase().includes('alternat');
-      const hasSecondary = isAlt && Boolean(edge.piping.secondaryColorId);
-      edges.push([`${name(slot)} Border Piping`, `${name(edge.piping.tip)} · ${name(edge.piping.colorId)}${hasSecondary ? ` / ${name(edge.piping.secondaryColorId)}` : ''}`, ['edge.piping'], slot === 'both' ? 2 : 1]);
+      const colors = resolveEdgeColors(config, slot, edge);
+      edges.push([`${name(slot)} Border Piping`, `${name(edge.piping.tip)} · ${colors.fullColorName}`, ['edge.piping'], slot === 'both' ? 2 : 1]);
     }
-    if (edge?.decorations?.setId) edges.push([`${name(slot)} Edge Decoration`, `${name(edge.decorations.setId)} · ${name(edge.decorations.colorId)}`, ['edge.decorationSet'], slot === 'both' ? 2 : 1]);
+    if (edge?.decorations?.setId) {
+      const colors = resolveEdgeColors(config, slot, edge);
+      edges.push([`${name(slot)} Edge Decoration`, `${name(edge.decorations.setId)} · ${colors.decorName}`, ['edge.decorationSet'], slot === 'both' ? 2 : 1]);
+    }
   });
   addSection('Edge', edges);
   const rows = sections.flatMap((section) => section.items);

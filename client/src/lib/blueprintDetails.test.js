@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG } from './cakeConfig';
-import { buildBlueprintDetails } from './blueprintDetails';
+import { buildBlueprintDetails, flavorColorOf } from './blueprintDetails';
 import { buildBlueprintPdf } from './blueprintPdf';
 
 import { buildBlueprintTierPlan } from './blueprintStages';
@@ -901,6 +901,55 @@ describe('internal blueprint', () => {
       });
       expect(doc.getNumberOfPages()).toBeGreaterThan(3);
     }
+  });
+
+  it('correctly recognizes applied edge colors from sugarColorOverrides for solid and alternating designs', () => {
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.exteriorFinish = { style: 'fullyFrosted', flavor: 'chocolate' };
+    config.edge = {
+      mode: 'topBottomSeparate',
+      top: { piping: { tip: 'shellAlt', colorId: 'vanilla', secondaryColorId: 'vanilla' } },
+      bottom: { piping: { tip: 'ropeTwistClassic', colorId: 'vanilla' } },
+    };
+    config.sugarColorOverrides = {
+      edgeTop: { mode: 'colorOverride', colorId: 'chocolate' },
+      edgeBottom: { mode: 'colorOverride', colorId: 'strawberry' },
+    };
+
+    const plan = buildBlueprintTierPlan(config);
+    const edgePages = plan.groups[plan.groups.length - 1].pages.filter((p) => p.kind === 'edge');
+    const topPage = edgePages.find((p) => p.slot === 'top');
+
+    // Primary color should be resolved to chocolate override, secondary to vanilla
+    expect(topPage.primaryColorName).toBe('Chocolate');
+    expect(topPage.secondaryColorName).toBe('Vanilla');
+    expect(topPage.colorName).toBe('Chocolate / Vanilla');
+    expect(topPage.secondaryColor).toBe(flavorColorOf('vanilla'));
+    expect(topPage.color).toBe(flavorColorOf('chocolate'));
+
+    const botPage = edgePages.find((p) => p.slot === 'bottom');
+    // ropeTwistClassic is solid, resolved to strawberry override
+    expect(botPage.primaryColorName).toBe('Strawberry');
+    expect(botPage.colorName).toBe('Strawberry');
+    expect(botPage.secondaryColor).toBeNull();
+    expect(botPage.color).toBe(flavorColorOf('strawberry'));
+
+    const details = buildBlueprintDetails(config, null);
+    const edgeSection = details.sections.find((s) => s.title === 'Edge');
+    const topDetail = edgeSection.items.find((i) => i.label.includes('Top Border Piping'));
+    expect(topDetail.detail).toBe('Shell Border - Alternating · Chocolate / Vanilla');
+    const botDetail = edgeSection.items.find((i) => i.label.includes('Bottom Border Piping'));
+    expect(botDetail.detail).toBe('Rope Twist Classic · Strawberry');
+
+    // Test secondaryColor override via sugarColorOverrides
+    config.sugarColorOverrides.edgeTopSecondary = { mode: 'colorOverride', colorId: 'pink' };
+    const planWithSecondaryOverride = buildBlueprintTierPlan(config);
+    const topPageUpdated = planWithSecondaryOverride.groups[planWithSecondaryOverride.groups.length - 1].pages
+      .filter((p) => p.kind === 'edge')
+      .find((p) => p.slot === 'top');
+    expect(topPageUpdated.secondaryColorName).toBe('Pink');
+    expect(topPageUpdated.colorName).toBe('Chocolate / Pink');
+    expect(topPageUpdated.secondaryColor).toBe(flavorColorOf('pink'));
   });
 });
 

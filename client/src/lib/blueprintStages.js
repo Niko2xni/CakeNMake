@@ -1,5 +1,5 @@
 import { getSurfaceTreatmentPattern, isPetitsFourStructure } from './cakeConfig';
-import { name, flavorColorOf, cleanDecorName } from './blueprintDetails';
+import { name, flavorColorOf, cleanDecorName, resolveEdgeColors } from './blueprintDetails';
 
 // Blueprint "DETAILS:" tier pages -- the plan.
 //
@@ -57,17 +57,16 @@ function edgeSlots(config) {
     return [['top', edge.top], ['bottom', edge.bottom]].filter(([, e]) => has(e));
 }
 
-function edgeDetails(edge) {
+function edgeDetails(edge, slot = 'top', config = {}) {
     const rows = [];
+    const colors = resolveEdgeColors(config, slot, edge);
     if (edge.piping?.tip) {
-        const isAlt = String(edge.piping.tip).endsWith('Alt') || String(edge.piping.tip).toLowerCase().includes('alternat');
-        const hasSecondary = isAlt && Boolean(edge.piping.secondaryColorId);
         rows.push(['Piping', name(edge.piping.tip)]);
-        rows.push(['Piping Color', [name(edge.piping.colorId), hasSecondary && name(edge.piping.secondaryColorId)].filter(Boolean).join(' / ')]);
+        rows.push(['Piping Color', colors.fullColorName]);
     }
     if (edge.decorations?.setId) {
         rows.push(['Decoration', name(edge.decorations.setId)]);
-        if (edge.decorations.colorId) rows.push(['Decoration Color', name(edge.decorations.colorId)]);
+        if (colors.decorColorId) rows.push(['Decoration Color', colors.decorName]);
     }
     return rows;
 }
@@ -768,13 +767,8 @@ export function buildBlueprintTierPlan(config = {}) {
     const shared = groups[groups.length - 1].pages;
     slots.forEach(([slot, edge]) => {
         const edgePipingTip = edge.piping?.tip || edge.decorations?.setId || 'shell';
-        const isAlt = String(edgePipingTip).endsWith('Alt') || String(edgePipingTip).toLowerCase().includes('alternat');
-        const edgeColorId = edge.piping?.colorId || edge.decorations?.colorId || config.sugarColor?.colorId || 'vanilla';
-        const edgeColorHex = flavorColorOf(edgeColorId) || '#F6DEAB';
-        const hasSecondary = isAlt && Boolean(edge.piping?.secondaryColorId);
-        const edgeSecondaryColorHex = hasSecondary ? (flavorColorOf(edge.piping.secondaryColorId) || null) : null;
+        const colors = resolveEdgeColors(config, slot, edge);
         const edgeDesignName = name(edgePipingTip);
-        const edgeColorName = [name(edgeColorId), hasSecondary && name(edge.piping.secondaryColorId)].filter(Boolean).join(' / ');
 
         shared.push({
             kind: 'edge',
@@ -784,11 +778,13 @@ export function buildBlueprintTierPlan(config = {}) {
             slot,
             designId: edgePipingTip,
             designName: edgeDesignName,
-            color: edgeColorHex,
-            colorName: edgeColorName,
-            secondaryColor: edgeSecondaryColorHex,
+            color: colors.primaryHex,
+            colorName: colors.fullColorName,
+            primaryColorName: colors.primaryName,
+            secondaryColor: colors.secondaryHex,
+            secondaryColorName: colors.secondaryName,
             callouts: [callout(`edge-${slot}`, `edge-${slot}`, `EDGE ${slot.toUpperCase()}`, slot === 'top' ? 0.97 : 0.04, -0.7, 0.3, slot === 'top' ? 0.34 : 0.84)],
-            details: edgeDetails(edge),
+            details: edgeDetails(edge, slot, config),
             highlights: [`${name(slot)} border (${edgeDesignName}) - 2D pattern schematic vs. 3D render`],
             flavor: null,
         });

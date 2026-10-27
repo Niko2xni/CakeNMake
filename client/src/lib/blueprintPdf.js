@@ -831,17 +831,19 @@ function addEdgePages(doc, page, images, anchors, fillColors, designName, tierLa
   }
 
   // 3. Details table & Highlights below the side-by-side boxes
+  const primaryName = page.primaryColorName || page.colorName?.split('/')?.[0]?.trim() || colorName;
+  const secondaryName = page.secondaryColorName || page.colorName?.split('/')?.[1]?.trim() || 'Accent';
   const rows = [
     ['Edge Position', `${name(slot)} Rim`],
     ['Border Design', patternName],
-    ['Color', colorName],
+    ['Color', secondaryColor ? primaryName : colorName],
   ];
   if (secondaryColor) {
-    rows.push(['Secondary Color', page.colorName?.split('/')?.[1]?.trim() || 'Accent']);
+    rows.push(['Secondary Color', secondaryName]);
   }
   if (page.details && Array.isArray(page.details)) {
     for (const [k, v] of page.details) {
-      if (!rows.some(([rk]) => rk.toLowerCase() === k.toLowerCase())) {
+      if (!rows.some(([rk]) => rk.toLowerCase() === k.toLowerCase() || (k.toLowerCase() === 'piping color' && rk.toLowerCase() === 'color'))) {
         rows.push([k, v]);
       }
     }
