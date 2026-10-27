@@ -545,13 +545,17 @@ export default function CenterSection({
 
   const clearVariationItems = () => {
     onItemSelect?.(null);
-    onPlacedItemsChange?.((currentItems) =>
-      currentItems.filter((item) => item.source !== 'variation')
-    );
+    // Order matters, same as the X toggle in handleSelectVariation: onChange
+    // writes a whole config snapshot built from the render-time config (stale
+    // place.items included), so it must run BEFORE the functional place-items
+    // update. Running it after would overwrite the cleared items with the old list.
     onChange({
       ...center,
       variations: {},
     });
+    onPlacedItemsChange?.((currentItems) =>
+      currentItems.filter((item) => item.source !== 'variation')
+    );
   };
 
   const handleSelectVariation = (decoration, variantId) => {

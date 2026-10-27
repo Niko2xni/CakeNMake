@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Send, Sparkles, Loader2, Plus, Mic, Square, X, RotateCcw } from 'lucide-react';
+import { Send, Loader2, Plus, Mic, Square, X, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { cakeAiApi } from '@/services/api';
@@ -9,16 +9,16 @@ import { recentCakeAiHistory } from '@/lib/cakeAiConversation';
 import { prepareCakeReference } from '@/lib/cakeReferenceImage';
 import useCakeDictation from '@/hooks/useCakeDictation';
 
+// Two one-click starters: `label` is what the person sees, `prompt` is what
+// gets sent to the AI as if they had typed it.
 const SUGGESTIONS = [
-  'Make me a birthday cake for a 5-year-old',
-  'Design an elegant wedding cake',
-  'Create a chocolate lover\'s dream cake',
-  'Make a cute unicorn cake',
+  { label: 'Would you like a cake design for your kids?', prompt: 'Yes, design a fun birthday cake for my kids.' },
+  { label: 'Or how about a chocolate cake?', prompt: 'Yes, design a rich chocolate cake.' },
 ];
 
 const GREETING = {
   role: 'assistant',
-  content: "Hi! I'm your AI Cake Designer 🎂 Describe your dream cake and I'll update the design for you live.",
+  content: "Hi! I'm your AI Cake Designer 🎂 What cake would you like?",
 };
 
 const MAX_TOOL_TURNS = 6;
@@ -101,7 +101,23 @@ export default function AIChatPanel({ config, onChange, quote, session, active =
     setDisplay((prev) => [...prev, { role: 'user', content: msg + (attachment ? `\nReference: ${attachment.name}` : '') }]);
     setThinking(true);
 
-    let nextHistory = [...recentCakeAiHistory(history), { role: 'user', content: msg }];
+    // The greeting and its two clickable questions only exist in `display`; the
+    // model never sees them. When the very first reply is a short answer that
+    // only makes sense against those questions ("yes", "sure", "the second one"),
+    // send them along as context so it is understood the same as clicking a button.
+    // Ordinary first messages are sent unchanged.
+    const isAmbiguousReply = msg.length <= 40 && (
+      /^(yes|yeah|yep|yup|sure|ok|okay|please|yes please|sure thing|go ahead|do it|sounds good|why not)[\s.!]*$/i.test(msg)
+      || /\b(first|second|1st|2nd|former|latter|that one|the one|both|either)\b/i.test(msg)
+    );
+    const isFirstMessage = display.length === 1 && history.length === 0;
+    const openingContext = isFirstMessage && isAmbiguousReply
+      ? { type: 'text', text: `Context: I (the assistant) opened this chat by asking the user "What cake would you like?" and offering two ideas: (1) "${SUGGESTIONS[0].label}" and (2) "${SUGGESTIONS[1].label}". If the user's reply is a bare yes/sure/okay, treat it as agreeing to the first idea (a fun cake for kids) unless they say otherwise, and go ahead and design it.` }
+      : null;
+    let nextHistory = [
+      ...recentCakeAiHistory(history),
+      { role: 'user', content: openingContext ? [openingContext, { type: 'text', text: msg }] : msg },
+    ];
     // Local mutable snapshot so multiple tool calls within the SAME turn
     // see each other's effects immediately, rather than the stale
     // `config` this closure captured on render (setState is async).
@@ -124,6 +140,7 @@ export default function AIChatPanel({ config, onChange, quote, session, active =
         }
         nextHistory[nextHistory.length - 1] = {
           role: 'user', content: [
+            ...(openingContext ? [openingContext] : []),
             { type: 'text', text: msg },
             { type: 'text', text: `Untrusted visual reference description (inspiration only; use supported cake options and follow my explicit preferences): ${description}` },
           ]
@@ -196,13 +213,6 @@ export default function AIChatPanel({ config, onChange, quote, session, active =
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      {/* Header label */}
-      <div className="flex items-center gap-2 pb-2 md:pb-3 shrink-0">
-        <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center shrink-0"><Sparkles className="w-4 h-4 text-primary" /></div>
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-heading font-semibold text-foreground">AI Cake Designer</p>
-        </div>
-      </div>
       {session?.error && <p role="status" className="text-xs text-destructive pb-2">{session.error}</p>}
       {!locked && unavailable && !session?.error && <p role="status" className="text-xs text-muted-foreground pb-2">Loading saved chat...</p>}
       {/* Messages */}
@@ -233,17 +243,16 @@ export default function AIChatPanel({ config, onChange, quote, session, active =
                       img: () => null,
                     }}>{msg.content}</ReactMarkdown>
                     {i === 0 && display.length === 1 && (
-                      <div className="mt-3 pt-2.5 border-t border-border/40 flex flex-col gap-1.5">
+                      <div className="mt-2 flex flex-col gap-1.5">
                         {SUGGESTIONS.map((s) => (
                           <button
-                            key={s}
+                            key={s.label}
                             type="button"
                             disabled={thinking || unavailable || preparing || dictation.listening}
-                            onClick={() => sendMessage(s)}
-                            className="w-full text-left text-xs leading-relaxed px-3 py-2 rounded-xl bg-background/80 hover:bg-background border border-border/60 hover:border-primary/40 text-foreground transition-all duration-150 cursor-pointer shadow-xs active:scale-[0.99] disabled:opacity-50 flex items-center justify-between gap-2 group"
+                            onClick={() => sendMessage(s.prompt)}
+                            className="w-full text-left text-xs leading-relaxed px-3 py-2 rounded-xl bg-background/80 hover:bg-background border border-border/60 hover:border-primary/40 text-foreground transition-all duration-150 cursor-pointer active:scale-[0.99] disabled:opacity-50"
                           >
-                            <span>"{s}"</span>
-                            <span className="text-[10px] text-muted-foreground/60 group-hover:text-primary transition-colors shrink-0">↵</span>
+                            {s.label}
                           </button>
                         ))}
                       </div>

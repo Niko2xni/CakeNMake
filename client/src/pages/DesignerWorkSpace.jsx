@@ -1327,6 +1327,10 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
 
   const handleCenterItemSelect = useCallback((id) => {
     if (id) {
+      // Priority: exit/home first, then a running AI edit. While the AI is
+      // working, clicking a center item does nothing.
+      if (aiChatSession?.thinking) return;
+
       // User entered Decoration selected mode
       if (activeToolRef.current) {
         lastActiveToolBeforeSelectionRef.current = activeToolRef.current;
@@ -1335,6 +1339,9 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
       setSelectedCenterItemId(id);
       setActiveTool(null);
 
+      // Jump out of the AI tab into Design > Center so the selection can be edited.
+      setToolPanelModeUi('design');
+      setPanelOpen(true);
       setActiveTab('center');
 
       setConfig((prev) => {
@@ -1373,7 +1380,7 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
         lastActiveToolBeforeSelectionRef.current = null;
       }
     }
-  }, []);
+  }, [aiChatSession?.thinking]);
 
   const handleCenterTextColorModeChange = useCallback((nextMode) => {
     setConfig((prev) => {

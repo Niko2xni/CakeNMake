@@ -1,6 +1,6 @@
 export const CAKE_AI_GREETING = {
   role: 'assistant',
-  content: "Hi! I'm your AI Cake Designer 🎂 Describe your dream cake and I'll update the design for you live.",
+  content: "Hi! I'm your AI Cake Designer 🎂 What cake would you like?",
 };
 
 export function emptyCakeAiConversation() {

@@ -24,7 +24,7 @@ function LineItem({ label, details, items, lineTotalMinor = 0, quantity = 1, uni
 
     return (
       <div className="text-xs space-y-1">
-        <div className="font-bold text-foreground text-xs">Center Decorations:</div>
+        <div className="text-foreground/80 font-medium text-xs">Center Decorations:</div>
         <div className="space-y-0.5">
           {decoList.map((deco, idx) => (
             <div key={idx} className="flex items-center justify-between text-[11px] text-muted-foreground">
@@ -52,7 +52,7 @@ function LineItem({ label, details, items, lineTotalMinor = 0, quantity = 1, uni
     return (
       <div className="flex items-start justify-between gap-3 text-xs">
         <div className="min-w-0 flex-1 space-y-0.5">
-          <div className="font-bold text-foreground text-xs">Center Text:</div>
+          <div className="text-foreground/80 font-medium text-xs">Center Text:</div>
           {displayDetails.map((spec, idx) => (
             <div key={idx} className="text-[11px] text-muted-foreground">
               {spec}
