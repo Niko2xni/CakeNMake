@@ -51,19 +51,30 @@ export function applyVerticalGradientUV(geometry) {
  * the shader the first time a color is seen; subsequent calls return the
  * same instance (uniforms already set).
  */
-export function getFrostingMaterial(hexColor, colorId = null) {
-  const cacheKey = colorId ? `${colorId}_${hexColor}` : hexColor;
+export function getFrostingMaterial(hexColor, colorId = null, options = {}) {
+  const optionFlags = [];
+  if (options.polygonOffset) {
+    optionFlags.push(`offset_${options.polygonOffsetFactor ?? -1}_${options.polygonOffsetUnits ?? -1}`);
+  }
+  if (options.clippingPlanes !== undefined) {
+    optionFlags.push(`clip_${options.clippingPlanes.length}`);
+  }
+  if (options.isFilling) {
+    optionFlags.push('filling');
+  }
+
+  const baseKey = colorId ? `${colorId}_${hexColor}` : (hexColor || 'default');
+  const cacheKey = optionFlags.length > 0 ? `${baseKey}_${optionFlags.join('_')}` : baseKey;
+
   if (frostingMaterialCache[cacheKey]) {
     return frostingMaterialCache[cacheKey];
   }
-  frostingMaterialCache[cacheKey] = markShared(createFrostingMaterial(hexColor, colorId));
+  frostingMaterialCache[cacheKey] = markShared(createFrostingMaterial(hexColor, colorId, options));
   return frostingMaterialCache[cacheKey];
 }
 
-function createFrostingMaterial(hexColor, colorId = null) {
+function createFrostingMaterial(hexColor, colorId = null, options = {}) {
   const dummyMap = getSpongeDummyMap();
-
-  console.log('Creating frosting material - hexColor:', hexColor, 'colorId:', colorId);
 
   // Check if this is a gradient color
   const sugarColor = colorId ? SUGAR_COLORS.find(c => c.id === colorId) : null;
@@ -76,13 +87,10 @@ function createFrostingMaterial(hexColor, colorId = null) {
   // buttercream's default matte 0.85–0.95).
   const isMetallic = !!(sugarColor && sugarColor.metallic);
 
-  console.log('Sugar color found:', sugarColor, 'Is gradient:', isGradient, 'Is metallic:', isMetallic);
-
   let gradientTexture = null;
   if (isGradient) {
     // Parse gradient CSS to extract color stops
     const colorStops = parseGradientStops(sugarColor.swatchCss);
-    console.log('Gradient color detected:', colorId, 'Color stops:', colorStops);
     if (colorStops.length > 0) {
       gradientTexture = buildGradientTexture(colorStops, 512, 512);
       // ClampToEdge (not the Three.js default RepeatWrapping) so a UV
@@ -94,46 +102,67 @@ function createFrostingMaterial(hexColor, colorId = null) {
       gradientTexture.wrapS = THREE.ClampToEdgeWrapping;
       gradientTexture.wrapT = THREE.ClampToEdgeWrapping;
       gradientTexture.needsUpdate = true;
-      console.log('Gradient texture created:', gradientTexture);
-    } else {
-      console.log('No color stops found, falling back to solid color');
     }
   }
 
+  const applyOptions = (mat) => {
+    if (options.polygonOffset) {
+      mat.polygonOffset = true;
+      mat.polygonOffsetFactor = options.polygonOffsetFactor ?? -1;
+      mat.polygonOffsetUnits = options.polygonOffsetUnits ?? -1;
+    }
+    if (options.clippingPlanes !== undefined) {
+      mat.clippingPlanes = options.clippingPlanes;
+    }
+    const origClone = mat.clone.bind(mat);
+    mat.clone = function () {
+      const cloned = origClone();
+      cloned.onBeforeCompile = this.onBeforeCompile;
+      cloned.customProgramCacheKey = this.customProgramCacheKey;
+      cloned.userData = { ...this.userData };
+      return cloned;
+    };
+    return mat;
+  };
+
   // For gradient colors, use a simpler material without custom shader
   if (isGradient && gradientTexture) {
-    console.log('Using simple gradient material');
     const material = new THREE.MeshStandardMaterial({
       map: gradientTexture,
       roughness: 0.90,
       metalness: 0,
     });
     material.userData.isGradient = true;
-    return material;
+    return applyOptions(material);
   }
 
   const material = new THREE.MeshStandardMaterial({
     map: gradientTexture || dummyMap,
     bumpMap: dummyMap,        // dummy — only used to unlock Three's USE_BUMPMAP
     bumpScale: 0.02,
-    color: isGradient ? '#ffffff' : '#ffffff',         // white for gradients to let texture show through
+    color: isGradient ? '#ffffff' : (hexColor || '#ffffff'),
     // Gold Shimmer gets real metalness/roughness values here; everything
     // else keeps the previous flat buttercream defaults.
     roughness: isMetallic ? 0.35 : 0.90,
     metalness: isMetallic ? 0.85 : 0,
   });
 
-  // All frosting colors share the same compiled GPU program — only
-  // the uFrostColor uniform differs per instance. Metallic gets its own
-  // cache key alongside gradient's, since it also needs a different
-  // roughness clamp range compiled into the shader below.
-  material.customProgramCacheKey = () => isGradient
-    ? 'frostingButtercreamGradient'
-    : (isMetallic ? 'frostingButtercreamMetallic' : 'frostingButtercream');
-  material.userData.frostColor = hexColor;
+  material.customProgramCacheKey = () => {
+    const base = isGradient
+      ? 'frostingButtercreamGradient'
+      : (isMetallic ? 'frostingButtercreamMetallic' : 'frostingButtercream');
+    return `${base}_${colorId || hexColor || 'default'}`;
+  };
+  material.userData.frostColor = hexColor || '#ffffff';
   material.userData.isGradient = isGradient;
   material.userData.isMetallic = isMetallic;
   material.defines = { ...material.defines, USE_UV: '', USE_BUMPMAP: '' };
+
+  material.onBeforeRender = function () {
+    if (this.userData.shader && this.userData.shader.uniforms.uFrostColor) {
+      this.userData.shader.uniforms.uFrostColor.value.set(this.userData.frostColor);
+    }
+  };
 
   material.onBeforeCompile = function (shader) {
     shader.uniforms.uFrostColor = {
@@ -241,9 +270,9 @@ float frostNoise(vec3 p) {
   // ── Diffuse color ──────────────────────────────────────────────
   // Strictly no procedural noise applied to the diffuse color;
   // all spatial/spatula detail is handled purely by normal perturbation.
-  // For gradient colors, use the texture as-is; for solid colors, multiply by uFrostColor
+  // For gradient colors, use the texture as-is; for solid colors, use uFrostColor
   if (uIsGradient < 0.5) {
-    diffuseColor.rgb *= uFrostColor;
+    diffuseColor.rgb = uFrostColor;
   }
 }
 `
@@ -308,5 +337,5 @@ if (uIsMetallic > 0.5) {
     material.userData.shader = shader;
   };
 
-  return material;
+  return applyOptions(material);
 }
