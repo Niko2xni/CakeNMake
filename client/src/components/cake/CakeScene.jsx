@@ -2726,9 +2726,7 @@ const CakeScene = React.forwardRef(function CakeScene({
               pieceFillingSugarColor || fillColor || '#FFF4DC',
               pieceFillingSugarColorId || null,
               {
-                polygonOffset: true,
-                polygonOffsetFactor: -1,
-                polygonOffsetUnits: -1,
+                isFilling: true,
                 clippingPlanes: [],
               }
             );
@@ -2745,6 +2743,7 @@ const CakeScene = React.forwardRef(function CakeScene({
             fillMesh.position.y = spongeCurrentY + fillingH / 2;
             fillMesh.frustumCulled = false;
             fillMesh.userData.blueprintRole = 'filling';
+            fillMesh.renderOrder = 0;
             pieceGroup.add(fillMesh);
             spongeCurrentY += fillingH;
           }
@@ -2777,6 +2776,7 @@ const CakeScene = React.forwardRef(function CakeScene({
           frostMesh.position.y = 0;
           frostMesh.castShadow = true;
           frostMesh.receiveShadow = true;
+          frostMesh.renderOrder = 1;
           pieceGroup.add(frostMesh);
         }
 
@@ -3819,9 +3819,7 @@ const CakeScene = React.forwardRef(function CakeScene({
               layerFillingSugarColors[i] || fillingPipingColor,
               layerFillingSugarColorIds[i] || fillingPipingColorId,
               {
-                polygonOffset: true,
-                polygonOffsetFactor: -1,
-                polygonOffsetUnits: -1,
+                isFilling: true,
                 clippingPlanes: [],
               }
             );
@@ -3895,6 +3893,7 @@ const CakeScene = React.forwardRef(function CakeScene({
             mashedFilling.frustumCulled = false;
             mashedFilling.userData.blueprintRole = 'filling';
             mashedFilling.userData.tier = i;
+            mashedFilling.renderOrder = 0;
             group.add(mashedFilling);
             // Recorded for Glaze's hugging profile below — see
             // lastFillingBands' declaration above. isSwirl/bumpJitter are
@@ -3922,9 +3921,7 @@ const CakeScene = React.forwardRef(function CakeScene({
               layerFillingSugarColors[i] || fillingPipingColor,
               layerFillingSugarColorIds[i] || fillingPipingColorId,
               {
-                polygonOffset: true,
-                polygonOffsetFactor: -1,
-                polygonOffsetUnits: -1,
+                isFilling: true,
                 clippingPlanes: [],
               }
             );
@@ -3938,6 +3935,7 @@ const CakeScene = React.forwardRef(function CakeScene({
             fillingSection.frustumCulled = false;
             fillingSection.userData.blueprintRole = 'filling';
             fillingSection.userData.tier = i;
+            fillingSection.renderOrder = 0;
             group.add(fillingSection);
 
             // No separate piping trim here: this branch only ever runs
@@ -4002,6 +4000,7 @@ const CakeScene = React.forwardRef(function CakeScene({
         frost.userData.tier = i;
         frost.position.y = currentY - FROST_CAP_H - tierSeamOverlap;
         frost.castShadow = true;
+        frost.renderOrder = 1;
         group.add(frost);
 
         // Glaze (see buildGlazeGeometry) is a "secondary copy" of THIS
@@ -5390,6 +5389,29 @@ const CakeScene = React.forwardRef(function CakeScene({
       group.position.y = baselineY;
       baselineYRef.current = baselineY;
     }
+
+    // Enforce z-index rule: Filling < Glaze < Side < Center < Edge
+    // Sponge/Filling (inner core) = 0
+    // Finish (Frosted / Textured Buttercream) = 1
+    // Pattern / Glaze (Side designs, Glaze) = 2
+    // Edge (Borders, Trim) = 3
+    // Center (Center decor) = 4
+    group.traverse((o) => {
+      if (o.isMesh) {
+        const role = o.userData?.blueprintRole;
+        if (role === 'sponge' || role === 'filling') {
+          o.renderOrder = 0;
+        } else if (role === 'finish') {
+          o.renderOrder = 1;
+        } else if (role === 'pattern') {
+          o.renderOrder = 2;
+        } else if (role === 'edge') {
+          o.renderOrder = 3;
+        } else if (role === 'center') {
+          o.renderOrder = 4;
+        }
+      }
+    });
 
     group.updateMatrixWorld(true);
 
