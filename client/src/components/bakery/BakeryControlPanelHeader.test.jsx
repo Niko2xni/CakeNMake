@@ -5,6 +5,11 @@ import { BrowserRouter } from 'react-router-dom';
 import BakeryControlPanelHeader from '@/components/bakery/BakeryControlPanelHeader';
 import ClientUpdateAdvanceWarning from '@/components/shared/ClientUpdateAdvanceWarning';
 import { systemApi } from '@/services/api';
+import { useAuth } from '@/lib/AuthContext';
+
+vi.mock('@/lib/AuthContext', () => ({
+  useAuth: vi.fn(),
+}));
 
 vi.mock('@/services/api', () => ({
   systemApi: {
@@ -20,6 +25,7 @@ vi.mock('@/services/api', () => ({
 describe('BakeryControlPanelHeader & ClientUpdateAdvanceWarning', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useAuth.mockReturnValue({ account: { role: 'bakery_admin', displayName: 'Bakery Admin' } });
   });
 
   it('renders unified control panel header with embedded message when drafts exist', async () => {
@@ -243,5 +249,81 @@ describe('BakeryControlPanelHeader & ClientUpdateAdvanceWarning', () => {
 
     fireEvent.click(screen.getByText('Minimize'));
     expect(handleMinimize).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides website toggle and blocks pricing draft modifications for bakery_staff while allowing template draft removal', async () => {
+    useAuth.mockReturnValue({ account: { role: 'bakery_staff', displayName: 'Bakery Worker' } });
+
+    systemApi.getStatus.mockResolvedValue({
+      isWebsiteOff: false,
+      statusText: 'Website On',
+    });
+
+    systemApi.getUnifiedDrafts.mockResolvedValue({
+      totalCount: 2,
+      templateCount: 1,
+      pricingCount: 1,
+      drafts: [
+        {
+          id: 'template-admin-draft',
+          category: 'template',
+          pendingAction: 'create',
+          name: 'Admin Cake Template',
+          summary: 'New Template: "Admin Cake Template"',
+          priceMinor: 150000,
+          hasOriginal: false,
+        },
+        {
+          id: 'pricing-item-buttercream',
+          category: 'pricing',
+          pendingAction: 'update',
+          name: 'Buttercream Frosting',
+          summary: 'Price markup updated: ₱150.00 → ₱180.00 (+₱30.00)',
+          priceMinor: 18000,
+          hasOriginal: true,
+        },
+      ],
+    });
+
+    systemApi.getDailyLog.mockResolvedValue({ count: 0, logs: [] });
+    systemApi.discardUnifiedDraft.mockResolvedValue({ message: 'Template draft discarded' });
+
+    render(
+      <BrowserRouter>
+        <BakeryControlPanelHeader activeView="templates" />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Website On')).toBeInTheDocument();
+      expect(screen.getByText('2 Drafted Edits')).toBeInTheDocument();
+    });
+
+    // Website shut-down button must NOT be rendered for bakery_staff
+    expect(screen.queryByText('Set Website Off')).not.toBeInTheDocument();
+    expect(screen.queryByText('Turn Website On')).not.toBeInTheDocument();
+
+    // Open Pending Drafts drawer
+    fireEvent.click(screen.getByText('2 Drafted Edits'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Admin Cake Template')).toBeInTheDocument();
+      expect(screen.getByText('Buttercream Frosting')).toBeInTheDocument();
+    });
+
+    // Bulk discard button is scoped to templates only for staff
+    expect(screen.getByText('Discard Template Drafts')).toBeInTheDocument();
+
+    // Pricing draft displays "Admin Only" instead of "Revert Change"
+    expect(screen.getByText('Admin Only')).toBeInTheDocument();
+    expect(screen.queryByText('Revert Change')).not.toBeInTheDocument();
+
+    // Template draft has "Remove Draft" button and can be removed by staff
+    const removeTemplateBtn = screen.getByText('Remove Draft');
+    fireEvent.click(removeTemplateBtn);
+
+    await waitFor(() => {
+      expect(systemApi.discardUnifiedDraft).toHaveBeenCalledWith('template-admin-draft');
+    });
   });
 });

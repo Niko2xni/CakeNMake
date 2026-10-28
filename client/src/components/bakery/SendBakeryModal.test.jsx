@@ -58,7 +58,7 @@ describe('SendBakeryModal 2-step flow', () => {
 
     expect(mocks.moderationMine).toHaveBeenCalled();
     expect(await screen.findByText('Step 2 of 2: Payment')).toBeInTheDocument();
-    expect(screen.getByText('Simulated GCash checkout')).toBeInTheDocument();
+    expect(screen.getByText('GCash demo')).toBeInTheDocument();
     expect(screen.queryByText(/Choose Fulfillment Method/i)).not.toBeInTheDocument();
   });
 
@@ -129,7 +129,7 @@ describe('SendBakeryModal 2-step flow', () => {
     expect(await screen.findByText('Step 2 of 2: Payment')).toBeInTheDocument();
 
     // Trigger payment
-    const checkoutBtn = screen.getByRole('button', { name: /Continue simulated checkout/i });
+    const checkoutBtn = screen.getByRole('button', { name: /Continue GCash demo/i });
     fireEvent.click(checkoutBtn);
 
     const confirmModalBtn = await screen.findByRole('button', { name: /Submit demo order/i });

@@ -6,7 +6,7 @@ const initialProfile = {
   name: 'AH TINAPS BAKESHOP',
   email: 'ahtinapsbakeshop@example.com',
   address: 'Metro Manila, Philippines',
-  hoursOfOperation: 'Monday – Saturday, 8:00 AM – 6:00 PM',
+  hoursOfOperation: 'Monday – Friday, 8:00 AM – 6:00 PM',
   description: 'Specializing in personalized 3D custom cakes and pastries for any occasion.',
 };
 

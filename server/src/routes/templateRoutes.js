@@ -257,7 +257,7 @@ router.get('/drafts', authenticate, loadAppUser, requireRole('bakery_staff', 'ba
 });
 
 // DELETE /api/bakery/templates/drafts/:id - Discard / Revert a single specific drafted edit
-router.delete('/drafts/:id', authenticate, loadAppUser, requireRole('bakery_admin', 'platform_admin'), async (req, res) => {
+router.delete('/drafts/:id', authenticate, loadAppUser, requireRole('bakery_staff', 'bakery_admin', 'platform_admin'), async (req, res) => {
   try {
     const template = await Template.findById(req.params.id);
     if (!template) {
@@ -324,7 +324,7 @@ router.delete('/drafts/:id', authenticate, loadAppUser, requireRole('bakery_admi
 });
 
 // POST /api/bakery/templates/drafts/discard-all - Discard all template drafts
-router.post('/drafts/discard-all', authenticate, loadAppUser, requireRole('bakery_admin', 'platform_admin'), async (req, res) => {
+router.post('/drafts/discard-all', authenticate, loadAppUser, requireRole('bakery_staff', 'bakery_admin', 'platform_admin'), async (req, res) => {
   try {
     const now = new Date();
     const draftedTemplates = await Template.find({
@@ -440,9 +440,9 @@ router.post('/', authenticate, loadAppUser, requireRole('bakery_staff', 'bakery_
       config: config || {},
       order: nextOrder,
       isPublished: true,
-      pendingAction: 'none',
+      pendingAction: 'create',
       draftOriginalState: null,
-      effectiveAt: null, // Bypasses timer - inserted now
+      effectiveAt: nextManilaTenPm(),
     });
 
     const { recordAuditLog } = require('../services/maintenanceService');
@@ -515,9 +515,9 @@ router.put('/:id', authenticate, loadAppUser, requireRole('bakery_staff', 'baker
     if (order !== undefined) existing.order = Number(order);
     if (isPublished !== undefined) existing.isPublished = Boolean(isPublished);
 
-    existing.pendingAction = 'none';
-    existing.draftOriginalState = null;
-    existing.effectiveAt = null; // Bypasses timer - inserted now
+    if (existing.pendingAction !== 'create') { existing.pendingAction = 'update'; existing.draftOriginalState = draftOriginalState; }
+    // Retained draftOriginalState from above
+    existing.effectiveAt = nextManilaTenPm();
 
     await existing.save();
 

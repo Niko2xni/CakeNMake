@@ -499,14 +499,40 @@ export default function ClientHome() {
 
     try {
       const copyableDesign = { ...design };
-      ['_id', 'userId', 'createdAt', 'lastEdited', 'isTrashed', 'trashedAt', 'sentToBakery'].forEach((key) => delete copyableDesign[key]);
+      [
+        '_id',
+        'userId',
+        'owner',
+        'createdAt',
+        'updatedAt',
+        'lastEdited',
+        'isTrashed',
+        'trashedAt',
+        'sentToBakery',
+        'paymentCompleted',
+        'orderContext',
+        'order',
+        'orders',
+        'hasOrder',
+      ].forEach((key) => delete copyableDesign[key]);
       const duplicate = await designApi.createDesign({
         ...copyableDesign,
         name: `${design.name || 'Untitled design'} copy`,
         sentToBakery: false,
+        paymentCompleted: false,
+        orderContext: null,
         isDuplicated: true,
       });
-      setRecentDesigns((designs) => [{ ...duplicate, isDuplicated: true }, ...designs.filter((d) => d._id !== duplicate._id)]);
+      setRecentDesigns((designs) => [
+        {
+          ...duplicate,
+          sentToBakery: false,
+          paymentCompleted: false,
+          orderContext: null,
+          isDuplicated: true,
+        },
+        ...designs.filter((d) => d._id !== duplicate._id),
+      ]);
     } catch (error) {
       console.error('Failed to duplicate design:', error);
       if (error?.message?.includes('capacity') || error?.message?.includes('maximum') || error?.status === 400) {
@@ -729,6 +755,7 @@ export default function ClientHome() {
                           : Math.max(0, Number(relatedTx?.totalPrice || 0) - Number(relatedTx?.downPayment?.amount || 0)));
                     const hasBalanceDue = Boolean(isSentToBakery && relatedTx && remainingBal > 0 && !isPaidInFull && !isCompleted);
                     const isActiveOrder = Boolean(isSentToBakery && relatedTx && !isCompleted && ['pending_payment', 'confirmed', 'in_production'].includes(relatedTx.status));
+                    const isPendingSend = Boolean(design.paymentCompleted && !isSentToBakery && !design.isDuplicated);
 
                     return (
                       <article
@@ -744,7 +771,7 @@ export default function ClientHome() {
                         >
                           <div className="cn-design-thumbnail">
                             {index === 0 && <span className="cn-latest-badge">Latest</span>}
-                            {Boolean(design.paymentCompleted && !isSentToBakery) && (
+                            {isPendingSend && (
                               <span className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white shadow-xs">
                                 Payment Verified • Pending Send
                               </span>
@@ -914,7 +941,7 @@ export default function ClientHome() {
                               Sent to Bakery
                             </div>
                           </div>
-                        ) : Boolean(design.paymentCompleted && !isSentToBakery) ? (
+                        ) : isPendingSend ? (
                           <div className="px-3 pb-3 pt-0 mt-auto">
                             <Link
                               to={`/designer?designId=${design._id}&resend=true`}
@@ -1081,7 +1108,7 @@ export default function ClientHome() {
               </Link>
             </div>
 
-            {selectedDesign?.paymentCompleted && !selectedDesign?.sentToBakery ? (
+            {Boolean(selectedDesign?.paymentCompleted && !selectedDesign?.sentToBakery && !selectedDesign?.isDuplicated) ? (
               <Link
                 to={`/designer?designId=${selectedDesign._id}&resend=true`}
                 state={{ sentToBakery: false, paymentCompleted: true }}
@@ -1111,7 +1138,7 @@ export default function ClientHome() {
                     <span className="font-semibold text-[var(--cn-ink)] text-right">{spec.value}</span>
                   </div>
                 ))}
-                {Boolean(selectedDesign?.paymentCompleted && !selectedDesign?.sentToBakery) && (
+                {Boolean(selectedDesign?.paymentCompleted && !selectedDesign?.sentToBakery && !selectedDesign?.isDuplicated) && (
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-medium">Payment Status</span>
                     <span className="font-semibold text-amber-600">

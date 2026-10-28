@@ -92,6 +92,8 @@ describe('ClientHome presentation', () => {
       _id: 'duplicate',
       name: 'Cherry cake copy',
       sentToBakery: false,
+      paymentCompleted: false,
+      orderContext: null,
       lastEdited: '2026-09-20T10:00:00Z',
     });
     renderHome();
@@ -106,10 +108,53 @@ describe('ClientHome presentation', () => {
       thumbnail: 'cherry.png',
       thumbnailFallback: 'cherry-fallback.png',
       sentToBakery: false,
+      paymentCompleted: false,
+      orderContext: null,
       isDuplicated: true,
     }));
     expect(await screen.findByText('Cherry cake copy')).toBeInTheDocument();
     expect(await screen.findByText('Duplicated')).toBeInTheDocument();
+  });
+
+  it('duplicating a design never inherits bakery order or payment status and has no resend button', async () => {
+    const paidDesign = {
+      _id: 'paid-1',
+      name: 'Paid Wedding Cake',
+      lastEdited: '2026-09-20T09:00:00Z',
+      thumbnail: 'wedding.png',
+      config: { structure: { layers: 3 } },
+      sentToBakery: true,
+      paymentCompleted: true,
+      orderContext: { reservationId: 'res-999' },
+    };
+    apiMocks.getDesigns.mockResolvedValue([paidDesign]);
+    apiMocks.createDesign.mockResolvedValue({
+      _id: 'copy-1',
+      name: 'Paid Wedding Cake copy',
+      config: { structure: { layers: 3 } },
+      thumbnail: 'wedding.png',
+      sentToBakery: false,
+      paymentCompleted: false,
+      orderContext: null,
+      isDuplicated: true,
+      lastEdited: '2026-09-20T09:05:00Z',
+    });
+    renderHome();
+
+    fireEvent.click(await screen.findByRole('button', { name: /actions for paid wedding cake/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /duplicate/i }));
+
+    await waitFor(() => expect(apiMocks.createDesign).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'Paid Wedding Cake copy',
+      sentToBakery: false,
+      paymentCompleted: false,
+      orderContext: null,
+      isDuplicated: true,
+    })));
+
+    expect(await screen.findByText('Paid Wedding Cake copy')).toBeInTheDocument();
+    expect(screen.queryByText(/payment verified • pending send/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /resend to bakery/i })).not.toBeInTheDocument();
   });
 
   it('wraps long unbroken design names in the move-to-trash confirmation', async () => {

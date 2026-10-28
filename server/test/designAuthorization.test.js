@@ -349,4 +349,27 @@ test('deleteDesign blocks deleting when design has an active reservation', async
   assert.match(res.body.message, /active reservation/i);
 });
 
+test('duplicated design creation strips sentToBakery, paymentCompleted, and orderContext', async () => {
+  mock.method(Design.prototype, 'save', async function save() { return this; });
+  const res = response();
+  await createDesign(request({
+    body: {
+      name: 'Original Copy',
+      config: { layers: 1 },
+      sentToBakery: true,
+      paymentCompleted: true,
+      orderContext: { reservationId: 'res-999' },
+      isDuplicated: true,
+    },
+  }), res);
+
+  assert.equal(res.statusCode, 201);
+  assert.equal(res.body.name, 'Original Copy');
+  assert.equal(res.body.isDuplicated, true);
+  assert.equal(res.body.sentToBakery, false);
+  assert.equal(res.body.paymentCompleted, false);
+  assert.equal(res.body.orderContext, null);
+});
+
+
 

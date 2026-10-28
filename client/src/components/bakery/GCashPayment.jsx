@@ -72,7 +72,7 @@ export default function GCashPayment({ total, selectedDate, fulfillment, onPaid,
         <ChevronLeft className="w-3.5 h-3.5" /> Back to date selection
       </button>
 
-      <p className="font-heading font-bold text-base mb-1">Simulated GCash checkout</p>
+      <p className="font-heading font-bold text-base mb-1">GCash demo</p>
       <p className="text-xs text-muted-foreground mb-4">
         This demo does not charge money. Pay the 50% reservation down payment to lock your date. The remaining 50% balance is due 48 hours before baking.
       </p>
@@ -200,7 +200,7 @@ export default function GCashPayment({ total, selectedDate, fulfillment, onPaid,
               ? 'Payments unavailable during 9:30 PM cutoff'
               : paying
               ? 'Processing...'
-              : 'Continue simulated checkout'}
+              : 'Continue GCash demo'}
           </Button>
         </div>
       )}

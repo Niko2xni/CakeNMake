@@ -2521,9 +2521,12 @@ const BORDER_PIPING_ALTERNATING_VARIATIONS = [
   { id: 'elongatedShellAlt', label: 'Elongated Shell Border - Alternating' },
 ];
 
-// Edge Border Piping supports only the 6 classic solid piping designs (alternating removed)
+// Alternating variants need a second color (piping.secondaryColorId,
+// already added to the edge default state above) — EdgeSection's Deluxe
+// tab shows a second color picker whenever the active id ends in "Alt".
 const BORDER_PIPING_VARIATIONS_DELUXE = [
   ...BORDER_PIPING_SOLID_VARIATIONS,
+  ...BORDER_PIPING_ALTERNATING_VARIATIONS,
 ];
 
 const DOLLOPS_SOLID_VARIATIONS_DELUXE = [

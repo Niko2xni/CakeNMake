@@ -45,7 +45,23 @@ exports.getDesigns = async (req, res) => {
     const designs = await Design.find({ ...ownerFilter(req), isTrashed: trashOnly })
       .sort(sort)
       .limit(MAX_TRASH_CAPACITY);
-    return res.json(designs);
+
+    const sanitized = designs.map((d) => {
+      if (d.isDuplicated && (d.paymentCompleted || d.sentToBakery || d.orderContext)) {
+        const doc = d.toObject ? d.toObject() : { ...d };
+        doc.sentToBakery = false;
+        doc.paymentCompleted = false;
+        doc.orderContext = null;
+        Design.updateOne(
+          { _id: d._id },
+          { $set: { sentToBakery: false, paymentCompleted: false, orderContext: null } }
+        ).exec().catch(() => {});
+        return doc;
+      }
+      return d;
+    });
+
+    return res.json(sanitized);
   } catch (error) {
     console.error('Error fetching designs:', error);
     return res.status(500).json({ message: 'Failed to load designs' });
@@ -56,7 +72,19 @@ exports.getDesignById = async (req, res) => {
   if (invalidDesignId(req, res)) return;
   try {
     const design = await Design.findOne(ownedDesignFilter(req));
-    return design ? res.json(design) : notFound(res);
+    if (!design) return notFound(res);
+    if (design.isDuplicated && (design.paymentCompleted || design.sentToBakery || design.orderContext)) {
+      const doc = design.toObject ? design.toObject() : { ...design };
+      doc.sentToBakery = false;
+      doc.paymentCompleted = false;
+      doc.orderContext = null;
+      Design.updateOne(
+        { _id: design._id },
+        { $set: { sentToBakery: false, paymentCompleted: false, orderContext: null } }
+      ).exec().catch(() => {});
+      return res.json(doc);
+    }
+    return res.json(design);
   } catch (error) {
     console.error('Error fetching design:', error);
     return res.status(500).json({ message: 'Failed to load design' });
@@ -122,6 +150,8 @@ exports.createDesign = async (req, res) => {
     }
     if (name.length > 100) return res.status(400).json({ message: 'Design name is too long' });
 
+    const isDuplicated = req.body.isDuplicated === true;
+
     const design = new Design({
       name,
       config,
@@ -130,10 +160,10 @@ exports.createDesign = async (req, res) => {
       thumbnail: typeof thumbnail === 'string' ? thumbnail : undefined,
       thumbnailFallback: typeof thumbnailFallback === 'string' ? thumbnailFallback : undefined,
       thumbnailAsset: thumbnailAsset && typeof thumbnailAsset === 'object' ? thumbnailAsset : undefined,
-      sentToBakery: req.body.sentToBakery === true,
-      paymentCompleted: req.body.paymentCompleted === true,
-      orderContext: req.body.orderContext && typeof req.body.orderContext === 'object' ? req.body.orderContext : undefined,
-      isDuplicated: req.body.isDuplicated === true,
+      sentToBakery: isDuplicated ? false : req.body.sentToBakery === true,
+      paymentCompleted: isDuplicated ? false : req.body.paymentCompleted === true,
+      orderContext: isDuplicated ? undefined : (req.body.orderContext && typeof req.body.orderContext === 'object' ? req.body.orderContext : undefined),
+      isDuplicated,
       templateId: req.body.templateId || undefined,
     });
     return res.status(201).json(await design.save());

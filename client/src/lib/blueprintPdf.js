@@ -793,8 +793,8 @@ function addEdgePages(doc, page, images, anchors, fillColors, designName, tierLa
     variantId,
     designName: patternName,
     color,
-    colorName,
-    secondaryColor,
+    colorName: page.primaryColorName || page.colorName?.split('/')?.[0]?.trim() || colorName,
+    secondaryColor: null,
   });
 
   // 2. RIGHT SIDE: Actual 3D Render Screenshot (Front / Top / Multi-angle)
@@ -831,16 +831,12 @@ function addEdgePages(doc, page, images, anchors, fillColors, designName, tierLa
   }
 
   // 3. Details table & Highlights below the side-by-side boxes
-  const primaryName = page.primaryColorName || page.colorName?.split('/')?.[0]?.trim() || colorName;
-  const secondaryName = page.secondaryColorName || page.colorName?.split('/')?.[1]?.trim() || 'Accent';
+  const solidColorName = page.primaryColorName || page.colorName?.split('/')?.[0]?.trim() || colorName;
   const rows = [
     ['Edge Position', `${name(slot)} Rim`],
     ['Border Design', patternName],
-    ['Color', secondaryColor ? primaryName : colorName],
+    ['Color', solidColorName],
   ];
-  if (secondaryColor) {
-    rows.push(['Secondary Color', secondaryName]);
-  }
   if (page.details && Array.isArray(page.details)) {
     for (const [k, v] of page.details) {
       if (!rows.some(([rk]) => rk.toLowerCase() === k.toLowerCase() || (k.toLowerCase() === 'piping color' && rk.toLowerCase() === 'color'))) {

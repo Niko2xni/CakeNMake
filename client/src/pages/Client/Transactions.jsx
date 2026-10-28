@@ -612,7 +612,7 @@ export default function Transactions() {
               <p className="text-sm text-gray-500 max-w-md mx-auto">
                 {search
                   ? `We couldn't find any orders matching "${search}". Try searching for another keyword or clear the search.`
-                  : "When you place a cake order with simulated checkout, your order progress and receipts will appear here."}
+                  : "When you place a cake order with GCash demo, your order progress and receipts will appear here."}
               </p>
             </div>
             {search ? (
@@ -709,7 +709,7 @@ export default function Transactions() {
                         ) : (
                           <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 font-medium">
                             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>Fully Paid via GCash (Simulated)</span>
+                            <span>Fully Paid via GCash demo</span>
                           </div>
                         )}
                       </div>
@@ -841,7 +841,7 @@ export default function Transactions() {
                   {selectedTx.downPayment?.isPaid !== false ? (
                     <div className="flex items-center justify-between text-xs text-emerald-600 font-semibold pt-1">
                       <span className="flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Down Payment Paid (GCash Simulated)
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Down Payment Paid (GCash demo)
                       </span>
                       <span className="tabular-nums font-bold">-{formatCurrency(downPaymentAmount)}</span>
                     </div>
@@ -881,7 +881,7 @@ export default function Transactions() {
                     <div className="space-y-1 pt-1 border-t border-gray-100">
                       <div className="flex items-center justify-between text-xs text-emerald-600 font-semibold">
                         <span className="flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Remaining Balance Paid (GCash Simulated)
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Remaining Balance Paid (GCash demo)
                         </span>
                         <span className="tabular-nums font-bold">-{formatCurrency(totalAmount - downPaymentAmount)}</span>
                       </div>

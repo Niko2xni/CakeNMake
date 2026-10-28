@@ -128,7 +128,7 @@ const EDGE_SECTIONS = [
   {
     id: 'borderPiping',
     title: 'Border Piping',
-    description: 'Classic piped rim borders',
+    description: 'Classic and alternating piped rim borders',
     items: [
       { id: 'shell', label: 'Shell Border', defaultPrice: 150 },
       { id: 'reverseShell', label: 'Reverse Shell', defaultPrice: 150 },
@@ -136,6 +136,12 @@ const EDGE_SECTIONS = [
       { id: 'ropeTwist', label: 'Rope Twist', defaultPrice: 150 },
       { id: 'ropeTwistClassic', label: 'Rope Twist Classic', defaultPrice: 150 },
       { id: 'elongatedShell', label: 'Elongated Shell Border', defaultPrice: 150 },
+      { id: 'shellAlt', label: 'Shell Border - Alternating', defaultPrice: 160 },
+      { id: 'reverseShellAlt', label: 'Reverse Shell - Alternating', defaultPrice: 160 },
+      { id: 'beadAlt', label: 'Bead Piping - Alternating', defaultPrice: 160 },
+      { id: 'ropeTwistAlt', label: 'Rope Twist - Alternating', defaultPrice: 160 },
+      { id: 'ropeTwistClassicAlt', label: 'Rope Twist Classic - Alternating', defaultPrice: 160 },
+      { id: 'elongatedShellAlt', label: 'Elongated Shell Border - Alternating', defaultPrice: 160 },
     ],
   },
   {

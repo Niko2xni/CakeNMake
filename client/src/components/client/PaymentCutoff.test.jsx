@@ -121,7 +121,7 @@ describe('Payment 30-minute cutoff logic', () => {
       );
 
       expect(screen.queryByText(/Payment Cutoff Active/i)).not.toBeInTheDocument();
-      const checkoutBtn = screen.getByRole('button', { name: /Continue simulated checkout/i });
+      const checkoutBtn = screen.getByRole('button', { name: /Continue GCash demo/i });
       expect(checkoutBtn).not.toBeDisabled();
     });
   });

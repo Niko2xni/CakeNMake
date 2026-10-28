@@ -20,8 +20,10 @@ import {
   ChevronRight,
   X,
   Minus,
+  Lock,
 } from 'lucide-react';
 import { systemApi } from '@/services/api';
+import { useAuth } from '@/lib/AuthContext';
 
 const formatMoney = (minor = 0) =>
   new Intl.NumberFormat('en-PH', {
@@ -42,6 +44,14 @@ const formatTime = (isoString) => {
 
 export default function BakeryControlPanelHeader({ onDraftsChange, onMinimize, className = '' }) {
   const location = useLocation();
+  let account = null;
+  try {
+    account = useAuth()?.account || null;
+  } catch {
+    account = null;
+  }
+  const isStaff = account?.role === 'bakery_staff';
+  const canToggleWebsite = !isStaff;
   const [systemStatus, setSystemStatus] = useState(null);
   const [unifiedDrafts, setUnifiedDrafts] = useState({
     drafts: [],
@@ -84,7 +94,12 @@ export default function BakeryControlPanelHeader({ onDraftsChange, onMinimize, c
   useEffect(() => {
     loadData();
     const timer = setInterval(loadData, 10000);
-    return () => clearInterval(timer);
+    const handleDraftsChanged = () => loadData();
+    window.addEventListener('bakery-drafts-changed', handleDraftsChanged);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('bakery-drafts-changed', handleDraftsChanged);
+    };
   }, [location.pathname]);
 
   const handleDiscardSingle = async (draftId, draftName) => {
@@ -107,13 +122,20 @@ export default function BakeryControlPanelHeader({ onDraftsChange, onMinimize, c
   };
 
   const handleDiscardAll = async () => {
-    if (!window.confirm('Are you sure you want to discard ALL pending Template and Pricing drafts?')) {
+    const confirmMsg = isStaff
+      ? 'Are you sure you want to discard ALL pending Template drafts?'
+      : 'Are you sure you want to discard ALL pending Template and Pricing drafts?';
+    if (!window.confirm(confirmMsg)) {
       return;
     }
     try {
       setActionInProgress('all');
       await systemApi.discardAllUnifiedDrafts();
-      setNotification('All template and pricing draft edits discarded.');
+      setNotification(
+        isStaff
+          ? 'All template draft edits discarded.'
+          : 'All template and pricing draft edits discarded.'
+      );
       setTimeout(() => setNotification(''), 4000);
       await loadData();
       if (onDraftsChange) onDraftsChange();
@@ -174,6 +196,11 @@ export default function BakeryControlPanelHeader({ onDraftsChange, onMinimize, c
 
   const isWebsiteOff = Boolean(systemStatus?.isWebsiteOff);
   const totalCount = unifiedDrafts.totalCount || unifiedDrafts.drafts?.length || 0;
+  const templatesCount =
+    unifiedDrafts.templatesCount ??
+    unifiedDrafts.templateCount ??
+    (unifiedDrafts.drafts || []).filter((d) => d.category === 'template').length;
+  const canBulkDiscard = isStaff ? templatesCount > 0 : totalCount > 0;
   const isDesignerPage = location.pathname.includes('/bakery/designer');
   const isPricingPage = location.pathname.includes('/bakery/pricing');
   const isTemplatesPage = location.pathname.includes('/bakery/templates');
@@ -244,23 +271,25 @@ export default function BakeryControlPanelHeader({ onDraftsChange, onMinimize, c
             <span>{isWebsiteOff ? 'Website Off' : 'Website On'}</span>
           </div>
 
-          {/* Website Toggle Button */}
-          <button
-            type="button"
-            onClick={handleToggleWebsite}
-            disabled={actionInProgress === 'toggle'}
-            className={`inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold border transition-all ${
-              isWebsiteOff
-                ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700'
-                : 'bg-white hover:bg-rose-50 text-rose-700 border-rose-200 hover:border-rose-300'
-            }`}
-            title="Toggle client-side access during updates"
-          >
-            <Power className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">
-              {isWebsiteOff ? 'Turn Website On' : 'Set Website Off'}
-            </span>
-          </button>
+          {/* Website Toggle Button (Bakery Admin / Platform Admin only) */}
+          {canToggleWebsite && (
+            <button
+              type="button"
+              onClick={handleToggleWebsite}
+              disabled={actionInProgress === 'toggle'}
+              className={`inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold border transition-all ${
+                isWebsiteOff
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700'
+                  : 'bg-white hover:bg-rose-50 text-rose-700 border-rose-200 hover:border-rose-300'
+              }`}
+              title="Toggle client-side access during updates"
+            >
+              <Power className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">
+                {isWebsiteOff ? 'Turn Website On' : 'Set Website Off'}
+              </span>
+            </button>
+          )}
 
           {/* Unified Drafts Dropdown Button */}
           <button
@@ -429,16 +458,16 @@ export default function BakeryControlPanelHeader({ onDraftsChange, onMinimize, c
             </div>
 
             <div className="flex items-center gap-2">
-              {activeTab === 'drafts' && totalCount > 0 && (
+              {activeTab === 'drafts' && canBulkDiscard && (
                 <button
                   type="button"
                   onClick={handleDiscardAll}
                   disabled={actionInProgress === 'all'}
                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors"
-                  title="Discard all pending template and pricing edits"
+                  title={isStaff ? 'Discard all pending template edits' : 'Discard all pending template and pricing edits'}
                 >
                   <Trash2 className="w-3 h-3" />
-                  <span>Discard All Edits</span>
+                  <span>{isStaff ? 'Discard Template Drafts' : 'Discard All Edits'}</span>
                 </button>
               )}
               <button
@@ -537,17 +566,27 @@ export default function BakeryControlPanelHeader({ onDraftsChange, onMinimize, c
                           </div>
                         </div>
 
-                        {/* Discard Individual Edit Button */}
-                        <button
-                          type="button"
-                          disabled={isItemActioning}
-                          onClick={() => handleDiscardSingle(draft.id, draft.name)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors disabled:opacity-50 shrink-0"
-                          title="Revert or remove this specific drafted change"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                          <span>{draft.hasOriginal ? 'Revert Change' : 'Remove Draft'}</span>
-                        </button>
+                        {/* Discard Individual Edit Button (Staff can only discard/revert template drafts, not pricing drafts) */}
+                        {!isStaff || isTemplate ? (
+                          <button
+                            type="button"
+                            disabled={isItemActioning}
+                            onClick={() => handleDiscardSingle(draft.id, draft.name)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors disabled:opacity-50 shrink-0"
+                            title="Revert or remove this specific drafted change"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>{draft.hasOriginal ? 'Revert Change' : 'Remove Draft'}</span>
+                          </button>
+                        ) : (
+                          <span
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-gray-500 bg-gray-100 border border-gray-200 shrink-0 select-none"
+                            title="Bakery workers cannot modify or discard pricing drafts"
+                          >
+                            <Lock className="w-3 h-3" />
+                            <span>Admin Only</span>
+                          </span>
+                        )}
                       </div>
                     );
                   })}
@@ -639,7 +678,7 @@ export default function BakeryControlPanelHeader({ onDraftsChange, onMinimize, c
         </div>
       </div>
       {/* Turn Off Website Confirmation Modal with Required Text Input - Portaled to document.body so z-index affects entire screen */}
-      {typeof document !== 'undefined' && showTurnOffModal &&
+      {typeof document !== 'undefined' && canToggleWebsite && showTurnOffModal &&
         createPortal(
           <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
             <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-rose-200 space-y-4">

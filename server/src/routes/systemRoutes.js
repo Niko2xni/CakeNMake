@@ -86,10 +86,14 @@ router.delete(
   '/unified-drafts/:id',
   authenticate,
   loadAppUser,
-  requireRole('bakery_admin', 'platform_admin'),
+  requireRole('bakery_staff', 'bakery_admin', 'platform_admin'),
   async (req, res) => {
     try {
       const id = req.params.id;
+      const isStaff = req.user?.role === 'bakery_staff';
+      if (isStaff && !id.startsWith('template-')) {
+        return res.status(403).json({ message: 'Bakery staff cannot modify or discard pricing drafts.' });
+      }
       const PriceBook = require('../models/PriceBook');
       const Template = require('../models/Template');
       const { recordAuditLog } = require('../services/maintenanceService');
@@ -262,23 +266,26 @@ router.delete(
   }
 );
 
-// POST /api/system/unified-drafts/discard-all - Discard all drafts (both templates & pricing)
+// POST /api/system/unified-drafts/discard-all - Discard all drafts (both templates & pricing for admin, template drafts only for staff)
 router.post(
   '/unified-drafts/discard-all',
   authenticate,
   loadAppUser,
-  requireRole('bakery_admin', 'platform_admin'),
+  requireRole('bakery_staff', 'bakery_admin', 'platform_admin'),
   async (req, res) => {
     try {
       const PriceBook = require('../models/PriceBook');
       const Template = require('../models/Template');
       const { recordAuditLog } = require('../services/maintenanceService');
       const now = new Date();
+      const isStaff = req.user?.role === 'bakery_staff';
 
       const platformId = req.platformId || req.user?.platform?._id || req.user?.platform || (await Platform.findOne())?._id;
 
-      // Discard Pricing draft
-      await PriceBook.deleteMany({ platform: platformId, status: 'draft' });
+      // Discard Pricing draft only if user is admin (bakery_staff cannot touch pricing drafts)
+      if (!isStaff) {
+        await PriceBook.deleteMany({ platform: platformId, status: 'draft' });
+      }
 
       // Discard Template drafts
       const draftedTemplates = await Template.find({
@@ -319,13 +326,19 @@ router.post(
         platformId,
         type: 'template',
         action: 'discard',
-        title: 'Discarded All Pending Drafts',
-        description: 'Cleared both templates and pricing drafts back to active state.',
+        title: isStaff ? 'Discarded All Pending Template Drafts' : 'Discarded All Pending Drafts',
+        description: isStaff
+          ? 'Cleared template drafts back to active state.'
+          : 'Cleared both templates and pricing drafts back to active state.',
         changedBy: req.user?._id,
         changedByName: req.user?.displayName || req.user?.email || 'Bakery Staff',
       });
 
-      return res.json({ message: 'All template and pricing draft edits discarded.' });
+      return res.json({
+        message: isStaff
+          ? 'All template draft edits discarded.'
+          : 'All template and pricing draft edits discarded.',
+      });
     } catch (error) {
       console.error('Failed to discard all drafts:', error);
       return res.status(500).json({ message: 'Failed to discard all drafts' });

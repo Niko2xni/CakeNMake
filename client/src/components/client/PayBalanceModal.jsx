@@ -130,7 +130,7 @@ export default function PayBalanceModal({
                 <span className="font-bold text-sm tracking-tight">PayMongo demo</span>
               </div>
               <span className="text-[11px] font-semibold bg-white/20 px-2.5 py-0.5 rounded-md text-white/95 tracking-wide whitespace-nowrap">
-                Simulated Checkout
+                GCash demo
               </span>
             </div>
           </div>
@@ -145,7 +145,7 @@ export default function PayBalanceModal({
                   Payment Complete!
                 </h3>
                 <p className="text-xs text-gray-600 max-w-xs mx-auto">
-                  Your balance of <strong>{formatCurrency(balanceToPay)}</strong> has been settled via GCash (Simulated).
+                  Your balance of <strong>{formatCurrency(balanceToPay)}</strong> has been settled via GCash demo.
                 </p>
                 <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-pink-50 border border-pink-200 text-pink-700 text-xs font-semibold">
                   <Sparkles className="w-3.5 h-3.5 text-pink-500" />
