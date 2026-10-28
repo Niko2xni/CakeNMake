@@ -1034,7 +1034,7 @@ export default function DesignerWorkSpace({ isGuestPage = false }) {
     try {
       await chatApi.sendMessage(convoId, {
         clientMessageId: `order_${snapshot.submissionId}`,
-        text: `🎂 Cake Order Submitted!\n• Design: "${snapshot.designName}"\n${fulfillmentLines}\n• Down Payment (50%): ₱${downpayment} (Paid - GCash demo)\n• Remaining Balance (50%): ₱${remaining} (Due 48h before event to begin baking)\n\nGCash demo down payment completed. You can coordinate pickup or delivery arrangements and cake specifications directly here with the bakery!`,
+        text: `🎂 Cake Order Submitted!\n• Design: "${snapshot.designName}"\n${fulfillmentLines}\n• Down Payment (50%): ₱${downpayment} (Paid - GCash demo)\n• Remaining Balance (50%): ₱${remaining} (Pay 48h ahead to keep selected schedule; paying later still proceeds with a delayed schedule)\n\nGCash demo down payment completed. Chat with the bakery here on how to get your cake and how you want it to be!`,
       });
     } catch (err) {
       console.warn('Failed to send automated initial chat message:', err);

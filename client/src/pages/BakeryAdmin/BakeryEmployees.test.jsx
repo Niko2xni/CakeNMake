@@ -177,7 +177,7 @@ describe('BakeryEmployees Management Component', () => {
   });
 
   describe('Add Employee Flow', () => {
-    it('opens modal, inputs email and role, and grants staff access successfully', async () => {
+    it('opens modal, inputs email, and grants staff access only (without admin role option)', async () => {
       render(<BakeryEmployees />);
 
       await screen.findByText('Bakery Employee Management');
@@ -186,18 +186,18 @@ describe('BakeryEmployees Management Component', () => {
       const dialog = await screen.findByRole('dialog', { name: /grant employee access/i });
       expect(dialog).toBeInTheDocument();
 
+      // Verify Staff is shown and no Admin radio option exists
+      expect(within(dialog).getByText('Staff (Bakery Worker)')).toBeInTheDocument();
+      expect(within(dialog).queryByRole('radio', { name: /admin/i })).not.toBeInTheDocument();
+
       const emailInput = screen.getByPlaceholderText('employee@cakenmake.com');
       fireEvent.change(emailInput, { target: { value: 'newstaff@cakenmake.com' } });
-
-      // Default role is staff, change to admin
-      const adminRadio = screen.getByRole('radio', { name: /admin/i });
-      fireEvent.click(adminRadio);
 
       const submitBtn = screen.getByRole('button', { name: /confirm & add/i });
       fireEvent.click(submitBtn);
 
       await waitFor(() => {
-        expect(employeeApiMocks.addEmployee).toHaveBeenCalledWith('newstaff@cakenmake.com', 'bakery_admin');
+        expect(employeeApiMocks.addEmployee).toHaveBeenCalledWith('newstaff@cakenmake.com', 'bakery_staff');
         expect(screen.getByText('Employee added successfully!')).toBeInTheDocument();
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       });

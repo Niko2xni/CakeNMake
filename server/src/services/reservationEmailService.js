@@ -50,7 +50,7 @@ function buildEmailContent({
     : bakeryName;
   const subject = `Reservation Confirmation: ${safeHeader(designName)} - CakeNMake`;
   const downPaymentNote = isDownPaymentPaid ? '(Paid)' : '(Pending verification)';
-  const balanceNote = '(Due 48h before baking)';
+  const balanceNote = '(Pay 48h ahead to keep schedule; later payment may delay schedule)';
   const statusDisplay = isDownPaymentPaid ? 'Confirmed' : (status || 'Pending Down Payment');
 
   const text = `Hello ${customerName},

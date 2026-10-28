@@ -61,3 +61,24 @@ export const moderationApi = {
   createRequest: (payload) => chatRequest('/moderation/requests', { method: 'POST', body: JSON.stringify(payload) }),
   reply: (id, text, resolve = false) => chatRequest(`/moderation/requests/${id}/reply`, { method: 'POST', body: JSON.stringify({ text, resolve }) }),
 };
+
+export const teamChatApi = {
+  getChannels: () => chatRequest('/bakery/team-chat/channels'),
+  getMessages: ({ channelKey = 'general', recipientId } = {}) => {
+    const query = new URLSearchParams();
+    if (channelKey) query.set('channelKey', channelKey);
+    if (recipientId) query.set('recipientId', recipientId);
+    return chatRequest(`/bakery/team-chat/messages?${query}`);
+  },
+  sendMessage: ({ channelKey = 'general', recipientId, text, ...extra }) => chatRequest('/bakery/team-chat/messages', {
+    method: 'POST',
+    body: JSON.stringify({ channelKey, recipientId, text, ...extra }),
+  }),
+  togglePin: (messageId) => chatRequest(`/bakery/team-chat/messages/${messageId}/pin`, {
+    method: 'PATCH',
+  }),
+  markRead: ({ channelKey = 'general', recipientId }) => chatRequest('/bakery/team-chat/read', {
+    method: 'PATCH',
+    body: JSON.stringify({ channelKey, recipientId }),
+  }),
+};

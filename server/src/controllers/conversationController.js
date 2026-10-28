@@ -173,7 +173,7 @@ async function postOrderAcknowledgement(req, res) {
       throw httpError(503, 'BAKERY_UNAVAILABLE', 'The bakery cannot receive chat messages right now. Please try again shortly.');
     }
 
-    const text = "We have received your design and payment details. Please wait for the bakery's reply with the remaining balance, including the delivery fee. Checkout is simulated; no money has been collected.";
+    const text = "We have received your design and payment details. Since your remaining balance is already shown in your order summary, please chat with the bakery here on how to get your cake and how you want it to be. Checkout is simulated; no money has been collected.";
     let created = true;
     try {
       message = await Message.create({

@@ -219,7 +219,7 @@ export default function FulfillmentStep({
             • <strong className="text-foreground">50% Downpayment Today:</strong> Confirms and locks your oven calendar slot.
           </p>
           <p>
-            • <strong className="text-foreground">50% Balance Due 48h Prior:</strong> Required to authorize baking. Unclaimed cakes held in chiller up to 24 hours.
+            • <strong className="text-foreground">50% Balance &amp; Prep Time:</strong> Preparation time depends on how long the cake is set to be made (not constrained by 48 hours). Paying 48 hours ahead keeps your selected schedule on time; paying later still works to start baking, but will delay your schedule.
           </p>
         </div>
 
@@ -231,7 +231,7 @@ export default function FulfillmentStep({
             className="mt-0.5 rounded border-primary/30 text-primary focus:ring-primary h-4 w-4 shrink-0"
           />
           <span className="text-[11px] font-medium text-foreground leading-snug">
-            I understand that full payment is required 48 hours before my event before baking starts.
+            I understand that preparation time depends on how long my cake takes to make, and paying the remaining balance 48 hours ahead keeps my selected schedule on time (paying later will still proceed but with a delayed schedule).
           </span>
         </label>
       </div>

@@ -49,9 +49,9 @@ router.post('/', ...adminOnly, async (req, res) => {
 
     const normalizedEmail = email.trim().toLowerCase();
 
-    // Check if target role is valid
-    if (!['bakery_staff', 'bakery_admin'].includes(role)) {
-      return res.status(400).json({ message: 'Assigned role must be bakery_staff or bakery_admin.' });
+    // Check if target role is valid (only bakery_staff can be granted)
+    if (role !== 'bakery_staff') {
+      return res.status(400).json({ message: 'Assigned role must be bakery_staff. Only Staff access can be granted.' });
     }
 
     // Find the user with this email
@@ -70,9 +70,12 @@ router.post('/', ...adminOnly, async (req, res) => {
       });
     }
 
-    // Protect platform_admin
+    // Protect platform_admin and bakery_admin
     if (user.role === 'platform_admin') {
       return res.status(403).json({ message: 'Cannot modify a platform administrator.' });
+    }
+    if (user.role === 'bakery_admin') {
+      return res.status(403).json({ message: 'Cannot modify the bakery administrator.' });
     }
 
     user.role = role;

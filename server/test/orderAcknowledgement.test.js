@@ -59,7 +59,7 @@ test('posts one bakery-authored acknowledgement for a ready customer order', asy
   });
   assert.equal(createdMessage.senderRole, 'bakery_admin');
   assert.match(createdMessage.text, /received your design and payment details/);
-  assert.match(createdMessage.text, /remaining balance, including the delivery fee/);
+  assert.match(createdMessage.text, /chat with the bakery here on how to get your cake/i);
   assert.match(createdMessage.text, /no money has been collected/i);
   assert.equal(res.body.message.senderRole, 'bakery_admin');
   assert.equal(update.mock.calls[0].arguments[1].$inc.customerUnreadCount, 1);

@@ -95,12 +95,12 @@ test('POST / rejects invalid email or disallowed role assignment', async () => {
   const reqBadRole = {
     platformId: 'platform-1',
     user: { _id: 'admin-1', platform: 'platform-1', role: 'bakery_admin' },
-    body: { email: 'staff@example.com', role: 'super_admin' },
+    body: { email: 'staff@example.com', role: 'bakery_admin' },
   };
   const resBadRole = createResponse();
   await postHandler(reqBadRole, resBadRole);
   assert.equal(resBadRole.statusCode, 400);
-  assert.match(resBadRole.body.message, /must be bakery_staff or bakery_admin/i);
+  assert.match(resBadRole.body.message, /must be bakery_staff/i);
 });
 
 test('POST / returns 404 when target user does not exist', async () => {

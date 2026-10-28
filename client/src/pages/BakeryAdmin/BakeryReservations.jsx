@@ -448,7 +448,7 @@ export default function BakeryReservations({ reservations, loading, selected, se
                           </p>
                         ) : (
                           <span className="text-[10px] text-gray-500 mt-1 block">
-                            Due 48h before baking
+                            48h ahead keeps schedule (later delays)
                           </span>
                         )}
                       </div>

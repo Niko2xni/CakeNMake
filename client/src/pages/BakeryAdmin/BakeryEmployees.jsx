@@ -18,7 +18,6 @@ const BakeryEmployees = () => {
   // Add employee modal state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newEmail, setNewEmail] = useState('');
-  const [newRole, setNewRole] = useState('bakery_staff');
   const [submitting, setSubmitting] = useState(false);
   const [modalError, setModalError] = useState('');
 
@@ -68,11 +67,10 @@ const BakeryEmployees = () => {
       setSubmitting(true);
       setError('');
       setModalError('');
-      const res = await employeeApi.addEmployee(newEmail.trim(), newRole);
+      const res = await employeeApi.addEmployee(newEmail.trim(), 'bakery_staff');
       setSuccessMessage(res.message || 'Employee added successfully!');
       setIsAddModalOpen(false);
       setNewEmail('');
-      setNewRole('bakery_staff');
       fetchEmployees();
       setTimeout(() => setSuccessMessage(''), 5000);
     } catch (err) {
@@ -127,7 +125,7 @@ const BakeryEmployees = () => {
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Bakery Employee Management</h1>
               <p className="text-sm text-gray-500">
-                Grant or revoke staff and manager access to your bakery workspace
+                Grant or revoke staff access to your bakery workspace
               </p>
             </div>
           </div>
@@ -438,56 +436,16 @@ const BakeryEmployees = () => {
 
               <div>
                 <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-                  Select Role & Permissions
+                  Assigned Role & Permissions
                 </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <label
-                    className={`cursor-pointer p-3 rounded-xl border flex flex-col items-start gap-1 transition ${
-                      newRole === 'bakery_staff'
-                        ? 'border-pink-500 bg-pink-50/50 ring-2 ring-pink-500/20'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="role"
-                      value="bakery_staff"
-                      checked={newRole === 'bakery_staff'}
-                      onChange={() => setNewRole('bakery_staff')}
-                      className="sr-only"
-                    />
-                    <div className="flex items-center gap-1.5 font-bold text-gray-900 text-sm">
-                      <Shield className="w-4 h-4 text-blue-600" />
-                      Staff
-                    </div>
-                    <span className="text-[11px] text-gray-500 leading-tight">
-                      Orders, chats, templates, blueprints, read-only pricing.
-                    </span>
-                  </label>
-
-                  <label
-                    className={`cursor-pointer p-3 rounded-xl border flex flex-col items-start gap-1 transition ${
-                      newRole === 'bakery_admin'
-                        ? 'border-pink-500 bg-pink-50/50 ring-2 ring-pink-500/20'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="role"
-                      value="bakery_admin"
-                      checked={newRole === 'bakery_admin'}
-                      onChange={() => setNewRole('bakery_admin')}
-                      className="sr-only"
-                    />
-                    <div className="flex items-center gap-1.5 font-bold text-gray-900 text-sm">
-                      <ShieldCheck className="w-4 h-4 text-purple-600" />
-                      Admin
-                    </div>
-                    <span className="text-[11px] text-gray-500 leading-tight">
-                      Full authority: rates, billing, profile & employee moderation.
-                    </span>
-                  </label>
+                <div className="p-3 rounded-xl border border-pink-500 bg-pink-50/50 ring-2 ring-pink-500/20 flex flex-col items-start gap-1">
+                  <div className="flex items-center gap-1.5 font-bold text-gray-900 text-sm">
+                    <Shield className="w-4 h-4 text-blue-600" />
+                    Staff (Bakery Worker)
+                  </div>
+                  <span className="text-[11px] text-gray-500 leading-tight">
+                    Orders, chats, templates, blueprints, and read-only pricing. Only Staff access can be granted (there is only one Bakery Admin).
+                  </span>
                 </div>
               </div>
 

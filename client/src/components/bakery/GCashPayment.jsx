@@ -74,7 +74,7 @@ export default function GCashPayment({ total, selectedDate, fulfillment, onPaid,
 
       <p className="font-heading font-bold text-base mb-1">GCash demo</p>
       <p className="text-xs text-muted-foreground mb-4">
-        This demo does not charge money. Pay the 50% reservation down payment to lock your date. The remaining 50% balance is due 48 hours before baking.
+        This demo does not charge money. Pay the 50% reservation down payment to lock your date. Preparation time depends on how long the cake is set to be made (not constrained by 48 hours) — paying the remaining 50% balance 48 hours ahead keeps your selected schedule on time, while paying later still works as normal but will delay the schedule.
       </p>
 
       {/* Order summary */}
@@ -88,7 +88,7 @@ export default function GCashPayment({ total, selectedDate, fulfillment, onPaid,
           <span className="font-medium">₱{total}</span>
         </div>
         <div className="flex justify-between text-xs">
-          <span className="text-muted-foreground">Balance (due 48h before baking)</span>
+          <span className="text-muted-foreground">Remaining balance (48h ahead keeps schedule; later delays)</span>
           <span className="font-medium text-muted-foreground">₱{remainingBalance}</span>
         </div>
         <Separator className="opacity-40" />
@@ -139,7 +139,7 @@ export default function GCashPayment({ total, selectedDate, fulfillment, onPaid,
           <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-2.5 text-[10.5px] text-amber-900 dark:text-amber-200 leading-snug">
             <p className="font-semibold mb-0.5">⚠️ Fulfillment &amp; Payment Rules</p>
             <p>
-              Paying this 50% down payment confirms your order slot. The remaining balance (₱{total - downpayment}) must be fully settled on or before delivery. The bakery will not release or deliver the cake without complete payment, and neither the platform nor the bakery is liable for non-fulfillment due to unpaid balances.
+              Paying this 50% down payment confirms your order slot. Preparation time depends on how long the cake is set to be made and is not constrained by 48 hours — you can pay the remaining balance (₱{total - downpayment}) 48 hours ahead to keep your selected schedule on time, or if paid later, the order will still proceed as the system does once paid, but the schedule will be delayed. The bakery will not release or deliver the cake without complete payment, and neither the platform nor the bakery is liable for non-fulfillment or delays due to unpaid balances.
             </p>
           </div>
         </div>
@@ -229,7 +229,7 @@ export default function GCashPayment({ total, selectedDate, fulfillment, onPaid,
               <div className="flex items-start gap-2">
                 <span className="font-bold text-foreground shrink-0">•</span>
                 <p>
-                  <strong className="text-foreground">Remaining Balance (₱{total - downpayment}):</strong> Must be settled on or before delivery/pickup.
+                  <strong className="text-foreground">Remaining Balance (₱{total - downpayment}) &amp; Schedule:</strong> Preparation time depends on how long the cake is set to be made and is not constrained by 48 hours. Paying 48 hours ahead keeps your selected schedule on time; if paid later, the system still works to start production, but your schedule will be delayed.
                 </p>
               </div>
               <div className="flex items-start gap-2">
@@ -241,7 +241,7 @@ export default function GCashPayment({ total, selectedDate, fulfillment, onPaid,
               <div className="flex items-start gap-2">
                 <span className="font-bold text-foreground shrink-0">•</span>
                 <p>
-                  <strong className="text-foreground">Fulfillment Policy:</strong> Unsettled cakes will not be released. The bakery and platform are not liable for non-fulfillment due to unpaid balances.
+                  <strong className="text-foreground">Fulfillment Policy:</strong> Baking begins once the remaining balance is paid, and unsettled cakes will not be released. The bakery and platform are not liable for delays or non-fulfillment due to unpaid balances.
                 </p>
               </div>
             </div>

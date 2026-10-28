@@ -63,7 +63,7 @@ const questions = [
   },
   {
     title: 'How do payments, down payments, and fulfillment work?',
-    answer: 'Sending your design to the bakery requires a 50% down payment to confirm your booking and reserve baker scheduling. The remaining 50% balance must be settled upon pickup or delivery. Custom cakes will only be released upon complete balance payment. CakeNMake and the partner bakeries are not liable for non-fulfillment or delays resulting from uncollected or unpaid balances.',
+    answer: 'Sending your design to the bakery requires a 50% down payment to confirm your booking and reserve baker scheduling. Preparation time depends on how long your cake is set to be made and is not constrained by 48 hours — paying the remaining 50% balance 48 hours ahead keeps your selected schedule on time, while paying later will still work as normal to start production, though your schedule will be delayed. Custom cakes will only be released upon complete balance payment, and CakeNMake and the partner bakeries are not liable for non-fulfillment or delays resulting from unpaid balances.',
   },
 ];
 
