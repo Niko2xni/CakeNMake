@@ -14,8 +14,8 @@ describe('Cake AI edits without a provider', () => {
     const config = structuredClone(DEFAULT_CONFIG);
     config.edge.mode = 'both'; config.edge.both.piping.tip = 'bead';
     config.sugarColorOverrides.edgeBoth = { mode: 'colorOverride', colorId: 'pink' };
-    const { next } = execute('set_edge_border', { slot: 'top', designId: 'shellAlt', colorId: 'chocolate', secondaryColorId: 'pink' }, config);
-    expect(next.edge.top.piping).toMatchObject({ tip: 'shellAlt', colorId: 'chocolate', secondaryColorId: 'pink' });
+    const { next } = execute('set_edge_border', { slot: 'top', designId: 'starDollopAlt', colorId: 'chocolate', secondaryColorId: 'pink' }, config);
+    expect(next.edge.top.piping).toMatchObject({ tip: 'starDollopAlt', colorId: 'chocolate', secondaryColorId: 'pink' });
     expect(next.edge.bottom.piping.tip).toBe('bead');
     expect(next.sugarColorOverrides.edgeBottom.colorId).toBe('pink');
     expect(config.edge.mode).toBe('both');
@@ -55,10 +55,10 @@ describe('Cake AI edits without a provider', () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
     const config = structuredClone(DEFAULT_CONFIG);
     config.sugarColorOverrides.center = { mode: 'colorOverride', colorId: 'chocolate' };
-    let next = execute('set_edge_border', { slot: 'top', designId: 'shellAlt', colorId: 'pink', secondaryColorId: 'red' }, config).next;
+    let next = execute('set_edge_border', { slot: 'top', designId: 'starDollopAlt', colorId: 'pink', secondaryColorId: 'red' }, config).next;
     next = execute('set_cake_text', { text: 'Hi', style: 'buttercream', colorId: 'pink' }, next).next;
     const rendered = adaptConfigToLegacy(next);
-    expect(rendered.edgeTop.pipingTip).toBe('shellAlt');
+    expect(rendered.edgeTop.pipingTip).toBe('starDollopAlt');
     expect(rendered.edgeTop.pipingColorId).toBe('pink');
     expect(rendered.edgeTop.pipingSecondaryColorId).toBe('red');
     expect(next.place.items).toHaveLength(2);

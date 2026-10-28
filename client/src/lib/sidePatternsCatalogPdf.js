@@ -175,7 +175,7 @@ export function buildSidePatternsCatalogPdf({
           });
         }
       } else {
-        const isAlt = String(variant.id).endsWith('Alt') || String(variant.label).includes('Alternating');
+        const isAlt = cat.id !== 'borderPiping' && (String(variant.id).endsWith('Alt') || String(variant.label).includes('Alternating'));
         const isLight = (color || '').toUpperCase() === '#FFF5EA' || (color || '').toUpperCase() === '#FFFFFF' || (color || '').toUpperCase() === '#E5C583';
         const defaultSecondaryColor = isLight ? '#3D2314' : '#E5C583';
         const defaultSecondaryName = isLight ? 'Chocolate' : 'Vanilla';

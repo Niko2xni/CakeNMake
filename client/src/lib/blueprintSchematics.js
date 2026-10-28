@@ -1417,9 +1417,8 @@ function renderSideShapes(doc, { wallX, wallY, wallW, wallH, treatmentId, varian
     }
 
     case 'borderPiping': {
-      // 12 variants: Shell, Reverse Shell, Bead, Rope Twist, Rope Twist Classic, Elongated Shell (+ Alternating)
-      const isAlt = str.includes('alt');
-      const altRgb = secondaryColor ? hexToRgb(secondaryColor) : [Math.min(255, rgb[0] + 75), Math.min(255, rgb[1] + 75), Math.min(255, rgb[2] + 75)];
+      // 6 solid variants: Shell, Reverse Shell, Bead, Rope Twist, Rope Twist Classic, Elongated Shell
+      // Alternating color function removed completely from Edge Border Piping per user request.
       const rimY = wallY + wallH * 0.52;
 
       // Fluted shell unit (matches the 3D render): a stack of horizontal flutes whose
@@ -1603,7 +1602,7 @@ function renderSideShapes(doc, { wallX, wallY, wallW, wallH, treatmentId, varian
         const overlap = elongated ? 7.5 : 6.0;
 
         for (let i = 0; i < count; i++) {
-          const col = (isAlt && i % 2 === 1) ? altRgb : rgb;
+          const col = rgb;
           const x0 = wallX - 1.0 + i * (unitW - overlap * 0.5);
           const w = unitW + overlap * 0.5;
           const N = 36;
@@ -1675,7 +1674,7 @@ function renderSideShapes(doc, { wallX, wallY, wallW, wallH, treatmentId, varian
         const overlap = 4.5;
 
         for (let i = 0; i < count; i++) {
-          const col = (isAlt && i % 2 === 1) ? altRgb : rgb;
+          const col = rgb;
           const isUp = (i % 2 === 0);
           const x0 = wallX - 1.0 + i * (unitW - overlap * 0.5);
           const w = unitW + overlap * 0.5;
@@ -1730,7 +1729,7 @@ function renderSideShapes(doc, { wallX, wallY, wallW, wallH, treatmentId, varian
         const strandH = isClassic ? 8.5 : 7.2;
 
         for (let i = 0; i < count; i++) {
-          const col = (isAlt && i % 2 === 1) ? altRgb : rgb;
+          const col = rgb;
           const cx = wallX + 3.0 + i * strandStep;
           const N = 28;
           const angle = 0.58;
@@ -1780,28 +1779,25 @@ function renderSideShapes(doc, { wallX, wallY, wallW, wallH, treatmentId, varian
       };
 
       if (str.includes('bead')) {
-        // Bead Piping: a stack of four buns lying sideways, receding down to the right. Outline
-        // follows the supplied sketch; pleat creases, shadow hatching, highlights and stipple
-        // are added in the ink style. Each bun is its own layer so Alternating can recolour
-        // every second one.
+        // Bead Piping: a stack of four buns in solid color
         drawBorderTrace(BORDER_PIPING_TRACES.bead, {
           left: wallX - 4.6, centerY: wallY + wallH * 0.5, width: wallW + 6.0,
-          colorFor: (bun) => (isAlt && bun % 2 === 1 ? altRgb : rgb),
+          colorFor: () => rgb,
         });
       } else if (str.includes('reverse')) {
-        // Reverse Shell: alternating crescent shell leaves arching left/right
+        // Reverse Shell: alternating crescent shell leaves in solid color
         drawInkReverseShell();
       } else if (str.includes('elongated')) {
-        // Elongated Shell Border: long sweeping shell units
+        // Elongated Shell Border: long sweeping shell units in solid color
         drawInkShellBorder({ elongated: true });
       } else if (str.includes('classic') && str.includes('rope')) {
-        // Rope Twist Classic: broad ribbon twist units
+        // Rope Twist Classic: broad ribbon twist units in solid color
         drawInkRopeTwist({ isClassic: true });
       } else if (str.includes('rope')) {
-        // Rope Twist: diagonal twisted rope strands
+        // Rope Twist: diagonal twisted rope strands in solid color
         drawInkRopeTwist({ isClassic: false });
       } else {
-        // Shell Border: three fluted fan shells
+        // Shell Border: three fluted fan shells in solid color
         drawInkShellBorder({ elongated: false });
       }
       break;
