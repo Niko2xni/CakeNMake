@@ -40,7 +40,6 @@ export default function BakeryChat() {
   const [inputText, setInputText] = useState('');
   const [sendError, setSendError] = useState('');
   const [sending, setSending] = useState(false);
-  const [updatingStatus, setUpdatingStatus] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const bottomRef = useRef(null);
 
@@ -122,21 +121,6 @@ export default function BakeryChat() {
       controller.setReplyingTo(null);
     } catch (error) {
       setSendError(error.message || 'Message could not be sent.');
-    }
-  }
-
-  async function toggleStatus() {
-    if (!chat.activeConversation || updatingStatus) return;
-    setUpdatingStatus(true);
-    setSendError('');
-    try {
-      const nextStatus = chat.activeConversation.status === 'open' ? 'closed' : 'open';
-      await chatApi.updateStatus(chat.activeConversation.id, nextStatus);
-      await chat.refreshConversations();
-    } catch (error) {
-      setSendError(error.message);
-    } finally {
-      setUpdatingStatus(false);
     }
   }
 
@@ -311,14 +295,6 @@ export default function BakeryChat() {
                   {chat.activeConversation.platform?.name || 'Bakery'}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={toggleStatus}
-                disabled={updatingStatus}
-                className="min-h-10 text-xs sm:text-sm px-3 py-1.5 rounded-xl border border-pink-300 text-pink-700 hover:bg-pink-50 disabled:opacity-50"
-              >
-                {chat.activeConversation.status === 'open' ? 'Close chat' : 'Reopen chat'}
-              </button>
               <button
                 type="button"
                 onClick={controller.toggleInfo}

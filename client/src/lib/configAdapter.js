@@ -637,7 +637,7 @@ export function adaptConfigFromLegacy(legacyConfig) {
 
     surfaceTreatment: {
       mode: legacyConfig.surfaceTreatmentMode || null,
-      pattern: legacyConfig.surfaceTreatmentPattern || 'longGaps',
+      pattern: legacyConfig.surfaceTreatmentPattern || 'naturalTear',
       colorId: legacyConfig.surfaceTreatmentColorId || null,
     },
 

@@ -909,7 +909,7 @@ export default function ClientHome() {
                           <div className="px-3 pb-3 pt-0 mt-auto">
                             <div className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
                               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                              Order Completed • Paid in full
+                              Order Completed
                             </div>
                           </div>
                         ) : hasBalanceDue ? (
@@ -1205,7 +1205,7 @@ export default function ClientHome() {
                   {isSelCompleted ? (
                     <div className="pt-1.5 border-t border-pink-100 flex items-center gap-1.5 text-[11px] text-emerald-700 font-medium">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Order completed · Paid in full</span>
+                      <span>Order completed</span>
                     </div>
                   ) : selBal > 0 && !isSelectedPaid ? (
                     <div className="pt-1.5 border-t border-pink-100 space-y-2">

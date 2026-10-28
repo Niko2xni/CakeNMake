@@ -150,6 +150,8 @@ export function getMiddlePipingRadius(topTierRadius) {
 }
 
 export function getCakeGlazeCarve(pattern) {
+  if (pattern === 'naturalTear' || pattern === 'naturalTear2') return getNaturalTearGlazeCarve(pattern);
+  if (pattern === 'unevenCombo' || pattern === 'tinyTip') return getPetitFoursGlazeCarve(pattern, 0);
   return GLAZE_PATTERN_CARVES[pattern] || GLAZE_PATTERN_CARVES.longGaps;
 }
 

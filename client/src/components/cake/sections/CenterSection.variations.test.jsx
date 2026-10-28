@@ -559,6 +559,150 @@ describe('CenterSection Variations', () => {
     expect(newItems.some(it => it.type === 'center-mangoCube-default')).toBe(true);
     expect(newItems.every(it => it.variationType === 'strawberryBlueberryAndMango')).toBe(true);
   });
+
+  it('deletes existing placed Decorations and Text that collide with a newly selected Variation while keeping non-colliding items', () => {
+    const onChange = vi.fn();
+    const onPlacedItemsChange = vi.fn();
+    const structure = { cakeFormat: 'standard', size: '8x6', layers: 1 };
+    const center = { mode: 'variations' };
+
+    const existingItems = [
+      { id: 'dec-collide', type: 'center-cherry-default', x: 0.05, z: 0.05, rotation: 0 },
+      { id: 'txt-collide', type: 'center-letterUpperA-default', x: 0.65, z: 0.02, rotation: 0 },
+      { id: 'dec-safe', type: 'center-chocolateBear-default', x: -2.2, z: -2.2, rotation: 0 },
+      { id: 'txt-safe', type: 'center-letterUpperB-default', x: 2.2, z: 2.2, rotation: 0 },
+    ];
+
+    render(
+      <CenterSection
+        center={center}
+        structure={structure}
+        onChange={onChange}
+        onPlacedItemsChange={onPlacedItemsChange}
+        placedItems={existingItems}
+      />
+    );
+
+    const buttons1 = screen.getAllByRole('button', { name: '1' });
+    fireEvent.click(buttons1[0]);
+
+    const updater = onPlacedItemsChange.mock.calls[0][0];
+    const resultingItems = updater(existingItems);
+
+    const ids = resultingItems.map((it) => it.id);
+    expect(ids).not.toContain('dec-collide');
+    expect(ids).not.toContain('txt-collide');
+    expect(ids).toContain('dec-safe');
+    expect(ids).toContain('txt-safe');
+    expect(resultingItems.filter((it) => it.source === 'variation')).toHaveLength(5);
+  });
+
+  it('deletes colliding placed Decorations and Text when resetting a moved Variation layout', () => {
+    const onChange = vi.fn();
+    const onPlacedItemsChange = vi.fn();
+    const structure = { cakeFormat: 'standard', size: '8x6', layers: 1 };
+    const center = {
+      mode: 'variations',
+      variations: { strawberry: 'singleCenter' },
+    };
+
+    const placedItems = [
+      {
+        id: 'center-var-strawberry-100-0',
+        type: 'center-strawberry-default',
+        x: 1.8,
+        z: 1.8,
+        source: 'variation',
+        variationType: 'strawberry',
+        variationId: 'singleCenter',
+      },
+      { id: 'txt-at-origin', type: 'center-letterLowera-default', x: 0, z: 0, rotation: 0 },
+      { id: 'dec-far', type: 'center-ferreroRocher-default', x: -2.1, z: 2.1, rotation: 0 },
+    ];
+
+    render(
+      <CenterSection
+        center={center}
+        structure={structure}
+        onChange={onChange}
+        onPlacedItemsChange={onPlacedItemsChange}
+        placedItems={placedItems}
+      />
+    );
+
+    const resetBtn = screen.getByRole('button', { name: /Reset Layout/i });
+    fireEvent.click(resetBtn);
+
+    const updater = onPlacedItemsChange.mock.calls[0][0];
+    const resultingItems = updater(placedItems);
+
+    const ids = resultingItems.map((it) => it.id);
+    expect(ids).not.toContain('txt-at-origin');
+    expect(ids).toContain('dec-far');
+    expect(resultingItems.filter((it) => it.source === 'variation')).toHaveLength(5);
+  });
+
+  it('removes existing Decorations starting from the last placed down to the first when a Variation exceeds the decoration max limit', () => {
+    const onChange = vi.fn();
+    const onPlacedItemsChange = vi.fn();
+    const structure = { cakeFormat: 'standard', size: '8x6', layers: 1 };
+    const center = { mode: 'variations' };
+
+    // 10 strawberries placed via Decorations around the outer ring (r=2.5, none physically colliding with singleCenter)
+    const maxPlacedStrawberries = Array.from({ length: 10 }, (_, idx) => {
+      const angle = (idx / 10) * Math.PI * 2;
+      return {
+        id: `straw-${idx + 1}`,
+        type: 'center-strawberry-default',
+        x: Math.cos(angle) * 2.5,
+        z: Math.sin(angle) * 2.5,
+        rotation: 0,
+      };
+    });
+
+    // Also include a cherry placed AFTER all strawberries (should remain untouched since variation is strawberry)
+    const existingItems = [
+      ...maxPlacedStrawberries,
+      { id: 'cherry-1', type: 'center-cherry-default', x: 2.2, z: 2.2, rotation: 0 },
+    ];
+
+    render(
+      <CenterSection
+        center={center}
+        structure={structure}
+        onChange={onChange}
+        onPlacedItemsChange={onPlacedItemsChange}
+        placedItems={existingItems}
+      />
+    );
+
+    // Click variation 1 for Strawberry (singleCenter -> 5 variation strawberries)
+    // Since strawberry limit on standard is 10, 5 existing strawberries must be removed
+    // starting from the last placed down (straw-10, straw-9, straw-8, straw-7, straw-6)
+    const buttons1 = screen.getAllByRole('button', { name: '1' });
+    fireEvent.click(buttons1[0]);
+
+    const updater = onPlacedItemsChange.mock.calls[0][0];
+    const resultingItems = updater(existingItems);
+
+    const survivingManualStrawberries = resultingItems.filter(
+      (it) => it.type === 'center-strawberry-default' && it.source !== 'variation'
+    );
+    expect(survivingManualStrawberries.map((it) => it.id)).toEqual([
+      'straw-1',
+      'straw-2',
+      'straw-3',
+      'straw-4',
+      'straw-5',
+    ]);
+
+    const variationStrawberries = resultingItems.filter((it) => it.source === 'variation');
+    expect(variationStrawberries).toHaveLength(5);
+
+    // Total strawberries == 10 (max limit) and unrelated cherry is untouched
+    expect(survivingManualStrawberries.length + variationStrawberries.length).toBe(10);
+    expect(resultingItems.some((it) => it.id === 'cherry-1')).toBe(true);
+  });
 });
 
 

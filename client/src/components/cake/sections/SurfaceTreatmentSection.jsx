@@ -55,7 +55,7 @@ export default function SurfaceTreatmentSection({ surfaceTreatment, onChange, is
           ...surfaceTreatment,
           layerTreatments: Object.assign(
             Array.from({ length: Math.max(minSlots, surfaceTreatment.layerTreatments?.length || 0) }, (_, index) => (
-              flatTreatment(surfaceTreatment.layerTreatments?.[index] || { mode: null, pattern: 'longGaps' })
+              flatTreatment(surfaceTreatment.layerTreatments?.[index] || { mode: null, pattern: 'naturalTear' })
             )),
             { [activeLayer]: nextTreatment },
           ),
@@ -79,7 +79,7 @@ export default function SurfaceTreatmentSection({ surfaceTreatment, onChange, is
           ...surfaceTreatment,
           layerTreatments: Object.assign(
             Array.from({ length: Math.max(minSlots, surfaceTreatment.layerTreatments?.length || 0) }, (_, index) => (
-              flatTreatment(surfaceTreatment.layerTreatments?.[index] || { mode: null, pattern: 'longGaps' })
+              flatTreatment(surfaceTreatment.layerTreatments?.[index] || { mode: null, pattern: 'naturalTear' })
             )),
             { [activeLayer]: nextTreatment },
           ),

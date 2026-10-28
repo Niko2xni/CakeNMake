@@ -131,7 +131,8 @@ describe('BakeryChat conversation list', () => {
     // View shared links in Media, files and links
     fireEvent.click(screen.getByText('Media, files and links'));
     fireEvent.click(screen.getByRole('button', { name: /Links \(1\)/i }));
-    expect(screen.getByText('https://instagram.com/cakeinspo')).toBeInTheDocument();
+    expect(screen.getAllByText('https://instagram.com/cakeinspo').length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByRole('button', { name: /Close chat|Reopen chat/i })).not.toBeInTheDocument();
 
     // Quick like button and Attach button are available
     expect(

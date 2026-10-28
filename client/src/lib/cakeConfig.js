@@ -153,10 +153,10 @@ export const DEFAULT_CONFIG = {
   surfaceTreatment: {
     mode: null,
     colorId: null,
-    pattern: 'longGaps', // one of GLAZE_PATTERNS ids — only relevant when mode === 'glaze'
+    pattern: 'naturalTear', // one of GLAZE_PATTERNS ids — only relevant when mode === 'glaze'
     layerTreatments: [
-      { mode: null, pattern: 'longGaps' },
-      { mode: null, pattern: 'longGaps' },
+      { mode: null, pattern: 'naturalTear' },
+      { mode: null, pattern: 'naturalTear' },
     ],
   },
 
@@ -548,6 +548,9 @@ export const SURFACE_TREATMENT_MODES = [
 //   shortWave    — the same gentle ripple edge, retreating to a shallow
 //                  coat near the top.
 export const GLAZE_PATTERNS = [
+  { id: 'naturalTear', label: 'Natural Tear', description: 'Long, hand-poured drips with an uneven, natural flow', implemented: true },
+  { id: 'unevenCombo', label: 'Tear Fall', description: 'Organic ganache coverage with flowing, varied teardrop drips', implemented: true },
+  { id: 'tinyTip', label: 'Wave Curve', description: 'A smooth glaze cap with a softly undulating edge', implemented: true },
   { id: 'longGaps', label: 'Long Drips', description: 'Tall dripping fingers with clear gaps between them', implemented: true },
   { id: 'longShortAlt', label: 'Long & Short Drips', description: 'Tall fingers alternating with shorter ones', implemented: true },
   { id: 'shortDrips', label: 'Short Drips', description: 'A uniform ring of short, shallow drips', implemented: true },
@@ -561,8 +564,8 @@ export const GLAZE_PATTERNS = [
 // combined into an organic uneven distribution tailored for mini-cake cubes,
 // featuring the signature poured ganache "Tear Fall" design.
 export const PETIT_FOURS_GLAZE_PATTERNS = [
-  { id: 'unevenCombo', label: 'Tear Fall', description: 'Organic ganache coverage with flowing, varied teardrop drips', implemented: true, petitsFoursOnly: true },
   { id: 'longGaps', label: 'Natural Tear', description: 'Long, hand-poured drips with an uneven, natural flow', implemented: true, petitsFoursOnly: true },
+  { id: 'unevenCombo', label: 'Tear Fall', description: 'Organic ganache coverage with flowing, varied teardrop drips', implemented: true, petitsFoursOnly: true },
   { id: 'tinyTip', label: 'Wave Curve', description: 'A smooth glaze cap with a softly undulating edge', implemented: true, petitsFoursOnly: true },
   { id: 'longWave', label: 'Full Coverage', description: 'Reaches almost to the base, with soft rippled edge', implemented: true, petitsFoursOnly: true },
   { id: 'midWave', label: 'Mid Coverage', description: 'Reaches about halfway down, with soft rippled edge', implemented: true, petitsFoursOnly: true },
@@ -576,7 +579,7 @@ export function getSurfaceTreatmentPattern(treatment = {}, structure = {}) {
   const formatPattern = treatment.patternsByFormat?.[patternSet];
   if (availableIds.has(formatPattern)) return formatPattern;
   if (availableIds.has(treatment.pattern)) return treatment.pattern;
-  return patternSet === 'petitsFour' ? 'longGaps' : 'longGaps';
+  return patternSet === 'petitsFour' ? 'longGaps' : 'naturalTear';
 }
 
 
@@ -740,7 +743,7 @@ export function getCenterItemRadius(designId, centerDecorScale = 1) {
 
   let baseRadius = CENTER_ITEM_RADII[designId];
   if (baseRadius === undefined) {
-    if (designId.startsWith('letterUpper')) {
+    if (designId.startsWith('letterUpper') || (designId.startsWith('letter') && !designId.startsWith('letterLower'))) {
       baseRadius = 0.28;
     } else if (designId.startsWith('letterLower')) {
       baseRadius = 0.20;
@@ -807,7 +810,7 @@ export function getItemFootprint(item, centerDecorScale = 1) {
       };
     }
 
-    if (designId.startsWith('letterUpper')) {
+    if (designId.startsWith('letterUpper') || (designId.startsWith('letter') && !designId.startsWith('letterLower'))) {
       const scale = centerDecorScale ?? 1;
       return {
         x,
@@ -1218,6 +1221,89 @@ export function pruneItemsCollidingWithEdgeFerrero(
     centerDecorScale,
     exteriorFinishStyle
   );
+}
+
+export function getCenterDecorScaleForStructure(structure = {}) {
+  if (isPetitsFourStructure(structure)) {
+    return structure?.size === 'largeCube' ? 0.65 : 0.45;
+  }
+  const topRadius = getTopTierRadiusFromConfig({ structure });
+  return topRadius / 4;
+}
+
+function extractCenterDesignId(item) {
+  if (!item) return null;
+  if (item.designId) return item.designId === 'mango' ? 'mangoCube' : item.designId;
+  if (!item.type || typeof item.type !== 'string') return null;
+  if (item.type.startsWith('center-')) {
+    const parts = item.type.split('-');
+    return parts[1] === 'mango' ? 'mangoCube' : parts[1];
+  }
+  return item.type === 'mango' ? 'mangoCube' : item.type;
+}
+
+export function pruneItemsCollidingWithVariation(
+  existingItems = [],
+  variationItems = [],
+  structure = {},
+  minGap = 0.01
+) {
+  if (!Array.isArray(existingItems) || existingItems.length === 0) return [];
+  const nonVariationItems = existingItems.filter((item) => item && item.source !== 'variation');
+  if (!Array.isArray(variationItems) || variationItems.length === 0) return nonVariationItems;
+
+  const centerDecorScale = getCenterDecorScaleForStructure(structure);
+  const isPetitsFour = isPetitsFourStructure(structure);
+  const pieceRadius = structure?.size === 'largeCube' ? 1.0 : 0.5;
+
+  // 1. Remove any existing placed Decorations or Text items that physically overlap with the Variation items
+  const survivingItems = nonVariationItems.filter((item) => {
+    const collidesWithVariation = variationItems.some((varItem) => {
+      if (isPetitsFour) {
+        const d = Math.hypot((item.x || 0) - (varItem.x || 0), (item.z || 0) - (varItem.z || 0));
+        if (d <= pieceRadius * 1.25) return true;
+      }
+      return doItemsClash(item, varItem, centerDecorScale, minGap);
+    });
+    return !collidesWithVariation;
+  });
+
+  // 2. If any decoration type in the selected Variation would exceed its max limit when combined with
+  //    existing placed Decorations of that same type, free up the required slots by removing existing
+  //    Decorations of that specific type starting from the LAST placed down backwards to the first.
+  const variationCountsByDesign = {};
+  for (const varItem of variationItems) {
+    const designId = extractCenterDesignId(varItem);
+    if (designId) {
+      variationCountsByDesign[designId] = (variationCountsByDesign[designId] || 0) + 1;
+    }
+  }
+
+  const removedIndices = new Set();
+  for (const [designId, variationCount] of Object.entries(variationCountsByDesign)) {
+    const limit = getCenterItemLimit(designId, structure);
+    if (limit === null) continue;
+
+    const matchingIndices = [];
+    for (let i = 0; i < survivingItems.length; i++) {
+      if (extractCenterDesignId(survivingItems[i]) === designId) {
+        matchingIndices.push(i);
+      }
+    }
+
+    const totalAfterVariation = matchingIndices.length + variationCount;
+    if (totalAfterVariation > limit) {
+      let slotsNeeded = totalAfterVariation - limit;
+      // Remove starting from the last placed down (end of matchingIndices) towards the first
+      for (let m = matchingIndices.length - 1; m >= 0 && slotsNeeded > 0; m--) {
+        removedIndices.add(matchingIndices[m]);
+        slotsNeeded--;
+      }
+    }
+  }
+
+  if (removedIndices.size === 0) return survivingItems;
+  return survivingItems.filter((_, idx) => !removedIndices.has(idx));
 }
 
 export const CENTER_PLACEABLE_DESIGNS = [

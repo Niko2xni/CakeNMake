@@ -25,6 +25,7 @@ import {
   getCenterItemCount,
   isCenterItemAtLimit,
   isPetitsFourStructure,
+  pruneItemsCollidingWithVariation,
 } from '@/lib/cakeConfig';
 import DecorationPreview from './DecorationPreview';
 import SugarColorSection from './SugarColorSection';
@@ -512,7 +513,7 @@ export default function CenterSection({
             variationId: variant.id,
           }));
           onPlacedItemsChange?.((currentItems) => {
-            const withoutExisting = currentItems.filter((item) => item.source !== 'variation');
+            const withoutExisting = pruneItemsCollidingWithVariation(currentItems, newItems, structure);
             return [...withoutExisting, ...newItems];
           });
           break;
@@ -604,7 +605,7 @@ export default function CenterSection({
     });
 
     onPlacedItemsChange?.((currentItems) => {
-      const withoutExisting = currentItems.filter((item) => item.source !== 'variation');
+      const withoutExisting = pruneItemsCollidingWithVariation(currentItems, newItems, structure);
       return [...withoutExisting, ...newItems];
     });
   };
@@ -728,7 +729,7 @@ export default function CenterSection({
 
   const clearDecorationItems = () => {
     onItemSelect?.(null);
-    onPlacedItemsChange?.((currentItems) => currentItems.filter((item) => !(item.type && item.type.startsWith('center-') && !isLetterToolType(item.type))));
+    onPlacedItemsChange?.((currentItems) => currentItems.filter((item) => !(item.type && item.type.startsWith('center-') && !isLetterToolType(item.type) && item.source !== 'variation')));
   };
 
   const clearLetterItems = () => {

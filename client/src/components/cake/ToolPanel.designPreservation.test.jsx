@@ -147,7 +147,7 @@ it('keeps the Fundamentals Surface Treatment section open while cycling through 
   }
 });
 
-it('defaults Standard and Bento to Long Drips and remembers Petit Fours Natural Tear', () => {
+it('defaults Standard, Bento, and Petit Fours to Natural Tear', () => {
   const initial = structuredClone(DEFAULT_CONFIG);
   let current;
   function Harness() {
@@ -160,26 +160,26 @@ it('defaults Standard and Bento to Long Drips and remembers Petit Fours Natural 
     .find(button => button.textContent.startsWith(label));
 
   fireEvent.click(buttonStartingWith('Drip'));
-  expect(buttonStartingWith('Long Drips').className).toContain('border-primary');
+  expect(buttonStartingWith('Natural Tear').className).toContain('bg-primary');
 
   fireEvent.click(buttonStartingWith('Petit Fours'));
   fireEvent.click(buttonStartingWith('Natural Tear'));
   expect(current.surfaceTreatment.pattern).toBe('longGaps');
 
   fireEvent.click(buttonStartingWith('Standard'));
-  expect(current.surfaceTreatment.pattern).toBe('longGaps');
-  expect(buttonStartingWith('Long Drips').className).toContain('border-primary');
+  expect(current.surfaceTreatment.pattern).toBe('naturalTear');
+  expect(buttonStartingWith('Natural Tear').className).toContain('bg-primary');
 
   fireEvent.click(buttonStartingWith('Bento'));
-  expect(current.surfaceTreatment.pattern).toBe('longGaps');
-  expect(buttonStartingWith('Long Drips').className).toContain('border-primary');
+  expect(current.surfaceTreatment.pattern).toBe('naturalTear');
+  expect(buttonStartingWith('Natural Tear').className).toContain('bg-primary');
 
   fireEvent.click(buttonStartingWith('Petit Fours'));
   expect(current.surfaceTreatment.patternsByFormat).toMatchObject({
-    standard: 'longGaps',
+    standard: 'naturalTear',
     petitsFour: 'longGaps',
   });
-  expect(buttonStartingWith('Natural Tear').className).toContain('border-primary');
+  expect(buttonStartingWith('Natural Tear').className).toContain('bg-primary');
 });
 
 it('clears center decorations when switching between single cake formats and Petit Fours', () => {

@@ -722,13 +722,9 @@ export default function Transactions() {
                         <p className="text-xl font-black text-gray-900 font-heading">
                           {formatCurrency(totalAmount)}
                         </p>
-                        {remainingBalance > 0 ? (
+                        {remainingBalance > 0 && (
                           <p className="text-[11px] text-amber-700 font-semibold">
                             Paid: {formatCurrency(downPaymentAmount)} • Balance: {formatCurrency(remainingBalance)}
-                          </p>
-                        ) : (
-                          <p className="text-[11px] text-emerald-600 font-semibold">
-                            Paid in Full: {formatCurrency(totalAmount)}
                           </p>
                         )}
                       </div>

@@ -179,6 +179,8 @@ export function GlazeTinyTipIcon({ className }) {
 function getIconComponent(patternId) {
   switch (patternId) {
     case 'longGaps':
+    case 'naturalTear':
+    case 'naturalTear2':
       return GlazeLongGapsIcon;
     case 'longShortAlt':
       return GlazeLongShortAltIcon;
