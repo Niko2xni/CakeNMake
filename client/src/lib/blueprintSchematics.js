@@ -1595,6 +1595,190 @@ function renderSideShapes(doc, { wallX, wallY, wallW, wallH, treatmentId, varian
       };
 
 
+      const drawInkShellBorder = ({ elongated = false } = {}) => {
+        const rnd = makeRng(elongated ? 7715 : 8812);
+        const cy = wallY + wallH * 0.52;
+        const count = 3;
+        const unitW = (wallW + 4) / count;
+        const overlap = elongated ? 7.5 : 6.0;
+
+        for (let i = 0; i < count; i++) {
+          const col = (isAlt && i % 2 === 1) ? altRgb : rgb;
+          const x0 = wallX - 1.0 + i * (unitW - overlap * 0.5);
+          const w = unitW + overlap * 0.5;
+          const N = 36;
+          const topPts = [];
+          const botPts = [];
+
+          const peakT = elongated ? 0.20 : 0.28;
+          const peakH = elongated ? 7.5 : 8.8;
+          const tailYRel = elongated ? 1.5 : 2.5;
+
+          for (let s = 0; s <= N; s++) {
+            const t = s / N;
+            const x = x0 + t * w;
+            const topRel = t < peakT
+              ? -peakH * Math.sin((t / peakT) * (Math.PI / 2))
+              : -peakH * Math.cos(((t - peakT) / (1 - peakT)) * (Math.PI / 2)) * 0.75 + tailYRel * ((t - peakT) / (1 - peakT));
+            const botRel = 5.5 * Math.sin(Math.pow(t, 0.75) * Math.PI) * (1 - 0.55 * t) + tailYRel * t;
+
+            topPts.push([x, cy + topRel]);
+            botPts.push([x, cy + botRel]);
+          }
+
+          const headArc = [];
+          const headN = 8;
+          for (let k = 1; k < headN; k++) {
+            const u = k / headN;
+            const hx = x0 - 1.5 * Math.sin(u * Math.PI);
+            const hy = botPts[0][1] + (topPts[0][1] - botPts[0][1]) * u;
+            headArc.push([hx, hy]);
+          }
+          const outline = [...headArc, ...topPts, ...botPts.slice().reverse()];
+          inkShape(outline, col, 0.52, rnd);
+
+          const flutes = elongated ? 7 : 9;
+          for (let r = 1; r < flutes; r++) {
+            const frac = r / flutes;
+            const ridgePts = [];
+            const steps = 24;
+            for (let st = 0; st <= steps; st++) {
+              const u = st / steps;
+              const idx = Math.round((1 - u) * N);
+              const topP = topPts[idx] || topPts[0];
+              const botP = botPts[idx] || botPts[0];
+              const ry = topP[1] + (botP[1] - topP[1]) * frac;
+              const rx = topP[0];
+              ridgePts.push([rx, ry]);
+            }
+            inkLine(ridgePts, 0.12, 0.05, col, (t) => 0.08 + 0.22 * Math.sin(t * Math.PI));
+          }
+
+          const hatchEdge = [];
+          for (let k = 4; k < N - 6; k += 2) hatchEdge.push(botPts[k]);
+          inkHatch(hatchEdge, col, rnd, { len: 1.8, dx: -0.42, lw: 0.14 });
+
+          doc.setFillColor(...col);
+          for (let k = 0; k < 6; k++) {
+            const px = x0 + w * (0.2 + 0.3 * rnd());
+            const py = cy - peakH * (0.4 + 0.4 * rnd());
+            doc.circle(px, py, 0.12 + 0.08 * rnd(), 'F');
+          }
+        }
+      };
+
+      const drawInkReverseShell = () => {
+        const rnd = makeRng(4419);
+        const cy = wallY + wallH * 0.52;
+        const count = 4;
+        const unitW = (wallW + 6) / count;
+        const overlap = 4.5;
+
+        for (let i = 0; i < count; i++) {
+          const col = (isAlt && i % 2 === 1) ? altRgb : rgb;
+          const isUp = (i % 2 === 0);
+          const x0 = wallX - 1.0 + i * (unitW - overlap * 0.5);
+          const w = unitW + overlap * 0.5;
+          const N = 32;
+          const topPts = [];
+          const botPts = [];
+
+          const dir = isUp ? -1 : 1;
+
+          for (let s = 0; s <= N; s++) {
+            const t = s / N;
+            const x = x0 + t * w;
+            const envelope = Math.sin(t * Math.PI);
+            const yMid = cy + dir * 3.0 * Math.sin(t * Math.PI * 0.95);
+            const th = (4.8 * envelope + 1.2) * (1 - 0.2 * t);
+            topPts.push([x, yMid - th * 0.5]);
+            botPts.push([x, yMid + th * 0.5]);
+          }
+
+          const endPts = [];
+          const M = 6;
+          for (let j = 1; j < M; j++) {
+            const v = j / M;
+            const ex = x0 + w + 1.0 * Math.sin(v * Math.PI);
+            const ey = topPts[N][1] + (botPts[N][1] - topPts[N][1]) * v;
+            endPts.push([ex, ey]);
+          }
+          const outline = [...topPts, ...endPts, ...botPts.slice().reverse()];
+          inkShape(outline, col, 0.50, rnd);
+
+          [0.32, 0.68].forEach((frac) => {
+            const cPts = [];
+            for (let s = 3; s <= N - 3; s++) {
+              cPts.push([topPts[s][0], topPts[s][1] + (botPts[s][1] - topPts[s][1]) * frac]);
+            }
+            inkLine(cPts, 0.08, 0.05, col, (t) => 0.06 + 0.2 * Math.sin(t * Math.PI));
+          });
+
+          const shadowEdge = isUp ? botPts : topPts;
+          const hatchPts = [];
+          for (let s = 4; s <= N - 5; s += 2) hatchPts.push(shadowEdge[s]);
+          inkHatch(hatchPts, col, rnd, { len: 1.5, dx: isUp ? -0.4 : 0.4, lw: 0.13 });
+        }
+      };
+
+      const drawInkRopeTwist = ({ isClassic = false } = {}) => {
+        const rnd = makeRng(isClassic ? 7192 : 6321);
+        const cy = wallY + wallH * 0.52;
+        const count = isClassic ? 5 : 8;
+        const strandStep = (wallW - 2) / count;
+        const strandW = isClassic ? 14.0 : 10.5;
+        const strandH = isClassic ? 8.5 : 7.2;
+
+        for (let i = 0; i < count; i++) {
+          const col = (isAlt && i % 2 === 1) ? altRgb : rgb;
+          const cx = wallX + 3.0 + i * strandStep;
+          const N = 28;
+          const angle = 0.58;
+
+          const pts = [];
+          const cosA = Math.cos(angle);
+          const sinA = Math.sin(angle);
+          const rx = strandW * 0.5;
+          const ry = strandH * 0.5;
+
+          for (let s = 0; s < N; s++) {
+            const theta = (s / N) * 2 * Math.PI;
+            const ex = rx * Math.cos(theta);
+            const ey = ry * Math.sin(theta);
+            const rotX = ex * cosA - ey * sinA;
+            const rotY = ex * sinA + ey * cosA;
+            pts.push([cx + rotX, cy + rotY]);
+          }
+
+          inkShape(pts, col, 0.48, rnd);
+
+          [-0.35, 0.0, 0.35].forEach((offsetFrac) => {
+            const crease = [];
+            const C = 16;
+            for (let k = 2; k < C - 2; k++) {
+              const u = (k / (C - 1)) * 2 - 1;
+              const ex = rx * u * 0.85;
+              const ey = ry * offsetFrac * Math.sqrt(Math.max(0, 1 - u * u * 0.6));
+              const rotX = ex * cosA - ey * sinA;
+              const rotY = ex * sinA + ey * cosA;
+              crease.push([cx + rotX, cy + rotY]);
+            }
+            inkLine(crease, 0.06, 0.06, col, (t) => 0.06 + 0.18 * Math.sin(t * Math.PI));
+          });
+
+          const lowerHatch = [];
+          for (let k = 0; k < 6; k++) {
+            const u = (k / 5) * 1.2 - 0.6;
+            const ex = rx * u;
+            const ey = ry * 0.75;
+            const rotX = ex * cosA - ey * sinA;
+            const rotY = ex * sinA + ey * cosA;
+            lowerHatch.push([cx + rotX, cy + rotY]);
+          }
+          inkHatch(lowerHatch, col, rnd, { len: 1.4, dx: -0.35, lw: 0.12 });
+        }
+      };
+
       if (str.includes('bead')) {
         // Bead Piping: a stack of four buns lying sideways, receding down to the right. Outline
         // follows the supplied sketch; pleat creases, shadow hatching, highlights and stipple
@@ -1605,37 +1789,20 @@ function renderSideShapes(doc, { wallX, wallY, wallW, wallH, treatmentId, varian
           colorFor: (bun) => (isAlt && bun % 2 === 1 ? altRgb : rgb),
         });
       } else if (str.includes('reverse')) {
-        // Reverse Shell: traced from the hand-drawn top border — stacked leaf plates with
-        // rolled tips, notched ends, crease lines, hatching and stipple
-        drawBorderTrace(BORDER_PIPING_TRACES.reverseShell, {
-          left: wallX, centerY: wallY + wallH * 0.5, width: wallW,
-          colorFor: (cx) => (isAlt && cx > 520 ? altRgb : rgb),
-        });
+        // Reverse Shell: alternating crescent shell leaves arching left/right
+        drawInkReverseShell();
       } else if (str.includes('elongated')) {
-        // Elongated Shell Border: traced from the supplied line art (one long shell + two short
-        // ones) with ink hatching/stipple added. Bands = units so Alternating recolours the middle one.
-        drawBorderTrace(BORDER_PIPING_TRACES.elongatedShell, {
-          left: wallX, centerY: wallY + wallH * 0.5, width: wallW,
-          colorFor: (band) => (isAlt && band === 1 ? altRgb : rgb),
-        });
+        // Elongated Shell Border: long sweeping shell units
+        drawInkShellBorder({ elongated: true });
       } else if (str.includes('classic') && str.includes('rope')) {
-        // Rope Twist Classic: traced from the supplied line art (two broad ribbon units)
-        drawBorderTrace(BORDER_PIPING_TRACES.ropeTwistClassic, {
-          left: wallX, centerY: wallY + wallH * 0.5, width: wallW,
-          colorFor: (band) => (isAlt && band === 1 ? altRgb : rgb),
-        });
+        // Rope Twist Classic: broad ribbon twist units
+        drawInkRopeTwist({ isClassic: true });
       } else if (str.includes('rope')) {
-        // Rope Twist: traced from the hand-drawn bottom border
-        drawBorderTrace(BORDER_PIPING_TRACES.ropeTwist, {
-          left: wallX, centerY: wallY + wallH * 0.5, width: wallW,
-          colorFor: (cx) => (isAlt && cx > 500 ? altRgb : rgb),
-        });
+        // Rope Twist: diagonal twisted rope strands
+        drawInkRopeTwist({ isClassic: false });
       } else {
-        // Shell Border: traced from the supplied line art (three shell units)
-        drawBorderTrace(BORDER_PIPING_TRACES.shellBorder, {
-          left: wallX, centerY: wallY + wallH * 0.5, width: wallW,
-          colorFor: (band) => (isAlt && band === 1 ? altRgb : rgb),
-        });
+        // Shell Border: three fluted fan shells
+        drawInkShellBorder({ elongated: false });
       }
       break;
     }

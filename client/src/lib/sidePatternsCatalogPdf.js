@@ -175,6 +175,13 @@ export function buildSidePatternsCatalogPdf({
           });
         }
       } else {
+        const isAlt = String(variant.id).endsWith('Alt') || String(variant.label).includes('Alternating');
+        const isLight = (color || '').toUpperCase() === '#FFF5EA' || (color || '').toUpperCase() === '#FFFFFF' || (color || '').toUpperCase() === '#E5C583';
+        const defaultSecondaryColor = isLight ? '#3D2314' : '#E5C583';
+        const defaultSecondaryName = isLight ? 'Chocolate' : 'Vanilla';
+        const secondaryColor = isAlt ? defaultSecondaryColor : null;
+        const effectiveColorName = isAlt ? `${colorName} / ${defaultSecondaryName}` : colorName;
+
         drawSidePatternSchematic(doc, {
           x: cardX,
           y: cardY,
@@ -183,8 +190,9 @@ export function buildSidePatternsCatalogPdf({
           treatmentId: cat.id,
           variantId: variant.id,
           color,
-          colorName,
+          colorName: effectiveColorName,
           patternName: variant.label,
+          secondaryColor,
           baseFinish: 'Frosted',
         });
       }
