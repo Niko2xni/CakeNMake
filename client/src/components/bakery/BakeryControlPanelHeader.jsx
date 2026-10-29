@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { systemApi } from '@/services/api';
 import { useAuth } from '@/lib/AuthContext';
+import { useBakeryControlPanel } from '@/context/BakeryControlPanelContext';
 
 const formatMoney = (minor = 0) =>
   new Intl.NumberFormat('en-PH', {
@@ -44,6 +45,21 @@ const formatTime = (isoString) => {
 
 export default function BakeryControlPanelHeader({ onDraftsChange, onMinimize, className = '' }) {
   const location = useLocation();
+  const { closeControlPanel } = useBakeryControlPanel();
+  const handleMinimize = () => {
+    try {
+      localStorage.setItem('cakenmake_control_panel_visible', 'false');
+      window.dispatchEvent(
+        new CustomEvent('cakenmake-control-panel-visibility', { detail: { visible: false } })
+      );
+    } catch {}
+    if (closeControlPanel) {
+      closeControlPanel();
+    }
+    if (onMinimize) {
+      onMinimize();
+    }
+  };
   let account = null;
   try {
     account = useAuth()?.account || null;
@@ -95,10 +111,17 @@ export default function BakeryControlPanelHeader({ onDraftsChange, onMinimize, c
     loadData();
     const timer = setInterval(loadData, 10000);
     const handleDraftsChanged = () => loadData();
+    const handleOpenReviewDrafts = () => {
+      loadData();
+      setActiveTab('drafts');
+      setIsExpanded(true);
+    };
     window.addEventListener('bakery-drafts-changed', handleDraftsChanged);
+    window.addEventListener('bakery-open-review-drafts', handleOpenReviewDrafts);
     return () => {
       clearInterval(timer);
       window.removeEventListener('bakery-drafts-changed', handleDraftsChanged);
+      window.removeEventListener('bakery-open-review-drafts', handleOpenReviewDrafts);
     };
   }, [location.pathname]);
 
@@ -344,10 +367,10 @@ export default function BakeryControlPanelHeader({ onDraftsChange, onMinimize, c
           </button>
 
           {/* Minimize / Remove from Top Button */}
-          {onMinimize && (
+          {(onMinimize || closeControlPanel) && (
             <button
               type="button"
-              onClick={onMinimize}
+              onClick={handleMinimize}
               className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-100 border border-gray-200 transition-colors shadow-2xs"
               title="Minimize Control Panel (Click Control in nav bar to summon it back)"
             >

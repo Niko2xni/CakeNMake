@@ -34,6 +34,7 @@ import useCakeQuote from '@/hooks/use-cake-quote';
 import PageLoadingSkeleton from '@/components/shared/PageLoadingSkeleton';
 import TemplateBackgroundStudioModal from '@/components/bakery/TemplateBackgroundStudioModal';
 import BakeryControlPanelHeader from '@/components/bakery/BakeryControlPanelHeader';
+import { useBakeryControlPanel } from '@/context/BakeryControlPanelContext';
 
 const formatMoney = (minor = 0) =>
   new Intl.NumberFormat('en-PH', {
@@ -365,7 +366,12 @@ export default function BakeryDesigner() {
   const placeUndoStackRef = useRef([]);
   const placeRedoStackRef = useRef([]);
   const [placeHistoryVersion, setPlaceHistoryVersion] = useState(0);
-  const [isControlPanelOpen, setIsControlPanelOpen] = useState(true);
+  const {
+    isControlPanelVisible,
+    closeControlPanel,
+    toggleControlPanel,
+    totalDrafts,
+  } = useBakeryControlPanel();
 
   const cakeSceneRef = useRef(null);
   const mainAreaRef = useRef(null);
@@ -893,6 +899,10 @@ export default function BakeryDesigner() {
         await templateApi.createTemplate(payload);
       }
 
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('bakery-drafts-changed'));
+      }
+
       // Clear the auto-save cache after successful publish
       clearCache();
 
@@ -950,6 +960,22 @@ export default function BakeryDesigner() {
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <Button
             type="button"
+            variant={isControlPanelVisible ? 'secondary' : 'outline'}
+            onClick={toggleControlPanel}
+            size="sm"
+            className="flex items-center gap-1.5 rounded-xl font-semibold text-xs border-border/70"
+            title={isControlPanelVisible ? 'Minimize Control Panel' : 'Show Control Panel'}
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Control Panel</span>
+            {totalDrafts > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-pink-500 text-white">
+                {totalDrafts}
+              </span>
+            )}
+          </Button>
+          <Button
+            type="button"
             onClick={handleTrigger8AngleCapture}
             disabled={isCapturing || loadingInitial}
             className="flex items-center gap-2 rounded-xl font-semibold"
@@ -972,9 +998,9 @@ export default function BakeryDesigner() {
       </header>
 
       {/* Control Panel Header for Templates, Pricing & Client Access */}
-      {isControlPanelOpen && (
+      {isControlPanelVisible && (
         <div className="px-3 sm:px-4 pt-2">
-          <BakeryControlPanelHeader onMinimize={() => setIsControlPanelOpen(false)} />
+          <BakeryControlPanelHeader onMinimize={closeControlPanel} />
         </div>
       )}
 

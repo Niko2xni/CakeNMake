@@ -130,6 +130,27 @@ router.delete(
               draft.rates.center.brackets[designId][idx].price = activeBook.rates.center.brackets[designId][idx].price;
             }
             revertedLabel = `Center Bracket "${designId}"`;
+          } else if (parts[0] === 'sponge' && parts[1] && parts[2]) {
+            const finish = parts[1];
+            const sizeKey = parts.slice(2).join('-');
+            if (draft.rates.sponge?.[finish]) {
+              draft.rates.sponge[finish][sizeKey] = activeBook.rates.sponge?.[finish]?.[sizeKey];
+            }
+            revertedLabel = `Sponge "${finish} · ${sizeKey}"`;
+          } else if (parts[0] === 'twoTier' && parts[1]) {
+            const finish = parts[1];
+            draft.rates.twoTier = draft.rates.twoTier || {};
+            draft.rates.twoTier[finish] = activeBook.rates.twoTier?.[finish];
+            revertedLabel = `Two-Tier "${finish}"`;
+          } else if (parts[0] === 'glazePerTier') {
+            draft.rates.glazePerTier = activeBook.rates.glazePerTier;
+            revertedLabel = 'Glaze (Per Tier)';
+          } else if (['drip', 'side', 'sideEdge', 'edge'].includes(parts[0]) && parts[1]) {
+            const grp = parts[0];
+            const key = parts.slice(1).join('-');
+            draft.rates[grp] = draft.rates[grp] || {};
+            draft.rates[grp][key] = activeBook.rates?.[grp]?.[key];
+            revertedLabel = `${grp} "${key}"`;
           }
 
           draft.markModified('rates');

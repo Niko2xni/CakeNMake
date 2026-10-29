@@ -4,6 +4,11 @@ import { systemApi } from '@/services/api';
 const BakeryControlPanelContext = createContext(null);
 
 export function BakeryControlPanelProvider({ children }) {
+  const existing = useContext(BakeryControlPanelContext);
+  if (existing) {
+    return <>{children}</>;
+  }
+
   const [isControlPanelVisible, setIsControlPanelVisible] = useState(() => {
     try {
       const saved = localStorage.getItem('cakenmake_control_panel_visible');
@@ -20,6 +25,9 @@ export function BakeryControlPanelProvider({ children }) {
     setIsControlPanelVisible(val);
     try {
       localStorage.setItem('cakenmake_control_panel_visible', String(val));
+      window.dispatchEvent(
+        new CustomEvent('cakenmake-control-panel-visibility', { detail: { visible: val } })
+      );
     } catch {
       // quiet fallback
     }
@@ -42,6 +50,27 @@ export function BakeryControlPanelProvider({ children }) {
       closeControlPanel();
     }
   };
+
+  // Sync visibility with custom events and storage changes across components/tabs
+  useEffect(() => {
+    const handleVisibilityEvent = (e) => {
+      const nextVal = e.detail?.visible;
+      if (typeof nextVal === 'boolean') {
+        setIsControlPanelVisible(nextVal);
+      }
+    };
+    const handleStorageEvent = (e) => {
+      if (e.key === 'cakenmake_control_panel_visible' && e.newValue !== null) {
+        setIsControlPanelVisible(e.newValue === 'true');
+      }
+    };
+    window.addEventListener('cakenmake-control-panel-visibility', handleVisibilityEvent);
+    window.addEventListener('storage', handleStorageEvent);
+    return () => {
+      window.removeEventListener('cakenmake-control-panel-visibility', handleVisibilityEvent);
+      window.removeEventListener('storage', handleStorageEvent);
+    };
+  }, []);
 
   // Poll lightweight status and draft counts for navbar badge
   useEffect(() => {
@@ -97,11 +126,29 @@ export function BakeryControlPanelProvider({ children }) {
 export function useBakeryControlPanel() {
   const context = useContext(BakeryControlPanelContext);
   if (!context) {
+    const isVisibleFallback = (() => {
+      try {
+        const s = localStorage.getItem('cakenmake_control_panel_visible');
+        return s !== null ? s === 'true' : true;
+      } catch {
+        return true;
+      }
+    })();
+
+    const updateVisibilityFallback = (val) => {
+      try {
+        localStorage.setItem('cakenmake_control_panel_visible', String(val));
+        window.dispatchEvent(
+          new CustomEvent('cakenmake-control-panel-visibility', { detail: { visible: val } })
+        );
+      } catch {}
+    };
+
     return {
-      isControlPanelVisible: true,
-      openControlPanel: () => {},
-      closeControlPanel: () => {},
-      toggleControlPanel: () => {},
+      isControlPanelVisible: isVisibleFallback,
+      openControlPanel: () => updateVisibilityFallback(true),
+      closeControlPanel: () => updateVisibilityFallback(false),
+      toggleControlPanel: () => updateVisibilityFallback(!isVisibleFallback),
       systemStatus: null,
       totalDrafts: 0,
     };

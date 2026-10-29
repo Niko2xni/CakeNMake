@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -38,6 +38,7 @@ import BakeryProfile from '@/pages/BakeryAdmin/BakeryProfile';
 import BakeryEmployees from '@/pages/BakeryAdmin/BakeryEmployees';
 import ClientAccessGuard from '@/components/shared/ClientAccessGuard';
 import ClientUpdateAdvanceWarning from '@/components/shared/ClientUpdateAdvanceWarning';
+import { BakeryControlPanelProvider } from '@/context/BakeryControlPanelContext';
 
 const AuthenticatedApp = () => {
   const { user, isLoadingAuth, authChecked, isLoadingPublicSettings, authError, navigateToLogin, retryAccountSync } = useAuth();
@@ -118,20 +119,28 @@ const AuthenticatedApp = () => {
 
           {/* Only bakery admin / staff accounts can access bakery admin routes */}
           <Route element={<RoleRoute allowedRoles={['bakery_staff', 'bakery_admin', 'platform_admin']} fallbackPath="/client" />}>
-            <Route path="/bakery/designer" element={<BakeryDesigner />} />
-            <Route path="/bakery" element={<BakeryAdminLayout />}>
-              <Route index element={<Navigate to="orders" replace />} />
-              <Route path="orders" element={<BakeryOrders />} />
-              <Route path="reservations" element={<Navigate to="/bakery/orders" replace />} />
-              <Route path="pricing" element={<BakeryPricing />} />
-              <Route path="templates" element={<BakeryTemplates />} />
-              <Route path="transactions" element={<Navigate to="/bakery/orders?tab=payments" replace />} />
-              <Route path="chats" element={<BakeryChatsSection />} />
-              <Route path="assets" element={<Navigate to="/bakery/orders" replace />} />
-              <Route path="billing" element={<BakeryBilling />} />
-              <Route path="employees" element={<BakeryEmployees />} />
-              <Route path="blueprints" element={<BakeryBlueprints />} />
-              <Route path="profile" element={<BakeryProfile />} />
+            <Route
+              element={
+                <BakeryControlPanelProvider>
+                  <Outlet />
+                </BakeryControlPanelProvider>
+              }
+            >
+              <Route path="/bakery/designer" element={<BakeryDesigner />} />
+              <Route path="/bakery" element={<BakeryAdminLayout />}>
+                <Route index element={<Navigate to="orders" replace />} />
+                <Route path="orders" element={<BakeryOrders />} />
+                <Route path="reservations" element={<Navigate to="/bakery/orders" replace />} />
+                <Route path="pricing" element={<BakeryPricing />} />
+                <Route path="templates" element={<BakeryTemplates />} />
+                <Route path="transactions" element={<Navigate to="/bakery/orders?tab=payments" replace />} />
+                <Route path="chats" element={<BakeryChatsSection />} />
+                <Route path="assets" element={<Navigate to="/bakery/orders" replace />} />
+                <Route path="billing" element={<BakeryBilling />} />
+                <Route path="employees" element={<BakeryEmployees />} />
+                <Route path="blueprints" element={<BakeryBlueprints />} />
+                <Route path="profile" element={<BakeryProfile />} />
+              </Route>
             </Route>
           </Route>
         </Route>

@@ -220,6 +220,116 @@ function diffRates(targetRates = {}, baseRates = {}, targetBook, isScheduled, st
     }
   }
 
+  // 5. Sponge Finish & Size Matrix
+  if (targetRates.sponge && baseRates.sponge) {
+    for (const [finish, sizesObj] of Object.entries(targetRates.sponge)) {
+      const oldSizesObj = baseRates.sponge[finish] || {};
+      if (sizesObj && typeof sizesObj === 'object') {
+        for (const [sizeKey, curr] of Object.entries(sizesObj)) {
+          const old = oldSizesObj[sizeKey];
+          if (curr !== undefined && old !== undefined && curr !== old) {
+            diffs.push({
+              id: `pricing-rate-sponge-${finish}-${sizeKey}`,
+              rawId: targetBook._id,
+              category: 'pricing',
+              name: `Sponge (${finish} · ${sizeKey})`,
+              thumbnail: null,
+              priceMinor: Number(curr) * 100,
+              sectionName: 'Sponge Base Rates',
+              pendingAction: isScheduled ? 'scheduled' : 'update',
+              effectiveAt,
+              summary: `Rate changed from ₱${old} to ₱${curr} (${curr > old ? '+' : ''}₱${curr - old}) (${statusLabel})`,
+              hasOriginal: true,
+              rateCategory: 'sponge',
+              rateKey: `${finish}.${sizeKey}`,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  // 6. Two-Tier Rates
+  if (targetRates.twoTier && baseRates.twoTier) {
+    for (const [finish, curr] of Object.entries(targetRates.twoTier)) {
+      const old = baseRates.twoTier[finish];
+      if (curr !== undefined && old !== undefined && curr !== old) {
+        diffs.push({
+          id: `pricing-rate-twoTier-${finish}`,
+          rawId: targetBook._id,
+          category: 'pricing',
+          name: `Two-Tier (${finish})`,
+          thumbnail: null,
+          priceMinor: Number(curr) * 100,
+          sectionName: 'Two-Tier Rates',
+          pendingAction: isScheduled ? 'scheduled' : 'update',
+          effectiveAt,
+          summary: `Rate changed from ₱${old} to ₱${curr} (${curr > old ? '+' : ''}₱${curr - old}) (${statusLabel})`,
+          hasOriginal: true,
+          rateCategory: 'twoTier',
+          rateKey: finish,
+        });
+      }
+    }
+  }
+
+  // 7. Glaze Per Tier
+  if (
+    targetRates.glazePerTier !== undefined &&
+    baseRates.glazePerTier !== undefined &&
+    targetRates.glazePerTier !== baseRates.glazePerTier
+  ) {
+    const curr = targetRates.glazePerTier;
+    const old = baseRates.glazePerTier;
+    diffs.push({
+      id: 'pricing-rate-glazePerTier',
+      rawId: targetBook._id,
+      category: 'pricing',
+      name: 'Glaze (Per Tier)',
+      thumbnail: null,
+      priceMinor: Number(curr) * 100,
+      sectionName: 'Surface & Glaze',
+      pendingAction: isScheduled ? 'scheduled' : 'update',
+      effectiveAt,
+      summary: `Rate changed from ₱${old} to ₱${curr} (${curr > old ? '+' : ''}₱${curr - old}) (${statusLabel})`,
+      hasOriginal: true,
+      rateCategory: 'glazePerTier',
+      rateKey: 'glazePerTier',
+    });
+  }
+
+  // 8. Drip, Side, SideEdge, Edge
+  const flatRateGroups = [
+    { key: 'drip', label: 'Drip', section: 'Drip Styles' },
+    { key: 'side', label: 'Side Pattern', section: 'Side Patterns' },
+    { key: 'sideEdge', label: 'Quantity Rate', section: 'Side & Edge Quantity' },
+    { key: 'edge', label: 'Edge Border', section: 'Edge Borders' },
+  ];
+  for (const grp of flatRateGroups) {
+    if (targetRates[grp.key] && baseRates[grp.key]) {
+      for (const [k, curr] of Object.entries(targetRates[grp.key])) {
+        const old = baseRates[grp.key][k];
+        if (curr !== undefined && old !== undefined && curr !== old) {
+          diffs.push({
+            id: `pricing-rate-${grp.key}-${k}`,
+            rawId: targetBook._id,
+            category: 'pricing',
+            name: `${grp.label} (${k})`,
+            thumbnail: null,
+            priceMinor: Number(curr) * 100,
+            sectionName: grp.section,
+            pendingAction: isScheduled ? 'scheduled' : 'update',
+            effectiveAt,
+            summary: `Rate changed from ₱${old} to ₱${curr} (${curr > old ? '+' : ''}₱${curr - old}) (${statusLabel})`,
+            hasOriginal: true,
+            rateCategory: grp.key,
+            rateKey: k,
+          });
+        }
+      }
+    }
+  }
+
   // Fallback for general rates difference
   if (diffs.length === 0 && JSON.stringify(targetRates) !== JSON.stringify(baseRates)) {
     diffs.push({
@@ -415,13 +525,15 @@ async function processScheduledMaintenance(platformId = null) {
       ],
     });
 
-    const scheduledPricing = await PriceBook.findOne({
+    const pendingPricing = await PriceBook.findOne({
       platform: plat._id,
-      status: 'scheduled',
-      effectiveAt: { $lte: now },
-    });
+      $or: [
+        { status: 'scheduled', effectiveAt: { $lte: now } },
+        { status: 'draft' },
+      ],
+    }).sort({ version: -1 });
 
-    if (pendingTemplates.length === 0 && !scheduledPricing) {
+    if (pendingTemplates.length === 0 && !pendingPricing) {
       if (plat.maintenanceMode?.isWebsiteOff) {
         plat.maintenanceMode.isWebsiteOff = false;
         plat.maintenanceMode.lastCompletedAt = now;
@@ -469,16 +581,16 @@ async function processScheduledMaintenance(platformId = null) {
     }
 
     // Step 3: Apply Pricing changes
-    if (scheduledPricing) {
-      scheduledPricing.status = 'active';
-      scheduledPricing.effectiveAt = now;
-      await scheduledPricing.save();
+    if (pendingPricing) {
+      pendingPricing.status = 'active';
+      pendingPricing.effectiveAt = now;
+      await pendingPricing.save();
 
       await PriceBook.updateMany(
         {
           platform: plat._id,
-          _id: { $ne: scheduledPricing._id },
-          status: { $in: ['active', 'scheduled'] },
+          _id: { $ne: pendingPricing._id },
+          status: { $in: ['active', 'scheduled', 'draft'] },
         },
         { $set: { status: 'archived' } }
       );
@@ -487,8 +599,8 @@ async function processScheduledMaintenance(platformId = null) {
         platformId: plat._id,
         type: 'pricing',
         action: 'publish',
-        title: `Pricing Book v${scheduledPricing.version} Activated`,
-        description: scheduledPricing.publicationReason || 'Committed at 10:00 PM scheduled update.',
+        title: `Pricing Book v${pendingPricing.version} Activated`,
+        description: pendingPricing.publicationReason || 'Committed at 10:00 PM scheduled update.',
         changedByName: 'Automated 10 PM Worker',
       });
     }

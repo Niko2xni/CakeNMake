@@ -95,7 +95,10 @@ export default function BakeryTemplates() {
         views: cleanedViews,
         thumbnail: updatedThumbnail,
       });
-      showNotification('Showcase pictures and background updated successfully!');
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('bakery-drafts-changed'));
+      }
+      showNotification('Showcase pictures saved as draft for 10:00 PM activation!');
       setViewTemplateModal(null);
       setStudioTargetTemplate(null);
       await fetchTemplatesData();
@@ -240,7 +243,10 @@ export default function BakeryTemplates() {
         sectionId: editTemplateModal.sectionId,
         priceMinor: Number(editTemplateModal.priceMinor) || 0,
       });
-      showNotification('Template updated successfully!');
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('bakery-drafts-changed'));
+      }
+      showNotification('Template changes saved as draft for 10:00 PM activation!');
       setEditTemplateModal({ open: false, template: null, name: '', description: '', longDescription: '', sectionId: '', priceMinor: 0 });
       await fetchTemplatesData();
     } catch (err) {
@@ -447,6 +453,12 @@ export default function BakeryTemplates() {
                               {viewsCount > 0 && (
                                 <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/65 backdrop-blur-xs text-[10px] font-bold text-white flex items-center gap-1">
                                   <Images className="w-3 h-3" /> {viewsCount} Angles
+                                </span>
+                              )}
+
+                              {tpl.pendingAction && tpl.pendingAction !== 'none' && (
+                                <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-amber-500/95 backdrop-blur-xs text-[10px] font-bold text-white flex items-center gap-1 shadow-xs">
+                                  <Clock className="w-3 h-3" /> Draft · 10 PM
                                 </span>
                               )}
 

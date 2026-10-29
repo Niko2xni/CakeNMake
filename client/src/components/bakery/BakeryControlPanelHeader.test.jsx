@@ -249,6 +249,27 @@ describe('BakeryControlPanelHeader & ClientUpdateAdvanceWarning', () => {
 
     fireEvent.click(screen.getByText('Minimize'));
     expect(handleMinimize).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem('cakenmake_control_panel_visible')).toBe('false');
+  });
+
+  it('minimizes and persists to localStorage across the whole website when minimize is clicked', async () => {
+    localStorage.setItem('cakenmake_control_panel_visible', 'true');
+    systemApi.getStatus.mockResolvedValue({ isWebsiteOff: false, statusText: 'Website On' });
+    systemApi.getUnifiedDrafts.mockResolvedValue({ totalCount: 0, drafts: [] });
+    systemApi.getDailyLog.mockResolvedValue({ logs: [] });
+
+    render(
+      <BrowserRouter>
+        <BakeryControlPanelHeader />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Minimize')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Minimize'));
+    expect(localStorage.getItem('cakenmake_control_panel_visible')).toBe('false');
   });
 
   it('hides website toggle and blocks pricing draft modifications for bakery_staff while allowing template draft removal', async () => {

@@ -138,17 +138,6 @@ async function updateDraftItem(req, res) {
     entry.markupMinor = markupMinor;
     await draft.save();
 
-    // Also sync to active pricebook so it bypasses timer and is inserted live now
-    const active = await getActivePriceBook(req.platformId);
-    if (active) {
-      const activeEntry = active.items.find((c) => c.componentKey === req.params.componentKey);
-      if (activeEntry) {
-        activeEntry.costBasisMinor = costBasisMinor;
-        activeEntry.markupMinor = markupMinor;
-        await active.save();
-      }
-    }
-
     const { recordAuditLog } = require('../services/maintenanceService');
     await recordAuditLog({
       platformId: req.platformId,
@@ -329,17 +318,22 @@ async function updateDraftRates(req, res) {
     if (!rates || typeof rates !== 'object') {
       return res.status(400).json({ message: 'Rates object is required.' });
     }
-    // Update active book directly so pricing edits bypass timer and are live now
-    const active = await getActivePriceBook(req.platformId);
-    if (active) {
-      active.rates = rates;
-      active.markModified('rates');
-      await active.save();
-    }
     const draft = await getOrCreateDraft(req.platformId, req.user._id);
     draft.rates = rates;
     draft.markModified('rates');
     await draft.save();
+
+    const { recordAuditLog } = require('../services/maintenanceService');
+    await recordAuditLog({
+      platformId: req.platformId,
+      type: 'pricing',
+      action: 'update',
+      title: `Pricing Draft v${draft.version} Rates Saved`,
+      description: 'Updated pricing rates staged in draft for 10:00 PM auto-activation.',
+      changedBy: req.user?._id,
+      changedByName: req.user?.displayName || req.user?.email || 'Bakery Admin',
+    });
+
     res.json(draft);
   } catch (error) {
     res.status(500).json({ message: 'Failed to update pricing draft rates', error: error.message });

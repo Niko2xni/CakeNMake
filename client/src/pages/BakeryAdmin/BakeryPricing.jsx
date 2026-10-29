@@ -27,6 +27,7 @@ import {
   History,
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
+import { useBakeryControlPanel } from '@/context/BakeryControlPanelContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import CustomScrollbar from '@/components/shared/CustomScrollbar';
 import { pricingApi } from '@/services/api';
@@ -439,6 +440,7 @@ export default function BakeryPricing() {
   }, []);
 
   const { account } = useAuth();
+  const { openControlPanel } = useBakeryControlPanel();
   const canEditPricing = account?.role === 'bakery_admin' || account?.role === 'platform_admin';
 
   const activeRates = workspace?.active?.rates || DEFAULT_RATES;
@@ -470,8 +472,31 @@ export default function BakeryPricing() {
       const updatedDraft = await pricingApi.updateDraftRates(updatedRates);
       setDraft(updatedDraft);
       setWorkspace((current) => ({ ...current, draft: updatedDraft }));
+      try {
+        window.dispatchEvent(new CustomEvent('bakery-drafts-changed'));
+      } catch {}
     } catch (err) {
       setError(err.message || 'Failed to save updated rates.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveDraftToReview() {
+    setSaving(true);
+    setError('');
+    try {
+      await ensureDraft();
+      const updatedDraft = await pricingApi.updateDraftRates(rates);
+      setDraft(updatedDraft);
+      setWorkspace((current) => ({ ...current, draft: updatedDraft }));
+      if (openControlPanel) openControlPanel();
+      try {
+        window.dispatchEvent(new CustomEvent('bakery-drafts-changed'));
+        window.dispatchEvent(new CustomEvent('bakery-open-review-drafts'));
+      } catch {}
+    } catch (err) {
+      setError(err.message || 'Failed to save pricing draft.');
     } finally {
       setSaving(false);
     }
@@ -588,6 +613,9 @@ export default function BakeryPricing() {
       try {
         await pricingApi.discardDraft();
         await load();
+        try {
+          window.dispatchEvent(new CustomEvent('bakery-drafts-changed'));
+        } catch {}
       } catch (discardError) {
         setError(discardError.message || 'Could not discard draft.');
       }
@@ -743,7 +771,6 @@ export default function BakeryPricing() {
             </button>
           ) : (
             <div className="flex items-center gap-2">
-
               <button
                 type="button"
                 onClick={discard}
@@ -752,6 +779,17 @@ export default function BakeryPricing() {
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 Discard
+              </button>
+
+              <button
+                type="button"
+                disabled={!hasChanges || saving || publishing}
+                onClick={saveDraftToReview}
+                title={!hasChanges ? 'No changes made to the pricing draft' : 'Save pricing draft and review in Drafted Edits'}
+                className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-white shadow-md shadow-primary/20 hover:bg-primary/90 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:bg-primary"
+              >
+                <Check className="h-3.5 w-3.5" />
+                {saving ? 'Saving…' : 'Save Draft'}
               </button>
             </div>
           )}

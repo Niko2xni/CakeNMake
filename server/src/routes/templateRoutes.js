@@ -53,13 +53,39 @@ router.get('/public', async (req, res) => {
     const now = new Date();
     const sections = await TemplateSection.find().sort({ order: 1, createdAt: 1 }).lean();
     // Only return templates that are published and whose scheduled 10 PM effective time has arrived (or was already live)
-    const templates = await Template.find({
+    const rawTemplates = await Template.find({
       isPublished: true,
+      pendingAction: { $ne: 'create' },
       $or: [
         { effectiveAt: null },
         { effectiveAt: { $lte: now } },
+        { pendingAction: { $in: ['update', 'delete'] } },
       ],
     }).sort({ order: 1, createdAt: 1 }).lean();
+
+    const templates = rawTemplates
+      .filter((t) => {
+        if (t.pendingAction === 'create') return false;
+        if (t.isPublished === false) return false;
+        if (t.effectiveAt && new Date(t.effectiveAt) > now && !t.draftOriginalState) {
+          return false;
+        }
+        return true;
+      })
+      .map((t) => {
+        if (
+          (t.pendingAction === 'update' || t.pendingAction === 'delete') &&
+          t.draftOriginalState &&
+          (!t.effectiveAt || new Date(t.effectiveAt) > now)
+        ) {
+          return {
+            ...t,
+            ...t.draftOriginalState,
+            _id: t._id,
+          };
+        }
+        return t;
+      });
 
     const sectionsWithTemplates = sections.map((section) => ({
       ...section,
@@ -439,7 +465,7 @@ router.post('/', authenticate, loadAppUser, requireRole('bakery_staff', 'bakery_
       thumbnail: defaultThumb,
       config: config || {},
       order: nextOrder,
-      isPublished: true,
+      isPublished: false,
       pendingAction: 'create',
       draftOriginalState: null,
       effectiveAt: nextManilaTenPm(),
@@ -449,11 +475,11 @@ router.post('/', authenticate, loadAppUser, requireRole('bakery_staff', 'bakery_
     await recordAuditLog({
       type: 'template',
       action: 'create',
-      title: `Template Created: "${template.name}"`,
-      description: `Created and published live in section "${targetSectionId}"`,
+      title: `Draft Template Created: "${template.name}"`,
+      description: `Staged as draft for 10:00 PM auto-activation in section "${targetSectionId}"`,
       changedBy: req.user?._id,
       changedByName: req.user?.displayName || req.user?.email || 'Bakery Staff',
-      scheduledEffectiveAt: null,
+      scheduledEffectiveAt: template.effectiveAt,
     });
 
     return res.status(201).json(template);
@@ -515,8 +541,12 @@ router.put('/:id', authenticate, loadAppUser, requireRole('bakery_staff', 'baker
     if (order !== undefined) existing.order = Number(order);
     if (isPublished !== undefined) existing.isPublished = Boolean(isPublished);
 
-    if (existing.pendingAction !== 'create') { existing.pendingAction = 'update'; existing.draftOriginalState = draftOriginalState; }
-    // Retained draftOriginalState from above
+    if (existing.pendingAction === 'create') {
+      existing.isPublished = false;
+    } else {
+      existing.pendingAction = 'update';
+      existing.draftOriginalState = draftOriginalState;
+    }
     existing.effectiveAt = nextManilaTenPm();
 
     await existing.save();
@@ -525,11 +555,11 @@ router.put('/:id', authenticate, loadAppUser, requireRole('bakery_staff', 'baker
     await recordAuditLog({
       type: 'template',
       action: 'update',
-      title: `Template Updated: "${existing.name}"`,
-      description: 'Changes applied immediately live.',
+      title: `Draft Template Updated: "${existing.name}"`,
+      description: 'Changes staged as draft for 10:00 PM auto-activation.',
       changedBy: req.user?._id,
       changedByName: req.user?.displayName || req.user?.email || 'Bakery Staff',
-      scheduledEffectiveAt: null,
+      scheduledEffectiveAt: existing.effectiveAt,
     });
 
     return res.json(existing);
