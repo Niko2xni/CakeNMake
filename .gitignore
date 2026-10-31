@@ -22,8 +22,6 @@ build/
 server/.env
 !.env.example
 !**/.env.example
-connect to cloudinary
-cloudinary credentials
 
 # Debug & Execution Logs
 *.log
@@ -36,24 +34,8 @@ pnpm-debug.log*
 
 # Scratch Notes & Temporary Specs
 *.tmp
-(.temp
-implementation_plan.md
-problem with white screen bug.md
-victorial-style-lambeth-piping.html
-DRAG_AND_DROP_DECORATIONS_RESEARCH.md
-EXTERIOR_FINISH_*.md
-SPONGE_*.md
-SUGAR_COLOR_FILES.md 
-REDESIGN_SUMMARY.md
-github_cleanup_plan.md
-fix_text_not_appearing_plan.md
-ball_overlap_fix_plan.md
-.kiro/
-AI_HANDOFF_NOTE.md
-ARCHITECTURE_ALIGNMENT.md
-CHANGES_BY_NIKOLAI.md
-Changes.txt
-CLEANUP_COMPLETED.md
+*.temp
+docs/archive/
 
 # IDE & System Files
 .vscode/*
@@ -62,4 +44,3 @@ CLEANUP_COMPLETED.md
 .DS_Store
 Thumbs.db
 *.suo
-PROJECT_OVERVIEW.md
